@@ -1,0 +1,129 @@
+import { useEffect, useRef } from 'react';
+import { uid, useLoom } from '../../store';
+import { PALETTE } from '../../types';
+
+function AutoTextarea({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const autoSize = () => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  };
+  useEffect(autoSize, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={2}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+export default function OutlineGrid() {
+  const columns = useLoom((s) => s.project.outlineColumns);
+  const rows = useLoom((s) => s.project.outlineRows);
+  const {
+    addOutlineRow, updateOutlineRow, setOutlineCell, removeOutlineRow, moveOutlineRow,
+    addOutlineColumn, updateOutlineColumn, removeOutlineColumn,
+  } = useLoom();
+
+  const addColumn = () => {
+    const title = prompt('新剧情线名称(例如:伏笔、感情线、某配角的暗线)');
+    if (!title) return;
+    addOutlineColumn({ id: uid(), title, color: PALETTE[columns.length % PALETTE.length] });
+  };
+
+  return (
+    <div className="pane-col">
+      <div className="toolbar">
+        <button className="primary" onClick={() => addOutlineRow()}>＋ 新章节(行)</button>
+        <button onClick={addColumn}>＋ 新剧情线(列)</button>
+        <span className="hint">
+          罗琳式大纲:每行一章,每列一条剧情线——逐格检查每条线在每一章的进展
+        </span>
+      </div>
+
+      <div className="outline-wrap">
+        <table className="outline-table">
+          <thead>
+            <tr>
+              <th style={{ width: 90 }}></th>
+              <th className="col-narrow">章节</th>
+              <th className="col-narrow">时间</th>
+              <th style={{ minWidth: 140 }}>章节标题</th>
+              <th style={{ minWidth: 220 }}>主线剧情</th>
+              {columns.map((c) => (
+                <th key={c.id} style={{ minWidth: 180 }}>
+                  <div className="col-head">
+                    <span className="col-strip" style={{ background: c.color }} />
+                    <input
+                      value={c.title}
+                      onChange={(e) => updateOutlineColumn(c.id, { title: e.target.value })}
+                    />
+                    <button
+                      className="ghost icon-btn"
+                      title="删除该剧情线"
+                      onClick={() => {
+                        if (confirm(`删除剧情线「${c.title}」及其所有单元格内容?`)) removeOutlineColumn(c.id);
+                      }}
+                    >×</button>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id}>
+                <td className="row-tools">
+                  <button className="ghost icon-btn" title="上移" disabled={i === 0} onClick={() => moveOutlineRow(r.id, -1)}>↑</button>
+                  <button className="ghost icon-btn" title="下移" disabled={i === rows.length - 1} onClick={() => moveOutlineRow(r.id, 1)}>↓</button>
+                  <button className="ghost icon-btn" title="在下方插入行" onClick={() => addOutlineRow(r.id)}>＋</button>
+                  <button
+                    className="ghost icon-btn" title="删除行"
+                    onClick={() => { if (confirm(`删除第 ${r.no || i + 1} 行?`)) removeOutlineRow(r.id); }}
+                  >×</button>
+                </td>
+                <td className="col-narrow">
+                  <input value={r.no} onChange={(e) => updateOutlineRow(r.id, { no: e.target.value })} />
+                </td>
+                <td className="col-narrow">
+                  <input value={r.time} onChange={(e) => updateOutlineRow(r.id, { time: e.target.value })} />
+                </td>
+                <td>
+                  <AutoTextarea value={r.title} onChange={(v) => updateOutlineRow(r.id, { title: v })} placeholder="章节标题" />
+                </td>
+                <td className="plot-cell">
+                  <AutoTextarea value={r.main} onChange={(v) => updateOutlineRow(r.id, { main: v })} placeholder="这一章主线上发生了什么" />
+                </td>
+                {columns.map((c) => (
+                  <td key={c.id} className="plot-cell" style={{ borderTop: `1px solid ${c.color}22` }}>
+                    <AutoTextarea
+                      value={r.cells[c.id] ?? ''}
+                      onChange={(v) => setOutlineCell(r.id, c.id, v)}
+                      placeholder="—"
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <div className="empty-hint">
+            还没有章节。点击「＋ 新章节」开始搭建大纲。<br />
+            建议先建好几条剧情线(列),再逐章填格子——空格也是信息:说明这条线在这一章沉默。
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
