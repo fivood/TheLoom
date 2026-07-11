@@ -257,6 +257,32 @@ textarea { resize: vertical; }
   --xy-edge-label-color: var(--text-dim);
 }
 
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.breadcrumbs .crumb-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.breadcrumbs .crumb { padding: 3px 8px; font-size: 13px; }
+.breadcrumbs .crumb.current { color: var(--accent); font-weight: 600; }
+.breadcrumbs .crumb-sep { color: var(--text-faint); font-size: 11px; }
+.breadcrumbs .hint { color: var(--text-faint); font-size: 12px; margin-left: auto; }
+
+.flow-node .sub-badge {
+  margin-top: 6px;
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 /* ---------- 头脑风暴便签 ---------- */
 
 .sticky-note {

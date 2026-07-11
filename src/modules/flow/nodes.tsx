@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import type { FlowNodeData, FlowNodeType } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import { useLoom } from '../../store';
+import { countSubNodes } from '../../util';
 
 export const TYPE_COLORS: Record<FlowNodeType, string> = {
   dialogue: '#5b8dee',
@@ -51,9 +52,17 @@ export function DialogueNode(props: NodeProps<LoomNode>) {
 }
 
 export function FragmentNode(props: NodeProps<LoomNode>) {
+  const count = countSubNodes(props.data.sub);
   return (
     <BaseNode {...props}>
-      {props.data.text && <div className="node-body">{props.data.text}</div>}
+      {(props.data.text || count > 0) && (
+        <div className="node-body">
+          {props.data.text}
+          {count > 0 && (
+            <div className="sub-badge" title="双击进入子流程">▦ 子流程 · {count} 个节点</div>
+          )}
+        </div>
+      )}
     </BaseNode>
   );
 }

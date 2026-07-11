@@ -49,11 +49,19 @@ export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   jump: '跳转',
 };
 
+/** 子流程:剧情片段节点内部的画布,可无限嵌套 */
+export interface SubFlow {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
 export interface FlowNodeData {
   title: string;
   text: string;
   speakerId?: ID;
   color?: string;
+  /** 仅剧情片段节点:内部子流程 */
+  sub?: SubFlow;
   [key: string]: unknown;
 }
 
