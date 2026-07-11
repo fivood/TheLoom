@@ -113,6 +113,29 @@ export interface OutlineRow {
   cells: Record<ID, string>; // 各剧情线单元格
 }
 
+/* ---------- 时间线(轨道 × 时间点) ---------- */
+
+export interface TimelineTrack {
+  id: ID;
+  name: string;
+  color: string;
+}
+
+export interface TimelinePoint {
+  id: ID;
+  label: string; // 故事时间:可以是"雨夜""三年前""第7日"等任意写法
+}
+
+export interface TimelineEvent {
+  id: ID;
+  trackId: ID;
+  pointId: ID;
+  title: string;
+  text: string;
+  color?: string;
+  entityIds: ID[]; // 关联的实体
+}
+
 /* ---------- 资料卡片 ---------- */
 
 export interface ResearchCard {
@@ -150,6 +173,9 @@ export interface Project {
   brainstormEdges: BrainEdge[];
   outlineColumns: OutlineColumn[];
   outlineRows: OutlineRow[];
+  timelineTracks: TimelineTrack[];
+  timelinePoints: TimelinePoint[];
+  timelineEvents: TimelineEvent[];
   researchCards: ResearchCard[];
   researchCategories: string[];
   variables: Variable[];

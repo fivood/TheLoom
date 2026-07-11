@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import type {
-  BrainEdge, BrainNote, Entity, Flow, FlowEdge, FlowNode,
+  BrainEdge, BrainNote, Entity, Flow,
   OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
 } from './types';
+import { normalizeProject, uid } from './util';
+import { getSavedFolder, isTauri, saveToFolder } from './storage';
 
-export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+export { uid, normalizeProject };
 
 const STORAGE_KEY = 'theloom-project-v1';
 
@@ -16,6 +18,8 @@ function seedProject(): Project {
   const colForeshadow = uid();
   const colRomance = uid();
   const colSide = uid();
+  const trackMain = uid(), trackMentor = uid();
+  const pt1 = uid(), pt2 = uid(), pt3 = uid();
 
   const n1 = uid(), n2 = uid(), n3 = uid(), n4 = uid(), n5 = uid(), n6 = uid();
 
@@ -113,6 +117,37 @@ function seedProject(): Project {
         },
       },
     ],
+    timelineTracks: [
+      { id: trackMain, name: '主线 · 林晚', color: '#5b8dee' },
+      { id: trackMentor, name: '暗线 · 守店人', color: '#9d6ae8' },
+    ],
+    timelinePoints: [
+      { id: pt1, label: '二十年前' },
+      { id: pt2, label: '雨夜' },
+      { id: pt3, label: '次日清晨' },
+    ],
+    timelineEvents: [
+      {
+        id: uid(), trackId: trackMentor, pointId: pt1,
+        title: '守店人被书选中', text: '当年的守店人也曾接过一本会翻页的书,从此困在书店。',
+        entityIds: [mentorId],
+      },
+      {
+        id: uid(), trackId: trackMain, pointId: pt2,
+        title: '林晚进入书店', text: '躲雨,遇见会翻页的书。',
+        entityIds: [heroId],
+      },
+      {
+        id: uid(), trackId: trackMentor, pointId: pt2,
+        title: '守店人认出预兆', text: '书自己翻页 = 织机在挑选新的看守者。他沉默未言。',
+        entityIds: [mentorId],
+      },
+      {
+        id: uid(), trackId: trackMain, pointId: pt3,
+        title: '踏入织机', text: '林晚接过书,看见交织的故事线。',
+        entityIds: [heroId],
+      },
+    ],
     researchCards: [
       {
         id: uid(), title: '织机的结构', content: '经线 = 时间,纬线 = 人物。断线意味着故事夭折。修补需要"读者的记忆"作为丝线。',
@@ -141,7 +176,7 @@ function loadProject(): Project {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const p = JSON.parse(raw) as Project;
-      if (p && p.version === 1) return p;
+      if (p && p.version === 1) return normalizeProject(p);
     }
   } catch { /* 损坏则重建 */ }
   return seedProject();
@@ -152,6 +187,10 @@ function loadProject(): Project {
 interface LoomState {
   project: Project;
   savedAt: number;
+  /** Tauri 模式下的项目文件夹路径;null = 仅存浏览器 */
+  folder: string | null;
+  syncError: string | null;
+  setFolder: (dir: string | null) => void;
   update: (fn: (p: Project) => void) => void;
   replaceProject: (p: Project) => void;
   resetProject: () => void;
@@ -184,18 +223,24 @@ interface LoomState {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-function persist(p: Project) {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
-    } catch (e) {
-      console.error('保存失败', e);
-    }
-  }, 400);
-}
-
 export const useLoom = create<LoomState>((set, get) => {
+  const persist = (p: Project) => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+      } catch (e) {
+        console.error('保存失败', e);
+      }
+      const folder = get().folder;
+      if (folder && isTauri) {
+        saveToFolder(folder, p)
+          .then(() => set({ syncError: null }))
+          .catch((e) => set({ syncError: String(e) }));
+      }
+    }, 400);
+  };
+
   const commit = (fn: (p: Project) => void) => {
     const next = structuredClone(get().project);
     fn(next);
@@ -207,6 +252,9 @@ export const useLoom = create<LoomState>((set, get) => {
   return {
     project: loadProject(),
     savedAt: Date.now(),
+    folder: isTauri ? getSavedFolder() : null,
+    syncError: null,
+    setFolder: (dir) => set({ folder: dir, syncError: null }),
 
     update: commit,
     replaceProject: (p) => { persist(p); set({ project: p, savedAt: Date.now() }); },
@@ -310,7 +358,7 @@ export function importProject(file: File): Promise<Project> {
       try {
         const p = JSON.parse(String(reader.result)) as Project;
         if (!p || p.version !== 1 || !Array.isArray(p.flows)) throw new Error('文件格式不正确');
-        resolve(p);
+        resolve(normalizeProject(p));
       } catch (e) {
         reject(e);
       }
