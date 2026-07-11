@@ -411,6 +411,97 @@ textarea { resize: vertical; }
 .var-table input:hover, .var-table select:hover { border-color: var(--border); }
 .var-table input:focus, .var-table select:focus { border-color: var(--accent); background: var(--bg); }
 
+/* ---------- 演出模式 ---------- */
+
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 11, 15, 0.92);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.player-head {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.player-title { font-weight: 700; font-size: 15px; }
+.player-body { flex: 1; display: flex; min-height: 0; justify-content: center; }
+.player-log {
+  flex: 1;
+  max-width: 720px;
+  overflow-y: auto;
+  padding: 30px 30px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.beat { animation: beat-in 0.25s ease; }
+@keyframes beat-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.beat-speaker { font-weight: 700; margin-bottom: 4px; }
+.beat-text { font-size: 15px; line-height: 1.8; white-space: pre-wrap; }
+.beat-text.dim { color: var(--text-dim); font-size: 13px; }
+.beat-meta { font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+.beat-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-family: Consolas, monospace;
+}
+.beat-dialogue {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.beat-end { text-align: center; color: var(--text-faint); padding: 20px 0; }
+.player-choices { display: flex; flex-direction: column; gap: 8px; padding: 8px 0 20px; }
+.player-choices .choice {
+  text-align: left;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 14px;
+}
+.player-choices .choice:hover { background: var(--accent); color: #fff; }
+.player-choices .choice.single {
+  border-color: var(--border-light);
+  background: var(--bg-raised);
+  color: var(--text);
+  text-align: center;
+}
+.player-vars {
+  width: 240px;
+  border-left: 1px solid var(--border);
+  padding: 20px 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.player-vars h3 { margin: 0 0 12px; font-size: 13px; color: var(--text-dim); }
+.var-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.var-name { font-family: Consolas, monospace; color: var(--text-dim); }
+.var-val { font-family: Consolas, monospace; }
+.var-val.on { color: #5fbf6e; }
+.var-val.off { color: var(--text-faint); }
+.player-tip { margin-top: 16px; font-size: 12px; color: var(--text-faint); line-height: 1.8; }
+
 /* ---------- 时间线 ---------- */
 
 .timeline-wrap { flex: 1; overflow: auto; padding: 14px; }

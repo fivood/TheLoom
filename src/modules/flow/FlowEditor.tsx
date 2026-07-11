@@ -9,6 +9,7 @@ import { countSubNodes, resolveSub } from '../../util';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL, PALETTE } from '../../types';
 import { nodeTypes, TYPE_COLORS } from './nodes';
+import Player from './Player';
 
 type LoomNode = Node<FlowNodeData>;
 
@@ -29,6 +30,7 @@ function Canvas({ flow, path, navigate, crumbs }: {
 }) {
   const updateFlow = useLoom((s) => s.updateFlow);
   const entities = useLoom((s) => s.project.entities);
+  const [playing, setPlaying] = useState(false);
   const sub = resolveSub(flow, path) ?? { nodes: [], edges: [] };
   const [nodes, setNodes] = useState<LoomNode[]>(() =>
     sub.nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
@@ -130,6 +132,11 @@ function Canvas({ flow, path, navigate, crumbs }: {
               <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
             </button>
           ))}
+          <button
+            className="primary"
+            title="从选中节点(或本层起点)开始播放流程"
+            onClick={() => { writeBack(); setPlaying(true); }}
+          >▶ 演出</button>
           <span className="hint">双击剧情片段进入子流程 · Delete 删除选中</span>
         </div>
         {crumbs.length > 1 && (
@@ -176,6 +183,15 @@ function Canvas({ flow, path, navigate, crumbs }: {
           </ReactFlow>
         </div>
       </div>
+
+      {playing && (
+        <Player
+          flow={useLoom.getState().project.flows.find((f) => f.id === flow.id) ?? flow}
+          path={path}
+          startNodeId={selectedNode?.id}
+          onClose={() => setPlaying(false)}
+        />
+      )}
 
       <aside className="inspector">
         {selectedNode ? (
