@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/store.ts","./src/types.ts","./src/modules/brainstorm/brainstorm.tsx","./src/modules/entities/entitylibrary.tsx","./src/modules/flow/floweditor.tsx","./src/modules/flow/nodes.tsx","./src/modules/outline/outlinegrid.tsx","./src/modules/research/researchcards.tsx","./src/modules/variables/variables.tsx"],"version":"5.9.3"}
