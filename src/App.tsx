@@ -32,7 +32,24 @@ export default function App() {
   const folder = useLoom((s) => s.folder);
   const syncError = useLoom((s) => s.syncError);
   const setFolder = useLoom((s) => s.setFolder);
+  const revision = useLoom((s) => s.revision);
+  const canUndo = useLoom((s) => s.canUndo);
+  const canRedo = useLoom((s) => s.canRedo);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 全局撤销/重做快捷键;焦点在输入框时交给浏览器原生文本撤销
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); useLoom.getState().undo(); }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); useLoom.getState().redo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Tauri 模式:启动时从上次的项目文件夹加载
   useEffect(() => {
@@ -110,6 +127,8 @@ export default function App() {
             onChange={(e) => update((p) => { p.name = e.target.value; })}
             placeholder="项目名称"
           />
+          <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}>↩</button>
+          <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}>↪</button>
           <span className="spacer" />
           {syncError ? (
             <span className="saved-hint" style={{ color: 'var(--danger)' }} title={syncError}>⚠ 同步失败</span>
@@ -147,7 +166,7 @@ export default function App() {
           />
         </header>
 
-        <div className="content">
+        <div className="content" key={revision}>
           {tab === 'flow' && <FlowEditor />}
           {tab === 'entities' && <EntityLibrary />}
           {tab === 'brainstorm' && <Brainstorm />}

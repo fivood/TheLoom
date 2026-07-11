@@ -187,11 +187,17 @@ function loadProject(): Project {
 interface LoomState {
   project: Project;
   savedAt: number;
+  /** 撤销/重做后递增,用于强制画布类组件重新挂载 */
+  revision: number;
+  canUndo: boolean;
+  canRedo: boolean;
   /** Tauri 模式下的项目文件夹路径;null = 仅存浏览器 */
   folder: string | null;
   syncError: string | null;
   setFolder: (dir: string | null) => void;
   update: (fn: (p: Project) => void) => void;
+  undo: () => void;
+  redo: () => void;
   replaceProject: (p: Project) => void;
   resetProject: () => void;
 
@@ -223,6 +229,12 @@ interface LoomState {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+const UNDO_LIMIT = 50;
+const UNDO_COALESCE_MS = 800;
+let undoStack: Project[] = [];
+let redoStack: Project[] = [];
+let lastUndoPush = 0;
+
 export const useLoom = create<LoomState>((set, get) => {
   const persist = (p: Project) => {
     if (saveTimer) clearTimeout(saveTimer);
@@ -242,23 +254,65 @@ export const useLoom = create<LoomState>((set, get) => {
   };
 
   const commit = (fn: (p: Project) => void) => {
-    const next = structuredClone(get().project);
+    const prev = get().project;
+    // 快速连续的编辑(如打字)合并为一步撤销
+    const now = Date.now();
+    if (now - lastUndoPush > UNDO_COALESCE_MS) {
+      undoStack.push(prev);
+      if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+      lastUndoPush = now;
+    }
+    redoStack = [];
+    const next = structuredClone(prev);
     fn(next);
     next.updatedAt = Date.now();
     persist(next);
-    set({ project: next, savedAt: Date.now() });
+    set({ project: next, savedAt: Date.now(), canUndo: true, canRedo: false });
+  };
+
+  /** 整项目替换(撤销/重做/导入/重置)后递增 revision,让画布重新挂载 */
+  const swapProject = (p: Project, extra?: Partial<LoomState>) => {
+    persist(p);
+    set((s) => ({
+      project: p, savedAt: Date.now(), revision: s.revision + 1,
+      canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
+      ...extra,
+    }));
   };
 
   return {
     project: loadProject(),
     savedAt: Date.now(),
+    revision: 0,
+    canUndo: false,
+    canRedo: false,
     folder: isTauri ? getSavedFolder() : null,
     syncError: null,
     setFolder: (dir) => set({ folder: dir, syncError: null }),
 
     update: commit,
-    replaceProject: (p) => { persist(p); set({ project: p, savedAt: Date.now() }); },
-    resetProject: () => { const p = seedProject(); persist(p); set({ project: p, savedAt: Date.now() }); },
+    undo: () => {
+      const prev = undoStack.pop();
+      if (!prev) return;
+      redoStack.push(get().project);
+      lastUndoPush = 0;
+      swapProject(prev);
+    },
+    redo: () => {
+      const next = redoStack.pop();
+      if (!next) return;
+      undoStack.push(get().project);
+      lastUndoPush = 0;
+      swapProject(next);
+    },
+    replaceProject: (p) => {
+      undoStack = []; redoStack = []; lastUndoPush = 0;
+      swapProject(p);
+    },
+    resetProject: () => {
+      undoStack = []; redoStack = []; lastUndoPush = 0;
+      swapProject(seedProject());
+    },
 
     updateFlow: (flowId, fn) => commit((p) => {
       const f = p.flows.find((x) => x.id === flowId);

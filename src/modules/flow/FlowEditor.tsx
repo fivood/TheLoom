@@ -43,9 +43,12 @@ function Canvas({ flow, path, navigate, crumbs }: {
   const dirty = useRef(false);
   const latest = useRef({ nodes, edges });
   latest.current = { nodes, edges };
+  // 撤销/重做会整体替换项目并重挂画布,此时本地状态已过期,禁止回写
+  const mountRevision = useRef(useLoom.getState().revision);
 
   const writeBack = useCallback(() => {
     if (!dirty.current) return;
+    if (useLoom.getState().revision !== mountRevision.current) { dirty.current = false; return; }
     dirty.current = false;
     const { nodes, edges } = latest.current;
     updateFlow(flow.id, (f) => {
