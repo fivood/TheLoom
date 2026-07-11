@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
+import { useNav } from '../../search';
 import type { ResearchCard } from '../../types';
 import { PALETTE } from '../../types';
 
@@ -12,6 +13,17 @@ export default function ResearchCards() {
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const navSeq = useNav((s) => s.seq);
+  useEffect(() => {
+    const t = useNav.getState().target;
+    if (t?.tab === 'research' && t.cardId) {
+      setCatFilter('all');
+      setTagFilter(null);
+      setSelectedId(t.cardId);
+      useNav.getState().clear();
+    }
+  }, [navSeq]);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();

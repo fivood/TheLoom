@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
+import { findEntityRefs, useNav } from '../../search';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 
@@ -15,11 +16,25 @@ export default function EntityLibrary() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
+  // 消费搜索跳转目标
+  const navSeq = useNav((s) => s.seq);
+  useEffect(() => {
+    const t = useNav.getState().target;
+    if (t?.tab === 'entities' && t.entityId) {
+      setKindFilter('all');
+      setSelectedId(t.entityId);
+      useNav.getState().clear();
+    }
+  }, [navSeq]);
+
   const filtered = entities.filter((e) =>
     (kindFilter === 'all' || e.kind === kindFilter) &&
     (!query || e.name.includes(query) || e.summary.includes(query)),
   );
   const selected = entities.find((e) => e.id === selectedId) ?? null;
+
+  const project = useLoom((s) => s.project);
+  const refs = useMemo(() => (selected ? findEntityRefs(project, selected) : []), [project, selected]);
 
   const createEntity = () => {
     const kind = kindFilter === 'all' ? 'character' : kindFilter;
@@ -153,6 +168,20 @@ export default function EntityLibrary() {
             <div className="field">
               <label>备注</label>
               <textarea rows={5} value={selected.notes} onChange={(e) => updateEntity(selected.id, { notes: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>出现于({refs.length})</label>
+              {refs.length === 0 && (
+                <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>
+                  暂无引用——在对白里选它做说话人、<br />在时间线事件里关联它,或在文本中提到它的名字
+                </div>
+              )}
+              {refs.map((r) => (
+                <div key={r.key} className="ref-item" onClick={() => useNav.getState().go(r.nav)} title={r.snippet}>
+                  <span className="palette-kind">{r.module} · {r.kind}</span>
+                  <span className="ref-title">{r.title}</span>
+                </div>
+              ))}
             </div>
             <button
               className="danger"

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { uid, useLoom } from '../../store';
+import { useNav } from '../../search';
 import type { TimelineEvent } from '../../types';
 import { PALETTE } from '../../types';
 
@@ -10,6 +11,15 @@ export default function Timeline() {
   const entities = useLoom((s) => s.project.entities);
   const update = useLoom((s) => s.update);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const navSeq = useNav((s) => s.seq);
+  useEffect(() => {
+    const t = useNav.getState().target;
+    if (t?.tab === 'timeline' && t.eventId) {
+      setSelectedId(t.eventId);
+      useNav.getState().clear();
+    }
+  }, [navSeq]);
 
   const selected = events.find((e) => e.id === selectedId) ?? null;
 

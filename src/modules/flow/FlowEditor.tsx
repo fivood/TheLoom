@@ -5,6 +5,7 @@ import {
   type Node, type Edge, type NodeChange, type EdgeChange, type Connection,
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
+import { useNav } from '../../search';
 import { countSubNodes, resolveSub } from '../../util';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL, PALETTE } from '../../types';
@@ -22,18 +23,22 @@ interface Crumb {
   path: string[];
 }
 
-function Canvas({ flow, path, navigate, crumbs }: {
+function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   flow: Flow;
   path: string[];
   navigate: (path: string[]) => void;
   crumbs: Crumb[];
+  focusNodeId?: string;
 }) {
   const updateFlow = useLoom((s) => s.updateFlow);
   const entities = useLoom((s) => s.project.entities);
   const [playing, setPlaying] = useState(false);
   const sub = resolveSub(flow, path) ?? { nodes: [], edges: [] };
   const [nodes, setNodes] = useState<LoomNode[]>(() =>
-    sub.nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
+    sub.nodes.map((n) => ({
+      id: n.id, type: n.type, position: n.position, data: n.data,
+      selected: n.id === focusNodeId,
+    })),
   );
   const [edges, setEdges] = useState<Edge[]>(() => sub.edges.map((e) => ({ ...e, ...EDGE_STYLE })));
   const { screenToFlowPosition } = useReactFlow();
@@ -177,6 +182,7 @@ function Canvas({ flow, path, navigate, crumbs }: {
             zoomOnDoubleClick={false}
             deleteKeyCode={['Delete', 'Backspace']}
             fitView
+            fitViewOptions={focusNodeId ? { nodes: [{ id: focusNodeId }], maxZoom: 1.1, padding: 2 } : undefined}
             minZoom={0.15}
             proOptions={{ hideAttribution: true }}
           >
@@ -275,6 +281,19 @@ export default function FlowEditor() {
   const update = useLoom((s) => s.update);
   const [activeId, setActiveId] = useState<string | null>(flows[0]?.id ?? null);
   const [path, setPath] = useState<string[]>([]);
+  const [focusNodeId, setFocusNodeId] = useState<string | undefined>();
+
+  // 消费搜索 / 反向引用的跳转目标
+  const navSeq = useNav((s) => s.seq);
+  useEffect(() => {
+    const t = useNav.getState().target;
+    if (t?.tab === 'flow' && t.flowId) {
+      setActiveId(t.flowId);
+      setPath(t.path ?? []);
+      setFocusNodeId(t.nodeId);
+      useNav.getState().clear();
+    }
+  }, [navSeq]);
 
   const active = flows.find((f) => f.id === activeId) ?? flows[0] ?? null;
 
@@ -359,8 +378,8 @@ export default function FlowEditor() {
       </div>
 
       {active ? (
-        <ReactFlowProvider key={`${active.id}/${validPath.join('/')}`}>
-          <Canvas flow={active} path={validPath} navigate={setPath} crumbs={crumbs} />
+        <ReactFlowProvider key={`${active.id}/${validPath.join('/')}/${focusNodeId ?? ''}`}>
+          <Canvas flow={active} path={validPath} navigate={setPath} crumbs={crumbs} focusNodeId={focusNodeId} />
         </ReactFlowProvider>
       ) : (
         <div className="pane-col">

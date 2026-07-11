@@ -3,6 +3,8 @@ import { exportProject, importProject, useLoom } from './store';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
 } from './storage';
+import { useNav } from './search';
+import SearchPalette from './components/SearchPalette';
 import FlowEditor from './modules/flow/FlowEditor';
 import EntityLibrary from './modules/entities/EntityLibrary';
 import Brainstorm from './modules/brainstorm/Brainstorm';
@@ -25,6 +27,14 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('flow');
+  const [searching, setSearching] = useState(false);
+  const navTarget = useNav((s) => s.target);
+  const navSeq = useNav((s) => s.seq);
+
+  // 搜索/反向引用跳转:切到目标模块,细节由模块自行消费
+  useEffect(() => {
+    if (navTarget) setTab(navTarget.tab);
+  }, [navSeq]);
   const project = useLoom((s) => s.project);
   const update = useLoom((s) => s.update);
   const replaceProject = useLoom((s) => s.replaceProject);
@@ -41,9 +51,10 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'k') { e.preventDefault(); setSearching(true); return; }
       const t = e.target as HTMLElement;
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
-      const k = e.key.toLowerCase();
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); useLoom.getState().undo(); }
       else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); useLoom.getState().redo(); }
     };
@@ -127,6 +138,7 @@ export default function App() {
             onChange={(e) => update((p) => { p.name = e.target.value; })}
             placeholder="项目名称"
           />
+          <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}>🔍 搜索</button>
           <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}>↩</button>
           <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}>↪</button>
           <span className="spacer" />
@@ -176,6 +188,8 @@ export default function App() {
           {tab === 'variables' && <Variables />}
         </div>
       </div>
+
+      {searching && <SearchPalette onClose={() => setSearching(false)} />}
     </div>
   );
 }
