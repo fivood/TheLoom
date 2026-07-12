@@ -1,5 +1,8 @@
+use base64::Engine;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+const IMG_EXTS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +17,31 @@ struct ProjectFiles {
     project_json: Option<String>,
     entities: Vec<MdFile>,
     research: Vec<MdFile>,
+    /// assets/ 下的图片,content 为 base64
+    assets: Vec<MdFile>,
+}
+
+fn read_asset_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
+    let mut out = Vec::new();
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let is_img = path
+                .extension()
+                .map(|e| IMG_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x)))
+                .unwrap_or(false);
+            if path.is_file() && is_img {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let bytes = fs::read(&path).map_err(|e| format!("{name}: {e}"))?;
+                out.push(MdFile {
+                    name,
+                    content: base64::engine::general_purpose::STANDARD.encode(bytes),
+                });
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn read_md_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
@@ -48,6 +76,7 @@ fn load_project_dir(dir: String) -> Result<ProjectFiles, String> {
         project_json: fs::read_to_string(base.join("project.json")).ok(),
         entities: read_md_dir(&base.join("entities"))?,
         research: read_md_dir(&base.join("research"))?,
+        assets: read_asset_dir(&base.join("assets"))?,
     })
 }
 
@@ -56,6 +85,9 @@ fn load_project_dir(dir: String) -> Result<ProjectFiles, String> {
 struct WriteSpec {
     rel_path: String,
     content: String,
+    /// true 时 content 为 base64,按二进制写入
+    #[serde(default)]
+    base64: bool,
 }
 
 fn safe_join(base: &Path, rel: &str) -> Result<PathBuf, String> {
@@ -65,7 +97,8 @@ fn safe_join(base: &Path, rel: &str) -> Result<PathBuf, String> {
     Ok(base.join(rel))
 }
 
-/// 写入项目文件夹,并清理 entities/ 与 research/ 下已被删除条目的 .md 文件
+/// 写入项目文件夹,并清理 entities/、research/ 下已删除条目的 .md
+/// 与 assets/ 下已删除的图片
 #[tauri::command]
 fn save_project_dir(
     dir: String,
@@ -80,10 +113,17 @@ fn save_project_dir(
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        fs::write(&path, &f.content).map_err(|e| format!("{}: {e}", f.rel_path))?;
+        if f.base64 {
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(&f.content)
+                .map_err(|e| format!("{}: {e}", f.rel_path))?;
+            fs::write(&path, bytes).map_err(|e| format!("{}: {e}", f.rel_path))?;
+        } else {
+            fs::write(&path, &f.content).map_err(|e| format!("{}: {e}", f.rel_path))?;
+        }
     }
 
-    for sub in ["entities", "research"] {
+    for sub in ["entities", "research", "assets"] {
         let d = base.join(sub);
         if !d.is_dir() {
             continue;
@@ -91,11 +131,17 @@ fn save_project_dir(
         for entry in fs::read_dir(&d).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let is_md = path
+            let managed = path
                 .extension()
-                .map(|e| e.eq_ignore_ascii_case("md"))
+                .map(|e| {
+                    if sub == "assets" {
+                        IMG_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))
+                    } else {
+                        e.eq_ignore_ascii_case("md")
+                    }
+                })
                 .unwrap_or(false);
-            if path.is_file() && is_md {
+            if path.is_file() && managed {
                 let rel = format!("{}/{}", sub, entry.file_name().to_string_lossy());
                 if !keep_md.contains(&rel) {
                     fs::remove_file(&path).map_err(|e| e.to_string())?;
@@ -115,14 +161,16 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("theloom-test-{}", std::process::id()));
         let dir_s = dir.to_string_lossy().to_string();
 
+        let png_b64 = base64::engine::general_purpose::STANDARD.encode([137u8, 80, 78, 71]);
         save_project_dir(
             dir_s.clone(),
             vec![
-                WriteSpec { rel_path: "project.json".into(), content: "{\"version\":1}".into() },
-                WriteSpec { rel_path: "entities/林晚.md".into(), content: "---\nid: e1\n---\n简介".into() },
-                WriteSpec { rel_path: "research/织机.md".into(), content: "---\nid: c1\n---\n正文".into() },
+                WriteSpec { rel_path: "project.json".into(), content: "{\"version\":1}".into(), base64: false },
+                WriteSpec { rel_path: "entities/林晚.md".into(), content: "---\nid: e1\n---\n简介".into(), base64: false },
+                WriteSpec { rel_path: "research/织机.md".into(), content: "---\nid: c1\n---\n正文".into(), base64: false },
+                WriteSpec { rel_path: "assets/entity-e1.png".into(), content: png_b64.clone(), base64: true },
             ],
-            vec!["entities/林晚.md".into(), "research/织机.md".into()],
+            vec!["entities/林晚.md".into(), "research/织机.md".into(), "assets/entity-e1.png".into()],
         )
         .unwrap();
 
@@ -131,22 +179,25 @@ mod tests {
         assert_eq!(loaded.entities.len(), 1);
         assert_eq!(loaded.entities[0].name, "林晚.md");
         assert_eq!(loaded.research.len(), 1);
+        assert_eq!(loaded.assets.len(), 1);
+        assert_eq!(loaded.assets[0].content, png_b64); // 二进制往返一致
 
-        // 实体被删除后,对应 md 应被清理
+        // 实体被删除后,对应 md 与头像图片应被清理
         save_project_dir(
             dir_s.clone(),
-            vec![WriteSpec { rel_path: "project.json".into(), content: "{}".into() }],
+            vec![WriteSpec { rel_path: "project.json".into(), content: "{}".into(), base64: false }],
             vec!["research/织机.md".into()],
         )
         .unwrap();
         let loaded = load_project_dir(dir_s.clone()).unwrap();
         assert_eq!(loaded.entities.len(), 0);
         assert_eq!(loaded.research.len(), 1);
+        assert_eq!(loaded.assets.len(), 0);
 
         // 路径穿越必须被拒绝
         let bad = save_project_dir(
             dir_s.clone(),
-            vec![WriteSpec { rel_path: "../escape.txt".into(), content: "x".into() }],
+            vec![WriteSpec { rel_path: "../escape.txt".into(), content: "x".into(), base64: false }],
             vec![],
         );
         assert!(bad.is_err());

@@ -24,6 +24,8 @@ export interface Entity {
   name: string;
   color: string;
   emoji: string;
+  /** 头像图片 dataURL(128px);文件夹模式下存为 assets/entity-{id}.png */
+  avatar?: string;
   summary: string;
   fields: EntityField[];
   notes: string;
@@ -38,7 +40,8 @@ export type FlowNodeType =
   | 'hub'         // 汇聚点
   | 'condition'   // 条件分支
   | 'instruction' // 指令(设置变量等)
-  | 'jump';       // 跳转
+  | 'jump'        // 跳转
+  | 'exit';       // 出口(子流程 → 父层的命名引脚)
 
 export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   dialogue: '对白',
@@ -47,6 +50,7 @@ export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   condition: '条件分支',
   instruction: '指令',
   jump: '跳转',
+  exit: '出口',
 };
 
 /** 子流程:剧情片段节点内部的画布,可无限嵌套 */

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
+import { fileToAvatar } from '../../util';
 import { findEntityRefs, useNav } from '../../search';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
@@ -35,6 +36,16 @@ export default function EntityLibrary() {
 
   const project = useLoom((s) => s.project);
   const refs = useMemo(() => (selected ? findEntityRefs(project, selected) : []), [project, selected]);
+  const avatarRef = useRef<HTMLInputElement>(null);
+
+  const uploadAvatar = async (file: File) => {
+    if (!selected) return;
+    try {
+      updateEntity(selected.id, { avatar: await fileToAvatar(file) });
+    } catch {
+      alert('无法读取该图片');
+    }
+  };
 
   const createEntity = () => {
     const kind = kindFilter === 'all' ? 'character' : kindFilter;
@@ -81,7 +92,9 @@ export default function EntityLibrary() {
               onClick={() => setSelectedId(e.id)}
             >
               <div className="card-title">
-                <span className="entity-avatar" style={{ background: `${e.color}33` }}>{e.emoji}</span>
+                <span className="entity-avatar" style={{ background: `${e.color}33` }}>
+                  {e.avatar ? <img src={e.avatar} alt="" /> : e.emoji}
+                </span>
                 <span>
                   {e.name}
                   <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 400 }}>{ENTITY_KIND_LABEL[e.kind]}</div>
@@ -106,6 +119,14 @@ export default function EntityLibrary() {
           <>
             <h3>实体属性</h3>
             <div className="kv-row">
+              <span
+                className="entity-avatar avatar-edit"
+                style={{ background: `${selected.color}33` }}
+                title="点击上传头像图片"
+                onClick={() => avatarRef.current?.click()}
+              >
+                {selected.avatar ? <img src={selected.avatar} alt="" /> : selected.emoji}
+              </span>
               <input
                 style={{ width: 56, textAlign: 'center', fontSize: 18 }}
                 value={selected.emoji}
@@ -113,6 +134,23 @@ export default function EntityLibrary() {
                 title="图标(可输入任意 emoji)"
               />
               <input value={selected.name} onChange={(e) => updateEntity(selected.id, { name: e.target.value })} />
+            </div>
+            <div className="kv-row">
+              <button onClick={() => avatarRef.current?.click()}>🖼 上传头像</button>
+              {selected.avatar && (
+                <button className="ghost" onClick={() => updateEntity(selected.id, { avatar: undefined })}>移除头像</button>
+              )}
+              <input
+                ref={avatarRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadAvatar(f);
+                  e.target.value = '';
+                }}
+              />
             </div>
             <div className="field">
               <label>类型</label>

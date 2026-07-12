@@ -10,6 +10,27 @@ export function normalizeProject(p: Project): Project {
   return p;
 }
 
+/** 图片文件 → 128px 方形头像 dataURL(居中裁剪) */
+export function fileToAvatar(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const size = 128;
+      const s = Math.min(img.width, img.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
+    img.src = url;
+  });
+}
+
 /** 递归统计子流程内的节点总数(含所有层级) */
 export function countSubNodes(sub?: SubFlow): number {
   if (!sub) return 0;

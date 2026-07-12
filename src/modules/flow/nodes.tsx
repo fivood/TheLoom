@@ -11,6 +11,7 @@ export const TYPE_COLORS: Record<FlowNodeType, string> = {
   condition: '#e8a23d',
   instruction: '#9d6ae8',
   jump: '#e85d9b',
+  exit: '#d4c437',
 };
 
 type LoomNode = Node<FlowNodeData>;
@@ -42,7 +43,9 @@ export function DialogueNode(props: NodeProps<LoomNode>) {
       <div className="node-body">
         {speaker && (
           <div className="node-speaker" style={{ color: speaker.color }}>
-            {speaker.emoji} {speaker.name}
+            {speaker.avatar
+              ? <img className="speaker-avatar" src={speaker.avatar} alt="" />
+              : speaker.emoji} {speaker.name}
           </div>
         )}
         {props.data.text || <span style={{ opacity: 0.5 }}>(空对白)</span>}
@@ -53,6 +56,7 @@ export function DialogueNode(props: NodeProps<LoomNode>) {
 
 export function FragmentNode(props: NodeProps<LoomNode>) {
   const count = countSubNodes(props.data.sub);
+  const exits = (props.data.sub?.nodes ?? []).filter((n) => n.type === 'exit');
   return (
     <BaseNode {...props}>
       {(props.data.text || count > 0) && (
@@ -63,7 +67,27 @@ export function FragmentNode(props: NodeProps<LoomNode>) {
           )}
         </div>
       )}
+      {exits.length > 0 && (
+        <div className="exit-rows">
+          {exits.map((x) => (
+            <div key={x.id} className="exit-row">
+              <span>{x.data.title || '出口'}</span>
+              <Handle id={`exit:${x.id}`} type="source" position={Position.Right} />
+            </div>
+          ))}
+        </div>
+      )}
     </BaseNode>
+  );
+}
+
+/** 出口节点:子流程通向父层命名引脚的锚点 */
+export function ExitNode({ data, selected }: NodeProps<LoomNode>) {
+  return (
+    <div className={`flow-node exit-node ${selected ? 'selected' : ''}`}>
+      <Handle type="target" position={Position.Left} />
+      <span>⇥ {data.title || '出口'}</span>
+    </div>
   );
 }
 
@@ -114,4 +138,5 @@ export const nodeTypes = {
   instruction: InstructionNode,
   jump: JumpNode,
   hub: HubNode,
+  exit: ExitNode,
 };

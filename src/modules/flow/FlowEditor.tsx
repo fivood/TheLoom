@@ -135,11 +135,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     <>
       <div className="pane-col">
         <div className="toolbar">
-          {(Object.keys(FLOW_NODE_LABEL) as FlowNodeType[]).map((t) => (
-            <button key={t} onClick={() => addNode(t)}>
-              <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
-            </button>
-          ))}
+          {(Object.keys(FLOW_NODE_LABEL) as FlowNodeType[])
+            .filter((t) => t !== 'exit' || path.length > 0)
+            .map((t) => (
+              <button key={t} onClick={() => addNode(t)} title={t === 'exit' ? '出口会成为父层片段节点的命名引脚' : undefined}>
+                <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
+              </button>
+            ))}
           <button
             className="primary"
             title="从选中节点(或本层起点)开始播放流程"
@@ -179,6 +181,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               const total = withSub.reduce((s, n) => s + countSubNodes((n.data as FlowNodeData).sub), 0);
               return confirm(`要删除的剧情片段里还有 ${total} 个子节点,将一并删除。继续?`);
             }}
+            onError={(code, msg) => console.warn('[RF]', code, msg)}
             zoomOnDoubleClick={false}
             deleteKeyCode={['Delete', 'Backspace']}
             fitView

@@ -98,14 +98,30 @@ export default function Player({ flow, path, startNodeId, onClose }: {
 
   const pushBeat = (b: Omit<Beat, 'id'>) => setLog((l) => [...l, { ...b, id: String(++beatSeq) }]);
 
-  /** 节点的出边 → 选项列表;没有出边时向父级回溯 */
+  /** 节点的出边 → 选项列表;没有出边时向父级回溯;出口节点走父层片段的命名引脚 */
   const outgoingChoices = (p: string[], node: FlowNode, vv: Record<string, VarValue>): { choices: Choice[]; path: string[] } => {
     let curP = [...p];
     let cur: FlowNode | undefined = node;
+    let exitId: string | null = null;
     // 无出边时逐层弹出:从进入的片段节点继续
     for (let guard = 0; guard < 64; guard++) {
+      // 出口节点:弹回父层,走片段上对应的命名引脚
+      if (cur?.type === 'exit' && curP.length > 0) {
+        exitId = cur.id;
+        const fragId = curP[curP.length - 1];
+        curP = curP.slice(0, -1);
+        cur = container(curP).nodes.find((n) => n.id === fragId);
+      }
       const c = container(curP);
-      const edges = cur ? c.edges.filter((e) => e.source === cur!.id) : [];
+      let edges = cur ? c.edges.filter((e) => e.source === cur!.id) : [];
+      if (exitId) {
+        const named = edges.filter((e) => e.sourceHandle === `exit:${exitId}`);
+        edges = named.length > 0 ? named : edges.filter((e) => !e.sourceHandle);
+        exitId = null;
+      } else if (cur?.type === 'fragment') {
+        // 子路径自然结束(未经出口)→ 走默认引脚
+        edges = edges.filter((e) => !e.sourceHandle);
+      }
       const usable = cur?.type === 'condition' ? filterCondEdges(edges, cur, vv) : edges;
       if (usable.length > 0) {
         return {
@@ -189,6 +205,9 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         case 'jump':
           pushBeat({ kind: 'jump', title: node.data.title || '跳转', text: node.data.text });
           break;
+        case 'exit':
+          pushBeat({ kind: 'exit', title: `⇥ 经「${node.data.title || '出口'}」离开子流程`, text: '' });
+          break;
       }
 
       const { choices: cs, path: outP } = outgoingChoices(curP, node, nextVars);
@@ -201,7 +220,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         setEnded(true);
         return;
       }
-      if (cs.length === 1 && ['hub', 'instruction', 'condition'].includes(node.type)) {
+      if (cs.length === 1 && ['hub', 'instruction', 'condition', 'exit'].includes(node.type)) {
         id = cs[0].nodeId; // 直通型节点自动前进
         continue;
       }

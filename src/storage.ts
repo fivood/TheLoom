@@ -51,7 +51,7 @@ function withFrontmatter(meta: Record<string, unknown>, body: string): string {
 
 const SECTION_NOTES = '## 备注';
 
-export function entityToMd(e: Entity): string {
+export function entityToMd(e: Entity, avatarPath?: string): string {
   const meta: Record<string, unknown> = {
     loom: 'entity',
     id: e.id,
@@ -60,6 +60,7 @@ export function entityToMd(e: Entity): string {
     emoji: e.emoji,
     createdAt: e.createdAt,
   };
+  if (avatarPath) meta.avatar = avatarPath;
   for (const f of e.fields) {
     if (f.label) meta[f.label] = f.value;
   }
@@ -68,10 +69,10 @@ export function entityToMd(e: Entity): string {
   return withFrontmatter(meta, body);
 }
 
-const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'createdAt', 'tags', 'aliases', 'cssclasses']);
+const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'tags', 'aliases', 'cssclasses']);
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
-export function mdToEntity(filename: string, md: string, index: number): Entity {
+export function mdToEntity(filename: string, md: string, index: number, assets?: Map<string, string>): Entity {
   const { meta, body } = splitFrontmatter(md);
   const name = filename.replace(/\.md$/i, '');
   const notesIdx = body.indexOf(SECTION_NOTES);
@@ -81,12 +82,14 @@ export function mdToEntity(filename: string, md: string, index: number): Entity 
   const fields = Object.entries(meta)
     .filter(([k]) => !ENTITY_META_KEYS.has(k))
     .map(([k, v]) => ({ id: uid(), label: k, value: String(v ?? '') }));
+  const avatarFile = typeof meta.avatar === 'string' ? meta.avatar.replace(/^assets\//, '') : null;
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
     kind,
     name,
     color: typeof meta.color === 'string' ? meta.color : PALETTE[index % PALETTE.length],
     emoji: typeof meta.emoji === 'string' ? meta.emoji : '📄',
+    avatar: (avatarFile && assets?.get(avatarFile)) || undefined,
     summary,
     fields,
     notes,
@@ -150,6 +153,13 @@ interface ProjectFiles {
   projectJson: string | null;
   entities: MdFile[];
   research: MdFile[];
+  /** assets/ 下的图片,content 为 base64 */
+  assets: MdFile[];
+}
+
+function assetMime(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase();
+  return ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
 }
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -185,8 +195,9 @@ export async function loadFromFolder(dir: string): Promise<Project> {
     };
   }
   normalizeProject(base);
+  const assets = new Map(files.assets.map((f) => [f.name, `data:${assetMime(f.name)};base64,${f.content}`]));
   base.entities = files.entities
-    .map((f, i) => mdToEntity(f.name, f.content, i))
+    .map((f, i) => mdToEntity(f.name, f.content, i, assets))
     .sort((a, b) => a.createdAt - b.createdAt);
   base.researchCards = files.research
     .map((f, i) => mdToCard(f.name, f.content, i))
@@ -204,16 +215,29 @@ export async function saveToFolder(dir: string, project: Project): Promise<void>
   // project.json 里不重复存 md 化的内容,只留引用顺序无关的结构化数据
   const slim = { ...project, entities: [], researchCards: [] };
 
-  const files: { relPath: string; content: string }[] = [
+  const files: { relPath: string; content: string; base64?: boolean }[] = [
     { relPath: 'project.json', content: JSON.stringify(slim, null, 2) },
   ];
-  for (const [name, e] of entityFiles) files.push({ relPath: `entities/${name}`, content: entityToMd(e) });
-  for (const [name, c] of cardFiles) files.push({ relPath: `research/${name}`, content: cardToMd(c) });
+  const keepMd: string[] = [];
 
-  const keepMd = [
-    ...[...entityFiles.keys()].map((n) => `entities/${n}`),
-    ...[...cardFiles.keys()].map((n) => `research/${n}`),
-  ];
+  for (const [name, e] of entityFiles) {
+    let avatarPath: string | undefined;
+    if (e.avatar) {
+      const payload = e.avatar.split(',')[1];
+      if (payload) {
+        avatarPath = `assets/entity-${e.id}.png`;
+        files.push({ relPath: avatarPath, content: payload, base64: true });
+        keepMd.push(avatarPath);
+      }
+    }
+    // md 中不内嵌图片数据,只引用 assets/ 路径
+    files.push({ relPath: `entities/${name}`, content: entityToMd({ ...e, avatar: undefined }, avatarPath) });
+    keepMd.push(`entities/${name}`);
+  }
+  for (const [name, c] of cardFiles) {
+    files.push({ relPath: `research/${name}`, content: cardToMd(c) });
+    keepMd.push(`research/${name}`);
+  }
 
   await invoke('save_project_dir', { dir, files, keepMd });
 }
