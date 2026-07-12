@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
+import Icon from '../../components/Icon';
 import type { ResearchCard } from '../../types';
 import { PALETTE } from '../../types';
 
@@ -122,7 +123,7 @@ export default function ResearchCards() {
             >
               <div className="card-title">
                 <span>{c.title}</span>
-                {c.pinned && <span className="pin">📌</span>}
+                {c.pinned && <span className="pin"><Icon name="pin" size={13} /></span>}
               </div>
               <div className="card-body">{c.content || '(空白卡片)'}</div>
               <div className="card-tags">
@@ -183,7 +184,7 @@ export default function ResearchCards() {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => updateCard(selected.id, { pinned: !selected.pinned })}>
-                {selected.pinned ? '取消置顶' : '📌 置顶'}
+                <Icon name="pin" size={13} /> {selected.pinned ? '取消置顶' : '置顶'}
               </button>
               <button
                 className="danger"

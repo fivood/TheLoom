@@ -4,6 +4,7 @@ import { resolveSub } from '../../util';
 import type { Entity, Flow, FlowEdge, FlowNode, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import { TYPE_COLORS } from './nodes';
+import Icon from '../../components/Icon';
 
 type VarValue = boolean | number | string;
 
@@ -264,7 +265,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   return (
     <div className="player-overlay">
       <div className="player-head">
-        <span className="player-title">▶ 演出 · {flow.name}</span>
+        <span className="player-title"><Icon name="play" size={14} /> 演出 · {flow.name}</span>
         <span className="spacer" />
         <button onClick={begin}>⟲ 重新开始</button>
         <button onClick={onClose}>✕ 退出演出</button>
@@ -275,8 +276,9 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             <div key={b.id} className={`beat beat-${b.kind}`}>
               {b.kind === 'dialogue' ? (
                 <>
-                  <div className="beat-speaker" style={{ color: b.speaker?.color }}>
-                    {b.speaker ? `${b.speaker.emoji} ${b.speaker.name}` : b.title || '对白'}
+                  <div className="beat-speaker">
+                    {b.speaker?.avatar && <img className="speaker-avatar" src={b.speaker.avatar} alt="" />}
+                    {b.speaker ? b.speaker.name : b.title || '对白'}
                   </div>
                   <div className="beat-text">{b.text || '(空对白)'}</div>
                 </>

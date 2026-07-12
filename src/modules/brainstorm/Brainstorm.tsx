@@ -14,7 +14,7 @@ interface StickyData {
 }
 type StickyNode = Node<StickyData>;
 
-const NOTE_COLORS = ['#f5d76e', '#f7a072', '#ef8fb4', '#b39ddb', '#90caf9', '#80cbc4', '#a5d6a7', '#e0e0e0'];
+const NOTE_COLORS = ['#ffffff', '#f2f1ee', '#e6e4df', '#d8d6d0', '#c9c7c1', '#bab8b1'];
 
 function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
   const { updateNodeData } = useReactFlow();
@@ -122,8 +122,8 @@ function Canvas() {
       </div>
       <div style={{ flex: 1 }}>
         <ReactFlow
-          className="rf-dark"
-          colorMode="dark"
+          className="rf-light"
+          colorMode="light"
           nodes={nodes}
           edges={edges}
           nodeTypes={stickyTypes}

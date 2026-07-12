@@ -88,7 +88,7 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
     kind,
     name,
     color: typeof meta.color === 'string' ? meta.color : PALETTE[index % PALETTE.length],
-    emoji: typeof meta.emoji === 'string' ? meta.emoji : '📄',
+    emoji: typeof meta.emoji === 'string' ? meta.emoji : '',
     avatar: (avatarFile && assets?.get(avatarFile)) || undefined,
     summary,
     fields,

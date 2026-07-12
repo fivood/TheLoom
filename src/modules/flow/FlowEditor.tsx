@@ -12,6 +12,7 @@ import { FLOW_NODE_LABEL, PALETTE } from '../../types';
 import { nodeTypes, TYPE_COLORS } from './nodes';
 import Player from './Player';
 import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
+import Icon from '../../components/Icon';
 
 type LoomNode = Node<FlowNodeData>;
 
@@ -147,7 +148,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             className="primary"
             title="从选中节点(或本层起点)开始播放流程"
             onClick={() => { writeBack(); setPlaying(true); }}
-          >▶ 演出</button>
+          ><Icon name="play" size={14} /> 演出</button>
           <button
             title="把当前流程导出为剧本式 Markdown(Shift+点击导出全部流程)"
             onClick={(e) => {
@@ -160,7 +161,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 downloadMarkdown(`${f.name}-剧本.md`, flowToMarkdown(f, p.entities));
               }
             }}
-          >📜 导出剧本</button>
+          ><Icon name="script" size={14} /> 导出剧本</button>
           <span className="hint">双击剧情片段进入子流程 · Delete 删除选中</span>
         </div>
         {crumbs.length > 1 && (
@@ -180,8 +181,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         )}
         <div ref={wrapRef} style={{ flex: 1 }}>
           <ReactFlow
-            className="rf-dark"
-            colorMode="dark"
+            className="rf-light"
+            colorMode="light"
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
@@ -236,7 +237,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 >
                   <option value="">(无)</option>
                   {characters.map((c) => (
-                    <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>

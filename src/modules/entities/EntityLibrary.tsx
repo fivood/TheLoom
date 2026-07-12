@@ -4,11 +4,9 @@ import { fileToAvatar } from '../../util';
 import { findEntityRefs, useNav } from '../../search';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
+import Icon, { KIND_ICON } from '../../components/Icon';
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
-const KIND_EMOJI: Record<EntityKind, string> = {
-  character: '👤', location: '🗺️', item: '🗝️', faction: '🏰', concept: '📜',
-};
 
 export default function EntityLibrary() {
   const entities = useLoom((s) => s.project.entities);
@@ -52,7 +50,7 @@ export default function EntityLibrary() {
     const e: Entity = {
       id: uid(), kind, name: `新${ENTITY_KIND_LABEL[kind]}`,
       color: PALETTE[entities.length % PALETTE.length],
-      emoji: KIND_EMOJI[kind], summary: '', fields: [], notes: '', createdAt: Date.now(),
+      emoji: '', summary: '', fields: [], notes: '', createdAt: Date.now(),
     };
     addEntity(e);
     setSelectedId(e.id);
@@ -68,7 +66,7 @@ export default function EntityLibrary() {
           </div>
           {KINDS.map((k) => (
             <div key={k} className={`side-item ${kindFilter === k ? 'active' : ''}`} onClick={() => setKindFilter(k)}>
-              {KIND_EMOJI[k]} {ENTITY_KIND_LABEL[k]}
+              <Icon name={KIND_ICON[k]} /> {ENTITY_KIND_LABEL[k]}
               <span style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>
                 {entities.filter((e) => e.kind === k).length}
               </span>
@@ -92,8 +90,8 @@ export default function EntityLibrary() {
               onClick={() => setSelectedId(e.id)}
             >
               <div className="card-title">
-                <span className="entity-avatar" style={{ background: `${e.color}33` }}>
-                  {e.avatar ? <img src={e.avatar} alt="" /> : e.emoji}
+                <span className="entity-avatar" style={{ background: `${e.color}1a` }}>
+                  {e.avatar ? <img src={e.avatar} alt="" /> : <Icon name={KIND_ICON[e.kind]} size={18} />}
                 </span>
                 <span>
                   {e.name}
@@ -121,22 +119,20 @@ export default function EntityLibrary() {
             <div className="kv-row">
               <span
                 className="entity-avatar avatar-edit"
-                style={{ background: `${selected.color}33` }}
+                style={{ background: `${selected.color}1a` }}
                 title="点击上传头像图片"
                 onClick={() => avatarRef.current?.click()}
               >
-                {selected.avatar ? <img src={selected.avatar} alt="" /> : selected.emoji}
+                {selected.avatar ? <img src={selected.avatar} alt="" /> : <Icon name={KIND_ICON[selected.kind]} size={18} />}
               </span>
               <input
-                style={{ width: 56, textAlign: 'center', fontSize: 18 }}
-                value={selected.emoji}
-                onChange={(e) => updateEntity(selected.id, { emoji: e.target.value })}
-                title="图标(可输入任意 emoji)"
+                style={{ width: 'auto', flex: 1 }}
+                value={selected.name}
+                onChange={(e) => updateEntity(selected.id, { name: e.target.value })}
               />
-              <input value={selected.name} onChange={(e) => updateEntity(selected.id, { name: e.target.value })} />
             </div>
             <div className="kv-row">
-              <button onClick={() => avatarRef.current?.click()}>🖼 上传头像</button>
+              <button onClick={() => avatarRef.current?.click()}><Icon name="image" /> 上传头像</button>
               {selected.avatar && (
                 <button className="ghost" onClick={() => updateEntity(selected.id, { avatar: undefined })}>移除头像</button>
               )}

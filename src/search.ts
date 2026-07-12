@@ -82,7 +82,7 @@ export function searchProject(p: Project, query: string): SearchHit[] {
     const hit = matches(q, e.name, e.summary, e.notes, ...e.fields.flatMap((f) => [f.label, f.value]));
     if (hit) {
       push({
-        module: '实体', kind: ENTITY_KIND_LABEL[e.kind], title: `${e.emoji} ${e.name}`,
+        module: '实体', kind: ENTITY_KIND_LABEL[e.kind], title: e.name,
         snippet: snippetOf(hit, q),
         nav: { tab: 'entities', entityId: e.id },
       });

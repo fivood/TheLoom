@@ -3,15 +3,16 @@ import type { FlowNodeData, FlowNodeType } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import { useLoom } from '../../store';
 import { countSubNodes } from '../../util';
+import Icon, { KIND_ICON } from '../../components/Icon';
 
 export const TYPE_COLORS: Record<FlowNodeType, string> = {
-  dialogue: '#5b8dee',
-  fragment: '#3dbfb0',
-  hub: '#6b7488',
-  condition: '#e8a23d',
-  instruction: '#9d6ae8',
-  jump: '#e85d9b',
-  exit: '#d4c437',
+  dialogue: '#1b1b19',
+  fragment: '#565550',
+  hub: '#8e8d86',
+  condition: '#3a3936',
+  instruction: '#72716b',
+  jump: '#4a4946',
+  exit: '#aaa9a1',
 };
 
 type LoomNode = Node<FlowNodeData>;
@@ -42,10 +43,11 @@ export function DialogueNode(props: NodeProps<LoomNode>) {
     <BaseNode {...props}>
       <div className="node-body">
         {speaker && (
-          <div className="node-speaker" style={{ color: speaker.color }}>
+          <div className="node-speaker">
             {speaker.avatar
               ? <img className="speaker-avatar" src={speaker.avatar} alt="" />
-              : speaker.emoji} {speaker.name}
+              : <Icon name={KIND_ICON[speaker.kind]} size={13} />}
+            {speaker.name}
           </div>
         )}
         {props.data.text || <span style={{ opacity: 0.5 }}>(空对白)</span>}

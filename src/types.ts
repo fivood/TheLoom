@@ -195,7 +195,6 @@ export interface Project {
 }
 
 export const PALETTE = [
-  '#5b8dee', '#9d6ae8', '#e85d9b', '#e8654a',
-  '#e8a23d', '#d4c437', '#5fbf6e', '#3dbfb0',
-  '#4aa8e8', '#8a93a6',
+  '#1b1b19', '#3a3936', '#565550', '#72716b',
+  '#8e8d86', '#aaa9a1', '#c6c5bd', '#e0dfd8',
 ];

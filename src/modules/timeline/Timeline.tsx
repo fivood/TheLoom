@@ -175,7 +175,7 @@ export default function Timeline() {
                                   {ev.entityIds.map((eid) => {
                                     const ent = entities.find((x) => x.id === eid);
                                     return ent ? (
-                                      <span key={eid} className="tag" style={{ color: ent.color }}>{ent.emoji} {ent.name}</span>
+                                      <span key={eid} className="tag">{ent.name}</span>
                                     ) : null;
                                   })}
                                 </div>
@@ -232,7 +232,7 @@ export default function Timeline() {
                           ? selected.entityIds.filter((x) => x !== ent.id)
                           : [...selected.entityIds, ent.id],
                       })}
-                    >{ent.emoji} {ent.name}</span>
+                    >{ent.name}</span>
                   );
                 })}
                 {entities.length === 0 && <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>实体库为空</span>}

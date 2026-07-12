@@ -5,6 +5,7 @@ import {
 } from './storage';
 import { useNav } from './search';
 import SearchPalette from './components/SearchPalette';
+import Icon, { type IconName } from './components/Icon';
 import FlowEditor from './modules/flow/FlowEditor';
 import EntityLibrary from './modules/entities/EntityLibrary';
 import Brainstorm from './modules/brainstorm/Brainstorm';
@@ -15,14 +16,14 @@ import Variables from './modules/variables/Variables';
 
 type Tab = 'flow' | 'entities' | 'brainstorm' | 'outline' | 'timeline' | 'research' | 'variables';
 
-const TABS: { key: Tab; icon: string; label: string }[] = [
-  { key: 'flow', icon: '🧵', label: '流程' },
-  { key: 'entities', icon: '👤', label: '实体' },
-  { key: 'brainstorm', icon: '💡', label: '风暴' },
-  { key: 'outline', icon: '📋', label: '大纲' },
-  { key: 'timeline', icon: '⏳', label: '时间线' },
-  { key: 'research', icon: '🗂️', label: '资料' },
-  { key: 'variables', icon: '🔣', label: '变量' },
+const TABS: { key: Tab; icon: IconName; label: string }[] = [
+  { key: 'flow', icon: 'flow', label: '流程' },
+  { key: 'entities', icon: 'entity', label: '实体' },
+  { key: 'brainstorm', icon: 'bulb', label: '风暴' },
+  { key: 'outline', icon: 'grid', label: '大纲' },
+  { key: 'timeline', icon: 'clock', label: '时间线' },
+  { key: 'research', icon: 'archive', label: '资料' },
+  { key: 'variables', icon: 'braces', label: '变量' },
 ];
 
 export default function App() {
@@ -116,7 +117,7 @@ export default function App() {
   return (
     <div className="app">
       <nav className="sidebar">
-        <div className="logo" title="叙事织机 TheLoom">🪡</div>
+        <div className="logo" title="叙事织机 TheLoom"><Icon name="logo" size={22} /></div>
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -124,7 +125,7 @@ export default function App() {
             onClick={() => setTab(t.key)}
             title={t.label}
           >
-            <span className="nav-icon">{t.icon}</span>
+            <Icon name={t.icon} size={18} />
             <span>{t.label}</span>
           </button>
         ))}
@@ -138,9 +139,9 @@ export default function App() {
             onChange={(e) => update((p) => { p.name = e.target.value; })}
             placeholder="项目名称"
           />
-          <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}>🔍 搜索</button>
-          <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}>↩</button>
-          <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}>↪</button>
+          <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
+          <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}><Icon name="undo" /></button>
+          <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}><Icon name="redo" /></button>
           <span className="spacer" />
           {syncError ? (
             <span className="saved-hint" style={{ color: 'var(--danger)' }} title={syncError}>⚠ 同步失败</span>
@@ -152,18 +153,18 @@ export default function App() {
           {isTauri && (
             <>
               <button onClick={chooseFolder} title={folder ?? '选择一个文件夹存放项目(放进 OneDrive / Google Drive 即可云同步,也可直接作为 Obsidian 库)'}>
-                📁 {folder ? '更换文件夹' : '项目文件夹'}
+                <Icon name="folder" /> {folder ? '更换文件夹' : '项目文件夹'}
               </button>
-              {folder && <button onClick={reloadFolder} title="从磁盘重新加载(在 Obsidian 或其他设备上改动后用)">⟳ 重新加载</button>}
+              {folder && <button onClick={reloadFolder} title="从磁盘重新加载(在 Obsidian 或其他设备上改动后用)"><Icon name="refresh" /> 重新加载</button>}
             </>
           )}
-          <button onClick={() => exportProject(project)}>导出项目</button>
-          <button onClick={() => fileRef.current?.click()}>导入项目</button>
+          <button onClick={() => exportProject(project)}><Icon name="download" /> 导出项目</button>
+          <button onClick={() => fileRef.current?.click()}><Icon name="upload" /> 导入项目</button>
           <button
             className="ghost"
             onClick={() => { if (confirm('清空当前项目并恢复为示例项目?此操作不可撤销。')) resetProject(); }}
           >
-            重置
+            <Icon name="reset" /> 重置
           </button>
           <input
             ref={fileRef}

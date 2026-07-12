@@ -50,7 +50,7 @@ function seedProject(): Project {
     ],
     entities: [
       {
-        id: heroId, kind: 'character', name: '林晚', color: '#5b8dee', emoji: '🌙',
+        id: heroId, kind: 'character', name: '林晚', color: '#1b1b19', emoji: '🌙',
         summary: '深夜误入旧书店的年轻编剧,擅长把生活写成故事,却害怕自己的故事被别人书写。',
         fields: [
           { id: uid(), label: '年龄', value: '26' },
@@ -61,7 +61,7 @@ function seedProject(): Project {
         notes: '', createdAt: Date.now(),
       },
       {
-        id: mentorId, kind: 'character', name: '守店人', color: '#9d6ae8', emoji: '📖',
+        id: mentorId, kind: 'character', name: '守店人', color: '#565550', emoji: '📖',
         summary: '旧书店的看守者,叙事织机的引路人。说话总是只说一半。',
         fields: [
           { id: uid(), label: '身份', value: '织机的看守者' },
@@ -70,23 +70,23 @@ function seedProject(): Project {
         notes: '', createdAt: Date.now(),
       },
       {
-        id: uid(), kind: 'location', name: '旧书店「回声」', color: '#3dbfb0', emoji: '🏮',
+        id: uid(), kind: 'location', name: '旧书店「回声」', color: '#8e8d86', emoji: '🏮',
         summary: '只在雨夜营业的书店,书架的尽头连接着叙事织机。',
         fields: [{ id: uid(), label: '氛围', value: '潮湿、暖黄灯光、纸张的味道' }],
         notes: '', createdAt: Date.now(),
       },
     ],
     brainstormNotes: [
-      { id: uid(), text: '核心意象:织机 = 故事的经纬线', color: '#e8a23d', position: { x: 120, y: 80 } },
-      { id: uid(), text: '如果主角发现自己也是别人写的角色?', color: '#e85d9b', position: { x: 420, y: 40 } },
-      { id: uid(), text: '守店人的真实身份留到第三幕揭晓', color: '#9d6ae8', position: { x: 420, y: 220 } },
-      { id: uid(), text: '每章开头引用一句"书中书"的句子', color: '#5fbf6e', position: { x: 120, y: 260 } },
+      { id: uid(), text: '核心意象:织机 = 故事的经纬线', color: '#ffffff', position: { x: 120, y: 80 } },
+      { id: uid(), text: '如果主角发现自己也是别人写的角色?', color: '#e6e4df', position: { x: 420, y: 40 } },
+      { id: uid(), text: '守店人的真实身份留到第三幕揭晓', color: '#d8d6d0', position: { x: 420, y: 220 } },
+      { id: uid(), text: '每章开头引用一句"书中书"的句子', color: '#f2f1ee', position: { x: 120, y: 260 } },
     ],
     brainstormEdges: [],
     outlineColumns: [
-      { id: colForeshadow, title: '伏笔 / 预言', color: '#e8a23d' },
-      { id: colRomance, title: '感情线', color: '#e85d9b' },
-      { id: colSide, title: '配角线', color: '#3dbfb0' },
+      { id: colForeshadow, title: '伏笔 / 预言', color: '#3a3936' },
+      { id: colRomance, title: '感情线', color: '#72716b' },
+      { id: colSide, title: '配角线', color: '#8e8d86' },
     ],
     outlineRows: [
       {
@@ -118,8 +118,8 @@ function seedProject(): Project {
       },
     ],
     timelineTracks: [
-      { id: trackMain, name: '主线 · 林晚', color: '#5b8dee' },
-      { id: trackMentor, name: '暗线 · 守店人', color: '#9d6ae8' },
+      { id: trackMain, name: '主线 · 林晚', color: '#1b1b19' },
+      { id: trackMentor, name: '暗线 · 守店人', color: '#565550' },
     ],
     timelinePoints: [
       { id: pt1, label: '二十年前' },
@@ -151,15 +151,15 @@ function seedProject(): Project {
     researchCards: [
       {
         id: uid(), title: '织机的结构', content: '经线 = 时间,纬线 = 人物。断线意味着故事夭折。修补需要"读者的记忆"作为丝线。',
-        category: '世界观', tags: ['核心设定'], color: '#5b8dee', source: '', pinned: true, createdAt: Date.now(),
+        category: '世界观', tags: ['核心设定'], color: '#1b1b19', source: '', pinned: true, createdAt: Date.now(),
       },
       {
         id: uid(), title: '真实的织布机原理', content: '传统织布机:经纱固定在机架上,梭子带着纬纱来回穿行。提综装置决定哪些经纱抬起——可类比"哪些角色在这一章登场"。',
-        category: '参考资料', tags: ['考据'], color: '#5fbf6e', source: '', pinned: false, createdAt: Date.now(),
+        category: '参考资料', tags: ['考据'], color: '#aaa9a1', source: '', pinned: false, createdAt: Date.now(),
       },
       {
         id: uid(), title: '罗琳的表格大纲法', content: 'J.K.罗琳为《凤凰社》手绘表格:每行一章,列为时间、章节标题、主线剧情,以及预言、DA、恋爱线等各条支线——确保每条线在每一章都有交代或有意留白。',
-        category: '写作方法', tags: ['大纲', '结构'], color: '#e8a23d', source: '', pinned: false, createdAt: Date.now(),
+        category: '写作方法', tags: ['大纲', '结构'], color: '#3a3936', source: '', pinned: false, createdAt: Date.now(),
       },
     ],
     researchCategories: ['世界观', '写作方法', '参考资料'],

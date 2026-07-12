@@ -96,7 +96,7 @@ function renderContainer(sub: SubFlow, entities: Entity[], prefix: string): stri
       switch (n.type) {
         case 'dialogue': {
           const sp = entities.find((e) => e.id === n.data.speakerId);
-          const who = sp ? `${sp.emoji} ${sp.name}` : n.data.title || '对白';
+          const who = sp ? sp.name : n.data.title || '对白';
           lines.push(`**${who}**:${n.data.text || '(空)'}`, '');
           break;
         }
