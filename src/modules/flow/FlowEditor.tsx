@@ -11,6 +11,7 @@ import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL, PALETTE } from '../../types';
 import { nodeTypes, TYPE_COLORS } from './nodes';
 import Player from './Player';
+import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
 
 type LoomNode = Node<FlowNodeData>;
 
@@ -147,6 +148,19 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             title="从选中节点(或本层起点)开始播放流程"
             onClick={() => { writeBack(); setPlaying(true); }}
           >▶ 演出</button>
+          <button
+            title="把当前流程导出为剧本式 Markdown(Shift+点击导出全部流程)"
+            onClick={(e) => {
+              writeBack();
+              const p = useLoom.getState().project;
+              if (e.shiftKey) {
+                downloadMarkdown(`${p.name || '项目'}-剧本.md`, projectToMarkdown(p));
+              } else {
+                const f = p.flows.find((x) => x.id === flow.id) ?? flow;
+                downloadMarkdown(`${f.name}-剧本.md`, flowToMarkdown(f, p.entities));
+              }
+            }}
+          >📜 导出剧本</button>
           <span className="hint">双击剧情片段进入子流程 · Delete 删除选中</span>
         </div>
         {crumbs.length > 1 && (
