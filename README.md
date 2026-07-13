@@ -37,6 +37,21 @@ npm run tauri build   # 打包,安装程序在 src-tauri/target/release/bundle/n
 - **全局搜索**:`Ctrl+K` 打开,横跨全部模块,回车直达(流程结果会自动打开对应层级并选中节点)
 - **撤销 / 重做**:`Ctrl+Z` / `Ctrl+Y`,50 步历史,连续打字自动合并为一步
 
+## 部署到 Cloudflare Pages(网页版)
+
+仓库自带 GitHub Actions 工作流([deploy.yml](.github/workflows/deploy.yml)),每次 push 到 `main` 自动构建并部署。启用只需两步:
+
+1. 在 [Cloudflare Dashboard → My Profile → API Tokens](https://dash.cloudflare.com/profile/api-tokens) 创建一个 Token,使用 **Edit Cloudflare Workers** 模板(或自定义授予 `Cloudflare Pages: Edit` 权限);Account ID 在 Cloudflare 首页右侧栏可以找到。
+2. GitHub 仓库 → Settings → Secrets and variables → Actions,添加两个 Secret:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+
+之后每次推送自动发布到 `theloom.pages.dev`。未配置密钥时工作流只验证构建、跳过部署,不会报错。
+
+> 也可以不用 Actions:在 Cloudflare Dashboard → Workers & Pages → 创建 Pages 项目 → 连接此 GitHub 仓库,构建命令 `npm run build`、输出目录 `dist`,效果相同。
+
+**网页版的定位**:纯静态、无后端,数据只存在访问者自己的浏览器 localStorage 里(不会上传)。适合演示和轻量使用;认真写作请用桌面版绑定项目文件夹(见下文),那才有文件级备份、网盘同步和 Obsidian 联动。
+
 ## 数据存储与云同步
 
 - **网页版**:数据自动保存在浏览器 localStorage;顶栏可导出 / 导入 `.loom.json` 备份。
