@@ -70,6 +70,32 @@ npx wrangler pages dev dist --d1=SYNC_DB --port 8788
 - `project.json` 为结构化数据,不建议手工编辑
 - 同一时间请只在一台设备上编辑同一文件夹(最后写入者获胜)
 
+## 发布与自动更新
+
+推送 `v*` 标签触发 [release.yml](../.github/workflows/release.yml):在 Windows Runner 上构建 NSIS 安装包、用 minisign 私钥签名更新包,并连同自动更新清单 `latest.json` 发布为 GitHub Release。
+
+发布新版本的步骤:
+
+1. 同步修改三处版本号:`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`
+2. 提交后打标签并推送:`git tag v0.4.0 && git push origin v0.4.0`
+
+密钥:
+
+- 更新包签名私钥保存在仓库 Secret `TAURI_SIGNING_PRIVATE_KEY`(本机备份于 `~/.tauri/theloom.key`,**丢失后将无法对后续更新签名**,老版本用户只能手动重装);公钥内置在 `tauri.conf.json`
+- 私钥无口令,工作流中密码传空串
+
+### 自动更新与大陆网络
+
+桌面版启动后静默检查更新。更新清单与安装包不直连 GitHub,而是经 Cloudflare Pages Functions 中转:
+
+```
+GET /api/update/{target}/{version}   更新清单(重写下载地址为本站代理,边缘缓存 5 分钟)
+GET /api/download/{tag}/{file}       Release 资产流式代理(仅限本仓库,边缘缓存 1 天)
+GET /api/download/latest             302 到最新 Windows 安装包(固定下载入口)
+```
+
+Cloudflare 边缘节点到 GitHub 的连接稳定,大陆用户只需能访问 `theloom.pages.dev` 即可完成下载与更新。
+
 ## 协作接口
 
 ```

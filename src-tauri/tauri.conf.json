@@ -1,8 +1,16 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TheLoom",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.fivood.theloom",
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlCQkI3QzBEQkQxRDRCODgKUldTSVN4MjlEWHk3bS9tdVNVQ3E1bkZiMCthV2diRVNjK0U1c2w2QW9NL0JUclMvb2lUZk5YbXMK",
+      "endpoints": [
+        "https://theloom.pages.dev/api/update/{{target}}/{{current_version}}"
+      ]
+    }
+  },
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
@@ -27,6 +35,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
         "languages": ["SimpChinese", "English"],

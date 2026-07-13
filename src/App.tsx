@@ -4,6 +4,7 @@ import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
 } from './storage';
 import { useNav } from './search';
+import { checkForUpdates } from './updater';
 import SearchPalette from './components/SearchPalette';
 import SyncPanel from './components/SyncPanel';
 import Icon, { type IconName } from './components/Icon';
@@ -63,6 +64,11 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // 桌面版:启动后静默检查更新
+  useEffect(() => {
+    if (isTauri) setTimeout(() => checkForUpdates(true), 3000);
   }, []);
 
   // Tauri 模式:启动时从上次的项目文件夹加载
