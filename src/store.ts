@@ -10,9 +10,31 @@ export { uid, normalizeProject };
 
 const STORAGE_KEY = 'theloom-project-v1';
 
-/* ---------- 种子示例项目 ---------- */
+/* ---------- 空白项目(默认) ---------- */
 
-function seedProject(): Project {
+function blankProject(): Project {
+  return {
+    version: 1,
+    name: '未命名项目',
+    flows: [{ id: uid(), name: '第一章', nodes: [], edges: [] }],
+    entities: [],
+    brainstormNotes: [],
+    brainstormEdges: [],
+    outlineColumns: [],
+    outlineRows: [],
+    timelineTracks: [],
+    timelinePoints: [],
+    timelineEvents: [],
+    researchCards: [],
+    researchCategories: [],
+    variables: [],
+    updatedAt: Date.now(),
+  };
+}
+
+/* ---------- 内置示例项目(按需载入) ---------- */
+
+function sampleProject(): Project {
   const heroId = uid();
   const mentorId = uid();
   const colForeshadow = uid();
@@ -179,7 +201,7 @@ function loadProject(): Project {
       if (p && p.version === 1) return normalizeProject(p);
     }
   } catch { /* 损坏则重建 */ }
-  return seedProject();
+  return blankProject();
 }
 
 /* ---------- Store ---------- */
@@ -200,6 +222,7 @@ interface LoomState {
   redo: () => void;
   replaceProject: (p: Project) => void;
   resetProject: () => void;
+  loadSampleProject: () => void;
 
   updateFlow: (flowId: string, fn: (f: Flow) => void) => void;
 
@@ -311,7 +334,11 @@ export const useLoom = create<LoomState>((set, get) => {
     },
     resetProject: () => {
       undoStack = []; redoStack = []; lastUndoPush = 0;
-      swapProject(seedProject());
+      swapProject(blankProject());
+    },
+    loadSampleProject: () => {
+      undoStack = []; redoStack = []; lastUndoPush = 0;
+      swapProject(sampleProject());
     },
 
     updateFlow: (flowId, fn) => commit((p) => {

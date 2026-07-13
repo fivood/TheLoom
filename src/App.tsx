@@ -167,9 +167,16 @@ export default function App() {
           <button onClick={() => fileRef.current?.click()}><Icon name="upload" /> 导入项目</button>
           <button
             className="ghost"
-            onClick={() => { if (confirm('清空当前项目并恢复为示例项目?此操作不可撤销。')) resetProject(); }}
+            title="载入内置示例项目(旧书店与叙事织机的故事)"
+            onClick={() => { if (confirm('载入内置示例项目,替换当前内容?')) useLoom.getState().loadSampleProject(); }}
           >
-            <Icon name="reset" /> 重置
+            <Icon name="book" /> 示例
+          </button>
+          <button
+            className="ghost"
+            onClick={() => { if (confirm('清空当前项目,从空白开始?此操作不可撤销。')) resetProject(); }}
+          >
+            <Icon name="reset" /> 清空
           </button>
           <input
             ref={fileRef}
