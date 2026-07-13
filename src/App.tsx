@@ -158,6 +158,14 @@ export default function App() {
               {folder ? `已同步 · ${folder.split(/[\\/]/).pop()}` : '已自动保存到本地'}
             </span>
           )}
+          <button
+            className="ghost saved-hint"
+            style={{ padding: '2px 6px' }}
+            title={isTauri ? '点击检查更新' : '网页版随部署自动更新'}
+            onClick={() => { if (isTauri) checkForUpdates(false); }}
+          >
+            v{__APP_VERSION__}
+          </button>
           {isTauri && (
             <>
               <button onClick={chooseFolder} title={folder ?? '选择一个文件夹存放项目(放进 OneDrive / Google Drive 即可云同步,也可直接作为 Obsidian 库)'}>

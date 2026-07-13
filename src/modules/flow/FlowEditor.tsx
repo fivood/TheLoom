@@ -9,6 +9,32 @@ import { useNav } from '../../search';
 import { countSubNodes, resolveSub } from '../../util';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL, PALETTE } from '../../types';
+import { useLoom as useLoomStore } from '../../store';
+
+/** 条件/指令脚本的变量校验与快捷插入 */
+function ScriptHints({ text, onInsert }: { text: string; onInsert: (name: string) => void }) {
+  const variables = useLoomStore((s) => s.project.variables);
+  const known = new Set(variables.map((v) => v.name));
+  const RESERVED = new Set(['true', 'false']);
+  const used = [...new Set(text.match(/[A-Za-z_]\w*/g) ?? [])].filter((x) => !RESERVED.has(x));
+  const unknown = used.filter((x) => !known.has(x));
+  return (
+    <div className="script-hints">
+      {unknown.length > 0 && (
+        <div className="script-warn">未定义变量:{unknown.join('、')}(可在「变量」模块创建)</div>
+      )}
+      {variables.length > 0 && (
+        <div className="card-tags">
+          {variables.map((v) => (
+            <span key={v.id} className="tag clickable" title={`${v.type} · ${v.description}`} onClick={() => onInsert(v.name)}>
+              {v.name}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 import { nodeTypes, TYPE_COLORS } from './nodes';
 import Player from './Player';
 import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
@@ -40,6 +66,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     sub.nodes.map((n) => ({
       id: n.id, type: n.type, position: n.position, data: n.data,
       selected: n.id === focusNodeId,
+      dragHandle: n.type === 'zone' ? '.zone-head' : undefined,
     })),
   );
   const [edges, setEdges] = useState<Edge[]>(() => sub.edges.map((e) => ({ ...e, ...EDGE_STYLE })));
@@ -105,11 +132,15 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
       id: uid(),
       type,
       position: { x: center.x - 95 + Math.random() * 40, y: center.y - 40 + Math.random() * 40 },
-      data: { title: '', text: '' },
+      data: type === 'zone' ? { title: '', text: '', w: 420, h: 300 } : { title: '', text: '' },
       selected: true,
+      dragHandle: type === 'zone' ? '.zone-head' : undefined,
     };
     dirty.current = true;
-    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), node]);
+    // 分区框插入到最底层,避免盖住其他节点
+    setNodes((ns) => type === 'zone'
+      ? [node, ...ns.map((n) => ({ ...n, selected: false }))]
+      : [...ns.map((n) => ({ ...n, selected: false })), node]);
   };
 
   const enterSub = (nodeId: string) => {
@@ -252,6 +283,14 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               </label>
               <textarea rows={5} value={selectedNode.data.text} onChange={(e) => patchSelectedNode({ text: e.target.value })} />
             </div>
+            {(selectedNode.type === 'condition' || selectedNode.type === 'instruction') && (
+              <ScriptHints
+                text={selectedNode.data.text}
+                onInsert={(name) => patchSelectedNode({
+                  text: selectedNode.data.text ? `${selectedNode.data.text.trimEnd()} ${name}` : name,
+                })}
+              />
+            )}
             {selectedNode.type === 'fragment' && (
               <button className="primary" onClick={() => enterSub(selectedNode.id)}>
                 ▦ 进入子流程{countSubNodes(selectedNode.data.sub) > 0 ? `(${countSubNodes(selectedNode.data.sub)} 个节点)` : ''}

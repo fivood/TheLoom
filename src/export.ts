@@ -1,3 +1,4 @@
+import { ANNOTATION_TYPES } from './types';
 import type { Entity, Flow, FlowEdge, FlowNode, Project, SubFlow } from './types';
 
 /**
@@ -73,7 +74,9 @@ function branchLabel(e: FlowEdge, target: FlowNode | undefined, source?: FlowNod
   return parts.join(' · ');
 }
 
-function renderContainer(sub: SubFlow, entities: Entity[], prefix: string): string {
+function renderContainer(raw: SubFlow, entities: Entity[], prefix: string): string {
+  // 注释与分区不进入文稿
+  const sub: SubFlow = { nodes: raw.nodes.filter((n) => !ANNOTATION_TYPES.has(n.type)), edges: raw.edges };
   const segments = splitSegments(sub);
   const segIndex = new Map<string, number>();
   segments.forEach((s, i) => { for (const n of s.nodes) segIndex.set(n.id, i + 1); });

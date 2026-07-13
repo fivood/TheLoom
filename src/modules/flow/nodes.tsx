@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
+import { Handle, NodeResizer, Position, useReactFlow, type NodeProps, type Node } from '@xyflow/react';
 import type { FlowNodeData, FlowNodeType } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import { useLoom } from '../../store';
@@ -13,6 +13,8 @@ export const TYPE_COLORS: Record<FlowNodeType, string> = {
   instruction: '#72716b',
   jump: '#4a4946',
   exit: '#aaa9a1',
+  note: '#c6c5bd',
+  zone: '#e0dfd8',
 };
 
 type LoomNode = Node<FlowNodeData>;
@@ -133,6 +135,32 @@ export function HubNode({ data, selected }: NodeProps<LoomNode>) {
   );
 }
 
+/** 画布注释:不参与叙事,仅作备忘 */
+export function NoteNode({ data, selected }: NodeProps<LoomNode>) {
+  return (
+    <div className={`flow-note ${selected ? 'selected' : ''}`}>
+      {data.title && <div className="flow-note-title">{data.title}</div>}
+      <div className="flow-note-text">{data.text || '(空注释,选中后在右侧编辑)'}</div>
+    </div>
+  );
+}
+
+/** 分区框:可缩放的背景区块,用于给画布分幕/分场 */
+export function ZoneNode({ id, data, selected }: NodeProps<LoomNode>) {
+  const { updateNodeData } = useReactFlow();
+  return (
+    <div className={`flow-zone ${selected ? 'selected' : ''}`} style={{ width: data.w ?? 420, height: data.h ?? 300 }}>
+      <NodeResizer
+        isVisible={selected}
+        minWidth={160}
+        minHeight={100}
+        onResizeEnd={(_, p) => updateNodeData(id, { w: Math.round(p.width), h: Math.round(p.height) })}
+      />
+      <div className="zone-head">{data.title || '分区'}</div>
+    </div>
+  );
+}
+
 export const nodeTypes = {
   dialogue: DialogueNode,
   fragment: FragmentNode,
@@ -141,4 +169,6 @@ export const nodeTypes = {
   jump: JumpNode,
   hub: HubNode,
   exit: ExitNode,
+  note: NoteNode,
+  zone: ZoneNode,
 };

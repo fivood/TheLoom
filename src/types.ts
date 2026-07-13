@@ -41,7 +41,9 @@ export type FlowNodeType =
   | 'condition'   // 条件分支
   | 'instruction' // 指令(设置变量等)
   | 'jump'        // 跳转
-  | 'exit';       // 出口(子流程 → 父层的命名引脚)
+  | 'exit'        // 出口(子流程 → 父层的命名引脚)
+  | 'note'        // 画布注释(不参与演出与导出)
+  | 'zone';       // 分区框(可缩放背景区块)
 
 export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   dialogue: '对白',
@@ -51,7 +53,12 @@ export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   instruction: '指令',
   jump: '跳转',
   exit: '出口',
+  note: '注释',
+  zone: '分区',
 };
+
+/** 不参与叙事(演出、导出、起点判定)的画布组织类节点 */
+export const ANNOTATION_TYPES: ReadonlySet<FlowNodeType> = new Set(['note', 'zone']);
 
 /** 子流程:剧情片段节点内部的画布,可无限嵌套 */
 export interface SubFlow {
@@ -66,6 +73,9 @@ export interface FlowNodeData {
   color?: string;
   /** 仅剧情片段节点:内部子流程 */
   sub?: SubFlow;
+  /** 仅分区节点:框体尺寸 */
+  w?: number;
+  h?: number;
   [key: string]: unknown;
 }
 
@@ -191,6 +201,8 @@ export interface Project {
   researchCards: ResearchCard[];
   researchCategories: string[];
   variables: Variable[];
+  /** 实体字段模板:按类型预设字段名,新建实体时自动填入 */
+  entityTemplates?: Partial<Record<EntityKind, string[]>>;
   updatedAt: number;
 }
 

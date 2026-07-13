@@ -7,6 +7,7 @@ export function normalizeProject(p: Project): Project {
   p.timelineTracks ??= [];
   p.timelinePoints ??= [];
   p.timelineEvents ??= [];
+  p.entityTemplates ??= {};
   return p;
 }
 

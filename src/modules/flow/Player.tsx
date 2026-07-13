@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLoom } from '../../store';
 import { resolveSub } from '../../util';
 import type { Entity, Flow, FlowEdge, FlowNode, SubFlow } from '../../types';
-import { FLOW_NODE_LABEL } from '../../types';
+import { ANNOTATION_TYPES, FLOW_NODE_LABEL } from '../../types';
 import { TYPE_COLORS } from './nodes';
 import Icon from '../../components/Icon';
 
@@ -69,8 +69,9 @@ function applyInstructions(text: string, vars: Record<string, VarValue>): string
 
 function startNodes(sub: SubFlow): FlowNode[] {
   const hasIncoming = new Set(sub.edges.map((e) => e.target));
-  const starts = sub.nodes.filter((n) => !hasIncoming.has(n.id));
-  return starts.length > 0 ? starts : sub.nodes;
+  const story = sub.nodes.filter((n) => !ANNOTATION_TYPES.has(n.type));
+  const starts = story.filter((n) => !hasIncoming.has(n.id));
+  return starts.length > 0 ? starts : story;
 }
 
 let beatSeq = 0;

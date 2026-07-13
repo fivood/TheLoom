@@ -8,6 +8,59 @@ import Icon, { KIND_ICON } from '../../components/Icon';
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
+/** 按类型的字段模板编辑器 */
+function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onClose: () => void }) {
+  const templates = useLoom((s) => s.project.entityTemplates);
+  const update = useLoom((s) => s.update);
+  const [kind, setKind] = useState<EntityKind>(initialKind);
+  const [text, setText] = useState(() => (templates?.[initialKind] ?? []).join('\n'));
+
+  const switchKind = (k: EntityKind) => {
+    setKind(k);
+    setText((useLoom.getState().project.entityTemplates?.[k] ?? []).join('\n'));
+  };
+  const save = () => {
+    const labels = text.split('\n').map((s) => s.trim()).filter(Boolean);
+    update((p) => {
+      p.entityTemplates ??= {};
+      p.entityTemplates[kind] = labels;
+    });
+    onClose();
+  };
+
+  return (
+    <div className="palette-backdrop" onClick={onClose}>
+      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="sync-head">
+          <span>字段模板</span>
+          <span className="spacer" />
+          <button className="ghost icon-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="sync-body">
+          <div className="field">
+            <label>实体类型</label>
+            <select value={kind} onChange={(e) => switchKind(e.target.value as EntityKind)}>
+              {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>字段名(每行一个;新建该类型实体时自动带上这些字段)</label>
+            <textarea
+              rows={7}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={'例如(角色):\n欲望\n恐惧\n口头禅\n秘密'}
+            />
+          </div>
+          <div className="sync-actions">
+            <button className="primary" onClick={save}>保存模板</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EntityLibrary() {
   const entities = useLoom((s) => s.project.entities);
   const { addEntity, updateEntity, removeEntity } = useLoom();
@@ -45,21 +98,34 @@ export default function EntityLibrary() {
     }
   };
 
+  const [editingTemplate, setEditingTemplate] = useState(false);
+
   const createEntity = () => {
     const kind = kindFilter === 'all' ? 'character' : kindFilter;
+    const tpl = useLoom.getState().project.entityTemplates?.[kind] ?? [];
     const e: Entity = {
       id: uid(), kind, name: `新${ENTITY_KIND_LABEL[kind]}`,
       color: PALETTE[entities.length % PALETTE.length],
-      emoji: '', summary: '', fields: [], notes: '', createdAt: Date.now(),
+      emoji: '', summary: '',
+      fields: tpl.map((label) => ({ id: uid(), label, value: '' })),
+      notes: '', createdAt: Date.now(),
     };
     addEntity(e);
     setSelectedId(e.id);
   };
 
+  const missingTplFields = selected
+    ? (useLoom.getState().project.entityTemplates?.[selected.kind] ?? [])
+        .filter((label) => !selected.fields.some((f) => f.label === label))
+    : [];
+
   return (
     <>
       <div className="side-list">
-        <div className="side-head"><span>实体类型</span></div>
+        <div className="side-head">
+          <span>实体类型</span>
+          <button className="ghost icon-btn" title="按类型设置字段模板" onClick={() => setEditingTemplate(true)}>模板</button>
+        </div>
         <div className="items">
           <div className={`side-item ${kindFilter === 'all' ? 'active' : ''}`} onClick={() => setKindFilter('all')}>
             全部 <span style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>{entities.length}</span>
@@ -195,9 +261,19 @@ export default function EntityLibrary() {
                   >×</button>
                 </div>
               ))}
-              <button onClick={() => updateEntity(selected.id, {
-                fields: [...selected.fields, { id: uid(), label: '', value: '' }],
-              })}>＋ 添加字段</button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => updateEntity(selected.id, {
+                  fields: [...selected.fields, { id: uid(), label: '', value: '' }],
+                })}>＋ 添加字段</button>
+                {missingTplFields.length > 0 && (
+                  <button
+                    title={`补齐模板中缺少的字段:${missingTplFields.join('、')}`}
+                    onClick={() => updateEntity(selected.id, {
+                      fields: [...selected.fields, ...missingTplFields.map((label) => ({ id: uid(), label, value: '' }))],
+                    })}
+                  >按模板补齐({missingTplFields.length})</button>
+                )}
+              </div>
             </div>
             <div className="field">
               <label>备注</label>
@@ -231,6 +307,13 @@ export default function EntityLibrary() {
           <div className="empty-hint">点击左侧卡片<br />查看和编辑实体</div>
         )}
       </aside>
+
+      {editingTemplate && (
+        <TemplateModal
+          initialKind={kindFilter === 'all' ? 'character' : kindFilter}
+          onClose={() => setEditingTemplate(false)}
+        />
+      )}
     </>
   );
 }
