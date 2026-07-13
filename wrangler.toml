@@ -2,14 +2,8 @@ name = "theloom"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-01-01"
 
-# ---- 云同步(可选) ----
-# 启用方法:
-#   1. npx wrangler d1 create theloom-sync
-#   2. 取消下面三行注释,把 database_id 换成上一步输出的 id
-#   3. 重新部署(推送到 main 或手动 wrangler pages deploy)
-# 未配置时应用正常运行,仅协作同步功能不可用。
-#
-# [[d1_databases]]
-# binding = "SYNC_DB"
-# database_name = "theloom-sync"
-# database_id = "填入你的 database id"
+# ---- 云同步 ----
+[[d1_databases]]
+binding = "SYNC_DB"
+database_name = "theloom-sync"
+database_id = "4f9e56b2-5565-48ae-bebd-1d672cdf2698"
