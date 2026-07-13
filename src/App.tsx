@@ -5,6 +5,7 @@ import {
 } from './storage';
 import { useNav } from './search';
 import SearchPalette from './components/SearchPalette';
+import SyncPanel from './components/SyncPanel';
 import Icon, { type IconName } from './components/Icon';
 import FlowEditor from './modules/flow/FlowEditor';
 import EntityLibrary from './modules/entities/EntityLibrary';
@@ -29,6 +30,7 @@ const TABS: { key: Tab; icon: IconName; label: string }[] = [
 export default function App() {
   const [tab, setTab] = useState<Tab>('flow');
   const [searching, setSearching] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
 
@@ -158,6 +160,9 @@ export default function App() {
               {folder && <button onClick={reloadFolder} title="从磁盘重新加载(在 Obsidian 或其他设备上改动后用)"><Icon name="refresh" /> 重新加载</button>}
             </>
           )}
+          <button onClick={() => setSyncing(true)} title="多人协作:云端房间推送 / 拉取(端到端加密)">
+            <Icon name="cloud" /> 协作
+          </button>
           <button onClick={() => exportProject(project)}><Icon name="download" /> 导出项目</button>
           <button onClick={() => fileRef.current?.click()}><Icon name="upload" /> 导入项目</button>
           <button
@@ -191,6 +196,7 @@ export default function App() {
       </div>
 
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
+      {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
     </div>
   );
 }

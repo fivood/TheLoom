@@ -4,7 +4,7 @@ import type { EntityKind } from '../types';
 export type IconName =
   | 'logo' | 'flow' | 'entity' | 'bulb' | 'grid' | 'clock' | 'archive' | 'braces'
   | 'search' | 'undo' | 'redo' | 'folder' | 'refresh' | 'download' | 'upload' | 'reset'
-  | 'play' | 'script' | 'pin' | 'image' | 'plus'
+  | 'play' | 'script' | 'pin' | 'image' | 'plus' | 'cloud'
   | 'user' | 'mappin' | 'key' | 'flag' | 'book';
 
 /** 实体类型 → 图标 */
@@ -134,6 +134,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  cloud: (
+    <>
+      <path d="M7 18.5A4.5 4.5 0 0 1 6.6 9.5 5.5 5.5 0 0 1 17.3 10.7 3.9 3.9 0 0 1 17 18.5z" />
+      <path d="M12 12.5v5M9.8 14.5 12 12.3l2.2 2.2" />
+    </>
+  ),
   user: (
     <>
       <circle cx="12" cy="7.5" r="3.5" />

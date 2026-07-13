@@ -549,6 +549,26 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   white-space: nowrap;
 }
 
+/* ---------- 协作同步面板 ---------- */
+
+.sync-panel { width: 460px; }
+.sync-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+.sync-head .spacer { flex: 1; }
+.sync-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.sync-body label { font-size: 12px; color: var(--text-faint); display: block; margin-bottom: 4px; }
+.sync-body input { width: 100%; }
+.sync-actions { display: flex; gap: 8px; }
+.sync-actions button { flex: 1; padding: 8px; }
+.sync-status { font-size: 12px; color: var(--text-dim); min-height: 16px; }
+.sync-status .sync-msg { margin-top: 4px; color: var(--text); }
+
 /* ---------- 演出模式 ---------- */
 
 .player-overlay {
