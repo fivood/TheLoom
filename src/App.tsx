@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { exportProject, useLoom } from './store';
 import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export';
 import {
@@ -12,30 +12,37 @@ import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import ProjectMenu from './components/ProjectMenu';
 import Icon, { type IconName } from './components/Icon';
-import FlowEditor from './modules/flow/FlowEditor';
-import EntityLibrary from './modules/entities/EntityLibrary';
-import Assets from './modules/assets/Assets';
-import DocumentView from './modules/document/DocumentView';
-import Brainstorm from './modules/brainstorm/Brainstorm';
-import OutlineGrid from './modules/outline/OutlineGrid';
-import Timeline from './modules/timeline/Timeline';
-import MapEditor from './modules/map/MapEditor';
-import ResearchCards from './modules/research/ResearchCards';
-import Variables from './modules/variables/Variables';
+
+// 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
+const FlowEditor = lazy(() => import('./modules/flow/FlowEditor'));
+const EntityLibrary = lazy(() => import('./modules/entities/EntityLibrary'));
+const Assets = lazy(() => import('./modules/assets/Assets'));
+const DocumentView = lazy(() => import('./modules/document/DocumentView'));
+const Brainstorm = lazy(() => import('./modules/brainstorm/Brainstorm'));
+const OutlineGrid = lazy(() => import('./modules/outline/OutlineGrid'));
+const Timeline = lazy(() => import('./modules/timeline/Timeline'));
+const MapEditor = lazy(() => import('./modules/map/MapEditor'));
+const ResearchCards = lazy(() => import('./modules/research/ResearchCards'));
+const Variables = lazy(() => import('./modules/variables/Variables'));
 
 type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
+type TabGroup = 'build' | 'library' | 'plan' | 'logic';
 
-const TABS: { key: Tab; icon: IconName; label: string }[] = [
-  { key: 'flow', icon: 'flow', label: '流程' },
-  { key: 'entities', icon: 'entity', label: '实体' },
-  { key: 'assets', icon: 'image', label: '资源' },
-  { key: 'documents', icon: 'doc', label: '文档' },
-  { key: 'brainstorm', icon: 'bulb', label: '风暴' },
-  { key: 'outline', icon: 'grid', label: '大纲' },
-  { key: 'timeline', icon: 'clock', label: '时间线' },
-  { key: 'map', icon: 'mappin', label: '地图' },
-  { key: 'research', icon: 'archive', label: '资料' },
-  { key: 'variables', icon: 'braces', label: '变量' },
+const GROUP_LABEL: Record<TabGroup, string> = {
+  build: '构建', library: '素材', plan: '规划', logic: '逻辑',
+};
+
+const TABS: { key: Tab; icon: IconName; label: string; group: TabGroup }[] = [
+  { key: 'flow', icon: 'flow', label: '流程', group: 'build' },
+  { key: 'documents', icon: 'doc', label: '文档', group: 'build' },
+  { key: 'entities', icon: 'entity', label: '实体', group: 'library' },
+  { key: 'assets', icon: 'image', label: '资源', group: 'library' },
+  { key: 'research', icon: 'archive', label: '资料', group: 'library' },
+  { key: 'outline', icon: 'grid', label: '大纲', group: 'plan' },
+  { key: 'timeline', icon: 'clock', label: '时间线', group: 'plan' },
+  { key: 'map', icon: 'mappin', label: '地图', group: 'plan' },
+  { key: 'brainstorm', icon: 'bulb', label: '风暴', group: 'plan' },
+  { key: 'variables', icon: 'braces', label: '变量', group: 'logic' },
 ];
 
 export default function App() {
@@ -44,6 +51,7 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [auditing, setAuditing] = useState(false);
   const [history, setHistory] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
 
@@ -125,17 +133,23 @@ export default function App() {
     <div className="app">
       <nav className="sidebar">
         <div className="logo" title="叙事织机 TheLoom"><img src="/logo.svg" alt="TheLoom" width={26} height={26} /></div>
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={`nav-btn ${tab === t.key ? 'active' : ''}`}
-            onClick={() => setTab(t.key)}
-            title={t.label}
-          >
-            <Icon name={t.icon} size={18} />
-            <span>{t.label}</span>
-          </button>
-        ))}
+        {TABS.map((t, i) => {
+          const prev = i > 0 ? TABS[i - 1].group : null;
+          const showSep = prev !== null && prev !== t.group;
+          return (
+            <div key={t.key} style={{ display: 'contents' }}>
+              {showSep && <div className="nav-sep" title={GROUP_LABEL[t.group]}><span>{GROUP_LABEL[t.group]}</span></div>}
+              <button
+                className={`nav-btn ${tab === t.key ? 'active' : ''}`}
+                onClick={() => setTab(t.key)}
+                title={t.label}
+              >
+                <Icon name={t.icon} size={18} />
+                <span>{t.label}</span>
+              </button>
+            </div>
+          );
+        })}
       </nav>
 
       <div className="main">
@@ -160,56 +174,69 @@ export default function App() {
           >
             v{__APP_VERSION__}
           </button>
-          {isTauri && (
-            <>
-              <button onClick={chooseFolder} title={folder ?? '选择一个文件夹存放项目(放进 OneDrive / Google Drive 即可云同步,也可直接作为 Obsidian 库)'}>
-                <Icon name="folder" /> {folder ? '更换文件夹' : '项目文件夹'}
-              </button>
-              {folder && <button onClick={reloadFolder} title="从磁盘重新加载(在 Obsidian 或其他设备上改动后用)"><Icon name="refresh" /> 重新加载</button>}
-            </>
-          )}
-          <button onClick={() => setAuditing(true)} title="字数统计与问题检测(孤儿节点、分支缺口、未定义变量、空对白)">
-            <Icon name="script" /> 体检
-          </button>
-          <button onClick={() => setHistory(true)} title="版本历史:命名快照、回滚到任意版本">
-            <Icon name="undo" /> 历史
-          </button>
-          <button onClick={() => setSyncing(true)} title="多人协作:云端房间推送 / 拉取(端到端加密)">
-            <Icon name="cloud" /> 协作
-          </button>
-          <select
-            className="ghost"
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) return;
-              if (v === 'json') exportProject(project);
-              else if (v === 'entities') downloadCsv(`${project.name}-实体表.csv`, entitiesToCsv(project));
-              else if (v === 'assets') downloadCsv(`${project.name}-资源表.csv`, assetsToCsv(project));
-              else if (v === 'outline') downloadCsv(`${project.name}-大纲表.csv`, outlineToCsv(project));
-              e.currentTarget.value = '';
-            }}
-            title="导出"
-          >
-            <option value=""><Icon name="download" size={13} /> 导出 ▾</option>
-            <option value="json">JSON 完整备份</option>
-            <option value="entities">实体表 CSV</option>
-            <option value="assets">资源表 CSV</option>
-            <option value="outline">大纲表 CSV</option>
-          </select>
+          <div className="tools-wrap">
+            <button className="ghost" onClick={() => setToolsOpen((o) => !o)} title="工具:文件 / 体检 / 历史 / 协作 / 导出">
+              <Icon name="script" size={14} /> 工具 ▾
+            </button>
+            {toolsOpen && (
+              <>
+                <div className="backdrop" onClick={() => setToolsOpen(false)} />
+                <div className="tools-menu">
+                  {isTauri && (
+                    <>
+                      <button onClick={() => { setToolsOpen(false); chooseFolder(); }}>
+                        <Icon name="folder" size={14} /> {folder ? '更换文件夹' : '项目文件夹'}
+                      </button>
+                      {folder && (
+                        <button onClick={() => { setToolsOpen(false); reloadFolder(); }}>
+                          <Icon name="refresh" size={14} /> 重新加载
+                        </button>
+                      )}
+                      <div className="tools-sep" />
+                    </>
+                  )}
+                  <button onClick={() => { setToolsOpen(false); setAuditing(true); }}>
+                    <Icon name="script" size={14} /> 体检
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); setHistory(true); }}>
+                    <Icon name="undo" size={14} /> 版本历史
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); setSyncing(true); }}>
+                    <Icon name="cloud" size={14} /> 协作
+                  </button>
+                  <div className="tools-sep" />
+                  <div className="tools-label">导出</div>
+                  <button onClick={() => { setToolsOpen(false); exportProject(project); }}>
+                    JSON 完整备份
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-实体表.csv`, entitiesToCsv(project)); }}>
+                    实体表 CSV
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-资源表.csv`, assetsToCsv(project)); }}>
+                    资源表 CSV
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-大纲表.csv`, outlineToCsv(project)); }}>
+                    大纲表 CSV
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </header>
 
         <div className="content" key={revision}>
-          {tab === 'flow' && <FlowEditor />}
-          {tab === 'entities' && <EntityLibrary />}
-          {tab === 'assets' && <Assets />}
-          {tab === 'documents' && <DocumentView />}
-          {tab === 'brainstorm' && <Brainstorm />}
-          {tab === 'outline' && <OutlineGrid />}
-          {tab === 'timeline' && <Timeline />}
-          {tab === 'map' && <MapEditor />}
-          {tab === 'research' && <ResearchCards />}
-          {tab === 'variables' && <Variables />}
+          <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
+            {tab === 'flow' && <FlowEditor />}
+            {tab === 'entities' && <EntityLibrary />}
+            {tab === 'assets' && <Assets />}
+            {tab === 'documents' && <DocumentView />}
+            {tab === 'brainstorm' && <Brainstorm />}
+            {tab === 'outline' && <OutlineGrid />}
+            {tab === 'timeline' && <Timeline />}
+            {tab === 'map' && <MapEditor />}
+            {tab === 'research' && <ResearchCards />}
+            {tab === 'variables' && <Variables />}
+          </Suspense>
         </div>
       </div>
 

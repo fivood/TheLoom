@@ -111,6 +111,57 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .nav-btn:hover { background: var(--bg-hover); color: var(--text); }
 .nav-btn.active { background: #1b1b19; color: #fff; }
 
+.nav-sep {
+  width: 30px;
+  margin: 6px auto 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  user-select: none;
+}
+.nav-sep span { writing-mode: vertical-rl; }
+
+/* 工具下拉 */
+.tools-wrap { position: relative; }
+.tools-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(27, 27, 25, 0.12);
+  padding: 4px;
+  z-index: 50;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tools-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: left;
+  width: 100%;
+}
+.tools-menu button:hover { background: var(--bg-hover); color: var(--text); }
+.tools-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.tools-label { font-size: 10px; color: var(--text-faint); padding: 4px 10px 2px; letter-spacing: 1px; text-transform: uppercase; }
+.backdrop { position: fixed; inset: 0; z-index: 40; }
+
 .main {
   flex: 1; display: flex; flex-direction: column; min-width: 0;
   background: var(--bg-panel);

@@ -1,6 +1,6 @@
 [package]
 name = "theloom"
-version = "0.7.2"
+version = "0.7.3"
 description = "叙事织机 TheLoom — 叙事设计工具"
 edition = "2021"
 
