@@ -125,7 +125,7 @@ export default function App() {
   return (
     <div className="app">
       <nav className="sidebar">
-        <div className="logo" title="叙事织机 TheLoom"><Icon name="logo" size={22} /></div>
+        <div className="logo" title="叙事织机 TheLoom"><img src="/logo.svg" alt="TheLoom" width={26} height={26} /></div>
         {TABS.map((t) => (
           <button
             key={t.key}

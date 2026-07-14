@@ -86,11 +86,11 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   flex-shrink: 0;
 }
 .sidebar .logo {
-  color: var(--text);
   margin-bottom: 10px;
   width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
-  background: #1b1b19; color: #fff;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
 .nav-btn {
