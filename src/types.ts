@@ -28,11 +28,17 @@ export interface EntityField {
   filterKind?: EntityKind;
 }
 
-/** 模板字段:决定新建实体时预填的字段结构 */
+/** 模板字段:决定新建实体时预填的字段结构 + 约束 */
 export interface EntityTemplateField {
   label: string;
   type?: EntityFieldType;
   filterKind?: EntityKind;
+  /** 枚举约束:字段值必须从这些值里选 */
+  enumValues?: string[];
+  /** 必填:实例上不能为空 */
+  required?: boolean;
+  /** 只读:实例上不可编辑(由模板锁定) */
+  readonly?: boolean;
 }
 /** 兼容旧版:字符串等价于 { label, type: 'text' } */
 export type EntityTemplateSpec = string | EntityTemplateField;

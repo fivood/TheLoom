@@ -21,6 +21,26 @@ const SLOTS_KEY = 'theloom-slots-v1';
 const CURRENT_KEY = 'theloom-current-v1';
 const LEGACY_KEY = 'theloom-project-v1';
 const projectKey = (id: string) => `theloom-project-${id}`;
+const snapshotsKey = (slotId: string) => `theloom-snapshots-${slotId}`;
+
+export interface Snapshot {
+  id: string;
+  name: string;
+  createdAt: number;
+  /** 项目 JSON 序列化(完整快照,含所有模块) */
+  data: string;
+}
+
+function readSnapshots(slotId: string): Snapshot[] {
+  try {
+    const raw = localStorage.getItem(snapshotsKey(slotId));
+    if (raw) return JSON.parse(raw) as Snapshot[];
+  } catch { /* 忽略 */ }
+  return [];
+}
+function writeSnapshots(slotId: string, list: Snapshot[]) {
+  try { localStorage.setItem(snapshotsKey(slotId), JSON.stringify(list)); } catch (e) { console.error('快照写入失败', e); }
+}
 
 export interface SlotMeta {
   id: string;
@@ -184,6 +204,12 @@ interface LoomState {
   addFolder: (f: Folder) => void;
   updateFolder: (id: string, patch: Partial<Folder>) => void;
   removeFolder: (id: string) => void;
+
+  /** 版本历史快照 */
+  snapshots: Snapshot[];
+  createSnapshot: (name: string) => void;
+  restoreSnapshot: (id: string) => void;
+  deleteSnapshot: (id: string) => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -235,6 +261,7 @@ export const useLoom = create<LoomState>((set, get) => {
     set((s) => ({
       project: next,
       currentSlotId: targetId,
+      snapshots: readSnapshots(targetId),
       savedAt: Date.now(),
       revision: s.revision + 1,
       canUndo: false,
@@ -281,6 +308,7 @@ export const useLoom = create<LoomState>((set, get) => {
 
     slots: boot.slots,
     currentSlotId: boot.currentId,
+    snapshots: readSnapshots(boot.currentId),
 
     switchSlot: (id) => {
       const cur = get().currentSlotId;
@@ -463,6 +491,35 @@ export const useLoom = create<LoomState>((set, get) => {
       };
       for (const fid of toDelete) clear(fid);
     }),
+
+    createSnapshot: (name) => {
+      const cur = get();
+      const snap: Snapshot = { id: uid(), name: name || `版本 ${new Date().toLocaleString()}`, createdAt: Date.now(), data: JSON.stringify(cur.project) };
+      const list = [snap, ...cur.snapshots].slice(0, 30); // 上限 30 个,避免 localStorage 爆
+      writeSnapshots(cur.currentSlotId, list);
+      set({ snapshots: list });
+    },
+    restoreSnapshot: (id) => {
+      const cur = get();
+      const snap = cur.snapshots.find((s) => s.id === id);
+      if (!snap) return;
+      try {
+        const p = JSON.parse(snap.data) as Project;
+        if (!p || p.version !== 1) throw new Error('快照格式不正确');
+        normalizeProject(p);
+        if (!confirm(`回滚到「${snap.name}」?当前未保存的改动会进入撤销栈(可用 Ctrl+Z 恢复)。`)) return;
+        undoStack = []; redoStack = []; lastUndoPush = 0;
+        swapProject(p);
+      } catch (e) {
+        alert(`回滚失败:${e}`);
+      }
+    },
+    deleteSnapshot: (id) => {
+      const cur = get();
+      const list = cur.snapshots.filter((s) => s.id !== id);
+      writeSnapshots(cur.currentSlotId, list);
+      set({ snapshots: list });
+    },
   };
 });
 

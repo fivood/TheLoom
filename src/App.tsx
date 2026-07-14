@@ -8,6 +8,7 @@ import { checkForUpdates } from './updater';
 import SearchPalette from './components/SearchPalette';
 import SyncPanel from './components/SyncPanel';
 import AuditPanel from './components/AuditPanel';
+import VersionHistory from './components/VersionHistory';
 import ProjectMenu from './components/ProjectMenu';
 import Icon, { type IconName } from './components/Icon';
 import FlowEditor from './modules/flow/FlowEditor';
@@ -41,6 +42,7 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [auditing, setAuditing] = useState(false);
+  const [history, setHistory] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
 
@@ -168,6 +170,9 @@ export default function App() {
           <button onClick={() => setAuditing(true)} title="字数统计与问题检测(孤儿节点、分支缺口、未定义变量、空对白)">
             <Icon name="script" /> 体检
           </button>
+          <button onClick={() => setHistory(true)} title="版本历史:命名快照、回滚到任意版本">
+            <Icon name="undo" /> 历史
+          </button>
           <button onClick={() => setSyncing(true)} title="多人协作:云端房间推送 / 拉取(端到端加密)">
             <Icon name="cloud" /> 协作
           </button>
@@ -191,6 +196,7 @@ export default function App() {
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
       {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
+      {history && <VersionHistory onClose={() => setHistory(false)} />}
     </div>
   );
 }

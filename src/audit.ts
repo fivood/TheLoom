@@ -157,6 +157,22 @@ export function auditProject(p: Project): Issue[] {
     }
   }
 
+  // 必填模板字段:实体上缺失或为空
+  for (const e of p.entities) {
+    const specs = (p.entityTemplates?.[e.kind] ?? []).map((s) => (typeof s === 'string' ? { label: s } : s));
+    for (const spec of specs) {
+      if (!spec.required) continue;
+      const field = e.fields.find((f) => f.label === spec.label);
+      if (!field || !field.value.trim()) {
+        issues.push({
+          kind: '必填缺失',
+          message: `${e.name} · ${spec.label}`,
+          nav: { tab: 'entities', entityId: e.id },
+        });
+      }
+    }
+  }
+
   // 重复技术名
   for (const dup of findDuplicateTechnicalNames(p)) {
     const where = dup.owners.map((o) => `${o.kind}「${o.name}」`).join('、');

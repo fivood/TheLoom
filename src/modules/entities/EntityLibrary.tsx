@@ -27,15 +27,21 @@ function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onCl
 
   const switchKind = (k: EntityKind) => { setKind(k); setRows(readTpl(k)); };
   const save = () => {
-    const clean = rows.filter((r) => r.label.trim()).map((r) => ({
-      label: r.label.trim(),
-      ...(r.type && r.type !== 'text' ? { type: r.type } : {}),
-      ...(r.filterKind ? { filterKind: r.filterKind } : {}),
-    }));
+    const clean = rows.filter((r) => r.label.trim()).map((r): EntityTemplateField => {
+      const out: EntityTemplateField = { label: r.label.trim() };
+      if (r.type && r.type !== 'text') out.type = r.type;
+      if (r.filterKind) out.filterKind = r.filterKind;
+      if (r.enumValues && r.enumValues.length) out.enumValues = r.enumValues;
+      if (r.required) out.required = true;
+      if (r.readonly) out.readonly = true;
+      return out;
+    });
     update((p) => {
       p.entityTemplates ??= {};
-      // 纯文本模板落回字符串以保持文件精简
-      p.entityTemplates[kind] = clean.map((r) => (r.type || r.filterKind ? r : r.label));
+      // 无任何额外属性的纯文本字段落回字符串以保持文件精简
+      p.entityTemplates[kind] = clean.map((r) =>
+        (r.type || r.filterKind || r.enumValues?.length || r.required || r.readonly) ? r : r.label
+      );
     });
     onClose();
   };
@@ -47,7 +53,7 @@ function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onCl
 
   return (
     <div className="palette-backdrop" onClick={onClose}>
-      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
+      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 720 }}>
         <div className="sync-head">
           <span>字段模板 · {ENTITY_KIND_LABEL[kind]}</span>
           <span className="spacer" />
@@ -60,13 +66,16 @@ function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onCl
               {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
             </select>
           </div>
-          <table className="var-table">
+          <table className="var-table tpl-table">
             <thead>
               <tr>
                 <th>字段名</th>
-                <th style={{ width: 100 }}>类型</th>
-                <th style={{ width: 110 }}>限定实体</th>
-                <th style={{ width: 40 }}></th>
+                <th style={{ width: 90 }}>类型</th>
+                <th style={{ width: 90 }}>限定实体</th>
+                <th style={{ width: 150 }}>枚举值(逗号分隔)</th>
+                <th style={{ width: 34 }} title="必填:实例上不能为空">必</th>
+                <th style={{ width: 34 }} title="只读:实例上不可编辑">只</th>
+                <th style={{ width: 34 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -95,6 +104,33 @@ function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onCl
                         {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
                       </select>
                     ) : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>}
+                  </td>
+                  <td>
+                    {r.type === 'text' || !r.type ? (
+                      <input
+                        value={(r.enumValues ?? []).join(', ')}
+                        onChange={(e) => patchRow(i, {
+                          enumValues: e.target.value.split(/[，,]/).map((s) => s.trim()).filter(Boolean),
+                        })}
+                        placeholder="留空 = 自由文本;如:低,中,高"
+                      />
+                    ) : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={r.required === true}
+                      onChange={(e) => patchRow(i, { required: e.target.checked })}
+                      title="必填"
+                    />
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={r.readonly === true}
+                      onChange={(e) => patchRow(i, { readonly: e.target.checked })}
+                      title="只读"
+                    />
                   </td>
                   <td><button className="ghost icon-btn" onClick={() => removeRow(i)}>×</button></td>
                 </tr>
@@ -169,6 +205,13 @@ export default function EntityLibrary() {
         .map(normTpl)
         .filter((tf) => !selected.fields.some((f) => f.label === tf.label))
     : [];
+
+  const entityTemplates = useLoom((s) => s.project.entityTemplates);
+  const tplSpecs = useMemo(
+    () => (entityTemplates?.[selected?.kind ?? 'character'] ?? []).map(normTpl),
+    [entityTemplates, selected?.kind],
+  );
+  const specFor = (label: string) => tplSpecs.find((s) => s.label === label);
 
   return (
     <>
@@ -305,46 +348,65 @@ export default function EntityLibrary() {
                 const patchField = (patch: Partial<typeof f>) => updateEntity(selected.id, {
                   fields: selected.fields.map((x) => x.id === f.id ? { ...x, ...patch } : x),
                 });
+                const spec = specFor(f.label);
                 return (
-                  <div key={f.id} className="field-row">
+                  <div key={f.id} className={`field-row ${spec?.readonly ? 'field-readonly' : ''}`}>
                     <div className="field-row-head">
                       <input
                         className="field-label"
                         value={f.label}
                         placeholder="字段名"
+                        readOnly={spec?.readonly === true}
                         onChange={(e) => patchField({ label: e.target.value })}
                       />
-                      <select
-                        className="field-type"
-                        value={type}
-                        onChange={(e) => patchField({ type: e.target.value as EntityFieldType, value: '' })}
-                        title="字段类型"
-                      >
-                        <option value="text">文本</option>
-                        <option value="entity">→ 单实体</option>
-                        <option value="entities">→ 多实体</option>
-                      </select>
-                      {type !== 'text' && (
-                        <select
-                          className="field-filter"
-                          value={f.filterKind ?? ''}
-                          onChange={(e) => patchField({ filterKind: (e.target.value || undefined) as EntityKind | undefined })}
-                          title="限定实体类型"
-                        >
-                          <option value="">任意类型</option>
-                          {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
-                        </select>
+                      {spec?.required && <span className="req-mark" title="必填">*</span>}
+                      {spec?.readonly ? (
+                        <span className="hint" style={{ fontSize: 11 }} title="模板只读字段">🔒</span>
+                      ) : (
+                        <>
+                          <select
+                            className="field-type"
+                            value={type}
+                            onChange={(e) => patchField({ type: e.target.value as EntityFieldType, value: '' })}
+                            title="字段类型"
+                          >
+                            <option value="text">文本</option>
+                            <option value="entity">→ 单实体</option>
+                            <option value="entities">→ 多实体</option>
+                          </select>
+                          {type !== 'text' && (
+                            <select
+                              className="field-filter"
+                              value={f.filterKind ?? ''}
+                              onChange={(e) => patchField({ filterKind: (e.target.value || undefined) as EntityKind | undefined })}
+                              title="限定实体类型"
+                            >
+                              <option value="">任意类型</option>
+                              {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
+                            </select>
+                          )}
+                          <button
+                            className="ghost icon-btn"
+                            onClick={() => updateEntity(selected.id, { fields: selected.fields.filter((x) => x.id !== f.id) })}
+                          >×</button>
+                        </>
                       )}
-                      <button
-                        className="ghost icon-btn"
-                        onClick={() => updateEntity(selected.id, { fields: selected.fields.filter((x) => x.id !== f.id) })}
-                      >×</button>
                     </div>
                     <div className="field-row-value">
-                      {type === 'text' && (
+                      {type === 'text' && spec?.enumValues && spec.enumValues.length > 0 ? (
+                        <select
+                          value={f.value}
+                          onChange={(e) => patchField({ value: e.target.value })}
+                          disabled={spec?.readonly === true}
+                        >
+                          <option value="">(未选)</option>
+                          {spec.enumValues.map((v) => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      ) : type === 'text' && spec?.readonly ? (
+                        <input value={f.value} readOnly placeholder="值" />
+                      ) : type === 'text' ? (
                         <input value={f.value} placeholder="值" onChange={(e) => patchField({ value: e.target.value })} />
-                      )}
-                      {type !== 'text' && (
+                      ) : (
                         <EntityRefEditor
                           type={type}
                           value={f.value}

@@ -491,6 +491,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* ---------- 实体 ---------- */
 
 .field-row { border: 1px solid var(--border); border-radius: 8px; padding: 6px; margin-bottom: 6px; background: var(--bg-card); }
+.field-row.field-readonly { background: var(--bg-panel); border-style: dashed; }
+.field-row .req-mark { color: var(--danger); font-weight: 700; margin-left: 2px; }
+.tpl-table input, .tpl-table select { width: 100%; }
+.tpl-table th { font-size: 11px; }
 .field-row-head { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
 .field-row-head .field-label { flex: 1; min-width: 0; }
 .field-row-head .field-type { width: 100px; flex-shrink: 0; }
@@ -1084,6 +1088,21 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   text-align: left;
   padding: 0;
 }
+
+.snapshot-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.snapshot-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+.snapshot-meta { flex: 1; min-width: 0; }
+.snapshot-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snapshot-time { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+.snapshot-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* ---------- 富文本 ---------- */
 
