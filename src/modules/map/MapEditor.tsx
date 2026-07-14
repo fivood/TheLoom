@@ -99,6 +99,8 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
   const [draftRegion, setDraftRegion] = useState<{ x: number; y: number }[]>([]);
   const [pointFilter, setPointFilter] = useState<string>('');
   const [dragging, setDragging] = useState<string | null>(null);
+  const [draggingVertex, setDraggingVertex] = useState<{ regionId: string; idx: number } | null>(null);
+  const [playing, setPlaying] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const imgFileRef = useRef<HTMLInputElement>(null);
 
@@ -162,6 +164,41 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
       window.removeEventListener('mouseup', onUp);
     };
   }, [dragging]);
+
+  // 拖拽区域顶点
+  useEffect(() => {
+    if (!draggingVertex) return;
+    const onMove = (e: MouseEvent) => {
+      const { x, y } = clientToNormalized(e.clientX, e.clientY);
+      patch((m) => {
+        const r = m.regions.find((x) => x.id === draggingVertex.regionId);
+        if (r && r.points[draggingVertex.idx]) { r.points[draggingVertex.idx] = { x, y }; }
+      });
+    };
+    const onUp = () => setDraggingVertex(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [draggingVertex]);
+
+  // 时间线自动播放
+  useEffect(() => {
+    if (!playing || points.length === 0) return;
+    let idx = pointFilter ? (points.findIndex((p) => p.id === pointFilter)) : -1;
+    let cancelled = false;
+    const step = () => {
+      if (cancelled) return;
+      idx++;
+      if (idx >= points.length) { setPlaying(false); return; }
+      setPointFilter(points[idx].id);
+      setTimeout(step, 1200);
+    };
+    setTimeout(step, 1200);
+    return () => { cancelled = true; };
+  }, [playing]);
 
   const pointIndex = useMemo(() => new Map(points.map((p, i) => [p.id, i])), [points]);
   const filterIndex = pointFilter ? pointIndex.get(pointFilter) ?? -1 : -1;
@@ -237,8 +274,17 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
           />
           <button onClick={exportPng}><Icon name="download" /> 导出 PNG</button>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {points.length > 0 && (
+              <button
+                className="ghost icon-btn"
+                title={playing ? '停止播放' : '从当前时间点开始扫过所有时间点(约 1.2 秒/帧)'}
+                onClick={() => setPlaying((v) => !v)}
+              >
+                {playing ? '■' : '▶'}
+              </button>
+            )}
             <label style={{ fontSize: 12, color: 'var(--text-faint)' }}>时间线滤镜</label>
-            <select value={pointFilter} onChange={(e) => setPointFilter(e.target.value)}>
+            <select value={pointFilter} onChange={(e) => { setPointFilter(e.target.value); setPlaying(false); }}>
               <option value="">全部时间</option>
               {points.map((pt) => <option key={pt.id} value={pt.id}>{pt.label}</option>)}
             </select>
@@ -269,14 +315,38 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
                   const active = selection?.kind === 'region' && selection.id === r.id;
                   const col = r.color || '#565550';
                   return (
-                    <polygon
-                      key={r.id}
-                      points={pts}
-                      fill={col} fillOpacity={active ? 0.35 : 0.22}
-                      stroke={col} strokeWidth={active ? 3 : 1.5}
-                      style={{ cursor: 'pointer' }}
-                      onClick={(e) => { e.stopPropagation(); setSelection({ kind: 'region', id: r.id }); }}
-                    />
+                    <g key={r.id}>
+                      <polygon
+                        points={pts}
+                        fill={col} fillOpacity={active ? 0.35 : 0.22}
+                        stroke={col} strokeWidth={active ? 3 : 1.5}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e) => { e.stopPropagation(); setSelection({ kind: 'region', id: r.id }); }}
+                      />
+                      {/* 选中时显示可拖拽顶点 */}
+                      {active && r.points.map((v, i) => (
+                        <rect
+                          key={i}
+                          x={v.x * S - 6} y={v.y * S - 6} width={12} height={12}
+                          fill="#fff" stroke="#1b1b19" strokeWidth={2}
+                          style={{ cursor: 'grab' }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            setDraggingVertex({ regionId: r.id, idx: i });
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            if (r.points.length <= 3) { alert('多边形至少 3 顶点'); return; }
+                            patch((m) => {
+                              const rr = m.regions.find((x) => x.id === r.id);
+                              if (rr) rr.points.splice(i, 1);
+                            });
+                          }}
+                        >
+                          <title>拖拽移动 · 右键删除</title>
+                        </rect>
+                      ))}
+                    </g>
                   );
                 })}
 
@@ -460,7 +530,9 @@ function RegionInspector({ region, onChange, onDelete }: {
         </div>
       </div>
       <TimeRangeFields from={region.fromPointId} to={region.toPointId} onChange={onChange} />
-      <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>顶点数:{region.points.length}(暂不支持编辑顶点,如需微调请删除重画)</div>
+      <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+        顶点数:{region.points.length}。拖拽白色方块调整位置,右键删除(至少保留 3 顶点)。
+      </div>
       <button className="danger" onClick={onDelete}>删除区域</button>
     </>
   );
