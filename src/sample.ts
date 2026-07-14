@@ -9,6 +9,7 @@ export function sampleProject(): Project {
   const semId = uid();   // 塞梅尔维斯
   const valId = uid();   // 瓦伦缇娜
   const fanId = uid();   // 范肖先生
+  const foundationId = uid();  // 基金会(阵营)
   const whitehallId = uid();
   const tunnelId = uid();
   const phoneId = uid();
@@ -100,6 +101,8 @@ export function sampleProject(): Project {
           { id: uid(), label: '职业病', value: '用查案逻辑分析感情问题,随时准备写投诉信' },
           { id: uid(), label: '当前状态', value: '休假中(被迫结束)' },
           { id: uid(), label: '关于那部手机', value: '只是觉得它重量尚可。绝对不是在等谁的短信。' },
+          { id: uid(), label: '所属', value: foundationId, type: 'entity', filterKind: 'faction' },
+          { id: uid(), label: '搭档', value: valId, type: 'entity', filterKind: 'character' },
         ],
         notes: '', createdAt: Date.now(),
       },
@@ -143,10 +146,26 @@ export function sampleProject(): Project {
         summary: '通讯录里只有一个联系人。持有者坚称留着它是因为重量尚可,且德国电路的严谨设计适合记备忘录。绝对不是在等某人发来什么。绝对不是。',
         fields: [
           { id: uid(), label: '屏幕', value: '复古像素绿,黑暗里唯一的光源' },
+          { id: uid(), label: '持有者', value: semId, type: 'entity', filterKind: 'character' },
+        ],
+        notes: '', createdAt: Date.now(),
+      },
+      {
+        id: foundationId, kind: 'faction', name: '基金会', color: '#565550', emoji: '',
+        summary: '管理神秘事件的组织,视夜行种为稀缺人力。塞的雇主,同时也是她投诉信的常年收件人。',
+        fields: [
+          { id: uid(), label: '风格', value: '公文腔:签 24 小时待命的不平等条约,却给员工发怪味巧克力' },
         ],
         notes: '', createdAt: Date.now(),
       },
     ],
+    entityTemplates: {
+      character: [
+        '欲望',
+        '恐惧',
+        { label: '所属', type: 'entity', filterKind: 'faction' },
+      ],
+    },
     brainstormNotes: [
       { id: uid(), text: '核心反差:救援任务 × 被迫结束的假期', color: '#ffffff', position: { x: 120, y: 80 } },
       { id: uid(), text: '手机是两条线之间唯一的通道——短信界面全部用复古像素绿', color: '#e6e4df', position: { x: 430, y: 40 } },

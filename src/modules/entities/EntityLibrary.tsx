@@ -5,34 +5,49 @@ import { findEntityRefs, useNav } from '../../search';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import Icon, { KIND_ICON } from '../../components/Icon';
+import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
+import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
+
+/** 归一化模板条目:老字符串等价于文本字段 */
+function normTpl(spec: EntityTemplateSpec): EntityTemplateField {
+  return typeof spec === 'string' ? { label: spec } : spec;
+}
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
 /** 按类型的字段模板编辑器 */
 function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onClose: () => void }) {
-  const templates = useLoom((s) => s.project.entityTemplates);
   const update = useLoom((s) => s.update);
   const [kind, setKind] = useState<EntityKind>(initialKind);
-  const [text, setText] = useState(() => (templates?.[initialKind] ?? []).join('\n'));
+  const readTpl = (k: EntityKind): EntityTemplateField[] =>
+    (useLoom.getState().project.entityTemplates?.[k] ?? []).map(normTpl);
+  const [rows, setRows] = useState<EntityTemplateField[]>(() => readTpl(initialKind));
 
-  const switchKind = (k: EntityKind) => {
-    setKind(k);
-    setText((useLoom.getState().project.entityTemplates?.[k] ?? []).join('\n'));
-  };
+  const switchKind = (k: EntityKind) => { setKind(k); setRows(readTpl(k)); };
   const save = () => {
-    const labels = text.split('\n').map((s) => s.trim()).filter(Boolean);
+    const clean = rows.filter((r) => r.label.trim()).map((r) => ({
+      label: r.label.trim(),
+      ...(r.type && r.type !== 'text' ? { type: r.type } : {}),
+      ...(r.filterKind ? { filterKind: r.filterKind } : {}),
+    }));
     update((p) => {
       p.entityTemplates ??= {};
-      p.entityTemplates[kind] = labels;
+      // 纯文本模板落回字符串以保持文件精简
+      p.entityTemplates[kind] = clean.map((r) => (r.type || r.filterKind ? r : r.label));
     });
     onClose();
   };
 
+  const patchRow = (i: number, patch: Partial<EntityTemplateField>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i));
+  const addRow = () => setRows((rs) => [...rs, { label: '' }]);
+
   return (
     <div className="palette-backdrop" onClick={onClose}>
-      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
         <div className="sync-head">
-          <span>字段模板</span>
+          <span>字段模板 · {ENTITY_KIND_LABEL[kind]}</span>
           <span className="spacer" />
           <button className="ghost icon-btn" onClick={onClose}>×</button>
         </div>
@@ -43,16 +58,49 @@ function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onCl
               {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
             </select>
           </div>
-          <div className="field">
-            <label>字段名(每行一个;新建该类型实体时自动带上这些字段)</label>
-            <textarea
-              rows={7}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={'例如(角色):\n欲望\n恐惧\n口头禅\n秘密'}
-            />
-          </div>
+          <table className="var-table">
+            <thead>
+              <tr>
+                <th>字段名</th>
+                <th style={{ width: 100 }}>类型</th>
+                <th style={{ width: 110 }}>限定实体</th>
+                <th style={{ width: 40 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td>
+                    <input value={r.label} onChange={(e) => patchRow(i, { label: e.target.value })} placeholder="例如:欲望" />
+                  </td>
+                  <td>
+                    <select
+                      value={r.type ?? 'text'}
+                      onChange={(e) => patchRow(i, { type: e.target.value as EntityFieldType })}
+                    >
+                      <option value="text">文本</option>
+                      <option value="entity">→ 单实体</option>
+                      <option value="entities">→ 多实体</option>
+                    </select>
+                  </td>
+                  <td>
+                    {r.type && r.type !== 'text' ? (
+                      <select
+                        value={r.filterKind ?? ''}
+                        onChange={(e) => patchRow(i, { filterKind: (e.target.value || undefined) as EntityKind | undefined })}
+                      >
+                        <option value="">任意</option>
+                        {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
+                      </select>
+                    ) : <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>}
+                  </td>
+                  <td><button className="ghost icon-btn" onClick={() => removeRow(i)}>×</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           <div className="sync-actions">
+            <button onClick={addRow}>＋ 添加字段</button>
             <button className="primary" onClick={save}>保存模板</button>
           </div>
         </div>
@@ -102,21 +150,22 @@ export default function EntityLibrary() {
 
   const createEntity = () => {
     const kind = kindFilter === 'all' ? 'character' : kindFilter;
-    const tpl = useLoom.getState().project.entityTemplates?.[kind] ?? [];
+    const tpl = (useLoom.getState().project.entityTemplates?.[kind] ?? []).map(normTpl);
     const e: Entity = {
       id: uid(), kind, name: `新${ENTITY_KIND_LABEL[kind]}`,
       color: PALETTE[entities.length % PALETTE.length],
       emoji: '', summary: '',
-      fields: tpl.map((label) => ({ id: uid(), label, value: '' })),
+      fields: tpl.map((tf) => ({ id: uid(), label: tf.label, value: '', type: tf.type, filterKind: tf.filterKind })),
       notes: '', createdAt: Date.now(),
     };
     addEntity(e);
     setSelectedId(e.id);
   };
 
-  const missingTplFields = selected
+  const missingTplFields: EntityTemplateField[] = selected
     ? (useLoom.getState().project.entityTemplates?.[selected.kind] ?? [])
-        .filter((label) => !selected.fields.some((f) => f.label === label))
+        .map(normTpl)
+        .filter((tf) => !selected.fields.some((f) => f.label === tf.label))
     : [];
 
   return (
@@ -167,9 +216,14 @@ export default function EntityLibrary() {
               {e.summary && <div className="card-body">{e.summary}</div>}
               {e.fields.length > 0 && (
                 <div className="card-tags">
-                  {e.fields.slice(0, 3).map((f) => (
-                    <span key={f.id} className="tag">{f.label}: {f.value}</span>
-                  ))}
+                  {e.fields.slice(0, 3).map((f) => {
+                    const ids = fieldRefIds(f.value, f.type);
+                    if (ids.length > 0) {
+                      const names = ids.map((id) => entities.find((x) => x.id === id)?.name ?? '?').join('、');
+                      return <span key={f.id} className="tag">{f.label} → {names}</span>;
+                    }
+                    return <span key={f.id} className="tag">{f.label}: {f.value}</span>;
+                  })}
                 </div>
               )}
             </div>
@@ -238,38 +292,74 @@ export default function EntityLibrary() {
               <textarea rows={3} value={selected.summary} onChange={(e) => updateEntity(selected.id, { summary: e.target.value })} />
             </div>
             <div className="field">
-              <label>自定义字段(如 年龄 / 欲望 / 恐惧 / 口头禅)</label>
-              {selected.fields.map((f) => (
-                <div className="kv-row" key={f.id} style={{ marginBottom: 6 }}>
-                  <input
-                    value={f.label}
-                    placeholder="字段"
-                    onChange={(e) => updateEntity(selected.id, {
-                      fields: selected.fields.map((x) => x.id === f.id ? { ...x, label: e.target.value } : x),
-                    })}
-                  />
-                  <input
-                    value={f.value}
-                    placeholder="值"
-                    onChange={(e) => updateEntity(selected.id, {
-                      fields: selected.fields.map((x) => x.id === f.id ? { ...x, value: e.target.value } : x),
-                    })}
-                  />
-                  <button
-                    className="ghost icon-btn"
-                    onClick={() => updateEntity(selected.id, { fields: selected.fields.filter((x) => x.id !== f.id) })}
-                  >×</button>
-                </div>
-              ))}
+              <label>自定义字段(文本或引用其他实体)</label>
+              {selected.fields.map((f) => {
+                const type: EntityFieldType = f.type ?? 'text';
+                const patchField = (patch: Partial<typeof f>) => updateEntity(selected.id, {
+                  fields: selected.fields.map((x) => x.id === f.id ? { ...x, ...patch } : x),
+                });
+                return (
+                  <div key={f.id} className="field-row">
+                    <div className="field-row-head">
+                      <input
+                        className="field-label"
+                        value={f.label}
+                        placeholder="字段名"
+                        onChange={(e) => patchField({ label: e.target.value })}
+                      />
+                      <select
+                        className="field-type"
+                        value={type}
+                        onChange={(e) => patchField({ type: e.target.value as EntityFieldType, value: '' })}
+                        title="字段类型"
+                      >
+                        <option value="text">文本</option>
+                        <option value="entity">→ 单实体</option>
+                        <option value="entities">→ 多实体</option>
+                      </select>
+                      {type !== 'text' && (
+                        <select
+                          className="field-filter"
+                          value={f.filterKind ?? ''}
+                          onChange={(e) => patchField({ filterKind: (e.target.value || undefined) as EntityKind | undefined })}
+                          title="限定实体类型"
+                        >
+                          <option value="">任意类型</option>
+                          {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
+                        </select>
+                      )}
+                      <button
+                        className="ghost icon-btn"
+                        onClick={() => updateEntity(selected.id, { fields: selected.fields.filter((x) => x.id !== f.id) })}
+                      >×</button>
+                    </div>
+                    <div className="field-row-value">
+                      {type === 'text' && (
+                        <input value={f.value} placeholder="值" onChange={(e) => patchField({ value: e.target.value })} />
+                      )}
+                      {type !== 'text' && (
+                        <EntityRefEditor
+                          type={type}
+                          value={f.value}
+                          filterKind={f.filterKind}
+                          onChange={(v) => patchField({ value: v })}
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={() => updateEntity(selected.id, {
                   fields: [...selected.fields, { id: uid(), label: '', value: '' }],
                 })}>＋ 添加字段</button>
                 {missingTplFields.length > 0 && (
                   <button
-                    title={`补齐模板中缺少的字段:${missingTplFields.join('、')}`}
+                    title={`补齐模板中缺少的字段:${missingTplFields.map((f) => f.label).join('、')}`}
                     onClick={() => updateEntity(selected.id, {
-                      fields: [...selected.fields, ...missingTplFields.map((label) => ({ id: uid(), label, value: '' }))],
+                      fields: [...selected.fields, ...missingTplFields.map((tf) => ({
+                        id: uid(), label: tf.label, value: '', type: tf.type, filterKind: tf.filterKind,
+                      }))],
                     })}
                   >按模板补齐({missingTplFields.length})</button>
                 )}

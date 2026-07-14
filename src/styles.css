@@ -490,6 +490,16 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* ---------- 实体 ---------- */
 
+.field-row { border: 1px solid var(--border); border-radius: 8px; padding: 6px; margin-bottom: 6px; background: var(--bg-card); }
+.field-row-head { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+.field-row-head .field-label { flex: 1; min-width: 0; }
+.field-row-head .field-type { width: 100px; flex-shrink: 0; }
+.field-row-head .field-filter { width: 90px; flex-shrink: 0; }
+.field-row-value select, .field-row-value input { width: 100%; }
+.ref-editor-multi { display: flex; flex-direction: column; gap: 6px; }
+.chip-x { background: none; border: none; padding: 0 0 0 6px; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.6; }
+.chip-x:hover { opacity: 1; }
+
 .entity-avatar {
   width: 36px; height: 36px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;

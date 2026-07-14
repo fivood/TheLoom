@@ -225,6 +225,23 @@ export function findEntityRefs(p: Project, entity: Entity): SearchHit[] {
     }
   }
 
+  // 实体字段的引用(id 精确匹配)
+  for (const other of p.entities) {
+    if (other.id === entity.id) continue;
+    for (const f of other.fields) {
+      const ids = f.type === 'entity' ? (f.value ? [f.value] : [])
+        : f.type === 'entities' ? f.value.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+      if (ids.includes(entity.id)) {
+        push({
+          module: '实体', kind: `${other.name} · ${f.label}`, title: other.name,
+          snippet: `${ENTITY_KIND_LABEL[other.kind]}`,
+          nav: { tab: 'entities', entityId: other.id },
+        });
+      }
+    }
+  }
+
   for (const map of p.maps) {
     for (const mk of map.markers) {
       if (mk.entityId === entity.id) {

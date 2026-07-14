@@ -12,7 +12,7 @@
  * 会在下次加载时自动导入为实体 / 资料卡。
  */
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import type { Entity, EntityKind, Project, ResearchCard } from './types';
+import type { Entity, EntityField, EntityFieldType, EntityKind, Project, ResearchCard } from './types';
 import { ENTITY_KIND_LABEL, PALETTE } from './types';
 import { normalizeProject, uid } from './util';
 
@@ -51,7 +51,7 @@ function withFrontmatter(meta: Record<string, unknown>, body: string): string {
 
 const SECTION_NOTES = '## 备注';
 
-export function entityToMd(e: Entity, avatarPath?: string): string {
+export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string, string>): string {
   const meta: Record<string, unknown> = {
     loom: 'entity',
     id: e.id,
@@ -61,16 +61,36 @@ export function entityToMd(e: Entity, avatarPath?: string): string {
     createdAt: e.createdAt,
   };
   if (avatarPath) meta.avatar = avatarPath;
+  const fieldTypes: Record<string, string> = {};
   for (const f of e.fields) {
-    if (f.label) meta[f.label] = f.value;
+    if (!f.label) continue;
+    const type = f.type ?? 'text';
+    if (type === 'text') {
+      meta[f.label] = f.value;
+    } else if (type === 'entity') {
+      const nm = idToName?.get(f.value);
+      meta[f.label] = nm ? `[[${nm}]]` : f.value;
+      fieldTypes[f.label] = f.filterKind ? `entity:${f.filterKind}` : 'entity';
+    } else {
+      const ids = f.value.split(',').map((s) => s.trim()).filter(Boolean);
+      meta[f.label] = ids.map((id) => (idToName?.get(id) ? `[[${idToName.get(id)}]]` : id));
+      fieldTypes[f.label] = f.filterKind ? `entities:${f.filterKind}` : 'entities';
+    }
   }
+  if (Object.keys(fieldTypes).length > 0) meta._field_types = fieldTypes;
   let body = e.summary.trim();
   if (e.notes.trim()) body += `\n\n${SECTION_NOTES}\n\n${e.notes.trim()}`;
   return withFrontmatter(meta, body);
 }
 
-const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'tags', 'aliases', 'cssclasses']);
+const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'tags', 'aliases', 'cssclasses', '_field_types']);
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
+
+/** [[Name]] → Name;非链接返回 null */
+function parseWikiLink(s: string): string | null {
+  const m = /^\[\[(.+?)\]\]$/.exec(String(s).trim());
+  return m ? m[1] : null;
+}
 
 export function mdToEntity(filename: string, md: string, index: number, assets?: Map<string, string>): Entity {
   const { meta, body } = splitFrontmatter(md);
@@ -79,9 +99,34 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
   const summary = notesIdx >= 0 ? body.slice(0, notesIdx).trim() : body;
   const notes = notesIdx >= 0 ? body.slice(notesIdx + SECTION_NOTES.length).trim() : '';
   const kind = KINDS.includes(meta.kind as EntityKind) ? (meta.kind as EntityKind) : 'concept';
-  const fields = Object.entries(meta)
+  const fieldTypes = (meta._field_types ?? {}) as Record<string, string>;
+  const fields: EntityField[] = Object.entries(meta)
     .filter(([k]) => !ENTITY_META_KEYS.has(k))
-    .map(([k, v]) => ({ id: uid(), label: k, value: String(v ?? '') }));
+    .map(([k, v]) => {
+      const tSpec = fieldTypes[k];
+      let type: EntityFieldType | undefined;
+      let filterKind: EntityKind | undefined;
+      if (tSpec) {
+        const [t, f] = tSpec.split(':');
+        if (t === 'entity' || t === 'entities') type = t;
+        if (f && KINDS.includes(f as EntityKind)) filterKind = f as EntityKind;
+      }
+      let value: string;
+      if (Array.isArray(v)) {
+        // 多值:每项可能是 [[Name]] 或原样
+        value = v.map((x) => parseWikiLink(String(x)) ?? String(x)).join(',');
+        if (!type) type = 'entities';
+      } else {
+        const wl = parseWikiLink(String(v ?? ''));
+        if (wl !== null) {
+          value = wl;
+          if (!type) type = 'entity';
+        } else {
+          value = String(v ?? '');
+        }
+      }
+      return { id: uid(), label: k, value, type, filterKind };
+    });
   const avatarFile = typeof meta.avatar === 'string' ? meta.avatar.replace(/^assets\//, '') : null;
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
@@ -95,6 +140,23 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
     notes,
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
   };
+}
+
+/** 加载后把引用字段中残留的实体名解析为 id */
+export function resolveEntityRefs(entities: Entity[]) {
+  const byName = new Map(entities.map((e) => [e.name, e.id]));
+  const byId = new Set(entities.map((e) => e.id));
+  for (const e of entities) {
+    for (const f of e.fields) {
+      if (f.type === 'entity') {
+        if (!byId.has(f.value)) f.value = byName.get(f.value) ?? f.value;
+      } else if (f.type === 'entities') {
+        f.value = f.value.split(',').map((v) => v.trim())
+          .map((v) => (byId.has(v) ? v : byName.get(v) ?? v))
+          .filter(Boolean).join(',');
+      }
+    }
+  }
 }
 
 export function cardToMd(c: ResearchCard): string {
@@ -200,6 +262,7 @@ export async function loadFromFolder(dir: string): Promise<Project> {
   base.entities = files.entities
     .map((f, i) => mdToEntity(f.name, f.content, i, assets))
     .sort((a, b) => a.createdAt - b.createdAt);
+  resolveEntityRefs(base.entities);
   base.researchCards = files.research
     .map((f, i) => mdToCard(f.name, f.content, i))
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -212,6 +275,7 @@ export async function loadFromFolder(dir: string): Promise<Project> {
 export async function saveToFolder(dir: string, project: Project): Promise<void> {
   const entityFiles = assignFilenames(project.entities, (e) => e.name);
   const cardFiles = assignFilenames(project.researchCards, (c) => c.title);
+  const idToName = new Map(project.entities.map((e) => [e.id, e.name]));
 
   // project.json 里不重复存 md 化的内容,只留引用顺序无关的结构化数据
   const slim = { ...project, entities: [], researchCards: [] };
@@ -231,8 +295,8 @@ export async function saveToFolder(dir: string, project: Project): Promise<void>
         keepMd.push(avatarPath);
       }
     }
-    // md 中不内嵌图片数据,只引用 assets/ 路径
-    files.push({ relPath: `entities/${name}`, content: entityToMd({ ...e, avatar: undefined }, avatarPath) });
+    // md 中不内嵌图片数据,只引用 assets/ 路径;实体引用字段用 [[Name]] wiki-link 便于 Obsidian 打开
+    files.push({ relPath: `entities/${name}`, content: entityToMd({ ...e, avatar: undefined }, avatarPath, idToName) });
     keepMd.push(`entities/${name}`);
   }
   for (const [name, c] of cardFiles) {

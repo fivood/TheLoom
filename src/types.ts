@@ -12,11 +12,30 @@ export const ENTITY_KIND_LABEL: Record<EntityKind, string> = {
   concept: '设定',
 };
 
+export type EntityFieldType = 'text' | 'entity' | 'entities';
+
 export interface EntityField {
   id: ID;
   label: string;
+  /**
+   * text 类型:自由文本;
+   * entity 类型:value 是单个实体 id;
+   * entities 类型:value 是逗号分隔的实体 id 列表
+   */
   value: string;
+  type?: EntityFieldType;
+  /** 可选限定被选实体的类型(如"角色""阵营") */
+  filterKind?: EntityKind;
 }
+
+/** 模板字段:决定新建实体时预填的字段结构 */
+export interface EntityTemplateField {
+  label: string;
+  type?: EntityFieldType;
+  filterKind?: EntityKind;
+}
+/** 兼容旧版:字符串等价于 { label, type: 'text' } */
+export type EntityTemplateSpec = string | EntityTemplateField;
 
 export interface Entity {
   id: ID;
@@ -253,8 +272,8 @@ export interface Project {
   researchCards: ResearchCard[];
   researchCategories: string[];
   variables: Variable[];
-  /** 实体字段模板:按类型预设字段名,新建实体时自动填入 */
-  entityTemplates?: Partial<Record<EntityKind, string[]>>;
+  /** 实体字段模板:按类型预设字段名(字符串等价于文本类型),新建实体时自动填入 */
+  entityTemplates?: Partial<Record<EntityKind, EntityTemplateSpec[]>>;
   updatedAt: number;
 }
 
