@@ -7,6 +7,7 @@ import { useNav } from './search';
 import { checkForUpdates } from './updater';
 import SearchPalette from './components/SearchPalette';
 import SyncPanel from './components/SyncPanel';
+import AuditPanel from './components/AuditPanel';
 import Icon, { type IconName } from './components/Icon';
 import FlowEditor from './modules/flow/FlowEditor';
 import EntityLibrary from './modules/entities/EntityLibrary';
@@ -32,6 +33,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('flow');
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [auditing, setAuditing] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
 
@@ -174,6 +176,9 @@ export default function App() {
               {folder && <button onClick={reloadFolder} title="从磁盘重新加载(在 Obsidian 或其他设备上改动后用)"><Icon name="refresh" /> 重新加载</button>}
             </>
           )}
+          <button onClick={() => setAuditing(true)} title="字数统计与问题检测(孤儿节点、分支缺口、未定义变量、空对白)">
+            <Icon name="script" /> 体检
+          </button>
           <button onClick={() => setSyncing(true)} title="多人协作:云端房间推送 / 拉取(端到端加密)">
             <Icon name="cloud" /> 协作
           </button>
@@ -218,6 +223,7 @@ export default function App() {
 
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
+      {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
     </div>
   );
 }

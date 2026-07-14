@@ -623,6 +623,17 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .sync-status { font-size: 12px; color: var(--text-dim); min-height: 16px; }
 .sync-status .sync-msg { margin-top: 4px; color: var(--text); }
 
+/* ---------- 项目体检 ---------- */
+
+.audit-panel { width: 560px; max-height: 72vh; }
+.audit-body { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.audit-section h4 {
+  margin: 0 0 8px; font-size: 11px; color: var(--text-faint);
+  letter-spacing: 1.5px; text-transform: uppercase;
+}
+.audit-totals { font-size: 13px; color: var(--text-dim); margin-bottom: 8px; }
+.audit-ok { font-size: 13px; color: var(--text-dim); }
+
 /* ---------- 演出模式 ---------- */
 
 .player-overlay {
