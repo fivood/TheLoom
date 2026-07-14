@@ -1,4 +1,4 @@
-import { ANNOTATION_TYPES } from './types';
+import { ANNOTATION_TYPES, ENTITY_KIND_LABEL } from './types';
 import type { DocBlock, Document, Entity, Flow, FlowEdge, FlowNode, Project, SubFlow } from './types';
 
 /**
@@ -218,4 +218,62 @@ export function documentToMarkdown(doc: Document, entities: Entity[]): string {
   if (doc.notes.trim()) lines.push(`> ${doc.notes.trim().replace(/\n/g, '\n> ')}`, '');
   for (const b of doc.blocks) lines.push(...blockToLines(b, entities));
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/* ---------- CSV 导出(Excel 可直接打开) ---------- */
+
+function csvEscape(v: string | number | undefined): string {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+function csvRow(cells: (string | number | undefined)[]): string {
+  return cells.map(csvEscape).join(',');
+}
+function downloadText(filename: string, content: string, mime: string) {
+  const blob = new Blob(['\uFEFF' + content], { type: `${mime};charset=utf-8` }); // BOM 让 Excel 识别 UTF-8
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** 实体表 → CSV:每个实体一行,字段名作为列 */
+export function entitiesToCsv(p: Project): string {
+  const allLabels: string[] = [];
+  const seen = new Set<string>();
+  for (const e of p.entities) for (const f of e.fields) {
+    if (f.label && !seen.has(f.label)) { seen.add(f.label); allLabels.push(f.label); }
+  }
+  const header = csvRow(['名称', '类型', '技术名', '简介', ...allLabels]);
+  const rows = p.entities.map((e) => csvRow([
+    e.name, ENTITY_KIND_LABEL[e.kind], e.technicalName ?? '', e.summary,
+    ...allLabels.map((l) => e.fields.find((f) => f.label === l)?.value ?? ''),
+  ]));
+  return [header, ...rows].join('\n');
+}
+
+/** 资源表 → CSV */
+export function assetsToCsv(p: Project): string {
+  const header = csvRow(['名称', '类型', 'MIME', '大小(字节)', '技术名', '标签', '来源']);
+  const rows = p.assets.map((a) => csvRow([
+    a.name, a.kind, a.mime, a.size, a.technicalName ?? '', a.tags.join(' '), a.source,
+  ]));
+  return [header, ...rows].join('\n');
+}
+
+/** 大纲表 → CSV:行=章节,列=剧情线 */
+export function outlineToCsv(p: Project): string {
+  const cols = p.outlineColumns;
+  const header = csvRow(['章节号', '时间', '标题', '主线剧情', ...cols.map((c) => c.title)]);
+  const rows = p.outlineRows.map((r) => csvRow([
+    r.no, r.time, r.title, r.main, ...cols.map((c) => r.cells[c.id] ?? ''),
+  ]));
+  return [header, ...rows].join('\n');
+}
+
+export function downloadCsv(filename: string, content: string) {
+  downloadText(filename, content, 'text/csv');
 }

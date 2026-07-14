@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { exportProject, useLoom } from './store';
+import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
 } from './storage';
@@ -176,7 +177,26 @@ export default function App() {
           <button onClick={() => setSyncing(true)} title="多人协作:云端房间推送 / 拉取(端到端加密)">
             <Icon name="cloud" /> 协作
           </button>
-          <button onClick={() => exportProject(project)} title="导出当前项目为 JSON 文件"><Icon name="download" /> 导出</button>
+          <select
+            className="ghost"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              if (v === 'json') exportProject(project);
+              else if (v === 'entities') downloadCsv(`${project.name}-实体表.csv`, entitiesToCsv(project));
+              else if (v === 'assets') downloadCsv(`${project.name}-资源表.csv`, assetsToCsv(project));
+              else if (v === 'outline') downloadCsv(`${project.name}-大纲表.csv`, outlineToCsv(project));
+              e.currentTarget.value = '';
+            }}
+            title="导出"
+          >
+            <option value=""><Icon name="download" size={13} /> 导出 ▾</option>
+            <option value="json">JSON 完整备份</option>
+            <option value="entities">实体表 CSV</option>
+            <option value="assets">资源表 CSV</option>
+            <option value="outline">大纲表 CSV</option>
+          </select>
         </header>
 
         <div className="content" key={revision}>

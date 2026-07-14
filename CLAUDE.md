@@ -78,13 +78,13 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 
 **主要缺口(按建议优先级)**
 1. ~~技术名 + 文件夹式 Navigator 树~~ ✅(技术名全对象通用;Navigator 树流程模块已落地,其他模块待扩展)
-2. 通用模板系统(扩展到流程节点 + 约束/只读属性)
+2. ~~通用模板系统~~ ✅(实体约束 + 流程节点模板;`FieldListEditor` 跨对象复用)
 3. ~~对象属性脚本寻址 + seen/unseen/fallback~~ ✅
 4. ~~富文本对白~~ ✅(行内标记;段落级列表/标题待补)
 5. Localization 本地化模块
-6. 版本历史 + 回滚(超出 50 步撤销)
-7. Conflict Search 增强(重复技术名 ✅、损坏资产待补)
-8. Excel/FinalDraft 互通、矢量地点编辑、多窗口
+6. ~~版本历史 + 回滚~~ ✅
+7. ~~Conflict Search 增强~~ ✅(重复技术名、损坏资产)
+8. Excel/FinalDraft 互通、矢量地点编辑、多窗口(CSV 导出已做;Excel xlsx/FinalDraft/矢量/多窗口待补)
 
 ## 最近变更(v0.5.0)
 
@@ -105,6 +105,21 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 - `OutlineGrid.tsx` + `styles.css`:章节/时间列宽从 64px 固定改为 100%/150px,修复长内容(如 `16:09–16:32`)被截断
 
 验证:`npm run build` 通过;`cd src-tauri && cargo test --lib` 通过。
+
+## 最近变更(v0.7.1)
+
+流程节点模板 + FieldListEditor 复用(通用模板系统完整化):
+
+- `FieldListEditor.tsx`:抽出可复用字段列表编辑器(实体/节点共用,含 enum/required/readonly 约束渲染)
+- `FlowNodeData.fields?` + `Project.nodeTemplates`;`NodeTemplateModal` 按节点类型编辑模板;节点 inspector 加 `FieldListEditor` + ⚙ 模板入口
+- `EntityLibrary` 用 `FieldListEditor` 替换 ~90 行内联渲染
+
+## 最近变更(v0.7.0)
+
+实体模板约束 + 版本历史:
+
+- `EntityTemplateField` 加 `enumValues`/`required`/`readonly`;`TemplateModal` 加约束编辑列;实体字段渲染按约束(enum 下拉/readonly 只读/required 标记);audit 必填缺失检测
+- 版本历史:`Snapshot` 持久化快照(localStorage,上限 30);`VersionHistory` 面板(命名保存/列表/回滚/删除);顶栏「历史」入口
 
 ## 最近变更(v0.6.0)
 

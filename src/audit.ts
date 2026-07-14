@@ -173,6 +173,14 @@ export function auditProject(p: Project): Issue[] {
     }
   }
 
+  // 损坏资产:图片缺缩略图、无名称、大小异常
+  for (const a of p.assets) {
+    const nav: NavTarget = { tab: 'assets', assetId: a.id };
+    if (!a.name.trim()) issues.push({ kind: '资产无名称', message: `${a.kind} · ${a.id.slice(0, 6)}…`, nav });
+    if (a.kind === 'image' && !a.thumbnail) issues.push({ kind: '图片缺缩略图', message: a.name || '(无名称)', nav });
+    if (a.size === 0) issues.push({ kind: '资产大小异常', message: a.name || '(无名称)', nav });
+  }
+
   // 重复技术名
   for (const dup of findDuplicateTechnicalNames(p)) {
     const where = dup.owners.map((o) => `${o.kind}「${o.name}」`).join('、');
