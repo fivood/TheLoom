@@ -492,7 +492,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
 
 export default function FlowEditor() {
   const flows = useLoom((s) => s.project.flows);
-  const folders = useLoom((s) => s.project.folders.filter((f) => f.module === 'flow'));
+  const allFolders = useLoom((s) => s.project.folders);
+  const folders = useMemo(() => allFolders.filter((f) => f.module === 'flow'), [allFolders]);
   const update = useLoom((s) => s.update);
   const { addFolder, updateFolder, removeFolder } = useLoom();
   const [activeId, setActiveId] = useState<string | null>(flows[0]?.id ?? null);
