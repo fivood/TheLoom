@@ -623,6 +623,53 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .sync-status { font-size: 12px; color: var(--text-dim); min-height: 16px; }
 .sync-status .sync-msg { margin-top: 4px; color: var(--text); }
 
+/* ---------- 项目菜单 ---------- */
+
+.project-menu { position: relative; display: flex; align-items: center; gap: 2px; }
+.project-menu-toggle { color: var(--text-faint); }
+.project-menu-toggle:hover { color: var(--text); }
+.project-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 260px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(27, 27, 25, 0.14);
+  padding: 6px;
+  z-index: 60;
+}
+.project-dropdown-head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 8px 10px 4px;
+}
+.project-dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.project-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+}
+.project-slot:hover { background: var(--bg-hover); }
+.project-slot.danger-hover { color: var(--danger); }
+.project-slot.danger-hover:hover { background: #f6e9e7; }
+.project-slot-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-slot-date { font-size: 11px; color: var(--text-faint); }
+
 /* ---------- 项目体检 ---------- */
 
 .audit-panel { width: 560px; max-height: 72vh; }

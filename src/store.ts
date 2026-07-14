@@ -9,7 +9,24 @@ import { sampleProject } from './sample';
 
 export { uid, normalizeProject };
 
-const STORAGE_KEY = 'theloom-project-v1';
+/**
+ * 多项目槽位存储:
+ *   theloom-slots-v1       槽位元数据数组 SlotMeta[]
+ *   theloom-current-v1     当前槽位 id
+ *   theloom-project-{id}   每个槽位的项目 JSON
+ *
+ * 旧的单项目键 theloom-project-v1 首次加载时自动迁移为一个槽位并保留原键作备份。
+ */
+const SLOTS_KEY = 'theloom-slots-v1';
+const CURRENT_KEY = 'theloom-current-v1';
+const LEGACY_KEY = 'theloom-project-v1';
+const projectKey = (id: string) => `theloom-project-${id}`;
+
+export interface SlotMeta {
+  id: string;
+  name: string;
+  updatedAt: number;
+}
 
 /* ---------- 空白项目(默认) ---------- */
 
@@ -33,15 +50,69 @@ function blankProject(): Project {
   };
 }
 
-function loadProject(): Project {
+function readSlots(): SlotMeta[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(SLOTS_KEY);
+    if (raw) return JSON.parse(raw) as SlotMeta[];
+  } catch { /* 忽略 */ }
+  return [];
+}
+function writeSlots(slots: SlotMeta[]) {
+  localStorage.setItem(SLOTS_KEY, JSON.stringify(slots));
+}
+function readProjectAt(id: string): Project | null {
+  try {
+    const raw = localStorage.getItem(projectKey(id));
     if (raw) {
       const p = JSON.parse(raw) as Project;
       if (p && p.version === 1) return normalizeProject(p);
     }
-  } catch { /* 损坏则重建 */ }
-  return blankProject();
+  } catch { /* 忽略 */ }
+  return null;
+}
+
+/** 应用启动时的初始化:返回槽位列表、当前 id、当前项目 */
+function initSlots(): { slots: SlotMeta[]; currentId: string; project: Project } {
+  let slots = readSlots();
+  let id = localStorage.getItem(CURRENT_KEY);
+
+  // 首次运行:从旧的单项目键迁移
+  if (slots.length === 0) {
+    try {
+      const legacyRaw = localStorage.getItem(LEGACY_KEY);
+      if (legacyRaw) {
+        const p = JSON.parse(legacyRaw) as Project;
+        if (p && p.version === 1) {
+          const newId = uid();
+          localStorage.setItem(projectKey(newId), legacyRaw);
+          slots = [{ id: newId, name: p.name || '未命名项目', updatedAt: p.updatedAt || Date.now() }];
+          writeSlots(slots);
+          id = newId;
+          localStorage.setItem(CURRENT_KEY, id);
+        }
+      }
+    } catch { /* 忽略 */ }
+  }
+
+  // 还是空:建一个空白槽位
+  if (slots.length === 0) {
+    const newId = uid();
+    const p = blankProject();
+    localStorage.setItem(projectKey(newId), JSON.stringify(p));
+    slots = [{ id: newId, name: p.name, updatedAt: Date.now() }];
+    writeSlots(slots);
+    id = newId;
+    localStorage.setItem(CURRENT_KEY, id);
+  }
+
+  // current 指针失效时兜底
+  if (!id || !slots.some((s) => s.id === id)) {
+    id = slots[0].id;
+    localStorage.setItem(CURRENT_KEY, id);
+  }
+
+  const project = readProjectAt(id) ?? blankProject();
+  return { slots, currentId: id, project };
 }
 
 /* ---------- Store ---------- */
@@ -63,6 +134,13 @@ interface LoomState {
   replaceProject: (p: Project) => void;
   resetProject: () => void;
   loadSampleProject: () => void;
+
+  /** 多项目槽位 */
+  slots: SlotMeta[];
+  currentSlotId: string;
+  switchSlot: (id: string) => void;
+  newSlot: (kind: 'blank' | 'sample') => void;
+  deleteSlot: (id: string) => void;
 
   updateFlow: (flowId: string, fn: (f: Flow) => void) => void;
 
@@ -98,12 +176,21 @@ let undoStack: Project[] = [];
 let redoStack: Project[] = [];
 let lastUndoPush = 0;
 
+const boot = initSlots();
+
 export const useLoom = create<LoomState>((set, get) => {
   const persist = (p: Project) => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      const id = get().currentSlotId;
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+        localStorage.setItem(projectKey(id), JSON.stringify(p));
+        // 同步更新槽位元数据(名称、更新时间)
+        const slots = get().slots.map((s) =>
+          s.id === id ? { ...s, name: p.name || '未命名项目', updatedAt: p.updatedAt } : s,
+        );
+        writeSlots(slots);
+        set({ slots });
       } catch (e) {
         console.error('保存失败', e);
       }
@@ -114,6 +201,27 @@ export const useLoom = create<LoomState>((set, get) => {
           .catch((e) => set({ syncError: String(e) }));
       }
     }, 400);
+  };
+
+  /** 换到另一个槽位时:立即冲刷当前槽的保存,清撤销栈 */
+  const flushAndSwitch = (targetId: string) => {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    // 立即写入当前槽,避免防抖丢失
+    try {
+      const cur = get();
+      localStorage.setItem(projectKey(cur.currentSlotId), JSON.stringify(cur.project));
+    } catch { /* 忽略 */ }
+    localStorage.setItem(CURRENT_KEY, targetId);
+    undoStack = []; redoStack = []; lastUndoPush = 0;
+    const next = readProjectAt(targetId) ?? blankProject();
+    set((s) => ({
+      project: next,
+      currentSlotId: targetId,
+      savedAt: Date.now(),
+      revision: s.revision + 1,
+      canUndo: false,
+      canRedo: false,
+    }));
   };
 
   const commit = (fn: (p: Project) => void) => {
@@ -144,7 +252,7 @@ export const useLoom = create<LoomState>((set, get) => {
   };
 
   return {
-    project: loadProject(),
+    project: boot.project,
     savedAt: Date.now(),
     revision: 0,
     canUndo: false,
@@ -152,6 +260,35 @@ export const useLoom = create<LoomState>((set, get) => {
     folder: isTauri ? getSavedFolder() : null,
     syncError: null,
     setFolder: (dir) => set({ folder: dir, syncError: null }),
+
+    slots: boot.slots,
+    currentSlotId: boot.currentId,
+
+    switchSlot: (id) => {
+      const cur = get().currentSlotId;
+      if (id === cur) return;
+      if (!get().slots.some((s) => s.id === id)) return;
+      flushAndSwitch(id);
+    },
+    newSlot: (kind) => {
+      const newId = uid();
+      const proj = kind === 'sample' ? sampleProject() : blankProject();
+      localStorage.setItem(projectKey(newId), JSON.stringify(proj));
+      const meta: SlotMeta = { id: newId, name: proj.name, updatedAt: Date.now() };
+      const nextSlots = [...get().slots, meta];
+      writeSlots(nextSlots);
+      set({ slots: nextSlots });
+      flushAndSwitch(newId);
+    },
+    deleteSlot: (id) => {
+      const cur = get();
+      if (cur.slots.length <= 1) return; // 至少留一个
+      const nextSlots = cur.slots.filter((s) => s.id !== id);
+      writeSlots(nextSlots);
+      localStorage.removeItem(projectKey(id));
+      set({ slots: nextSlots });
+      if (cur.currentSlotId === id) flushAndSwitch(nextSlots[0].id);
+    },
 
     update: commit,
     undo: () => {

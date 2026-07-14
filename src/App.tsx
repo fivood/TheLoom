@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { exportProject, importProject, useLoom } from './store';
+import { useEffect, useState } from 'react';
+import { exportProject, useLoom } from './store';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
 } from './storage';
@@ -8,6 +8,7 @@ import { checkForUpdates } from './updater';
 import SearchPalette from './components/SearchPalette';
 import SyncPanel from './components/SyncPanel';
 import AuditPanel from './components/AuditPanel';
+import ProjectMenu from './components/ProjectMenu';
 import Icon, { type IconName } from './components/Icon';
 import FlowEditor from './modules/flow/FlowEditor';
 import EntityLibrary from './modules/entities/EntityLibrary';
@@ -42,16 +43,12 @@ export default function App() {
     if (navTarget) setTab(navTarget.tab);
   }, [navSeq]);
   const project = useLoom((s) => s.project);
-  const update = useLoom((s) => s.update);
-  const replaceProject = useLoom((s) => s.replaceProject);
-  const resetProject = useLoom((s) => s.resetProject);
   const folder = useLoom((s) => s.folder);
   const syncError = useLoom((s) => s.syncError);
   const setFolder = useLoom((s) => s.setFolder);
   const revision = useLoom((s) => s.revision);
   const canUndo = useLoom((s) => s.canUndo);
   const canRedo = useLoom((s) => s.canRedo);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   // 全局撤销/重做快捷键;焦点在输入框时交给浏览器原生文本撤销
   useEffect(() => {
@@ -115,15 +112,6 @@ export default function App() {
     }
   };
 
-  const onImport = async (file: File) => {
-    try {
-      const p = await importProject(file);
-      if (confirm(`导入「${p.name}」将覆盖当前项目,确定吗?`)) replaceProject(p);
-    } catch {
-      alert('导入失败:文件不是有效的 TheLoom 项目文件');
-    }
-  };
-
   return (
     <div className="app">
       <nav className="sidebar">
@@ -143,12 +131,7 @@ export default function App() {
 
       <div className="main">
         <header className="topbar">
-          <input
-            className="project-name"
-            value={project.name}
-            onChange={(e) => update((p) => { p.name = e.target.value; })}
-            placeholder="项目名称"
-          />
+          <ProjectMenu />
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
           <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}><Icon name="undo" /></button>
           <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}><Icon name="redo" /></button>
@@ -182,32 +165,7 @@ export default function App() {
           <button onClick={() => setSyncing(true)} title="多人协作:云端房间推送 / 拉取(端到端加密)">
             <Icon name="cloud" /> 协作
           </button>
-          <button onClick={() => exportProject(project)}><Icon name="download" /> 导出项目</button>
-          <button onClick={() => fileRef.current?.click()}><Icon name="upload" /> 导入项目</button>
-          <button
-            className="ghost"
-            title="载入内置示例项目(旧书店与叙事织机的故事)"
-            onClick={() => { if (confirm('载入内置示例项目,替换当前内容?')) useLoom.getState().loadSampleProject(); }}
-          >
-            <Icon name="book" /> 示例
-          </button>
-          <button
-            className="ghost"
-            onClick={() => { if (confirm('清空当前项目,从空白开始?此操作不可撤销。')) resetProject(); }}
-          >
-            <Icon name="reset" /> 清空
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".json,application/json"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onImport(f);
-              e.target.value = '';
-            }}
-          />
+          <button onClick={() => exportProject(project)} title="导出当前项目为 JSON 文件"><Icon name="download" /> 导出</button>
         </header>
 
         <div className="content" key={revision}>
