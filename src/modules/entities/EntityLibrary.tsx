@@ -7,6 +7,7 @@ import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import Icon, { KIND_ICON } from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
+import FieldListEditor from '../../components/FieldListEditor';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 
@@ -200,18 +201,7 @@ export default function EntityLibrary() {
     setSelectedId(e.id);
   };
 
-  const missingTplFields: EntityTemplateField[] = selected
-    ? (useLoom.getState().project.entityTemplates?.[selected.kind] ?? [])
-        .map(normTpl)
-        .filter((tf) => !selected.fields.some((f) => f.label === tf.label))
-    : [];
-
   const entityTemplates = useLoom((s) => s.project.entityTemplates);
-  const tplSpecs = useMemo(
-    () => (entityTemplates?.[selected?.kind ?? 'character'] ?? []).map(normTpl),
-    [entityTemplates, selected?.kind],
-  );
-  const specFor = (label: string) => tplSpecs.find((s) => s.label === label);
 
   return (
     <>
@@ -341,99 +331,11 @@ export default function EntityLibrary() {
               onChange={(v) => updateEntity(selected.id, { technicalName: v })}
               displayName={selected.name}
             />
-            <div className="field">
-              <label>自定义字段(文本或引用其他实体)</label>
-              {selected.fields.map((f) => {
-                const type: EntityFieldType = f.type ?? 'text';
-                const patchField = (patch: Partial<typeof f>) => updateEntity(selected.id, {
-                  fields: selected.fields.map((x) => x.id === f.id ? { ...x, ...patch } : x),
-                });
-                const spec = specFor(f.label);
-                return (
-                  <div key={f.id} className={`field-row ${spec?.readonly ? 'field-readonly' : ''}`}>
-                    <div className="field-row-head">
-                      <input
-                        className="field-label"
-                        value={f.label}
-                        placeholder="字段名"
-                        readOnly={spec?.readonly === true}
-                        onChange={(e) => patchField({ label: e.target.value })}
-                      />
-                      {spec?.required && <span className="req-mark" title="必填">*</span>}
-                      {spec?.readonly ? (
-                        <span className="hint" style={{ fontSize: 11 }} title="模板只读字段">🔒</span>
-                      ) : (
-                        <>
-                          <select
-                            className="field-type"
-                            value={type}
-                            onChange={(e) => patchField({ type: e.target.value as EntityFieldType, value: '' })}
-                            title="字段类型"
-                          >
-                            <option value="text">文本</option>
-                            <option value="entity">→ 单实体</option>
-                            <option value="entities">→ 多实体</option>
-                          </select>
-                          {type !== 'text' && (
-                            <select
-                              className="field-filter"
-                              value={f.filterKind ?? ''}
-                              onChange={(e) => patchField({ filterKind: (e.target.value || undefined) as EntityKind | undefined })}
-                              title="限定实体类型"
-                            >
-                              <option value="">任意类型</option>
-                              {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
-                            </select>
-                          )}
-                          <button
-                            className="ghost icon-btn"
-                            onClick={() => updateEntity(selected.id, { fields: selected.fields.filter((x) => x.id !== f.id) })}
-                          >×</button>
-                        </>
-                      )}
-                    </div>
-                    <div className="field-row-value">
-                      {type === 'text' && spec?.enumValues && spec.enumValues.length > 0 ? (
-                        <select
-                          value={f.value}
-                          onChange={(e) => patchField({ value: e.target.value })}
-                          disabled={spec?.readonly === true}
-                        >
-                          <option value="">(未选)</option>
-                          {spec.enumValues.map((v) => <option key={v} value={v}>{v}</option>)}
-                        </select>
-                      ) : type === 'text' && spec?.readonly ? (
-                        <input value={f.value} readOnly placeholder="值" />
-                      ) : type === 'text' ? (
-                        <input value={f.value} placeholder="值" onChange={(e) => patchField({ value: e.target.value })} />
-                      ) : (
-                        <EntityRefEditor
-                          type={type}
-                          value={f.value}
-                          filterKind={f.filterKind}
-                          onChange={(v) => patchField({ value: v })}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => updateEntity(selected.id, {
-                  fields: [...selected.fields, { id: uid(), label: '', value: '' }],
-                })}>＋ 添加字段</button>
-                {missingTplFields.length > 0 && (
-                  <button
-                    title={`补齐模板中缺少的字段:${missingTplFields.map((f) => f.label).join('、')}`}
-                    onClick={() => updateEntity(selected.id, {
-                      fields: [...selected.fields, ...missingTplFields.map((tf) => ({
-                        id: uid(), label: tf.label, value: '', type: tf.type, filterKind: tf.filterKind,
-                      }))],
-                    })}
-                  >按模板补齐({missingTplFields.length})</button>
-                )}
-              </div>
-            </div>
+            <FieldListEditor
+              fields={selected.fields}
+              specs={entityTemplates?.[selected.kind]}
+              onChange={(fields) => updateEntity(selected.id, { fields })}
+            />
             <div className="field">
               <label>备注</label>
               <textarea rows={5} value={selected.notes} onChange={(e) => updateEntity(selected.id, { notes: e.target.value })} />

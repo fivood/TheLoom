@@ -332,6 +332,7 @@ export async function loadFromFolder(dir: string): Promise<Project> {
       researchCards: [], researchCategories: [], variables: [],
       assets: [], documents: [], documentCategories: [], attachments: {},
       folders: [],
+      nodeTemplates: {},
       updatedAt: Date.now(),
     };
   }

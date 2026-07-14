@@ -15,6 +15,7 @@ export function normalizeProject(p: Project): Project {
   p.documentCategories ??= [];
   p.attachments ??= {};
   p.folders ??= [];
+  p.nodeTemplates ??= {};
   return p;
 }
 

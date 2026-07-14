@@ -56,10 +56,12 @@ function ScriptHints({ text, onInsert }: { text: string; onInsert: (name: string
 }
 import { nodeTypes, TYPE_COLORS } from './nodes';
 import Player from './Player';
+import NodeTemplateModal from './NodeTemplateModal';
 import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
 import Icon from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
+import FieldListEditor from '../../components/FieldListEditor';
 import { RichTextInput } from '../../components/RichText';
 
 type LoomNode = Node<FlowNodeData>;
@@ -98,7 +100,9 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
 }) {
   const updateFlow = useLoom((s) => s.updateFlow);
   const entities = useLoom((s) => s.project.entities);
+  const nodeTemplates = useLoom((s) => s.project.nodeTemplates);
   const [playing, setPlaying] = useState(false);
+  const [editingTpl, setEditingTpl] = useState<FlowNodeType | null>(null);
   const sub = resolveSub(flow, path) ?? { nodes: [], edges: [] };
   const [nodes, setNodes] = useState<LoomNode[]>(() =>
     sub.nodes.map((n) => ({
@@ -314,6 +318,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         />
       )}
 
+      {editingTpl && (
+        <NodeTemplateModal initialType={editingTpl} onClose={() => setEditingTpl(null)} />
+      )}
+
       <aside className="inspector">
         {selectedNode ? (
           <>
@@ -422,6 +430,20 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               value={selectedNode.data.technicalName}
               onChange={(v) => patchSelectedNode({ technicalName: v })}
               displayName={selectedNode.data.title || selectedNode.type || '节点'}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <label style={{ margin: 0, flex: 1, fontSize: 12, color: 'var(--text-faint)' }}>自定义字段</label>
+              <button
+                className="ghost"
+                style={{ fontSize: 11, padding: '2px 6px' }}
+                title={`编辑「${FLOW_NODE_LABEL[(selectedNode.type ?? 'fragment') as FlowNodeType]}」类型的字段模板`}
+                onClick={() => setEditingTpl((selectedNode.type ?? 'fragment') as FlowNodeType)}
+              >⚙ 模板</button>
+            </div>
+            <FieldListEditor
+              fields={selectedNode.data.fields ?? []}
+              specs={nodeTemplates?.[(selectedNode.type ?? 'fragment') as FlowNodeType]}
+              onChange={(fields) => patchSelectedNode({ fields })}
             />
             <AttachmentEditor ownerId={selectedNode.id} />
           </>

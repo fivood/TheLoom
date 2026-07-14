@@ -276,6 +276,7 @@ export function sampleProject(): Project {
     documentCategories: ['剧本草稿', '设计文档'],
     attachments: {},
     folders: [],
+    nodeTemplates: {},
     updatedAt: Date.now(),
   };
 }

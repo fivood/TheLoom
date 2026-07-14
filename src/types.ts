@@ -111,6 +111,8 @@ export interface FlowNodeData {
   checkRed?: boolean;
   /** 技术名:用于 seen("xxx") / unseen("xxx") 在脚本中引用本节点 */
   technicalName?: string;
+  /** 模板驱动的自定义字段(与实体同构,便于跨对象复用) */
+  fields?: EntityField[];
   [key: string]: unknown;
 }
 
@@ -402,6 +404,8 @@ export interface Project {
   attachments?: Record<ID, ID[]>;
   /** 文件夹(Navigator 树);按 module 隔离,各模块 side-list 可树化 */
   folders: Folder[];
+  /** 流程节点模板:按节点类型预设字段 + 约束 */
+  nodeTemplates?: Partial<Record<FlowNodeType, EntityTemplateSpec[]>>;
   updatedAt: number;
 }
 
