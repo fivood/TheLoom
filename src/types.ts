@@ -170,6 +170,45 @@ export interface TimelineEvent {
   entityIds: ID[]; // 关联的实体
 }
 
+/* ---------- 地图 ---------- */
+
+/** 归一化坐标 [0,1]:x = 相对底图左上角的水平比例,y = 垂直比例 */
+export interface MapMarker {
+  id: ID;
+  x: number;
+  y: number;
+  label: string;
+  entityId?: ID;
+  color?: string;
+  /** 出现的起始时间点(为空 = 始终存在);来自 timelinePoints */
+  fromPointId?: ID;
+  /** 消失的时间点(在此点之后不显示;为空 = 永远存在) */
+  toPointId?: ID;
+}
+
+/** 多边形区域(常用于阵营领地) */
+export interface MapRegion {
+  id: ID;
+  /** 顶点数组,归一化坐标 */
+  points: { x: number; y: number }[];
+  label: string;
+  entityId?: ID;
+  color?: string;
+  fromPointId?: ID;
+  toPointId?: ID;
+}
+
+export interface MapDoc {
+  id: ID;
+  name: string;
+  /** 底图:dataURL(网页版内嵌)或 asset:map-{id}.png(桌面文件夹模式) */
+  image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  markers: MapMarker[];
+  regions: MapRegion[];
+}
+
 /* ---------- 资料卡片 ---------- */
 
 export interface ResearchCard {
@@ -210,6 +249,7 @@ export interface Project {
   timelineTracks: TimelineTrack[];
   timelinePoints: TimelinePoint[];
   timelineEvents: TimelineEvent[];
+  maps: MapDoc[];
   researchCards: ResearchCard[];
   researchCategories: string[];
   variables: Variable[];

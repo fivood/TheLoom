@@ -43,6 +43,7 @@ function blankProject(): Project {
     timelineTracks: [],
     timelinePoints: [],
     timelineEvents: [],
+    maps: [],
     researchCards: [],
     researchCategories: [],
     variables: [],

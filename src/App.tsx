@@ -15,10 +15,11 @@ import EntityLibrary from './modules/entities/EntityLibrary';
 import Brainstorm from './modules/brainstorm/Brainstorm';
 import OutlineGrid from './modules/outline/OutlineGrid';
 import Timeline from './modules/timeline/Timeline';
+import MapEditor from './modules/map/MapEditor';
 import ResearchCards from './modules/research/ResearchCards';
 import Variables from './modules/variables/Variables';
 
-type Tab = 'flow' | 'entities' | 'brainstorm' | 'outline' | 'timeline' | 'research' | 'variables';
+type Tab = 'flow' | 'entities' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
 
 const TABS: { key: Tab; icon: IconName; label: string }[] = [
   { key: 'flow', icon: 'flow', label: '流程' },
@@ -26,6 +27,7 @@ const TABS: { key: Tab; icon: IconName; label: string }[] = [
   { key: 'brainstorm', icon: 'bulb', label: '风暴' },
   { key: 'outline', icon: 'grid', label: '大纲' },
   { key: 'timeline', icon: 'clock', label: '时间线' },
+  { key: 'map', icon: 'mappin', label: '地图' },
   { key: 'research', icon: 'archive', label: '资料' },
   { key: 'variables', icon: 'braces', label: '变量' },
 ];
@@ -174,6 +176,7 @@ export default function App() {
           {tab === 'brainstorm' && <Brainstorm />}
           {tab === 'outline' && <OutlineGrid />}
           {tab === 'timeline' && <Timeline />}
+          {tab === 'map' && <MapEditor />}
           {tab === 'research' && <ResearchCards />}
           {tab === 'variables' && <Variables />}
         </div>

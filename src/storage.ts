@@ -190,6 +190,7 @@ export async function loadFromFolder(dir: string): Promise<Project> {
       flows: [], entities: [], brainstormNotes: [], brainstormEdges: [],
       outlineColumns: [], outlineRows: [],
       timelineTracks: [], timelinePoints: [], timelineEvents: [],
+      maps: [],
       researchCards: [], researchCategories: [], variables: [],
       updatedAt: Date.now(),
     };

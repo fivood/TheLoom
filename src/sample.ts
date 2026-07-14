@@ -250,6 +250,7 @@ export function sampleProject(): Project {
         entityIds: [valId],
       },
     ],
+    maps: [],
     researchCards: [
       {
         id: uid(), title: '血食者的能力边界',

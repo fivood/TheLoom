@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Entity, FlowNode, Project, SubFlow } from './types';
 import { ENTITY_KIND_LABEL, FLOW_NODE_LABEL } from './types';
 
-export type NavTab = 'flow' | 'entities' | 'brainstorm' | 'outline' | 'timeline' | 'research' | 'variables';
+export type NavTab = 'flow' | 'entities' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
 
 export interface NavTarget {
   tab: NavTab;
@@ -12,6 +12,8 @@ export interface NavTarget {
   entityId?: string;
   cardId?: string;
   eventId?: string;
+  mapId?: string;
+  markerId?: string;
 }
 
 interface NavState {
@@ -220,6 +222,27 @@ export function findEntityRefs(p: Project, entity: Entity): SearchHit[] {
         snippet: snippetOf(n.text, name),
         nav: { tab: 'brainstorm' },
       });
+    }
+  }
+
+  for (const map of p.maps) {
+    for (const mk of map.markers) {
+      if (mk.entityId === entity.id) {
+        push({
+          module: '地图', kind: map.name, title: mk.label || entity.name,
+          snippet: '标记',
+          nav: { tab: 'map', mapId: map.id, markerId: mk.id },
+        });
+      }
+    }
+    for (const r of map.regions) {
+      if (r.entityId === entity.id) {
+        push({
+          module: '地图', kind: map.name, title: r.label || entity.name,
+          snippet: `区域(${r.points.length} 顶点)`,
+          nav: { tab: 'map', mapId: map.id },
+        });
+      }
     }
   }
 
