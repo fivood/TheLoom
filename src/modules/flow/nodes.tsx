@@ -13,6 +13,7 @@ export const TYPE_COLORS: Record<FlowNodeType, string> = {
   instruction: '#72716b',
   jump: '#4a4946',
   exit: '#aaa9a1',
+  check: '#2f2e2b',
   note: '#c6c5bd',
   zone: '#e0dfd8',
 };
@@ -135,6 +136,32 @@ export function HubNode({ data, selected }: NodeProps<LoomNode>) {
   );
 }
 
+/** 检定节点:2d6 + 技能 vs 难度;白检定可重试,红检定仅一次机会 */
+export function CheckNode(props: NodeProps<LoomNode>) {
+  const { data } = props;
+  const red = data.checkRed === true;
+  return (
+    <div className={`flow-node ${props.selected ? 'selected' : ''}`}>
+      <Handle type="target" position={Position.Left} />
+      <div className="node-head" style={{ background: data.color || TYPE_COLORS.check }}>
+        <span>{data.title || '检定'}</span>
+        <span className={`check-kind ${red ? 'red' : ''}`}>{red ? '红' : '白'}</span>
+        <span className="node-type">检定</span>
+      </div>
+      <div className="node-body" style={{ fontFamily: 'Consolas, monospace' }}>
+        2d6 + {data.checkExpr || '0'} ≥ {data.checkDc ?? 10}
+        {data.text && <div style={{ fontFamily: 'inherit', marginTop: 4 }}>{data.text}</div>}
+      </div>
+      <div className="cond-handles">
+        <span>✓ 成功</span>
+        <span>✗ 失败</span>
+      </div>
+      <Handle id="success" type="source" position={Position.Right} style={{ top: 'auto', bottom: 26 }} />
+      <Handle id="fail" type="source" position={Position.Right} style={{ top: 'auto', bottom: 8 }} />
+    </div>
+  );
+}
+
 /** 画布注释:不参与叙事,仅作备忘 */
 export function NoteNode({ data, selected }: NodeProps<LoomNode>) {
   return (
@@ -169,6 +196,7 @@ export const nodeTypes = {
   jump: JumpNode,
   hub: HubNode,
   exit: ExitNode,
+  check: CheckNode,
   note: NoteNode,
   zone: ZoneNode,
 };

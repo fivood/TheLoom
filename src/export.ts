@@ -65,12 +65,17 @@ function branchLabel(e: FlowEdge, target: FlowNode | undefined, source?: FlowNod
   const parts: string[] = [];
   if (e.sourceHandle === 'true') parts.push('✓ 真');
   else if (e.sourceHandle === 'false') parts.push('✗ 假');
+  else if (e.sourceHandle === 'success') parts.push('✓ 成功');
+  else if (e.sourceHandle === 'fail') parts.push('✗ 失败');
   else if (e.sourceHandle?.startsWith('exit:')) {
     const exitNode = source?.data.sub?.nodes.find((x) => x.id === e.sourceHandle!.slice(5));
     parts.push(`⇥ 经出口「${exitNode?.data.title || '出口'}」`);
   }
   if (typeof e.label === 'string' && e.label) parts.push(e.label);
   if (parts.length === 0 && target) parts.push(target.data.title || '继续');
+  if (e.condition) parts.push(`〔条件 \`${e.condition}\`〕`);
+  if (e.effect) parts.push(`〔效果 \`${e.effect}\`〕`);
+  if (e.once) parts.push('〔一次性〕');
   return parts.join(' · ');
 }
 
@@ -125,6 +130,9 @@ function renderContainer(raw: SubFlow, entities: Entity[], prefix: string): stri
           break;
         case 'exit':
           lines.push(`⇥ 出口「${n.data.title || '出口'}」`, '');
+          break;
+        case 'check':
+          lines.push(`🎲 ${n.data.checkRed ? '红色' : '白色'}检定:\`2d6 + ${n.data.checkExpr || '0'} ≥ ${n.data.checkDc ?? 10}\`${n.data.text ? ` — ${n.data.text}` : ''}`, '');
           break;
       }
     });

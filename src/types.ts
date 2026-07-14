@@ -42,6 +42,7 @@ export type FlowNodeType =
   | 'instruction' // 指令(设置变量等)
   | 'jump'        // 跳转
   | 'exit'        // 出口(子流程 → 父层的命名引脚)
+  | 'check'       // 检定(2d6 + 技能 vs 难度;白可重试,红仅一次)
   | 'note'        // 画布注释(不参与演出与导出)
   | 'zone';       // 分区框(可缩放背景区块)
 
@@ -53,6 +54,7 @@ export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   instruction: '指令',
   jump: '跳转',
   exit: '出口',
+  check: '检定',
   note: '注释',
   zone: '分区',
 };
@@ -76,6 +78,10 @@ export interface FlowNodeData {
   /** 仅分区节点:框体尺寸 */
   w?: number;
   h?: number;
+  /** 仅检定节点:技能表达式(可引用变量)、难度、红色检定(仅一次机会) */
+  checkExpr?: string;
+  checkDc?: number;
+  checkRed?: boolean;
   [key: string]: unknown;
 }
 
@@ -93,6 +99,12 @@ export interface FlowEdge {
   sourceHandle?: string | null;
   targetHandle?: string | null;
   label?: string;
+  /** 选项出现条件(变量表达式,空 = 始终出现) */
+  condition?: string;
+  /** 选中该选项时执行的指令 */
+  effect?: string;
+  /** 一次性选项:演出中选过即隐藏 */
+  once?: boolean;
 }
 
 export interface Flow {

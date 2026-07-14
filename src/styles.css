@@ -309,6 +309,16 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   cursor: grab;
 }
 
+.check-kind {
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.check-kind.red { background: #7a2e24; border-color: #7a2e24; }
+.choice-once { margin-left: 6px; font-size: 11px; opacity: 0.6; }
+
 .script-hints { display: flex; flex-direction: column; gap: 6px; }
 .script-warn {
   font-size: 12px;

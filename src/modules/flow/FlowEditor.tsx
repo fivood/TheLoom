@@ -46,6 +46,21 @@ const EDGE_STYLE = {
   markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
 } as const;
 
+interface EdgeData {
+  label: string;
+  condition: string;
+  effect: string;
+  once: boolean;
+  [key: string]: unknown;
+}
+
+/** 画布上显示的边标签:文本 + 逻辑标记(◇条件 ⚡效果 ①一次性) */
+function edgeDisplayLabel(d: EdgeData): string | undefined {
+  const marks = `${d.condition ? ' ◇' : ''}${d.effect ? ' ⚡' : ''}${d.once ? ' ①' : ''}`;
+  const s = `${d.label}${marks}`.trim();
+  return s || undefined;
+}
+
 interface Crumb {
   label: string;
   path: string[];
@@ -69,7 +84,16 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
       dragHandle: n.type === 'zone' ? '.zone-head' : undefined,
     })),
   );
-  const [edges, setEdges] = useState<Edge[]>(() => sub.edges.map((e) => ({ ...e, ...EDGE_STYLE })));
+  const [edges, setEdges] = useState<Edge[]>(() => sub.edges.map((e) => {
+    const data: EdgeData = {
+      label: e.label ?? '', condition: e.condition ?? '', effect: e.effect ?? '', once: e.once === true,
+    };
+    return {
+      id: e.id, source: e.source, target: e.target,
+      sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
+      data, label: edgeDisplayLabel(data), ...EDGE_STYLE,
+    };
+  }));
   const { screenToFlowPosition } = useReactFlow();
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -94,11 +118,17 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         position: { x: n.position.x, y: n.position.y },
         data: n.data,
       }));
-      target.edges = edges.map((e) => ({
-        id: e.id, source: e.source, target: e.target,
-        sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
-        label: typeof e.label === 'string' ? e.label : undefined,
-      }));
+      target.edges = edges.map((e) => {
+        const d = (e.data ?? {}) as Partial<EdgeData>;
+        return {
+          id: e.id, source: e.source, target: e.target,
+          sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
+          label: d.label || undefined,
+          condition: d.condition || undefined,
+          effect: d.effect || undefined,
+          once: d.once || undefined,
+        };
+      });
     });
   }, [flow.id, path.join('/')]);
 
@@ -120,7 +150,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   }, []);
   const onConnect = useCallback((conn: Connection) => {
     dirty.current = true;
-    setEdges((es) => addEdge({ ...conn, id: uid(), ...EDGE_STYLE }, es));
+    setEdges((es) => addEdge({
+      ...conn, id: uid(), ...EDGE_STYLE,
+      data: { label: '', condition: '', effect: '', once: false } satisfies EdgeData,
+    }, es));
   }, []);
 
   const addNode = (type: FlowNodeType) => {
@@ -156,11 +189,16 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     dirty.current = true;
     setNodes((ns) => ns.map((n) => (n.id === selectedNode.id ? { ...n, data: { ...n.data, ...patch } } : n)));
   };
-  const patchSelectedEdgeLabel = (label: string) => {
+  const patchSelectedEdge = (patch: Partial<EdgeData>) => {
     if (!selectedEdge) return;
     dirty.current = true;
-    setEdges((es) => es.map((e) => (e.id === selectedEdge.id ? { ...e, label } : e)));
+    setEdges((es) => es.map((e) => {
+      if (e.id !== selectedEdge.id) return e;
+      const data = { ...(e.data as EdgeData), ...patch };
+      return { ...e, data, label: edgeDisplayLabel(data) };
+    }));
   };
+  const selEdgeData = (selectedEdge?.data ?? { label: '', condition: '', effect: '', once: false }) as EdgeData;
 
   const characters = useMemo(() => entities.filter((e) => e.kind === 'character'), [entities]);
 
@@ -283,6 +321,44 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               </label>
               <textarea rows={5} value={selectedNode.data.text} onChange={(e) => patchSelectedNode({ text: e.target.value })} />
             </div>
+            {selectedNode.type === 'check' && (
+              <>
+                <div className="field">
+                  <label>技能表达式(可引用变量,如 logic + 2)</label>
+                  <input
+                    value={selectedNode.data.checkExpr ?? ''}
+                    onChange={(e) => patchSelectedNode({ checkExpr: e.target.value })}
+                    style={{ fontFamily: 'Consolas, monospace' }}
+                  />
+                </div>
+                <div className="kv-row">
+                  <div className="field" style={{ flex: 1 }}>
+                    <label>难度(2d6 + 技能 ≥ 此值)</label>
+                    <input
+                      type="number"
+                      value={selectedNode.data.checkDc ?? 10}
+                      onChange={(e) => patchSelectedNode({ checkDc: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="field" style={{ flex: 1 }}>
+                    <label>类型</label>
+                    <select
+                      value={selectedNode.data.checkRed ? 'red' : 'white'}
+                      onChange={(e) => patchSelectedNode({ checkRed: e.target.value === 'red' })}
+                    >
+                      <option value="white">白检定(可重试)</option>
+                      <option value="red">红检定(仅一次)</option>
+                    </select>
+                  </div>
+                </div>
+                <ScriptHints
+                  text={selectedNode.data.checkExpr ?? ''}
+                  onInsert={(name) => patchSelectedNode({
+                    checkExpr: selectedNode.data.checkExpr ? `${selectedNode.data.checkExpr.trimEnd()} ${name}` : name,
+                  })}
+                />
+              </>
+            )}
             {(selectedNode.type === 'condition' || selectedNode.type === 'instruction') && (
               <ScriptHints
                 text={selectedNode.data.text}
@@ -312,15 +388,48 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
           </>
         ) : selectedEdge ? (
           <>
-            <h3>连线属性</h3>
+            <h3>连线属性(玩家选项)</h3>
             <div className="field">
-              <label>连线标签(如选项文本、转场说明)</label>
+              <label>选项文本 / 标签</label>
               <input
-                value={typeof selectedEdge.label === 'string' ? selectedEdge.label : ''}
-                onChange={(e) => patchSelectedEdgeLabel(e.target.value)}
+                value={selEdgeData.label}
+                onChange={(e) => patchSelectedEdge({ label: e.target.value })}
                 placeholder="例如:选择相信他"
               />
             </div>
+            <div className="field">
+              <label>出现条件 ◇(空 = 始终出现)</label>
+              <input
+                value={selEdgeData.condition}
+                onChange={(e) => patchSelectedEdge({ condition: e.target.value })}
+                placeholder="例如:has_address == true"
+                style={{ fontFamily: 'Consolas, monospace' }}
+              />
+            </div>
+            <div className="field">
+              <label>选中效果 ⚡(指令,如 favor += 1)</label>
+              <input
+                value={selEdgeData.effect}
+                onChange={(e) => patchSelectedEdge({ effect: e.target.value })}
+                placeholder="例如:took_book = true"
+                style={{ fontFamily: 'Consolas, monospace' }}
+              />
+            </div>
+            <ScriptHints
+              text={`${selEdgeData.condition} ${selEdgeData.effect}`}
+              onInsert={(name) => patchSelectedEdge({
+                condition: selEdgeData.condition ? `${selEdgeData.condition.trimEnd()} ${name}` : name,
+              })}
+            />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={selEdgeData.once}
+                onChange={(e) => patchSelectedEdge({ once: e.target.checked })}
+                style={{ width: 'auto' }}
+              />
+              一次性选项 ①(演出中选过即隐藏)
+            </label>
           </>
         ) : (
           <div className="empty-hint">

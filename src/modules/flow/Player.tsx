@@ -20,7 +20,9 @@ interface Beat {
 interface Choice {
   label: string;
   nodeId: string | null; // null = 结束
-  viaExit?: boolean;
+  edgeId?: string;
+  effect?: string;
+  once?: boolean;
 }
 
 function coerceVar(type: string, value: string): VarValue {
@@ -37,6 +39,19 @@ function evalCondition(expr: string, vars: Record<string, VarValue>): boolean | 
     return Boolean(fn(...names.map((n) => vars[n])));
   } catch {
     return null;
+  }
+}
+
+/** 数值表达式求值(检定的技能值);失败按 0 计 */
+function evalNumber(expr: string | undefined, vars: Record<string, VarValue>): number {
+  if (!expr?.trim()) return 0;
+  try {
+    const names = Object.keys(vars);
+    const fn = new Function(...names, `"use strict"; return (${expr});`);
+    const n = Number(fn(...names.map((x) => vars[x])));
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -95,6 +110,10 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const [choices, setChoices] = useState<Choice[]>([]);
   const [ended, setEnded] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  /** 一次性选项的已选记录 */
+  const takenEdges = useRef(new Set<string>());
+  /** 红色检定的既定结果 */
+  const checkResults = useRef(new Map<string, boolean>());
 
   const container = (p: string[]): SubFlow => resolveSub(flow, p) ?? { nodes: [], edges: [] };
 
@@ -124,7 +143,18 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         // 子路径自然结束(未经出口)→ 走默认引脚
         edges = edges.filter((e) => !e.sourceHandle);
       }
-      const usable = cur?.type === 'condition' ? filterCondEdges(edges, cur, vv) : edges;
+      if (cur?.type === 'condition') edges = filterCondEdges(edges, cur, vv);
+      if (cur?.type === 'check') {
+        const passed = checkResults.current.get(cur.id) ?? false;
+        const want = passed ? 'success' : 'fail';
+        const picked = edges.filter((e) => e.sourceHandle === want);
+        edges = picked.length > 0 ? picked : [];
+      }
+      // 选项级过滤:一次性已选、出现条件不满足的选项隐藏
+      const usable = edges.filter((e) =>
+        !(e.once && takenEdges.current.has(e.id)) &&
+        (!e.condition || evalCondition(e.condition, vv) !== false),
+      );
       if (usable.length > 0) {
         return {
           path: curP,
@@ -133,6 +163,9 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             return {
               label: (typeof e.label === 'string' && e.label) || target?.data.title || (target ? FLOW_NODE_LABEL[target.type] : '继续'),
               nodeId: e.target,
+              edgeId: e.id,
+              effect: e.effect,
+              once: e.once,
             };
           }),
         };
@@ -210,6 +243,28 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         case 'exit':
           pushBeat({ kind: 'exit', title: `⇥ 经「${node.data.title || '出口'}」离开子流程`, text: '' });
           break;
+        case 'check': {
+          const red = node.data.checkRed === true;
+          const dc = Number(node.data.checkDc ?? 10);
+          let note: string;
+          if (red && checkResults.current.has(node.id)) {
+            note = `红色检定只有一次机会 → 沿用先前结果:${checkResults.current.get(node.id) ? '成功' : '失败'}`;
+          } else {
+            const skill = evalNumber(node.data.checkExpr, nextVars);
+            const d1 = 1 + Math.floor(Math.random() * 6);
+            const d2 = 1 + Math.floor(Math.random() * 6);
+            const passed = d1 + d2 + skill >= dc;
+            checkResults.current.set(node.id, passed);
+            note = `2d6 = ${d1}+${d2},技能 ${skill},合计 ${d1 + d2 + skill} vs 难度 ${dc} → ${passed ? '成功' : '失败'}`;
+          }
+          pushBeat({
+            kind: 'check',
+            title: `${red ? '红色' : '白色'}检定 · ${node.data.title || node.data.checkExpr || ''}`,
+            text: node.data.text,
+            note,
+          });
+          break;
+        }
       }
 
       const { choices: cs, path: outP } = outgoingChoices(curP, node, nextVars);
@@ -222,8 +277,12 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         setEnded(true);
         return;
       }
-      if (cs.length === 1 && ['hub', 'instruction', 'condition', 'exit'].includes(node.type)) {
-        id = cs[0].nodeId; // 直通型节点自动前进
+      if (cs.length === 1 && ['hub', 'instruction', 'condition', 'exit', 'check'].includes(node.type)) {
+        // 直通型节点自动前进,沿途执行边效果并记录一次性选项
+        const c0 = cs[0];
+        if (c0.edgeId && c0.once) takenEdges.current.add(c0.edgeId);
+        if (c0.effect) applyInstructions(c0.effect, nextVars);
+        id = c0.nodeId;
         continue;
       }
       setCurPath(curP);
@@ -237,9 +296,22 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     setEnded(true);
   };
 
+  const choose = (c: Choice) => {
+    if (!c.nodeId) return;
+    if (c.edgeId && c.once) takenEdges.current.add(c.edgeId);
+    let vv = vars;
+    if (c.effect) {
+      vv = { ...vars };
+      applyInstructions(c.effect, vv);
+    }
+    visit(curPath, c.nodeId, vv);
+  };
+
   const begin = () => {
     setLog([]);
     setEnded(false);
+    takenEdges.current.clear();
+    checkResults.current.clear();
     const initVars: Record<string, VarValue> = {};
     for (const x of project.variables) initVars[x.name] = coerceVar(x.type, x.value);
     setVars(initVars);
@@ -305,9 +377,10 @@ export default function Player({ flow, path, startNodeId, onClose }: {
                 <button
                   key={i}
                   className={choices.length > 1 ? 'choice' : 'choice single'}
-                  onClick={() => c.nodeId && visit(curPath, c.nodeId, vars)}
+                  onClick={() => choose(c)}
                 >
                   {choices.length > 1 ? `${i + 1}. ${c.label}` : `${c.label} →`}
+                  {c.once && <span className="choice-once" title="一次性选项">①</span>}
                 </button>
               ))}
             </div>
