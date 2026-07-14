@@ -254,6 +254,93 @@ export interface Variable {
   description: string;
 }
 
+/* ---------- 资源库 ---------- */
+
+export type AssetKind = 'image' | 'audio' | 'video' | 'file';
+
+export const ASSET_KIND_LABEL: Record<AssetKind, string> = {
+  image: '图片',
+  audio: '音频',
+  video: '视频',
+  file: '文件',
+};
+
+export const ASSET_KIND_ICON: Record<AssetKind, 'image' | 'music' | 'film' | 'archive'> = {
+  image: 'image',
+  audio: 'music',
+  video: 'film',
+  file: 'archive',
+};
+
+export interface Asset {
+  id: ID;
+  name: string;
+  kind: AssetKind;
+  mime: string;
+  /** 预览 dataURL:图片为 256px JPEG,音频/视频/文件留空。
+   *  网页模式唯一可用形态;文件夹模式加载时从 assets/ 读入后也填入 */
+  thumbnail?: string;
+  /** 文件夹模式下 assets/ 内的文件名(如 asset-abc.png);网页模式为空——数据完全内嵌 */
+  fileRef?: string;
+  /** 原始字节数,用于配额提示 */
+  size: number;
+  tags: string[];
+  source: string;
+  notes: string;
+  createdAt: number;
+}
+
+/* ---------- 文档视图 ---------- */
+
+/** 文档块类型:每类都能 1:1 映射到流程节点 */
+export type DocBlockType =
+  | 'heading'      // 场景标题 → fragment
+  | 'action'       // 动作/旁白 → dialogue(无说话人)
+  | 'dialogue'     // 对白 → dialogue(带说话人)
+  | 'choice'       // 选项点 → hub + 多个带 label 的出边
+  | 'condition'    // 条件分支 → condition 节点
+  | 'instruction'  // 指令 → instruction 节点
+  | 'note';        // 注释 → 不进入流程
+
+export const DOC_BLOCK_LABEL: Record<DocBlockType, string> = {
+  heading: '场景',
+  action: '动作',
+  dialogue: '对白',
+  choice: '选项',
+  condition: '条件',
+  instruction: '指令',
+  note: '注释',
+};
+
+export interface DocChoice {
+  id: ID;
+  label: string;
+}
+
+export interface DocBlock {
+  id: ID;
+  type: DocBlockType;
+  /** 对白:说话人(实体 id) */
+  speakerId?: ID;
+  text: string;
+  /** 仅 choice:选项列表 */
+  choices?: DocChoice[];
+  /** 仅 condition:表达式 */
+  condition?: string;
+  /** 仅 instruction:指令 */
+  instruction?: string;
+}
+
+export interface Document {
+  id: ID;
+  name: string;
+  category: string;
+  blocks: DocBlock[];
+  notes: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /* ---------- 项目 ---------- */
 
 export interface Project {
@@ -274,6 +361,13 @@ export interface Project {
   variables: Variable[];
   /** 实体字段模板:按类型预设字段名(字符串等价于文本类型),新建实体时自动填入 */
   entityTemplates?: Partial<Record<EntityKind, EntityTemplateSpec[]>>;
+  /** 资源库 */
+  assets: Asset[];
+  /** 文档视图 */
+  documents: Document[];
+  documentCategories: string[];
+  /** 通用附件映射:对象 id(实体/卡片/流程节点/大纲行/文档块...) → asset id 列表 */
+  attachments?: Record<ID, ID[]>;
   updatedAt: number;
 }
 

@@ -39,6 +39,7 @@ import { nodeTypes, TYPE_COLORS } from './nodes';
 import Player from './Player';
 import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
 import Icon from '../../components/Icon';
+import AttachmentEditor from '../../components/AttachmentEditor';
 
 type LoomNode = Node<FlowNodeData>;
 
@@ -385,6 +386,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 ))}
               </div>
             </div>
+            <AttachmentEditor ownerId={selectedNode.id} />
           </>
         ) : selectedEdge ? (
           <>

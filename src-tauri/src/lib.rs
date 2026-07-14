@@ -17,6 +17,7 @@ struct ProjectFiles {
     project_json: Option<String>,
     entities: Vec<MdFile>,
     research: Vec<MdFile>,
+    documents: Vec<MdFile>,
     /// assets/ 下的图片,content 为 base64
     assets: Vec<MdFile>,
 }
@@ -65,7 +66,7 @@ fn read_md_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
     Ok(out)
 }
 
-/// 读取项目文件夹:project.json + entities/*.md + research/*.md
+/// 读取项目文件夹:project.json + entities/*.md + research/*.md + documents/*.md
 #[tauri::command]
 fn load_project_dir(dir: String) -> Result<ProjectFiles, String> {
     let base = PathBuf::from(&dir);
@@ -76,6 +77,7 @@ fn load_project_dir(dir: String) -> Result<ProjectFiles, String> {
         project_json: fs::read_to_string(base.join("project.json")).ok(),
         entities: read_md_dir(&base.join("entities"))?,
         research: read_md_dir(&base.join("research"))?,
+        documents: read_md_dir(&base.join("documents"))?,
         assets: read_asset_dir(&base.join("assets"))?,
     })
 }
@@ -123,7 +125,7 @@ fn save_project_dir(
         }
     }
 
-    for sub in ["entities", "research", "assets"] {
+    for sub in ["entities", "research", "documents", "assets"] {
         let d = base.join(sub);
         if !d.is_dir() {
             continue;
@@ -161,38 +163,42 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("theloom-test-{}", std::process::id()));
         let dir_s = dir.to_string_lossy().to_string();
 
-        let png_b64 = base64::engine::general_purpose::STANDARD.encode([137u8, 80, 78, 71]);
-        save_project_dir(
-            dir_s.clone(),
-            vec![
-                WriteSpec { rel_path: "project.json".into(), content: "{\"version\":1}".into(), base64: false },
-                WriteSpec { rel_path: "entities/林晚.md".into(), content: "---\nid: e1\n---\n简介".into(), base64: false },
-                WriteSpec { rel_path: "research/织机.md".into(), content: "---\nid: c1\n---\n正文".into(), base64: false },
-                WriteSpec { rel_path: "assets/entity-e1.png".into(), content: png_b64.clone(), base64: true },
-            ],
-            vec!["entities/林晚.md".into(), "research/织机.md".into(), "assets/entity-e1.png".into()],
-        )
-        .unwrap();
+    let png_b64 = base64::engine::general_purpose::STANDARD.encode([137u8, 80, 78, 71]);
+    save_project_dir(
+        dir_s.clone(),
+        vec![
+            WriteSpec { rel_path: "project.json".into(), content: "{\"version\":1}".into(), base64: false },
+            WriteSpec { rel_path: "entities/林晚.md".into(), content: "---\nid: e1\n---\n简介".into(), base64: false },
+            WriteSpec { rel_path: "research/织机.md".into(), content: "---\nid: c1\n---\n正文".into(), base64: false },
+            WriteSpec { rel_path: "documents/草稿.md".into(), content: "---\nid: d1\n---\n正文".into(), base64: false },
+            WriteSpec { rel_path: "assets/entity-e1.png".into(), content: png_b64.clone(), base64: true },
+        ],
+        vec!["entities/林晚.md".into(), "research/织机.md".into(), "documents/草稿.md".into(), "assets/entity-e1.png".into()],
+    )
+    .unwrap();
 
-        let loaded = load_project_dir(dir_s.clone()).unwrap();
-        assert_eq!(loaded.project_json.as_deref(), Some("{\"version\":1}"));
-        assert_eq!(loaded.entities.len(), 1);
-        assert_eq!(loaded.entities[0].name, "林晚.md");
-        assert_eq!(loaded.research.len(), 1);
-        assert_eq!(loaded.assets.len(), 1);
-        assert_eq!(loaded.assets[0].content, png_b64); // 二进制往返一致
+    let loaded = load_project_dir(dir_s.clone()).unwrap();
+    assert_eq!(loaded.project_json.as_deref(), Some("{\"version\":1}"));
+    assert_eq!(loaded.entities.len(), 1);
+    assert_eq!(loaded.entities[0].name, "林晚.md");
+    assert_eq!(loaded.research.len(), 1);
+    assert_eq!(loaded.documents.len(), 1);
+    assert_eq!(loaded.documents[0].name, "草稿.md");
+    assert_eq!(loaded.assets.len(), 1);
+    assert_eq!(loaded.assets[0].content, png_b64); // 二进制往返一致
 
         // 实体被删除后,对应 md 与头像图片应被清理
         save_project_dir(
             dir_s.clone(),
             vec![WriteSpec { rel_path: "project.json".into(), content: "{}".into(), base64: false }],
-            vec!["research/织机.md".into()],
-        )
-        .unwrap();
-        let loaded = load_project_dir(dir_s.clone()).unwrap();
-        assert_eq!(loaded.entities.len(), 0);
-        assert_eq!(loaded.research.len(), 1);
-        assert_eq!(loaded.assets.len(), 0);
+        vec!["research/织机.md".into()],
+    )
+    .unwrap();
+    let loaded = load_project_dir(dir_s.clone()).unwrap();
+    assert_eq!(loaded.entities.len(), 0);
+    assert_eq!(loaded.research.len(), 1);
+    assert_eq!(loaded.documents.len(), 0); // 删除已生效
+    assert_eq!(loaded.assets.len(), 0);
 
         // 路径穿越必须被拒绝
         let bad = save_project_dir(

@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import type {
-  BrainEdge, BrainNote, Entity, Flow,
+  BrainEdge, BrainNote, Document, Entity, Flow,
   OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
 } from './types';
-import { normalizeProject, uid } from './util';
+import { normalizeProject, uid, detachAssetEverywhere } from './util';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
 import { sampleProject } from './sample';
 
@@ -47,6 +47,10 @@ function blankProject(): Project {
     researchCards: [],
     researchCategories: [],
     variables: [],
+    assets: [],
+    documents: [],
+    documentCategories: [],
+    attachments: {},
     updatedAt: Date.now(),
   };
 }
@@ -167,6 +171,14 @@ interface LoomState {
   addVariable: (v: Variable) => void;
   updateVariable: (id: string, patch: Partial<Variable>) => void;
   removeVariable: (id: string) => void;
+
+  addAsset: (a: import('./types').Asset) => void;
+  updateAsset: (id: string, patch: Partial<import('./types').Asset>) => void;
+  removeAsset: (id: string) => void;
+
+  addDocument: (d: Document) => void;
+  updateDocument: (id: string, fn: (d: Document) => void) => void;
+  removeDocument: (id: string) => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -394,6 +406,31 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeVariable: (id) => commit((p) => {
       p.variables = p.variables.filter((x) => x.id !== id);
+    }),
+
+    addAsset: (a) => commit((p) => { p.assets.push(a); }),
+    updateAsset: (id, patch) => commit((p) => {
+      const a = p.assets.find((x) => x.id === id);
+      if (a) Object.assign(a, patch);
+    }),
+    removeAsset: (id) => commit((p) => {
+      p.assets = p.assets.filter((x) => x.id !== id);
+      detachAssetEverywhere(p, id);
+    }),
+
+    addDocument: (d) => commit((p) => {
+      p.documents.push(d);
+      if (d.category && !p.documentCategories.includes(d.category)) p.documentCategories.push(d.category);
+    }),
+    updateDocument: (id, fn) => commit((p) => {
+      const d = p.documents.find((x) => x.id === id);
+      if (!d) return;
+      fn(d);
+      d.updatedAt = Date.now();
+      if (d.category && !p.documentCategories.includes(d.category)) p.documentCategories.push(d.category);
+    }),
+    removeDocument: (id) => commit((p) => {
+      p.documents = p.documents.filter((x) => x.id !== id);
     }),
   };
 });

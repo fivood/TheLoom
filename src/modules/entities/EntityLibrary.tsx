@@ -5,6 +5,7 @@ import { findEntityRefs, useNav } from '../../search';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import Icon, { KIND_ICON } from '../../components/Icon';
+import AttachmentEditor from '../../components/AttachmentEditor';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 
@@ -369,6 +370,7 @@ export default function EntityLibrary() {
               <label>备注</label>
               <textarea rows={5} value={selected.notes} onChange={(e) => updateEntity(selected.id, { notes: e.target.value })} />
             </div>
+            <AttachmentEditor ownerId={selected.id} />
             <div className="field">
               <label>出现于({refs.length})</label>
               {refs.length === 0 && (

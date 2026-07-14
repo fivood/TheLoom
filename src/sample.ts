@@ -14,10 +14,6 @@ export function sampleProject(): Project {
   const tunnelId = uid();
   const phoneId = uid();
 
-  const colRomance = uid();
-  const colForeshadow = uid();
-  const colPuzzle = uid();
-
   const trackSem = uid(), trackVal = uid();
   const ptBefore = uid(), pt1609 = uid(), pt1627 = uid(), ptFive = uid(), ptChime = uid();
 
@@ -174,58 +170,8 @@ export function sampleProject(): Project {
       { id: uid(), text: '收集要素「记忆碎片」:暴雨 / 巧克力 / 手机 / 她', color: '#ffffff', position: { x: 740, y: 130 } },
     ],
     brainstormEdges: [],
-    outlineColumns: [
-      { id: colRomance, title: '感情线', color: '#3a3936' },
-      { id: colForeshadow, title: '悬念与伏笔', color: '#72716b' },
-      { id: colPuzzle, title: '解谜设计', color: '#8e8d86' },
-    ],
-    outlineRows: [
-      {
-        id: uid(), no: 'ACT 0', time: '雨天下午', title: '基金会走廊',
-        main: '塞领取新通讯器,假期开始。检视德制手机触发内心独白。',
-        cells: {
-          [colRomance]: '通讯录只有一个联系人(不点破)',
-          [colForeshadow]: '她为什么一直带着这部手机',
-          [colPuzzle]: '无,移动与检视教程',
-        },
-      },
-      {
-        id: uid(), no: 'ACT 1', time: '16:09–16:32', title: '雨中街道 · 遮阳篷',
-        main: '两条求救短信先后抵达,塞注意到时间戳异常。',
-        cells: {
-          [colRomance]: '三条回复草稿删到只剩「……?」',
-          [colForeshadow]: '延迟六分钟 + 电话不通',
-          [colPuzzle]: '时间戳逻辑推断(信息全部来自已展示内容)',
-        },
-      },
-      {
-        id: uid(), no: 'ACT 2', time: '傍晚五点', title: '白厅七号',
-        main: '过接待员一关,讯问范肖,取得软盘与手提包。',
-        cells: {
-          [colRomance]: '签名小游戏:那个更短的名字听起来不错。不打算进一步解释。',
-          [colForeshadow]: '接待员不知道楼上发生了什么',
-          [colPuzzle]: '对话博弈:不亮证件,以代理人身份施压',
-        },
-      },
-      {
-        id: uid(), no: 'ACT 3', time: '入夜', title: '查令十字地下',
-        main: '手电筒、振动与水声导航;一个字的短信之后,气味追踪开启。',
-        cells: {
-          [colRomance]: '「血」——本能没经过意识批准就接管了呼吸系统',
-          [colForeshadow]: '收容室的建造者不想让任何人找到出口',
-          [colPuzzle]: '气味浓度指示条导航,走错方向消耗手电电量',
-        },
-      },
-      {
-        id: uid(), no: 'ACT 4-5', time: '整点', title: '共振与结局',
-        main: '大本钟六声,雾化穿墙。黑暗中的重逢,与一场晚饭谈判。',
-        cells: {
-          [colRomance]: '靠在一起,听地铁的震动慢慢弱下去',
-          [colForeshadow]: '救援小队抵达时间:未知',
-          [colPuzzle]: '节奏 QTE:第四声钟声按下确认',
-        },
-      },
-    ],
+    outlineColumns: [],
+    outlineRows: [],
     timelineTracks: [
       { id: trackSem, name: '明线 · 塞梅尔维斯', color: '#1b1b19' },
       { id: trackVal, name: '暗线 · 瓦伦缇娜', color: '#565550' },
@@ -304,6 +250,27 @@ export function sampleProject(): Project {
       { id: uid(), name: 'resonance_window', type: 'boolean', value: 'false', description: '大本钟整点与双向列车交会的共振窗口' },
       { id: uid(), name: 'chocolate_rating', type: 'number', value: '-3', description: '后勤部巧克力的可食用评分(满分 5)' },
     ],
+    assets: [],
+    documents: [
+      {
+        id: uid(),
+        name: 'ACT 1 · 雨中短信草稿',
+        category: '剧本草稿',
+        notes: '先把对白按剧本块写顺,再「转为流程」生成节点图。块类型左到右对应流程节点。',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        blocks: [
+          { id: uid(), type: 'heading', text: '遮阳篷下 · 16:09' },
+          { id: uid(), type: 'action', text: '雨打在遮阳篷上,塞梅尔维斯把新发的通讯器塞回口袋,从外套内衬掏出那部德制直板手机。' },
+          { id: uid(), type: 'dialogue', speakerId: valId, text: '我需要你的帮助,亲爱的塞梅尔维斯 @-‵-,--' },
+          { id: uid(), type: 'dialogue', speakerId: semId, text: '……?' },
+          { id: uid(), type: 'dialogue', speakerId: valId, text: '很高兴你没把手机扔了。亲爱的,我好像被困在一个讨厌神秘术的盒子里。帮我出去,价钱随你开,如何?' },
+          { id: uid(), type: 'note', text: '这里先线性写,转流程后再在 condition 节点处分支:玩家是否注意到时间戳异常。' },
+        ],
+      },
+    ],
+    documentCategories: ['剧本草稿', '设计文档'],
+    attachments: {},
     updatedAt: Date.now(),
   };
 }

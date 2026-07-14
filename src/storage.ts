@@ -12,9 +12,10 @@
  * 会在下次加载时自动导入为实体 / 资料卡。
  */
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import type { Entity, EntityField, EntityFieldType, EntityKind, Project, ResearchCard } from './types';
+import type { DocBlock, DocBlockType, Document, Entity, EntityField, EntityFieldType, EntityKind, Project, ResearchCard } from './types';
 import { ENTITY_KIND_LABEL, PALETTE } from './types';
 import { normalizeProject, uid } from './util';
+import { documentToMarkdown } from './export';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -188,6 +189,80 @@ export function mdToCard(filename: string, md: string, index: number): ResearchC
   };
 }
 
+/* ---------- 文档序列化 ---------- */
+
+export function documentToMd(d: Document, entities: Entity[]): string {
+  const meta: Record<string, unknown> = {
+    loom: 'document',
+    id: d.id,
+    category: d.category,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt,
+  };
+  // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
+  const blockYaml = stringifyYaml(d.blocks.map((b) => {
+    const out: Record<string, unknown> = { type: b.type };
+    if (b.speakerId) out.speakerId = b.speakerId;
+    if (b.text) out.text = b.text;
+    if (b.choices) out.choices = b.choices;
+    if (b.condition !== undefined) out.condition = b.condition;
+    if (b.instruction !== undefined) out.instruction = b.instruction;
+    return out;
+  })).trimEnd();
+  const body = [
+    '```yaml loom-blocks',
+    blockYaml,
+    '```',
+    '',
+    '## 剧本预览',
+    '',
+    documentToMarkdown(d, entities),
+  ].join('\n');
+  return withFrontmatter(meta, body);
+}
+
+export function mdToDocument(filename: string, md: string, _index: number): Document {
+  const { meta, body } = splitFrontmatter(md);
+  const name = filename.replace(/\.md$/i, '');
+
+  // 从 ```yaml loom-blocks … ``` 围栏块里恢复结构化块
+  let blocks: DocBlock[] = [];
+  const fence = md.match(/```yaml\s+loom-blocks\s*\n([\s\S]*?)\n```/);
+  if (fence) {
+    try {
+      const arr = parseYaml(fence[1]) as unknown[];
+      if (Array.isArray(arr)) {
+        blocks = arr.map((raw) => {
+          const r = raw as Record<string, unknown>;
+          const b: DocBlock = { id: uid(), type: (r.type as DocBlockType) ?? 'note', text: '' };
+          if (typeof r.text === 'string') b.text = r.text;
+          if (typeof r.speakerId === 'string') b.speakerId = r.speakerId;
+          if (Array.isArray(r.choices)) b.choices = (r.choices as { label: string }[]).map((c) => ({ id: uid(), label: c.label ?? '' }));
+          if (typeof r.condition === 'string') b.condition = r.condition;
+          if (typeof r.instruction === 'string') b.instruction = r.instruction;
+          return b;
+        });
+      }
+    } catch { /* 损坏时回落空 */ }
+  }
+  if (blocks.length === 0) {
+    // 兼容:无结构化块时把正文当单一动作块
+    const previewIdx = body.indexOf('## 剧本预览');
+    const text = (previewIdx >= 0 ? body.slice(previewIdx + 7) : body).trim();
+    blocks = text ? [{ id: uid(), type: 'action', text }] : [{ id: uid(), type: 'heading', text: name }];
+  }
+
+  return {
+    id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
+    name,
+    category: typeof meta.category === 'string' && meta.category ? meta.category : '未分类',
+    blocks,
+    notes: '',
+    createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
+    updatedAt: typeof meta.updatedAt === 'number' ? meta.updatedAt : Date.now(),
+  };
+}
+
 /* ---------- 文件名 ---------- */
 
 function sanitizeFilename(name: string, fallback: string): string {
@@ -215,6 +290,7 @@ interface ProjectFiles {
   projectJson: string | null;
   entities: MdFile[];
   research: MdFile[];
+  documents: MdFile[];
   /** assets/ 下的图片,content 为 base64 */
   assets: MdFile[];
 }
@@ -237,7 +313,7 @@ export async function pickFolder(): Promise<string | null> {
 
 export async function folderHasProject(dir: string): Promise<boolean> {
   const files = await invoke<ProjectFiles>('load_project_dir', { dir });
-  return files.projectJson !== null || files.entities.length > 0 || files.research.length > 0;
+  return files.projectJson !== null || files.entities.length > 0 || files.research.length > 0 || files.documents.length > 0;
 }
 
 export async function loadFromFolder(dir: string): Promise<Project> {
@@ -254,6 +330,7 @@ export async function loadFromFolder(dir: string): Promise<Project> {
       timelineTracks: [], timelinePoints: [], timelineEvents: [],
       maps: [],
       researchCards: [], researchCategories: [], variables: [],
+      assets: [], documents: [], documentCategories: [], attachments: {},
       updatedAt: Date.now(),
     };
   }
@@ -269,16 +346,27 @@ export async function loadFromFolder(dir: string): Promise<Project> {
   for (const c of base.researchCards) {
     if (c.category && !base.researchCategories.includes(c.category)) base.researchCategories.push(c.category);
   }
+  // documents/:优先以 md 为准(可 Obsidian 直接编辑),project.json 的同名文档被覆盖
+  const docByName = new Map(files.documents.map((f) => [f.name, f]));
+  base.documents = files.documents
+    .map((f, i) => mdToDocument(f.name, f.content, i))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  // 同步分类:把 md 里出现的 category 合并进 project.documentCategories
+  for (const d of base.documents) {
+    if (d.category && !base.documentCategories.includes(d.category)) base.documentCategories.push(d.category);
+    docByName.delete(`${d.name}.md`); // 标记已消费
+  }
   return base;
 }
 
 export async function saveToFolder(dir: string, project: Project): Promise<void> {
   const entityFiles = assignFilenames(project.entities, (e) => e.name);
   const cardFiles = assignFilenames(project.researchCards, (c) => c.title);
+  const docFiles = assignFilenames(project.documents, (d) => d.name);
   const idToName = new Map(project.entities.map((e) => [e.id, e.name]));
 
   // project.json 里不重复存 md 化的内容,只留引用顺序无关的结构化数据
-  const slim = { ...project, entities: [], researchCards: [] };
+  const slim = { ...project, entities: [], researchCards: [], documents: [] };
 
   const files: { relPath: string; content: string; base64?: boolean }[] = [
     { relPath: 'project.json', content: JSON.stringify(slim, null, 2) },
@@ -302,6 +390,10 @@ export async function saveToFolder(dir: string, project: Project): Promise<void>
   for (const [name, c] of cardFiles) {
     files.push({ relPath: `research/${name}`, content: cardToMd(c) });
     keepMd.push(`research/${name}`);
+  }
+  for (const [name, d] of docFiles) {
+    files.push({ relPath: `documents/${name}`, content: documentToMd(d, project.entities) });
+    keepMd.push(`documents/${name}`);
   }
 
   await invoke('save_project_dir', { dir, files, keepMd });

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import type { Entity, FlowNode, Project, SubFlow } from './types';
+import type { Asset, Entity, FlowNode, Project, SubFlow } from './types';
 import { ENTITY_KIND_LABEL, FLOW_NODE_LABEL } from './types';
 
-export type NavTab = 'flow' | 'entities' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
+export type NavTab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
 
 export interface NavTarget {
   tab: NavTab;
@@ -14,6 +14,9 @@ export interface NavTarget {
   eventId?: string;
   mapId?: string;
   markerId?: string;
+  assetId?: string;
+  docId?: string;
+  blockId?: string;
 }
 
 interface NavState {
@@ -147,6 +150,28 @@ export function searchProject(p: Project, query: string): SearchHit[] {
     }
   }
 
+  for (const a of p.assets) {
+    const hit = matches(q, a.name, a.notes, a.source, ...a.tags);
+    if (hit) {
+      push({
+        module: '资源', kind: a.kind, title: a.name,
+        snippet: snippetOf(hit, q),
+        nav: { tab: 'assets', assetId: a.id },
+      });
+    }
+  }
+
+  for (const d of p.documents) {
+    const hit = matches(q, d.name, d.notes, ...d.blocks.map((b) => b.text));
+    if (hit) {
+      push({
+        module: '文档', kind: d.category, title: d.name,
+        snippet: snippetOf(hit, q),
+        nav: { tab: 'documents', docId: d.id },
+      });
+    }
+  }
+
   return hits;
 }
 
@@ -260,6 +285,89 @@ export function findEntityRefs(p: Project, entity: Entity): SearchHit[] {
           nav: { tab: 'map', mapId: map.id },
         });
       }
+    }
+  }
+
+  return hits;
+}
+
+/** 资产反向引用:该资源被哪些对象挂为附件 */
+export function findAssetRefs(p: Project, asset: Asset): SearchHit[] {
+  const hits: SearchHit[] = [];
+  const push = (h: Omit<SearchHit, 'key'>) => {
+    if (hits.length < 40) hits.push({ ...h, key: `ref-${hits.length}` });
+  };
+
+  if (!p.attachments) return hits;
+
+  // 建立 ownerId → 它是什么对象的反查表
+  // 实体
+  for (const e of p.entities) {
+    if ((p.attachments[e.id] ?? []).includes(asset.id)) {
+      push({
+        module: '实体', kind: ENTITY_KIND_LABEL[e.kind], title: e.name,
+        snippet: '附件',
+        nav: { tab: 'entities', entityId: e.id },
+      });
+    }
+  }
+  // 资料卡
+  for (const c of p.researchCards) {
+    if ((p.attachments[c.id] ?? []).includes(asset.id)) {
+      push({
+        module: '资料', kind: c.category, title: c.title,
+        snippet: '附件',
+        nav: { tab: 'research', cardId: c.id },
+      });
+    }
+  }
+  // 文档块
+  for (const d of p.documents) {
+    for (const b of d.blocks) {
+      if ((p.attachments[b.id] ?? []).includes(asset.id)) {
+        push({
+          module: '文档', kind: d.category, title: d.name,
+          snippet: `块 · ${b.text.slice(0, 40) || b.type}`,
+          nav: { tab: 'documents', docId: d.id, blockId: b.id },
+        });
+      }
+    }
+  }
+  // 流程节点(任意深度)
+  for (const flow of p.flows) {
+    const walk = (sub: SubFlow, path: string[], crumb: string) => {
+      for (const n of sub.nodes as FlowNode[]) {
+        if ((p.attachments![n.id] ?? []).includes(asset.id)) {
+          push({
+            module: '流程', kind: FLOW_NODE_LABEL[n.type], title: n.data.title || FLOW_NODE_LABEL[n.type],
+            snippet: `${crumb} · 附件`,
+            nav: { tab: 'flow', flowId: flow.id, path, nodeId: n.id },
+          });
+        }
+        if (n.data.sub) walk(n.data.sub, [...path, n.id], `${crumb} ▸ ${n.data.title || '片段'}`);
+      }
+    };
+    walk(flow, [], flow.name);
+  }
+  // 大纲行
+  for (const r of p.outlineRows) {
+    if ((p.attachments[r.id] ?? []).includes(asset.id)) {
+      push({
+        module: '大纲', kind: `第 ${r.no || '?'} 章`, title: r.title || '(未命名章节)',
+        snippet: '附件',
+        nav: { tab: 'outline' },
+      });
+    }
+  }
+  // 时间线事件
+  for (const ev of p.timelineEvents) {
+    if ((p.attachments[ev.id] ?? []).includes(asset.id)) {
+      const pt = p.timelinePoints.find((x) => x.id === ev.pointId);
+      push({
+        module: '时间线', kind: pt?.label || '事件', title: ev.title,
+        snippet: '附件',
+        nav: { tab: 'timeline', eventId: ev.id },
+      });
     }
   }
 

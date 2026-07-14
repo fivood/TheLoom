@@ -12,6 +12,8 @@ import ProjectMenu from './components/ProjectMenu';
 import Icon, { type IconName } from './components/Icon';
 import FlowEditor from './modules/flow/FlowEditor';
 import EntityLibrary from './modules/entities/EntityLibrary';
+import Assets from './modules/assets/Assets';
+import DocumentView from './modules/document/DocumentView';
 import Brainstorm from './modules/brainstorm/Brainstorm';
 import OutlineGrid from './modules/outline/OutlineGrid';
 import Timeline from './modules/timeline/Timeline';
@@ -19,11 +21,13 @@ import MapEditor from './modules/map/MapEditor';
 import ResearchCards from './modules/research/ResearchCards';
 import Variables from './modules/variables/Variables';
 
-type Tab = 'flow' | 'entities' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
+type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
 
 const TABS: { key: Tab; icon: IconName; label: string }[] = [
   { key: 'flow', icon: 'flow', label: '流程' },
   { key: 'entities', icon: 'entity', label: '实体' },
+  { key: 'assets', icon: 'image', label: '资源' },
+  { key: 'documents', icon: 'doc', label: '文档' },
   { key: 'brainstorm', icon: 'bulb', label: '风暴' },
   { key: 'outline', icon: 'grid', label: '大纲' },
   { key: 'timeline', icon: 'clock', label: '时间线' },
@@ -173,6 +177,8 @@ export default function App() {
         <div className="content" key={revision}>
           {tab === 'flow' && <FlowEditor />}
           {tab === 'entities' && <EntityLibrary />}
+          {tab === 'assets' && <Assets />}
+          {tab === 'documents' && <DocumentView />}
           {tab === 'brainstorm' && <Brainstorm />}
           {tab === 'outline' && <OutlineGrid />}
           {tab === 'timeline' && <Timeline />}

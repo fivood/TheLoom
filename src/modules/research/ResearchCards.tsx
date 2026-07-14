@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import Icon from '../../components/Icon';
+import AttachmentEditor from '../../components/AttachmentEditor';
 import type { ResearchCard } from '../../types';
 import { PALETTE } from '../../types';
 
@@ -196,6 +197,7 @@ export default function ResearchCards() {
                 }}
               >删除</button>
             </div>
+            <AttachmentEditor ownerId={selected.id} />
           </>
         ) : (
           <div className="empty-hint">点击卡片查看和编辑<br /><br />左侧可按分类和标签筛选</div>

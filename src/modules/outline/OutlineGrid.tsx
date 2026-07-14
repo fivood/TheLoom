@@ -56,8 +56,8 @@ export default function OutlineGrid() {
           <thead>
             <tr>
               <th style={{ width: 90 }}></th>
-              <th className="col-narrow">章节</th>
-              <th className="col-narrow">时间</th>
+              <th className="col-narrow" style={{ width: 110 }}>章节</th>
+              <th className="col-narrow" style={{ width: 150 }}>时间</th>
               <th style={{ minWidth: 140 }}>章节标题</th>
               <th style={{ minWidth: 220 }}>主线剧情</th>
               {columns.map((c) => (

@@ -20,6 +20,9 @@ export interface ProjectStats {
   totalNodes: number;
   outlineWords: number;
   researchWords: number;
+  documentWords: number;
+  assets: number;
+  documents: number;
 }
 
 export function projectStats(p: Project): ProjectStats {
@@ -55,11 +58,17 @@ export function projectStats(p: Project): ProjectStats {
   const outlineWords = p.outlineRows.reduce((s, r) =>
     s + countWords(r.title) + countWords(r.main) + Object.values(r.cells).reduce((x, c) => x + countWords(c), 0), 0);
   const researchWords = p.researchCards.reduce((s, c) => s + countWords(c.title) + countWords(c.content), 0);
+  const documentWords = p.documents.reduce((s, d) =>
+    s + countWords(d.name) + countWords(d.notes) + d.blocks.reduce((x, b) =>
+      x + countWords(b.text) + countWords(b.instruction) + countWords(b.condition)
+        + (b.choices?.reduce((y, c) => y + countWords(c.label), 0) ?? 0), 0), 0);
 
   return {
     flows,
     speakers: [...speakerMap.values()].sort((a, b) => b.words - a.words),
-    totalWords, totalNodes, outlineWords, researchWords,
+    totalWords, totalNodes, outlineWords, researchWords, documentWords,
+    assets: p.assets.length,
+    documents: p.documents.length,
   };
 }
 
@@ -126,5 +135,17 @@ export function auditProject(p: Project): Issue[] {
     };
     walk(flow, [], flow.name);
   }
+
+  // 悬挂附件引用:attachments 里指向了已删除的 asset
+  if (p.attachments) {
+    const knownAssetIds = new Set(p.assets.map((a) => a.id));
+    for (const [ownerId, ids] of Object.entries(p.attachments)) {
+      const dangling = ids.filter((id) => !knownAssetIds.has(id));
+      if (dangling.length) {
+        issues.push({ kind: '悬挂附件', message: `对象 ${ownerId.slice(0, 8)}… 引用了 ${dangling.length} 个不存在的资源` });
+      }
+    }
+  }
+
   return issues;
 }

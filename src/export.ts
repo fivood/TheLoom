@@ -1,5 +1,5 @@
 import { ANNOTATION_TYPES } from './types';
-import type { Entity, Flow, FlowEdge, FlowNode, Project, SubFlow } from './types';
+import type { DocBlock, Document, Entity, Flow, FlowEdge, FlowNode, Project, SubFlow } from './types';
 
 /**
  * 流程 → 剧本式 Markdown
@@ -175,4 +175,46 @@ export function downloadMarkdown(filename: string, content: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/* ---------- 文档 → Markdown(剧本格式) ---------- */
+
+function speakerName(b: DocBlock, entities: Entity[]): string {
+  if (!b.speakerId) return '';
+  return entities.find((e) => e.id === b.speakerId)?.name ?? '';
+}
+
+function blockToLines(b: DocBlock, entities: Entity[]): string[] {
+  switch (b.type) {
+    case 'heading':
+      return [`## ${b.text || '(未命名场景)'}`, ''];
+    case 'action':
+      return [b.text || '(空动作)', ''];
+    case 'dialogue': {
+      const who = speakerName(b, entities);
+      return who ? [`**${who}**:${b.text || '(空台词)'}`, ''] : [b.text || '(空对白)', ''];
+    }
+    case 'choice': {
+      const labels = (b.choices ?? []).map((c) => c.label).filter(Boolean);
+      const head = b.text ? `${b.text}` : '选项点';
+      const lines = [`*◇ ${head}*`, ''];
+      if (labels.length) for (const l of labels) lines.push(`- ▸ ${l}`);
+      return [...lines, ''];
+    }
+    case 'condition':
+      return [`*◇ 条件 \`${b.condition || '(未填写)'}\`*`, ''];
+    case 'instruction':
+      return [`*⚙ 指令 \`${b.instruction || '(未填写)'}\`*`, ''];
+    case 'note':
+      return b.text ? [`<!-- ${b.text} -->`, ''] : [];
+    default:
+      return [];
+  }
+}
+
+export function documentToMarkdown(doc: Document, entities: Entity[]): string {
+  const lines: string[] = [`# ${doc.name}`, ''];
+  if (doc.notes.trim()) lines.push(`> ${doc.notes.trim().replace(/\n/g, '\n> ')}`, '');
+  for (const b of doc.blocks) lines.push(...blockToLines(b, entities));
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

@@ -5,7 +5,7 @@ export type IconName =
   | 'logo' | 'flow' | 'entity' | 'bulb' | 'grid' | 'clock' | 'archive' | 'braces'
   | 'search' | 'undo' | 'redo' | 'folder' | 'refresh' | 'download' | 'upload' | 'reset'
   | 'play' | 'script' | 'pin' | 'image' | 'plus' | 'cloud'
-  | 'user' | 'mappin' | 'key' | 'flag' | 'book';
+  | 'user' | 'mappin' | 'key' | 'flag' | 'book' | 'doc' | 'tag' | 'trash' | 'film' | 'music';
 
 /** 实体类型 → 图标 */
 export const KIND_ICON: Record<EntityKind, IconName> = {
@@ -163,6 +163,36 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M4.5 19a2.5 2.5 0 0 1 2.5-2.5H19.5V3H7A2.5 2.5 0 0 0 4.5 5.5z" />
       <path d="M4.5 19A2.5 2.5 0 0 0 7 21.5h12.5v-5" />
+    </>
+  ),
+  doc: (
+    <>
+      <path d="M6 3h8l5 5v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M13 3v6h6M8 13h8M8 17h6" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M3 12 12 3h6v6L9 18z" />
+      <circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7M10 11v6M14 11v6" />
+    </>
+  ),
+  film: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <path d="M3.5 9h17M3.5 15h17M8 4.5v15M16 4.5v15" />
+    </>
+  ),
+  music: (
+    <>
+      <path d="M9 18V5l11-2v11" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="17" cy="16" r="3" />
     </>
   ),
 };

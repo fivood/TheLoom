@@ -24,6 +24,8 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
               流程 {stats.totalWords} 字 · {stats.totalNodes} 节点
               &nbsp;|&nbsp; 大纲 {stats.outlineWords} 字
               &nbsp;|&nbsp; 资料 {stats.researchWords} 字
+              &nbsp;|&nbsp; 文档 {stats.documentWords} 字
+              &nbsp;|&nbsp; 资源 {stats.assets} · 文档 {stats.documents}
             </div>
             <table className="var-table">
               <thead><tr><th>流程</th><th>节点</th><th>字数</th></tr></thead>
@@ -51,7 +53,7 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
 
           <div className="audit-section">
             <h4>问题检测({issues.length})</h4>
-            {issues.length === 0 && <div className="audit-ok">没有发现问题:无孤儿节点、无分支缺口、无未定义变量、无空对白。</div>}
+            {issues.length === 0 && <div className="audit-ok">没有发现问题:无孤儿节点、无分支缺口、无未定义变量、无空对白、无悬挂附件。</div>}
             {issues.map((it, i) => (
               <div
                 key={i}

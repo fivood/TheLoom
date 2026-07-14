@@ -62,11 +62,12 @@ npx wrangler pages dev dist --d1=SYNC_DB --port 8788
 ├── project.json       流程、大纲、时间线、风暴、变量等结构化数据
 ├── entities/          实体卡,每个实体一个 Markdown 文件(YAML frontmatter)
 ├── research/          资料卡,每张卡一个 Markdown 文件
+├── documents/         文档,每篇一个 Markdown 文件(结构化块 + 剧本预览)
 └── assets/            实体头像等二进制资源
 ```
 
-- `entities/`、`research/` 下新建的 `.md` 文件在下次加载时自动导入,文件名即名称,frontmatter 中 `kind: character` 可指定实体类型
-- 在应用内删除实体或资料卡会同步删除对应文件
+- `entities/`、`research/`、`documents/` 下新建的 `.md` 文件在下次加载时自动导入,文件名即名称,frontmatter 中 `kind: character` 可指定实体类型
+- 在应用内删除实体、资料卡或文档会同步删除对应文件
 - `project.json` 为结构化数据,不建议手工编辑
 - 同一时间请只在一台设备上编辑同一文件夹(最后写入者获胜)
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
+import AttachmentEditor from '../../components/AttachmentEditor';
 import type { TimelineEvent } from '../../types';
 import { PALETTE } from '../../types';
 
@@ -254,6 +255,7 @@ export default function Timeline() {
             <button className="danger" onClick={() => { if (confirm(`删除事件「${selected.title}」?`)) removeEvent(selected.id); }}>
               删除事件
             </button>
+            <AttachmentEditor ownerId={selected.id} />
           </>
         ) : (
           <div className="empty-hint">
