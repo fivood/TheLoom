@@ -1084,3 +1084,45 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   text-align: left;
   padding: 0;
 }
+
+/* ---------- 富文本 ---------- */
+
+.rich-input { display: flex; flex-direction: column; gap: 4px; }
+.rich-input textarea { width: 100%; }
+.rich-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0;
+}
+.rich-toolbar button {
+  width: 26px; height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.rich-toolbar button:hover { background: var(--bg-hover); }
+.rich-toolbar .hint { margin-left: 6px; color: var(--text-faint); }
+.node-body em, .beat-text em, .doc-block-main em { font-style: italic; }
+.node-body s, .beat-text s, .doc-block-main s { text-decoration: line-through; }
+
+/* ---------- 文件夹树(Navigator) ---------- */
+
+.side-item.folder-row { gap: 4px; }
+.side-item.folder-row .caret { width: 12px; flex-shrink: 0; color: var(--text-faint); text-align: center; }
+.side-item.folder-row .count { font-size: 11px; }
+.side-item .move-to-folder {
+  width: 16px; height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0.4;
+}
+.side-item:hover .move-to-folder { opacity: 1; }
+.side-item .move-to-folder option { font-size: 12px; padding: 2px 6px; }

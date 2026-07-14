@@ -29,6 +29,7 @@ export function sampleProject(): Project {
       {
         id: uid(),
         name: 'DEMO · 雨夜寻人',
+        technicalName: 'demo_rain_night',
         nodes: [
           { id: n1, type: 'fragment', position: { x: 40, y: 200 }, data: { title: 'ACT 0 · 基金会走廊', text: '伦敦的雨季长得就像这条走廊——你永远搞不清楚走了多久,也不知道又在官僚主义的迷宫里拐了几个弯。我叫塞梅尔维斯,基金会高级调查员。今天放假。' } },
           { id: n2, type: 'dialogue', position: { x: 360, y: 200 }, data: { title: '第一条短信', text: '我需要你的帮助,亲爱的塞梅尔维斯 @-‵-,--', speakerId: valId } },
@@ -39,6 +40,7 @@ export function sampleProject(): Project {
             data: {
               title: '谜题 · 时间戳分析',
               text: '双击进入解谜子流程。',
+              technicalName: 'puzzle_timestamp',
               sub: {
                 nodes: [
                   { id: s1, type: 'fragment', position: { x: 40, y: 120 }, data: { title: '便条纸展开', text: '第一条:发送 16:09,接收 16:15。第二条:发送 16:27,接收 16:32。伦敦市中心,五六分钟的延迟不正常。拨号尝试:「您拨打的号码暂时无法接通——」' } },
@@ -91,6 +93,7 @@ export function sampleProject(): Project {
     entities: [
       {
         id: semId, kind: 'character', name: '塞梅尔维斯', color: '#1b1b19', emoji: '',
+        technicalName: 'semelvie',
         summary: '基金会高级调查员,血食者。极度自律的理性外壳,以及被高级甜点和某人惯坏的品味内芯。今天放假——放到一半。',
         fields: [
           { id: uid(), label: '能力', value: '夜视、雾化(需要缝隙与时机)、犬齿' },
@@ -104,6 +107,7 @@ export function sampleProject(): Project {
       },
       {
         id: valId, kind: 'character', name: '瓦伦缇娜', color: '#3a3936', emoji: '',
+        technicalName: 'valentine',
         summary: '古老血食贵族,神秘术强者,以戏弄塞梅尔维斯为人生乐趣。目前被困在一个讨厌神秘术的盒子里,对此的主要不满集中在空气发霉。',
         fields: [
           { id: uid(), label: '身份', value: '血食贵族 · 收藏品爱好者' },
@@ -271,6 +275,7 @@ export function sampleProject(): Project {
     ],
     documentCategories: ['剧本草稿', '设计文档'],
     attachments: {},
+    folders: [],
     updatedAt: Date.now(),
   };
 }

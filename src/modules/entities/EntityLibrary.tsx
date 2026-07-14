@@ -6,6 +6,7 @@ import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import Icon, { KIND_ICON } from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
+import TechNameField from '../../components/TechNameField';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 
@@ -292,6 +293,11 @@ export default function EntityLibrary() {
               <label>一句话简介</label>
               <textarea rows={3} value={selected.summary} onChange={(e) => updateEntity(selected.id, { summary: e.target.value })} />
             </div>
+            <TechNameField
+              value={selected.technicalName}
+              onChange={(v) => updateEntity(selected.id, { technicalName: v })}
+              displayName={selected.name}
+            />
             <div className="field">
               <label>自定义字段(文本或引用其他实体)</label>
               {selected.fields.map((f) => {

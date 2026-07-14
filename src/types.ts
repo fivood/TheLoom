@@ -48,6 +48,8 @@ export interface Entity {
   summary: string;
   fields: EntityField[];
   notes: string;
+  /** 技术名:项目内唯一的稳定标识符,用于脚本寻址与导出,如 semelvie */
+  technicalName?: string;
   createdAt: number;
 }
 
@@ -101,6 +103,8 @@ export interface FlowNodeData {
   checkExpr?: string;
   checkDc?: number;
   checkRed?: boolean;
+  /** 技术名:用于 seen("xxx") / unseen("xxx") 在脚本中引用本节点 */
+  technicalName?: string;
   [key: string]: unknown;
 }
 
@@ -124,11 +128,17 @@ export interface FlowEdge {
   effect?: string;
   /** 一次性选项:演出中选过即隐藏 */
   once?: boolean;
+  /** 兜底分支:当其他出边都不满足时才走这条;有其他可用候选时被遮蔽 */
+  fallback?: boolean;
 }
 
 export interface Flow {
   id: ID;
   name: string;
+  /** 技术名:项目内唯一,用于跳转与导出,如 act1_rain */
+  technicalName?: string;
+  /** 所属文件夹 id(null / undefined = 未分组);Navigator 树用 */
+  folderId?: ID;
   nodes: FlowNode[];
   edges: FlowEdge[];
 }
@@ -287,11 +297,12 @@ export interface Asset {
   tags: string[];
   source: string;
   notes: string;
+  /** 技术名:项目内唯一,用于脚本与导出,如 portrait_semelvie */
+  technicalName?: string;
   createdAt: number;
 }
 
 /* ---------- 文档视图 ---------- */
-
 /** 文档块类型:每类都能 1:1 映射到流程节点 */
 export type DocBlockType =
   | 'heading'      // 场景标题 → fragment
@@ -334,11 +345,26 @@ export interface DocBlock {
 export interface Document {
   id: ID;
   name: string;
+  /** 技术名:项目内唯一,用于导出,如 act1_draft */
+  technicalName?: string;
   category: string;
   blocks: DocBlock[];
   notes: string;
   createdAt: number;
   updatedAt: number;
+}
+
+/* ---------- 文件夹(Navigator 树) ---------- */
+
+export type FolderModule = 'flow' | 'entity' | 'asset' | 'document' | 'research';
+
+export interface Folder {
+  id: ID;
+  name: string;
+  /** 该文件夹归属的模块(文件夹按模块隔离) */
+  module: FolderModule;
+  /** 父文件夹 id;null / undefined = 顶层 */
+  parentId?: ID | null;
 }
 
 /* ---------- 项目 ---------- */
@@ -368,6 +394,8 @@ export interface Project {
   documentCategories: string[];
   /** 通用附件映射:对象 id(实体/卡片/流程节点/大纲行/文档块...) → asset id 列表 */
   attachments?: Record<ID, ID[]>;
+  /** 文件夹(Navigator 树);按 module 隔离,各模块 side-list 可树化 */
+  folders: Folder[];
   updatedAt: number;
 }
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  BrainEdge, BrainNote, Document, Entity, Flow,
+  BrainEdge, BrainNote, Document, Entity, Flow, Folder,
   OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
 } from './types';
 import { normalizeProject, uid, detachAssetEverywhere } from './util';
@@ -51,6 +51,7 @@ function blankProject(): Project {
     documents: [],
     documentCategories: [],
     attachments: {},
+    folders: [],
     updatedAt: Date.now(),
   };
 }
@@ -179,6 +180,10 @@ interface LoomState {
   addDocument: (d: Document) => void;
   updateDocument: (id: string, fn: (d: Document) => void) => void;
   removeDocument: (id: string) => void;
+
+  addFolder: (f: Folder) => void;
+  updateFolder: (id: string, patch: Partial<Folder>) => void;
+  removeFolder: (id: string) => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -431,6 +436,32 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeDocument: (id) => commit((p) => {
       p.documents = p.documents.filter((x) => x.id !== id);
+    }),
+
+    addFolder: (f) => commit((p) => { p.folders.push(f); }),
+    updateFolder: (id, patch) => commit((p) => {
+      const f = p.folders.find((x) => x.id === id);
+      if (f) Object.assign(f, patch);
+    }),
+    removeFolder: (id) => commit((p) => {
+      // 递归收集该文件夹及其所有后代文件夹 id
+      const toDelete = new Set<string>([id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const f of p.folders) {
+          if (f.parentId && toDelete.has(f.parentId) && !toDelete.has(f.id)) {
+            toDelete.add(f.id);
+            changed = true;
+          }
+        }
+      }
+      p.folders = p.folders.filter((f) => !toDelete.has(f.id));
+      // 解除受影响文件夹下所有对象的归属(此处覆盖所有用 folderId 的对象类型)
+      const clear = (fid: string) => {
+        for (const fl of p.flows) if (fl.folderId === fid) fl.folderId = undefined;
+      };
+      for (const fid of toDelete) clear(fid);
     }),
   };
 });

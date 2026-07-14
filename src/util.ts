@@ -14,6 +14,7 @@ export function normalizeProject(p: Project): Project {
   p.documents ??= [];
   p.documentCategories ??= [];
   p.attachments ??= {};
+  p.folders ??= [];
   return p;
 }
 
@@ -144,4 +145,53 @@ export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/* ---------- 技术名 ---------- */
+
+const TECH_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** 从显示名生成技术名:取字母数字,空格转下划线,小写;纯中文等无字母时返回空串 */
+export function sanitizeTechnicalName(name: string): string {
+  const cleaned = name
+    .replace(/[^A-Za-z0-9_\s]/g, ' ')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/^[0-9]+/, (m) => `_${m}`);
+  return cleaned.slice(0, 40);
+}
+
+/** 校验技术名:合法返回 null,否则返回错误信息 */
+export function validateTechnicalName(name: string): string | null {
+  if (!name) return null;
+  if (name.length > 64) return '技术名过长(≤64 字符)';
+  if (!TECH_NAME_RE.test(name)) return '只能含字母、数字、下划线,且不能以数字开头';
+  return null;
+}
+
+export interface TechNameOwner { kind: string; id: string; name: string; ownerId: string }
+export interface TechNameDuplicate { name: string; owners: TechNameOwner[] }
+
+/** 收集项目内所有技术名及归属,用于冲突检测 */
+export function collectTechnicalNames(p: Project): { name: string; owner: TechNameOwner }[] {
+  const out: { name: string; owner: TechNameOwner }[] = [];
+  const push = (kind: string, id: string, name: string, tn: string | undefined) => {
+    if (tn) out.push({ name: tn, owner: { kind, id, name, ownerId: id } });
+  };
+  for (const e of p.entities) push('实体', e.id, e.name, e.technicalName);
+  for (const f of p.flows) push('流程', f.id, f.name, f.technicalName);
+  for (const a of p.assets) push('资源', a.id, a.name, a.technicalName);
+  for (const d of p.documents) push('文档', d.id, d.name, d.technicalName);
+  return out;
+}
+
+/** 找出重复的技术名 */
+export function findDuplicateTechnicalNames(p: Project): TechNameDuplicate[] {
+  const map = new Map<string, TechNameOwner[]>();
+  for (const { name, owner } of collectTechnicalNames(p)) {
+    const arr = map.get(name) ?? [];
+    arr.push(owner);
+    map.set(name, arr);
+  }
+  return [...map.entries()].filter(([, arr]) => arr.length > 1).map(([name, owners]) => ({ name, owners }));
 }

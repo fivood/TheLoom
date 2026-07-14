@@ -1,5 +1,6 @@
 import type { FlowNode, Project, SubFlow } from './types';
 import { ANNOTATION_TYPES } from './types';
+import { findDuplicateTechnicalNames } from './util';
 import type { NavTarget } from './search';
 
 /** 中文按字计,拉丁与数字按词计 */
@@ -78,15 +79,24 @@ export interface Issue {
   nav?: NavTarget;
 }
 
-const RESERVED = new Set(['true', 'false']);
+const RESERVED = new Set(['true', 'false', 'seen', 'unseen']);
+
+/** 收集某文本里出现的"独立标识符"(obj.prop 的 prop 不算),返回未知的 */
+function findUnknownIdentifiers(text: string, known: Set<string>): string[] {
+  // 负向后看:前面不是 . 或 word 字符 → 跳过 obj.prop 的 prop 部分
+  const tokens = text.match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
+  return [...new Set(tokens)].filter((x) => !RESERVED.has(x) && !known.has(x));
+}
 
 export function auditProject(p: Project): Issue[] {
   const issues: Issue[] = [];
   const known = new Set(p.variables.map((v) => v.name));
+  // 设了技术名的实体作为对象注入脚本,其技术名是已知标识符
+  for (const e of p.entities) if (e.technicalName) known.add(e.technicalName);
 
   const checkVars = (text: string | undefined, where: string, nav?: NavTarget) => {
     if (!text) return;
-    const used = [...new Set(text.match(/[A-Za-z_]\w*/g) ?? [])].filter((x) => !RESERVED.has(x) && !known.has(x));
+    const used = findUnknownIdentifiers(text, known);
     if (used.length > 0) {
       issues.push({ kind: '未定义变量', message: `${where}:${used.join('、')}`, nav });
     }
@@ -145,6 +155,12 @@ export function auditProject(p: Project): Issue[] {
         issues.push({ kind: '悬挂附件', message: `对象 ${ownerId.slice(0, 8)}… 引用了 ${dangling.length} 个不存在的资源` });
       }
     }
+  }
+
+  // 重复技术名
+  for (const dup of findDuplicateTechnicalNames(p)) {
+    const where = dup.owners.map((o) => `${o.kind}「${o.name}」`).join('、');
+    issues.push({ kind: '重复技术名', message: `${dup.name} → ${where}` });
   }
 
   return issues;

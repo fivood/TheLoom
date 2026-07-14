@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   applyNodeChanges, applyEdgeChanges, addEdge, useReactFlow, MarkerType,
@@ -14,14 +14,20 @@ import { useLoom as useLoomStore } from '../../store';
 /** 条件/指令脚本的变量校验与快捷插入 */
 function ScriptHints({ text, onInsert }: { text: string; onInsert: (name: string) => void }) {
   const variables = useLoomStore((s) => s.project.variables);
+  const entities = useLoomStore((s) => s.project.entities);
   const known = new Set(variables.map((v) => v.name));
-  const RESERVED = new Set(['true', 'false']);
-  const used = [...new Set(text.match(/[A-Za-z_]\w*/g) ?? [])].filter((x) => !RESERVED.has(x));
+  // 设了技术名的实体作为对象注入脚本,其技术名是已知标识符
+  for (const e of entities) if (e.technicalName) known.add(e.technicalName);
+  const RESERVED = new Set(['true', 'false', 'seen', 'unseen']);
+  // 负向后看:跳过 obj.prop 的 prop 部分
+  const tokens = text.match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
+  const used = [...new Set(tokens)].filter((x) => !RESERVED.has(x));
   const unknown = used.filter((x) => !known.has(x));
+  const namedEntities = entities.filter((e) => e.technicalName);
   return (
     <div className="script-hints">
       {unknown.length > 0 && (
-        <div className="script-warn">未定义变量:{unknown.join('、')}(可在「变量」模块创建)</div>
+        <div className="script-warn">未定义标识符:{unknown.join('、')}(seen / unseen 是保留函数;有技术名的实体作为对象可直接用)</div>
       )}
       {variables.length > 0 && (
         <div className="card-tags">
@@ -32,6 +38,19 @@ function ScriptHints({ text, onInsert }: { text: string; onInsert: (name: string
           ))}
         </div>
       )}
+      {namedEntities.length > 0 && (
+        <div className="card-tags">
+          {namedEntities.map((e) => (
+            <span key={e.id} className="tag clickable" title={`${e.name} 的字段,如 ${e.technicalName}.某字段`} onClick={() => onInsert(e.technicalName!)}>
+              {e.technicalName}
+              <span style={{ opacity: 0.6, fontSize: 10 }}>·{e.name}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+        可用:<code>seen("技术名")</code> 走过 · <code>unseen("技术名")</code> 未走过 · <code>实体技术名.字段名</code> 访问属性
+      </div>
     </div>
   );
 }
@@ -40,6 +59,8 @@ import Player from './Player';
 import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
 import Icon from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
+import TechNameField from '../../components/TechNameField';
+import { RichTextInput } from '../../components/RichText';
 
 type LoomNode = Node<FlowNodeData>;
 
@@ -52,12 +73,13 @@ interface EdgeData {
   condition: string;
   effect: string;
   once: boolean;
+  fallback: boolean;
   [key: string]: unknown;
 }
 
-/** 画布上显示的边标签:文本 + 逻辑标记(◇条件 ⚡效果 ①一次性) */
+/** 画布上显示的边标签:文本 + 逻辑标记(◇条件 ⚡效果 ①一次性 ⤓兜底) */
 function edgeDisplayLabel(d: EdgeData): string | undefined {
-  const marks = `${d.condition ? ' ◇' : ''}${d.effect ? ' ⚡' : ''}${d.once ? ' ①' : ''}`;
+  const marks = `${d.condition ? ' ◇' : ''}${d.effect ? ' ⚡' : ''}${d.once ? ' ①' : ''}${d.fallback ? ' ⤓' : ''}`;
   const s = `${d.label}${marks}`.trim();
   return s || undefined;
 }
@@ -87,7 +109,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   );
   const [edges, setEdges] = useState<Edge[]>(() => sub.edges.map((e) => {
     const data: EdgeData = {
-      label: e.label ?? '', condition: e.condition ?? '', effect: e.effect ?? '', once: e.once === true,
+      label: e.label ?? '', condition: e.condition ?? '', effect: e.effect ?? '',
+      once: e.once === true, fallback: e.fallback === true,
     };
     return {
       id: e.id, source: e.source, target: e.target,
@@ -128,6 +151,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
           condition: d.condition || undefined,
           effect: d.effect || undefined,
           once: d.once || undefined,
+          fallback: d.fallback || undefined,
         };
       });
     });
@@ -153,7 +177,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     dirty.current = true;
     setEdges((es) => addEdge({
       ...conn, id: uid(), ...EDGE_STYLE,
-      data: { label: '', condition: '', effect: '', once: false } satisfies EdgeData,
+      data: { label: '', condition: '', effect: '', once: false, fallback: false } satisfies EdgeData,
     }, es));
   }, []);
 
@@ -199,7 +223,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
       return { ...e, data, label: edgeDisplayLabel(data) };
     }));
   };
-  const selEdgeData = (selectedEdge?.data ?? { label: '', condition: '', effect: '', once: false }) as EdgeData;
+  const selEdgeData = (selectedEdge?.data ?? { label: '', condition: '', effect: '', once: false, fallback: false }) as EdgeData;
 
   const characters = useMemo(() => entities.filter((e) => e.kind === 'character'), [entities]);
 
@@ -320,7 +344,15 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                   : selectedNode.type === 'jump' ? '跳转目标说明'
                   : '内容'}
               </label>
-              <textarea rows={5} value={selectedNode.data.text} onChange={(e) => patchSelectedNode({ text: e.target.value })} />
+              {selectedNode.type === 'dialogue' || selectedNode.type === 'fragment' || selectedNode.type === 'jump' ? (
+                <RichTextInput
+                  value={selectedNode.data.text}
+                  onChange={(v) => patchSelectedNode({ text: v })}
+                  placeholder={selectedNode.type === 'dialogue' ? '台词内容(可用 **粗** *斜* ~~删~~)' : undefined}
+                />
+              ) : (
+                <textarea rows={5} value={selectedNode.data.text} onChange={(e) => patchSelectedNode({ text: e.target.value })} />
+              )}
             </div>
             {selectedNode.type === 'check' && (
               <>
@@ -386,6 +418,11 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 ))}
               </div>
             </div>
+            <TechNameField
+              value={selectedNode.data.technicalName}
+              onChange={(v) => patchSelectedNode({ technicalName: v })}
+              displayName={selectedNode.data.title || selectedNode.type || '节点'}
+            />
             <AttachmentEditor ownerId={selectedNode.id} />
           </>
         ) : selectedEdge ? (
@@ -432,6 +469,15 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               />
               一次性选项 ①(演出中选过即隐藏)
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={selEdgeData.fallback}
+                onChange={(e) => patchSelectedEdge({ fallback: e.target.checked })}
+                style={{ width: 'auto' }}
+              />
+              兜底分支 ⤓(其他出边都不可用时才走这条)
+            </label>
           </>
         ) : (
           <div className="empty-hint">
@@ -446,10 +492,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
 
 export default function FlowEditor() {
   const flows = useLoom((s) => s.project.flows);
+  const folders = useLoom((s) => s.project.folders.filter((f) => f.module === 'flow'));
   const update = useLoom((s) => s.update);
+  const { addFolder, updateFolder, removeFolder } = useLoom();
   const [activeId, setActiveId] = useState<string | null>(flows[0]?.id ?? null);
   const [path, setPath] = useState<string[]>([]);
   const [focusNodeId, setFocusNodeId] = useState<string | undefined>();
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(folders.map((f) => f.id)));
 
   // 消费搜索 / 反向引用的跳转目标
   const navSeq = useNav((s) => s.seq);
@@ -512,10 +561,114 @@ export default function FlowEditor() {
     const name = prompt('流程名称', current);
     if (name) update((p) => { const f = p.flows.find((x) => x.id === id); if (f) f.name = name; });
   };
+  const setFlowTechName = (id: string, current: string | undefined) => {
+    const tn = prompt('技术名(留空清除,只能含字母数字下划线)', current ?? '');
+    if (tn !== null) update((p) => { const f = p.flows.find((x) => x.id === id); if (f) f.technicalName = tn || undefined; });
+  };
   const removeFlow = (id: string) => {
     if (!confirm('删除该流程及其全部节点?')) return;
     update((p) => { p.flows = p.flows.filter((x) => x.id !== id); });
     if (activeId === id) { setActiveId(null); setPath([]); }
+  };
+
+  /* ---------- 文件夹树 ---------- */
+  const toggleFolder = (id: string) => setExpanded((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const addTopFolder = () => {
+    const name = prompt('文件夹名称');
+    if (!name) return;
+    const id = uid();
+    addFolder({ id, name, module: 'flow', parentId: null });
+    setExpanded((s) => new Set(s).add(id));
+  };
+  const addSubFolder = (parentId: string) => {
+    const name = prompt('子文件夹名称');
+    if (!name) return;
+    const id = uid();
+    addFolder({ id, name, module: 'flow', parentId });
+    setExpanded((s) => new Set(s).add(id));
+  };
+  const renameFolder = (id: string, current: string) => {
+    const name = prompt('文件夹名称', current);
+    if (name) updateFolder(id, { name });
+  };
+  const moveFlowToFolder = (flowId: string, folderId: string | null) => {
+    update((p) => { const f = p.flows.find((x) => x.id === flowId); if (f) f.folderId = folderId ?? undefined; });
+    if (folderId) setExpanded((s) => new Set(s).add(folderId));
+  };
+  const countFlowsIn = (folderId: string): number => {
+    const direct = flows.filter((f) => f.folderId === folderId).length;
+    const subFolders = folders.filter((f) => f.parentId === folderId);
+    return direct + subFolders.reduce((s, sf) => s + countFlowsIn(sf.id), 0);
+  };
+
+  const renderTree = (parentId: string | null, depth: number): ReactNode => {
+    const subFolders = folders.filter((f) => (f.parentId ?? null) === parentId);
+    const flowsHere = flows.filter((f) => (f.folderId ?? null) === parentId);
+    const pad = { paddingLeft: 8 + depth * 14 };
+    return (
+      <>
+        {subFolders.map((folder) => {
+          const open = expanded.has(folder.id);
+          const cnt = countFlowsIn(folder.id);
+          return (
+            <div key={folder.id}>
+              <div
+                className={`side-item folder-row ${open ? 'open' : ''}`}
+                style={pad}
+                onClick={() => toggleFolder(folder.id)}
+              >
+                <span className="caret">{open ? '▾' : '▸'}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
+                <span className="count" style={{ color: 'var(--text-faint)' }}>{cnt}</span>
+                <button className="ghost icon-btn" title="新建子文件夹" onClick={(e) => { e.stopPropagation(); addSubFolder(folder.id); }}>＋</button>
+                <button className="ghost icon-btn" title="重命名" onClick={(e) => { e.stopPropagation(); renameFolder(folder.id, folder.name); }}>✎</button>
+                <button className="ghost icon-btn" title="删除文件夹(其下流程归入未分组)" onClick={(e) => { e.stopPropagation(); if (confirm(`删除文件夹「${folder.name}」?其下子文件夹一并删除,流程归入未分组。`)) removeFolder(folder.id); }}>×</button>
+              </div>
+              {open && renderTree(folder.id, depth + 1)}
+            </div>
+          );
+        })}
+        {flowsHere.map((f) => (
+          <div
+            key={f.id}
+            className={`side-item ${active?.id === f.id ? 'active' : ''}`}
+            style={{ ...pad, paddingLeft: 8 + depth * 14 + 16 }}
+            onClick={() => selectFlow(f.id)}
+            onDoubleClick={() => renameFlow(f.id, f.name)}
+            title="双击重命名"
+          >
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+            {f.technicalName && (
+              <code style={{ fontSize: 10, color: 'var(--text-faint)' }} title={`技术名:${f.technicalName}`}>{f.technicalName}</code>
+            )}
+            <select
+              className="move-to-folder"
+              value={f.folderId ?? ''}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => moveFlowToFolder(f.id, e.target.value || null)}
+              title="移到文件夹"
+            >
+              <option value="">未分组</option>
+              {folders.map((fo) => <option key={fo.id} value={fo.id}>{fo.name}</option>)}
+            </select>
+            <button
+              className="ghost icon-btn"
+              onClick={(e) => { e.stopPropagation(); setFlowTechName(f.id, f.technicalName); }}
+              title="设置技术名"
+            >#</button>
+            <button
+              className="ghost icon-btn"
+              onClick={(e) => { e.stopPropagation(); removeFlow(f.id); }}
+              title="删除"
+            >×</button>
+          </div>
+        ))}
+      </>
+    );
   };
 
   return (
@@ -523,25 +676,16 @@ export default function FlowEditor() {
       <div className="side-list">
         <div className="side-head">
           <span>流程</span>
-          <button className="ghost icon-btn" onClick={addFlow} title="新建流程">＋</button>
+          <div style={{ display: 'flex', gap: 2 }}>
+            <button className="ghost icon-btn" onClick={addTopFolder} title="新建文件夹">▤＋</button>
+            <button className="ghost icon-btn" onClick={addFlow} title="新建流程">＋</button>
+          </div>
         </div>
         <div className="items">
-          {flows.map((f) => (
-            <div
-              key={f.id}
-              className={`side-item ${active?.id === f.id ? 'active' : ''}`}
-              onClick={() => selectFlow(f.id)}
-              onDoubleClick={() => renameFlow(f.id, f.name)}
-              title="双击重命名"
-            >
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-              <button
-                className="ghost icon-btn"
-                onClick={(e) => { e.stopPropagation(); removeFlow(f.id); }}
-                title="删除"
-              >×</button>
-            </div>
-          ))}
+          {renderTree(null, 0)}
+          {flows.length === 0 && (
+            <div className="empty-hint" style={{ marginTop: 40 }}>还没有流程<br />点击「＋」新建,或「▤＋」建文件夹分组</div>
+          )}
         </div>
       </div>
 

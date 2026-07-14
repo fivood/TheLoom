@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import Icon from '../../components/Icon';
+import TechNameField from '../../components/TechNameField';
+import { RichTextInput } from '../../components/RichText';
 import type { DocBlock, DocBlockType, Document } from '../../types';
 import { DOC_BLOCK_LABEL } from '../../types';
 import { documentToFlow } from './convert';
@@ -305,6 +307,12 @@ export default function DocumentView() {
                         onChange={(e) => patchBlock(b.id, { instruction: e.target.value })}
                         placeholder="指令,如:trust = trust + 1"
                       />
+                    ) : b.type === 'action' || b.type === 'dialogue' ? (
+                      <RichTextInput
+                        value={b.text}
+                        onChange={(v) => patchBlock(b.id, { text: v })}
+                        placeholder={b.type === 'dialogue' ? '台词内容(可用 **粗** *斜* ~~删~~)' : '动作 / 旁白描述'}
+                      />
                     ) : (
                       <textarea
                         rows={b.type === 'heading' ? 1 : Math.max(2, Math.ceil((b.text.length || 1) / 30))}
@@ -313,8 +321,6 @@ export default function DocumentView() {
                         onChange={(e) => patchBlock(b.id, { text: e.target.value })}
                         placeholder={
                           b.type === 'heading' ? '场景标题,如:雨夜酒馆' :
-                          b.type === 'action' ? '动作 / 旁白描述' :
-                          b.type === 'dialogue' ? '台词内容' :
                           '注释内容(不进入流程)'
                         }
                       />
@@ -377,6 +383,12 @@ export default function DocumentView() {
               )}
             </div>
           )}
+
+          <TechNameField
+            value={selected.technicalName}
+            onChange={(v) => patchDoc((d) => { d.technicalName = v; })}
+            displayName={selected.name}
+          />
 
           <div className="field">
             <label>备注</label>

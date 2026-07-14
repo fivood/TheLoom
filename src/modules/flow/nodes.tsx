@@ -4,6 +4,7 @@ import { FLOW_NODE_LABEL } from '../../types';
 import { useLoom } from '../../store';
 import { countSubNodes } from '../../util';
 import Icon, { KIND_ICON } from '../../components/Icon';
+import { RichText } from '../../components/RichText';
 
 export const TYPE_COLORS: Record<FlowNodeType, string> = {
   dialogue: '#1b1b19',
@@ -53,7 +54,9 @@ export function DialogueNode(props: NodeProps<LoomNode>) {
             {speaker.name}
           </div>
         )}
-        {props.data.text || <span style={{ opacity: 0.5 }}>(空对白)</span>}
+        {props.data.text
+          ? <div className="node-body"><RichText text={props.data.text} /></div>
+          : <span style={{ opacity: 0.5 }}>(空对白)</span>}
       </div>
     </BaseNode>
   );
@@ -66,7 +69,7 @@ export function FragmentNode(props: NodeProps<LoomNode>) {
     <BaseNode {...props}>
       {(props.data.text || count > 0) && (
         <div className="node-body">
-          {props.data.text}
+          {props.data.text && <RichText text={props.data.text} />}
           {count > 0 && (
             <div className="sub-badge" title="双击进入子流程">▦ 子流程 · {count} 个节点</div>
           )}
@@ -121,7 +124,7 @@ export function InstructionNode(props: NodeProps<LoomNode>) {
 export function JumpNode(props: NodeProps<LoomNode>) {
   return (
     <BaseNode {...props}>
-      <div className="node-body">↪ {props.data.text || '(未指定跳转目标)'}</div>
+      <div className="node-body">↪ {props.data.text ? <RichText text={props.data.text} /> : '(未指定跳转目标)'}</div>
     </BaseNode>
   );
 }
@@ -167,7 +170,7 @@ export function NoteNode({ data, selected }: NodeProps<LoomNode>) {
   return (
     <div className={`flow-note ${selected ? 'selected' : ''}`}>
       {data.title && <div className="flow-note-title">{data.title}</div>}
-      <div className="flow-note-text">{data.text || '(空注释,选中后在右侧编辑)'}</div>
+      <div className="flow-note-text">{data.text ? <RichText text={data.text} /> : '(空注释,选中后在右侧编辑)'}</div>
     </div>
   );
 }

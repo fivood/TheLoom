@@ -5,6 +5,7 @@ import Icon from '../../components/Icon';
 import type { Asset, AssetKind } from '../../types';
 import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
 import { classifyAsset, fileToImageThumb, formatSize } from '../../util';
+import TechNameField from '../../components/TechNameField';
 
 const KINDS = Object.keys(ASSET_KIND_LABEL) as AssetKind[];
 
@@ -200,6 +201,11 @@ export default function Assets() {
             <label>名称</label>
             <input value={selected.name} onChange={(e) => updateAsset(selected.id, { name: e.target.value })} />
           </div>
+          <TechNameField
+            value={selected.technicalName}
+            onChange={(v) => updateAsset(selected.id, { technicalName: v })}
+            displayName={selected.name}
+          />
           <div className="field">
             <label>类型 / 大小</label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: 'var(--text-dim)' }}>

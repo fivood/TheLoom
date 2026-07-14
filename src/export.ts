@@ -76,6 +76,7 @@ function branchLabel(e: FlowEdge, target: FlowNode | undefined, source?: FlowNod
   if (e.condition) parts.push(`〔条件 \`${e.condition}\`〕`);
   if (e.effect) parts.push(`〔效果 \`${e.effect}\`〕`);
   if (e.once) parts.push('〔一次性〕');
+  if (e.fallback) parts.push('〔兜底〕');
   return parts.join(' · ');
 }
 

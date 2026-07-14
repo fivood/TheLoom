@@ -331,6 +331,7 @@ export async function loadFromFolder(dir: string): Promise<Project> {
       maps: [],
       researchCards: [], researchCategories: [], variables: [],
       assets: [], documents: [], documentCategories: [], attachments: {},
+      folders: [],
       updatedAt: Date.now(),
     };
   }

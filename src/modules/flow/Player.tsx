@@ -5,8 +5,19 @@ import type { Entity, Flow, FlowEdge, FlowNode, SubFlow } from '../../types';
 import { ANNOTATION_TYPES, FLOW_NODE_LABEL } from '../../types';
 import { TYPE_COLORS } from './nodes';
 import Icon from '../../components/Icon';
+import { RichText } from '../../components/RichText';
 
 type VarValue = boolean | number | string;
+
+/** seen("techName") / unseen("techName") 在条件表达式里判断玩家是否走过某节点 */
+type SeenFn = (techName: string) => boolean;
+
+/** 脚本求值上下文:seen/unseen 函数 + 实体属性对象(按技术名注入) */
+interface EvalCtx {
+  seen: SeenFn;
+  /** 技术名 → 属性对象(字段名 → 标量值或被引用实体的技术名) */
+  entityProps: Record<string, Record<string, VarValue>>;
+}
 
 interface Beat {
   id: string;
@@ -31,24 +42,49 @@ function coerceVar(type: string, value: string): VarValue {
   return value;
 }
 
-function evalCondition(expr: string, vars: Record<string, VarValue>): boolean | null {
+/** 把字符串值按 true/false / 数字 / 文本 推断为标量 */
+function coerceScalar(raw: string): VarValue {
+  const v = raw.trim();
+  if (v === 'true' || v === 'false') return v === 'true';
+  if (v !== '' && !Number.isNaN(Number(v))) return Number(v);
+  return v;
+}
+
+/** 求值条件表达式;注入变量 + seen/unseen + 实体属性对象 */
+function evalCondition(expr: string, vars: Record<string, VarValue>, ctx: EvalCtx): boolean | null {
   if (!expr.trim()) return null;
   try {
-    const names = Object.keys(vars);
-    const fn = new Function(...names, `"use strict"; return (${expr});`);
-    return Boolean(fn(...names.map((n) => vars[n])));
+    const varNames = Object.keys(vars);
+    const entNames = Object.keys(ctx.entityProps);
+    const fn = new Function(
+      ...varNames, ...entNames, 'seen', 'unseen',
+      `"use strict"; return (${expr});`,
+    );
+    return Boolean(fn(
+      ...varNames.map((n) => vars[n]),
+      ...entNames.map((n) => ctx.entityProps[n]),
+      ctx.seen, (tn: string) => !ctx.seen(tn),
+    ));
   } catch {
     return null;
   }
 }
 
 /** 数值表达式求值(检定的技能值);失败按 0 计 */
-function evalNumber(expr: string | undefined, vars: Record<string, VarValue>): number {
+function evalNumber(expr: string | undefined, vars: Record<string, VarValue>, ctx: EvalCtx): number {
   if (!expr?.trim()) return 0;
   try {
-    const names = Object.keys(vars);
-    const fn = new Function(...names, `"use strict"; return (${expr});`);
-    const n = Number(fn(...names.map((x) => vars[x])));
+    const varNames = Object.keys(vars);
+    const entNames = Object.keys(ctx.entityProps);
+    const fn = new Function(
+      ...varNames, ...entNames, 'seen', 'unseen',
+      `"use strict"; return (${expr});`,
+    );
+    const n = Number(fn(
+      ...varNames.map((x) => vars[x]),
+      ...entNames.map((n) => ctx.entityProps[n]),
+      ctx.seen, (tn: string) => !ctx.seen(tn),
+    ));
     return Number.isFinite(n) ? n : 0;
   } catch {
     return 0;
@@ -114,6 +150,46 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const takenEdges = useRef(new Set<string>());
   /** 红色检定的既定结果 */
   const checkResults = useRef(new Map<string, boolean>());
+  /** 已访问节点 id 集合(用于 seen/unseen 求值) */
+  const seenRef = useRef<Set<string>>(new Set());
+
+  /** 技术名 → 节点 id 映射,递归遍历流程所有层级 */
+  const techToId = useMemo(() => {
+    const m = new Map<string, string>();
+    const walk = (sub: SubFlow) => {
+      for (const n of sub.nodes) {
+        if (n.data.technicalName) m.set(n.data.technicalName, n.id);
+        if (n.data.sub) walk(n.data.sub);
+      }
+    };
+    walk(flow);
+    return m;
+  }, [flow]);
+  const seen: SeenFn = (tn) => seenRef.current.has(techToId.get(tn) ?? '__none__');
+
+  /** 实体属性对象:技术名 → { 字段名 → 标量值 / 被引用实体技术名 } */
+  const entityProps = useMemo(() => {
+    const out: Record<string, Record<string, VarValue>> = {};
+    const byId = new Map(entities.map((e) => [e.id, e]));
+    for (const e of entities) {
+      if (!e.technicalName) continue;
+      const props: Record<string, VarValue> = {};
+      for (const f of e.fields) {
+        if (!f.label) continue;
+        if (f.type === 'entity') {
+          const ref = f.value ? byId.get(f.value) : undefined;
+          if (ref?.technicalName) props[f.label] = ref.technicalName;
+        } else if (f.type === 'entities') {
+          // 多引用字段暂不展开为属性(数组非标量);跳过
+        } else {
+          props[f.label] = coerceScalar(f.value);
+        }
+      }
+      out[e.technicalName] = props;
+    }
+    return out;
+  }, [entities]);
+  const evalCtx: EvalCtx = { seen, entityProps };
 
   const container = (p: string[]): SubFlow => resolveSub(flow, p) ?? { nodes: [], edges: [] };
 
@@ -143,7 +219,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         // 子路径自然结束(未经出口)→ 走默认引脚
         edges = edges.filter((e) => !e.sourceHandle);
       }
-      if (cur?.type === 'condition') edges = filterCondEdges(edges, cur, vv);
+      if (cur?.type === 'condition') edges = filterCondEdges(edges, cur, vv, evalCtx);
       if (cur?.type === 'check') {
         const passed = checkResults.current.get(cur.id) ?? false;
         const want = passed ? 'success' : 'fail';
@@ -153,12 +229,15 @@ export default function Player({ flow, path, startNodeId, onClose }: {
       // 选项级过滤:一次性已选、出现条件不满足的选项隐藏
       const usable = edges.filter((e) =>
         !(e.once && takenEdges.current.has(e.id)) &&
-        (!e.condition || evalCondition(e.condition, vv) !== false),
+        (!e.condition || evalCondition(e.condition, vv, evalCtx) !== false),
       );
-      if (usable.length > 0) {
+      // 兜底分支:有其他可用候选时遮蔽 fallback 边
+      const nonFallback = usable.filter((e) => !e.fallback);
+      const finalUsable = nonFallback.length > 0 ? nonFallback : usable;
+      if (finalUsable.length > 0) {
         return {
           path: curP,
-          choices: usable.map((e) => {
+          choices: finalUsable.map((e) => {
             const target = c.nodes.find((n) => n.id === e.target);
             return {
               label: (typeof e.label === 'string' && e.label) || target?.data.title || (target ? FLOW_NODE_LABEL[target.type] : '继续'),
@@ -178,8 +257,8 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     return { path: curP, choices: [] };
   };
 
-  const filterCondEdges = (edges: FlowEdge[], node: FlowNode, vv: Record<string, VarValue>): FlowEdge[] => {
-    const result = evalCondition(node.data.text, vv);
+  const filterCondEdges = (edges: FlowEdge[], node: FlowNode, vv: Record<string, VarValue>, ctx: EvalCtx): FlowEdge[] => {
+    const result = evalCondition(node.data.text, vv, ctx);
     if (result === null) return edges; // 无法求值 → 手动选择
     const want = result ? 'true' : 'false';
     const picked = edges.filter((e) => e.sourceHandle === want);
@@ -196,6 +275,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
       const c = container(curP);
       const node = c.nodes.find((n) => n.id === id);
       if (!node) break;
+      seenRef.current.add(id);
 
       const speaker = entities.find((e) => e.id === node.data.speakerId);
 
@@ -230,7 +310,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           break;
         }
         case 'condition': {
-          const result = evalCondition(node.data.text, nextVars);
+          const result = evalCondition(node.data.text, nextVars, evalCtx);
           pushBeat({
             kind: 'condition', title: node.data.title || '条件分支', text: node.data.text,
             note: result === null ? '无法求值,请手动选择分支' : result ? '→ 真' : '→ 假',
@@ -250,7 +330,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           if (red && checkResults.current.has(node.id)) {
             note = `红色检定只有一次机会 → 沿用先前结果:${checkResults.current.get(node.id) ? '成功' : '失败'}`;
           } else {
-            const skill = evalNumber(node.data.checkExpr, nextVars);
+            const skill = evalNumber(node.data.checkExpr, nextVars, evalCtx);
             const d1 = 1 + Math.floor(Math.random() * 6);
             const d2 = 1 + Math.floor(Math.random() * 6);
             const passed = d1 + d2 + skill >= dc;
@@ -312,6 +392,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     setEnded(false);
     takenEdges.current.clear();
     checkResults.current.clear();
+    seenRef.current = new Set();
     const initVars: Record<string, VarValue> = {};
     for (const x of project.variables) initVars[x.name] = coerceVar(x.type, x.value);
     setVars(initVars);
@@ -353,14 +434,14 @@ export default function Player({ flow, path, startNodeId, onClose }: {
                     {b.speaker?.avatar && <img className="speaker-avatar" src={b.speaker.avatar} alt="" />}
                     {b.speaker ? b.speaker.name : b.title || '对白'}
                   </div>
-                  <div className="beat-text">{b.text || '(空对白)'}</div>
+                  <div className="beat-text">{b.text ? <RichText text={b.text} /> : '(空对白)'}</div>
                 </>
               ) : (
                 <>
                   <div className="beat-meta" style={{ color: TYPE_COLORS[b.kind as keyof typeof TYPE_COLORS] }}>
                     {b.kind === 'fragment' ? `▦ ${b.title}` : b.kind === 'jump' ? `↪ ${b.title}` : b.title}
                   </div>
-                  {b.text && <div className="beat-text dim">{b.text}</div>}
+                  {b.text && <div className="beat-text dim"><RichText text={b.text} /></div>}
                 </>
               )}
               {b.note && <div className="beat-note">{b.note}</div>}

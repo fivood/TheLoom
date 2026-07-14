@@ -64,23 +64,26 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 - 流程编辑器(嵌套子流程、出口引脚、演出模式、剧本导出)
 - 实体库(自定义字段模板、头像、反向引用)
 - 脚本系统(全局变量、条件/指令节点、选项级逻辑、一次性选项、检定节点、变量校验提示)
-- 检查工具(演出/体检面板:孤儿节点、分支缺口、未定义变量、空对白、悬挂附件、字数统计)
+- **脚本表达力**:技术名 + `seen("x")`/`unseen("x")` 走过判断 + `实体技术名.字段名` 属性寻址 + `fallback` 兜底分支
+- **富文本对白**:`**粗**` / `*斜*` / `~~删~~` 行内标记,带 B/I/S 工具栏
+- 检查工具(演出/体检面板:孤儿节点、分支缺口、未定义变量、空对白、悬挂附件、重复技术名、字数统计)
 - 导出(JSON 备份、流程→Markdown 剧本、文档→Markdown 剧本)
 - 多人协作(端到端加密云房间)
 - 通用附件(`AttachmentEditor` 已接入:流程节点 / 实体 / 资料卡 / 时间线事件)
-- 资源库 + 文档视图(本轮新增)
+- 资源库 + 文档视图
+- **文件夹式 Navigator 树**(`Folder`,流程模块已落地,数据层通用可扩展)
 
 **明确暂缓**
 - 音视频/大图原文件的 Rust 文件夹存储(网页模式缩略图已可用;`assets/` 目录读写框架已就位,只差把二进制原文件 push 到 files 列表)
 
 **主要缺口(按建议优先级)**
-1. 技术名(Technical Name)+ 文件夹式 Navigator 树
+1. ~~技术名 + 文件夹式 Navigator 树~~ ✅(技术名全对象通用;Navigator 树流程模块已落地,其他模块待扩展)
 2. 通用模板系统(扩展到流程节点 + 约束/只读属性)
-3. 对象属性在脚本中寻址(`entity.skill`)+ seen/unseen/fallback 关键字
-4. 富文本对白(粗体/斜体/列表)
+3. ~~对象属性脚本寻址 + seen/unseen/fallback~~ ✅
+4. ~~富文本对白~~ ✅(行内标记;段落级列表/标题待补)
 5. Localization 本地化模块
 6. 版本历史 + 回滚(超出 50 步撤销)
-7. Conflict Search 增强(重复技术名、损坏资产)
+7. Conflict Search 增强(重复技术名 ✅、损坏资产待补)
 8. Excel/FinalDraft 互通、矢量地点编辑、多窗口
 
 ## 最近变更(v0.5.0)
@@ -102,6 +105,17 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 - `OutlineGrid.tsx` + `styles.css`:章节/时间列宽从 64px 固定改为 100%/150px,修复长内容(如 `16:09–16:32`)被截断
 
 验证:`npm run build` 通过;`cd src-tauri && cargo test --lib` 通过。
+
+## 最近变更(v0.6.0)
+
+脚本表达力 + 富文本 + Navigator 树 + 技术名四个批次:
+
+- **技术名**:`Entity`/`Flow`/`Asset`/`Document`/`FlowNodeData` 加 `technicalName?`;`util.ts` `sanitizeTechnicalName`/`validateTechnicalName`/`findDuplicateTechnicalNames`;`TechNameField` 组件接入各 inspector;audit 重复技术名检测
+- **富文本对白**:`RichText`/`RichTextInput` 组件(`**粗**`/`*斜*`/`~~删~~` 行内标记 + B/I/S 工具栏);接入流程节点(对白/片段/跳转/注释)、Player beat、文档动作/对白块;导出 Markdown 天然透传
+- **seen/unseen/fallback**:`FlowEdge.fallback` + `FlowNodeData.technicalName`;Player 维护 `seenRef` 节点访问集 + `techToId` 映射;`evalCondition`/`evalNumber` 注入 `seen`/`unseen` 函数;`outgoingChoices` fallback 边遮蔽逻辑;audit/ScriptHints 保留字同步
+- **对象属性脚本寻址**:Player 构建 `entityProps`(实体技术名 → 字段属性对象,标量推断 + 引用字段解析为被引用实体技术名);注入 `evalCondition` 实现 `semelvie.trust > 5`;audit `findUnknownIdentifiers` 负向后看跳过 `obj.prop` 的 prop
+- **文件夹式 Navigator 树**:`Folder` 类型(`module: FolderModule`)+ `Project.folders` + `Flow.folderId`;store `addFolder`/`updateFolder`/`removeFolder`(递归级联删除);FlowEditor side-list 树化(展开/折叠、子文件夹、移到下拉);数据层通用,其他模块待扩展
+- `sample.ts`:`semelvie`/`valentine`/`demo_rain_night` 技术名 + `puzzle_timestamp` 节点技术名
 
 ## 开发命令
 
