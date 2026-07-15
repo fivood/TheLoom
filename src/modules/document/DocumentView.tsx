@@ -8,6 +8,7 @@ import type { DocBlock, DocBlockType, Document } from '../../types';
 import { DOC_BLOCK_LABEL } from '../../types';
 import { documentToFlow } from './convert';
 import { downloadMarkdown, documentToMarkdown } from '../../export';
+import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
 const BLOCK_TYPES = Object.keys(DOC_BLOCK_LABEL) as DocBlockType[];
 
@@ -28,13 +29,15 @@ export default function DocumentView() {
 
   const [catFilter, setCatFilter] = useState<string | 'all'>('all');
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(documents[0]?.id ?? null);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
   const navSeq = useNav((s) => s.seq);
   useEffect(() => {
     const t = useNav.getState().target;
     if (t?.tab === 'documents' && t.docId) {
+      setCatFilter('all');
+      setQuery('');
       setSelectedId(t.docId);
       setActiveBlockId(t.blockId ?? null);
       useNav.getState().clear();
@@ -60,6 +63,7 @@ export default function DocumentView() {
   const createDoc = () => {
     const d: Document = {
       id: uid(),
+      folderId: selected?.folderId,
       name: '新文档',
       category: catFilter === 'all' ? (categories[0] ?? '未分类') : catFilter,
       blocks: [emptyBlock('heading')],
@@ -181,43 +185,35 @@ export default function DocumentView() {
 
   return (
     <>
-      <div className="side-list">
-        <div className="side-head">
-          <span>文档</span>
-          <button className="ghost icon-btn" onClick={createDoc} title="新建文档">＋</button>
-        </div>
-        <div className="items">
-          <div
-            className={`side-item ${catFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setCatFilter('all')}
-          >
-            <span style={{ flex: 1 }}>全部</span>
-            <span style={{ color: 'var(--text-faint)' }}>{documents.length}</span>
-          </div>
-          {categories.map((cat) => (
-            <div
-              key={cat}
-              className={`side-item ${catFilter === cat ? 'active' : ''}`}
-              onClick={() => setCatFilter(cat)}
-            >
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat}</span>
-              <span style={{ color: 'var(--text-faint)' }}>{documents.filter((d) => d.category === cat).length}</span>
-              <button className="ghost icon-btn" onClick={(e) => { e.stopPropagation(); removeCategory(cat); }}>×</button>
-            </div>
-          ))}
-          <button className="ghost" style={{ margin: '6px 4px', justifySelf: 'start' }} onClick={addCategory}>＋ 新分类</button>
-        </div>
-      </div>
+      <NavigatorTree
+        module="document"
+        title="文档"
+        items={filtered}
+        selectedId={selectedId}
+        getLabel={(document) => document.name}
+        getDetail={(document) => document.category}
+        onSelect={(id) => { setSelectedId(id); setActiveBlockId(null); }}
+        onMove={(id, folderId) => updateDocument(id, (document) => { document.folderId = folderId; })}
+        onCreate={createDoc}
+        createLabel="新建文档"
+        emptyLabel="还没有文档"
+      />
 
       <div className="pane-col">
         <div className="toolbar">
+          <button className="primary" onClick={createDoc}>＋ 新文档</button>
+          <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
+            <option value="all">全部分类</option>
+            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <button className="ghost icon-btn" onClick={addCategory} title="新建分类">＋</button>
+          {catFilter !== 'all' && <button className="ghost icon-btn" onClick={() => removeCategory(catFilter)} title="删除当前分类">×</button>}
           <input
             placeholder="搜索文档…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ width: 260 }}
           />
-          <button className="primary" onClick={createDoc}>＋ 新文档</button>
           <span className="hint">在结构化剧本块里起草,再「转为流程」生成节点图</span>
         </div>
 
@@ -236,7 +232,7 @@ export default function DocumentView() {
                 style={{ width: 130 }}
               >
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                <option value="未分类">未分类</option>
+                {!categories.includes('未分类') && <option value="未分类">未分类</option>}
               </select>
               <button
                 className="primary"
@@ -389,6 +385,11 @@ export default function DocumentView() {
             onChange={(v) => patchDoc((d) => { d.technicalName = v; })}
             displayName={selected.name}
           />
+
+          <div className="field">
+            <label>文件夹</label>
+            <FolderSelect module="document" value={selected.folderId} onChange={(folderId) => patchDoc((document) => { document.folderId = folderId; })} />
+          </div>
 
           <div className="field">
             <label>备注</label>

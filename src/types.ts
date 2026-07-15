@@ -45,6 +45,8 @@ export type EntityTemplateSpec = string | EntityTemplateField;
 
 export interface Entity {
   id: ID;
+  /** 所属实体文件夹 id;空 = 未分组 */
+  folderId?: ID;
   kind: EntityKind;
   name: string;
   color: string;
@@ -250,6 +252,8 @@ export interface MapDoc {
 
 export interface ResearchCard {
   id: ID;
+  /** 所属资料文件夹 id;空 = 未分组 */
+  folderId?: ID;
   title: string;
   content: string;
   category: string;
@@ -292,6 +296,8 @@ export const ASSET_KIND_ICON: Record<AssetKind, 'image' | 'music' | 'film' | 'ar
 
 export interface Asset {
   id: ID;
+  /** 所属资源文件夹 id;空 = 未分组 */
+  folderId?: ID;
   name: string;
   kind: AssetKind;
   mime: string;
@@ -352,6 +358,8 @@ export interface DocBlock {
 
 export interface Document {
   id: ID;
+  /** 所属文档文件夹 id;空 = 未分组 */
+  folderId?: ID;
   name: string;
   /** 技术名:项目内唯一,用于导出,如 act1_draft */
   technicalName?: string;

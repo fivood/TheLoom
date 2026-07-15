@@ -575,6 +575,10 @@ export const useLoom = create<LoomState>((set, get) => {
       // 解除受影响文件夹下所有对象的归属(此处覆盖所有用 folderId 的对象类型)
       const clear = (fid: string) => {
         for (const fl of p.flows) if (fl.folderId === fid) fl.folderId = undefined;
+        for (const entity of p.entities) if (entity.folderId === fid) entity.folderId = undefined;
+        for (const asset of p.assets) if (asset.folderId === fid) asset.folderId = undefined;
+        for (const document of p.documents) if (document.folderId === fid) document.folderId = undefined;
+        for (const card of p.researchCards) if (card.folderId === fid) card.folderId = undefined;
       };
       for (const fid of toDelete) clear(fid);
     }),

@@ -12,7 +12,7 @@ describe('文件夹 Markdown 往返', () => {
       summary: '', fields: [], notes: '', createdAt: 2,
     };
     const source: Entity = {
-      id: 'entity-source', kind: 'character', name: '塞梅尔维斯', technicalName: 'semelvie',
+      id: 'entity-source', folderId: 'folder-entity', kind: 'character', name: '塞梅尔维斯', technicalName: 'semelvie',
       color: '#111111', emoji: 'S', summary: '简介', notes: '备注', createdAt: 1,
       fields: [
         { id: 'field-1', label: '同伴', value: target.id, type: 'entity', filterKind: 'character' },
@@ -28,6 +28,7 @@ describe('文件夹 Markdown 往返', () => {
       name: source.name,
       kind: source.kind,
       technicalName: source.technicalName,
+      folderId: source.folderId,
       summary: source.summary,
       notes: source.notes,
       createdAt: source.createdAt,
@@ -40,7 +41,7 @@ describe('文件夹 Markdown 往返', () => {
 
   it('保留资料卡内容和元数据', () => {
     const card: ResearchCard = {
-      id: 'card-1', title: '史料', content: '正文', category: '考据', tags: ['伦敦'],
+      id: 'card-1', folderId: 'folder-research', title: '史料', content: '正文', category: '考据', tags: ['伦敦'],
       color: '#333333', source: '档案馆', pinned: true, createdAt: 3,
     };
     const restored = mdToCard(`${card.title}.md`, cardToMd(card), 0);
@@ -49,7 +50,7 @@ describe('文件夹 Markdown 往返', () => {
 
   it('保留文档块和选项的稳定 ID', () => {
     const document: Document = {
-      id: 'doc-1', name: '第一幕', technicalName: 'act_one', category: '正文', notes: '草稿',
+      id: 'doc-1', folderId: 'folder-document', name: '第一幕', technicalName: 'act_one', category: '正文', notes: '草稿',
       createdAt: 4, updatedAt: 5,
       blocks: [
         { id: 'block-heading', type: 'heading', text: '雨夜' },
@@ -65,6 +66,7 @@ describe('文件夹 Markdown 往返', () => {
       id: document.id,
       name: document.name,
       technicalName: document.technicalName,
+      folderId: document.folderId,
       category: document.category,
       notes: document.notes,
       createdAt: document.createdAt,

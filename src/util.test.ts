@@ -24,6 +24,28 @@ describe('normalizeProject', () => {
     expect(project.attachments).toEqual({});
     expect(project.nodeTemplates).toEqual({});
   });
+
+  it('清理跨模块和不存在的文件夹归属', () => {
+    const project = sampleProject();
+    project.folders = [
+      { id: 'entities', name: '人物', module: 'entity' },
+      { id: 'docs', name: '正文', module: 'document' },
+      { id: 'broken-parent', name: '孤立', module: 'entity', parentId: 'docs' },
+      { id: 'cycle-a', name: '循环 A', module: 'entity', parentId: 'cycle-b' },
+      { id: 'cycle-b', name: '循环 B', module: 'entity', parentId: 'cycle-a' },
+    ];
+    project.entities[0].folderId = 'entities';
+    project.entities[1].folderId = 'docs';
+    project.documents[0].folderId = 'missing';
+
+    normalizeProject(project);
+
+    expect(project.entities[0].folderId).toBe('entities');
+    expect(project.entities[1].folderId).toBeUndefined();
+    expect(project.documents[0].folderId).toBeUndefined();
+    expect(project.folders[2].parentId).toBeNull();
+    expect(project.folders[3].parentId).toBeNull();
+  });
 });
 
 describe('配色导入', () => {

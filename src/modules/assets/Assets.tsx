@@ -6,6 +6,7 @@ import type { Asset, AssetKind } from '../../types';
 import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
 import { classifyAsset, fileToImageThumb, formatSize } from '../../util';
 import TechNameField from '../../components/TechNameField';
+import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
 const KINDS = Object.keys(ASSET_KIND_LABEL) as AssetKind[];
 
@@ -25,6 +26,9 @@ export default function Assets() {
   useEffect(() => {
     const t = useNav.getState().target;
     if (t?.tab === 'assets' && t.assetId) {
+      setKindFilter('all');
+      setTagFilter(null);
+      setQuery('');
       setSelectedId(t.assetId);
       useNav.getState().clear();
     }
@@ -65,6 +69,7 @@ export default function Assets() {
       }
       const a: Asset = {
         id: uid(),
+        folderId: selected?.folderId,
         name: file.name.replace(/\.[^.]+$/, ''),
         kind,
         mime: file.type || 'application/octet-stream',
@@ -81,10 +86,23 @@ export default function Assets() {
 
   return (
     <>
-      <div className="side-list">
-        <div className="side-head">
-          <span>类型</span>
-          <button className="ghost icon-btn" onClick={() => fileRef.current?.click()} title="导入文件(图片会自动压缩为 256px 缩略图;音频/视频需文件夹模式才能保留原文件)">＋</button>
+      <NavigatorTree
+        module="asset"
+        title="资源"
+        items={filtered}
+        selectedId={selectedId}
+        getLabel={(asset) => asset.name}
+        getDetail={(asset) => ASSET_KIND_LABEL[asset.kind]}
+        onSelect={setSelectedId}
+        onMove={(id, folderId) => updateAsset(id, { folderId })}
+        onCreate={() => fileRef.current?.click()}
+        createLabel="导入资源"
+        emptyLabel="还没有资源"
+      />
+
+      <div className="pane-col">
+        <div className="toolbar">
+          <button className="primary" onClick={() => fileRef.current?.click()}>＋ 导入资源</button>
           <input
             ref={fileRef}
             type="file"
@@ -93,49 +111,16 @@ export default function Assets() {
             style={{ display: 'none' }}
             onChange={(e) => { if (e.target.files) onPickFiles(e.target.files); e.currentTarget.value = ''; }}
           />
-        </div>
-        <div className="items">
-          <div
-            className={`side-item ${kindFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setKindFilter('all')}
-          >
-            <Icon name="archive" size={14} />
-            <span style={{ flex: 1 }}>全部</span>
-            <span style={{ color: 'var(--text-faint)' }}>{assets.length}</span>
-          </div>
-          {KINDS.map((k) => {
-            const n = assets.filter((a) => a.kind === k).length;
-            return (
-              <div
-                key={k}
-                className={`side-item ${kindFilter === k ? 'active' : ''}`}
-                onClick={() => setKindFilter(k)}
-              >
-                <Icon name={ASSET_KIND_ICON[k]} size={14} />
-                <span style={{ flex: 1 }}>{ASSET_KIND_LABEL[k]}</span>
-                <span style={{ color: 'var(--text-faint)' }}>{n}</span>
-              </div>
-            );
-          })}
+          <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as AssetKind | 'all')} style={{ width: 110 }}>
+            <option value="all">全部类型</option>
+            {KINDS.map((kind) => <option key={kind} value={kind}>{ASSET_KIND_LABEL[kind]}</option>)}
+          </select>
           {allTags.length > 0 && (
-            <>
-              <div className="side-head" style={{ borderTop: '1px solid var(--border)', marginTop: 8 }}><span>标签</span></div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '8px 4px' }}>
-                {allTags.map((t) => (
-                  <span
-                    key={t}
-                    className={`tag clickable ${tagFilter === t ? 'active' : ''}`}
-                    onClick={() => setTagFilter(tagFilter === t ? null : t)}
-                  >#{t}</span>
-                ))}
-              </div>
-            </>
+            <select value={tagFilter ?? ''} onChange={(event) => setTagFilter(event.target.value || null)} style={{ width: 120 }}>
+              <option value="">全部标签</option>
+              {allTags.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
+            </select>
           )}
-        </div>
-      </div>
-
-      <div className="pane-col">
-        <div className="toolbar">
           <input
             placeholder="搜索名称 / 标签 / 来源…"
             value={query}
@@ -213,6 +198,10 @@ export default function Assets() {
               <span style={{ flex: 1 }}>{selected.mime || '—'}</span>
               <span>{formatSize(selected.size)}</span>
             </div>
+          </div>
+          <div className="field">
+            <label>文件夹</label>
+            <FolderSelect module="asset" value={selected.folderId} onChange={(folderId) => updateAsset(selected.id, { folderId })} />
           </div>
           <div className="field">
             <label>来源(URL / 作者 / 出处)</label>

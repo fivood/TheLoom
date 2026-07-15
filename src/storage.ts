@@ -71,6 +71,7 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
     createdAt: e.createdAt,
   };
   if (e.technicalName) meta.technicalName = e.technicalName;
+  if (e.folderId) meta.folderId = e.folderId;
   if (avatarPath) meta.avatar = avatarPath;
   const fieldTypes: Record<string, string> = {};
   const conflicts: ConflictField[] = [];
@@ -103,7 +104,7 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
   return withFrontmatter(meta, body);
 }
 
-const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'technicalName', 'tags', 'aliases', 'cssclasses', '_field_types', '_conflict_fields']);
+const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'technicalName', 'folderId', 'tags', 'aliases', 'cssclasses', '_field_types', '_conflict_fields']);
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
 /** [[Name]] → Name;非链接返回 null */
@@ -159,6 +160,7 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
   const avatarFile = typeof meta.avatar === 'string' ? meta.avatar.replace(/^assets\//, '') : null;
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
+    folderId: typeof meta.folderId === 'string' && meta.folderId ? meta.folderId : undefined,
     kind,
     name,
     color: typeof meta.color === 'string' ? meta.color : PALETTE[index % PALETTE.length],
@@ -200,6 +202,7 @@ export function cardToMd(c: ResearchCard): string {
     createdAt: c.createdAt,
   };
   if (c.source) meta.source = c.source;
+  if (c.folderId) meta.folderId = c.folderId;
   return withFrontmatter(meta, c.content);
 }
 
@@ -207,6 +210,7 @@ export function mdToCard(filename: string, md: string, index: number): ResearchC
   const { meta, body } = splitFrontmatter(md);
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
+    folderId: typeof meta.folderId === 'string' && meta.folderId ? meta.folderId : undefined,
     title: filename.replace(/\.md$/i, ''),
     content: body,
     category: typeof meta.category === 'string' && meta.category ? meta.category : '未分类',
@@ -229,6 +233,7 @@ export function documentToMd(d: Document, entities: Entity[]): string {
     updatedAt: d.updatedAt,
   };
   if (d.technicalName) meta.technicalName = d.technicalName;
+  if (d.folderId) meta.folderId = d.folderId;
   if (d.notes.trim()) meta.notes = d.notes;
   // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
   const blockYaml = stringifyYaml(d.blocks.map((b) => {
@@ -292,6 +297,7 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
 
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
+    folderId: typeof meta.folderId === 'string' && meta.folderId ? meta.folderId : undefined,
     name,
     technicalName: typeof meta.technicalName === 'string' && meta.technicalName ? meta.technicalName : undefined,
     category: typeof meta.category === 'string' && meta.category ? meta.category : '未分类',
@@ -421,6 +427,7 @@ export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> 
     if (d.category && !base.documentCategories.includes(d.category)) base.documentCategories.push(d.category);
     docByName.delete(`${d.name}.md`); // 标记已消费
   }
+  normalizeProject(base);
   return { project: base, recoveredFromBackup: files.recoveredFromBackup };
 }
 

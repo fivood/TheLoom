@@ -71,13 +71,13 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 - 多人协作(端到端加密云房间)
 - 通用附件(`AttachmentEditor` 已接入:流程节点 / 实体 / 资料卡 / 时间线事件)
 - 资源库 + 文档视图
-- **文件夹式 Navigator 树**(`Folder`,流程模块已落地,数据层通用可扩展)
+- **文件夹式 Navigator 树**(`Folder`,已覆盖流程 / 实体 / 资源 / 文档 / 资料,支持多级目录与移动)
 
 **明确暂缓**
 - 音视频/大图原文件的 Rust 文件夹存储(网页模式缩略图已可用;`assets/` 目录读写框架已就位,只差把二进制原文件 push 到 files 列表)
 
 **主要缺口(按建议优先级)**
-1. ~~技术名 + 文件夹式 Navigator 树~~ ✅(技术名全对象通用;Navigator 树流程模块已落地,其他模块待扩展)
+1. ~~技术名 + 文件夹式 Navigator 树~~ ✅(技术名全对象通用;Navigator 树已覆盖全部适用模块)
 2. ~~通用模板系统~~ ✅(实体约束 + 流程节点模板;`FieldListEditor` 跨对象复用)
 3. ~~对象属性脚本寻址 + seen/unseen/fallback~~ ✅
 4. ~~富文本对白~~ ✅(行内标记;段落级列表/标题待补)
@@ -85,6 +85,16 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 6. ~~版本历史 + 回滚~~ ✅
 7. ~~Conflict Search 增强~~ ✅(重复技术名、损坏资产)
 8. Excel/FinalDraft 互通、矢量地点编辑、多窗口(CSV 导出已做;Excel xlsx/FinalDraft/矢量/多窗口待补)
+
+## 最近变更(R1 开发中)
+
+全模块 Navigator 与长篇项目组织:
+
+- `Entity` / `Asset` / `Document` / `ResearchCard` 增 `folderId?`;实体 / 资料 / 文档 Markdown frontmatter 无损往返文件夹归属
+- `NavigatorTree` / `FolderSelect` 作为通用组件,实体、资源、文档、资料共用多级文件夹、对象移动和属性栏归档
+- `removeFolder` 会解除五类对象的归属,内容回到未分组;`normalizeProject` 清理跨模块、失效和循环目录引用
+- 文档模块补上原先缺失的可见文档列表;类型 / 分类 / 标签保留为工具栏筛选
+- 自动化测试覆盖旧项目迁移、目录引用修复和 Markdown 文件夹归属往返
 
 ## 最近变更(v0.5.0)
 

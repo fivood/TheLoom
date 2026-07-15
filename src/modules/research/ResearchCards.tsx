@@ -7,6 +7,7 @@ import type { ResearchCard } from '../../types';
 import { PALETTE } from '../../types';
 import { activePaletteColors } from '../../util';
 import ColorPicker from '../../components/ColorPicker';
+import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
 export default function ResearchCards() {
   const cards = useLoom((s) => s.project.researchCards);
@@ -24,6 +25,7 @@ export default function ResearchCards() {
     if (t?.tab === 'research' && t.cardId) {
       setCatFilter('all');
       setTagFilter(null);
+      setQuery('');
       setSelectedId(t.cardId);
       useNav.getState().clear();
     }
@@ -50,6 +52,7 @@ export default function ResearchCards() {
     const cols = activePaletteColors(useLoom.getState().project);
     const c: ResearchCard = {
       id: uid(), title: '新资料卡片', content: '',
+      folderId: selected?.folderId,
       category: catFilter === 'all' ? (categories[0] ?? '未分类') : catFilter,
       tags: [], color: cols[cards.length % cols.length] ?? PALETTE[0],
       source: '', pinned: false, createdAt: Date.now(),
@@ -77,42 +80,35 @@ export default function ResearchCards() {
 
   return (
     <>
-      <div className="side-list">
-        <div className="side-head">
-          <span>分类</span>
-          <button className="ghost icon-btn" onClick={addCategory} title="新建分类">＋</button>
-        </div>
-        <div className="items">
-          <div className={`side-item ${catFilter === 'all' ? 'active' : ''}`} onClick={() => setCatFilter('all')}>
-            全部 <span style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>{cards.length}</span>
-          </div>
-          {categories.map((cat) => (
-            <div key={cat} className={`side-item ${catFilter === cat ? 'active' : ''}`} onClick={() => setCatFilter(cat)}>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat}</span>
-              <span style={{ color: 'var(--text-faint)' }}>{cards.filter((c) => c.category === cat).length}</span>
-              <button className="ghost icon-btn" onClick={(e) => { e.stopPropagation(); removeCategory(cat); }}>×</button>
-            </div>
-          ))}
-          {allTags.length > 0 && (
-            <>
-              <div className="side-head" style={{ borderTop: '1px solid var(--border)', marginTop: 8 }}><span>标签</span></div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '8px 4px' }}>
-                {allTags.map((t) => (
-                  <span
-                    key={t}
-                    className={`tag clickable ${tagFilter === t ? 'active' : ''}`}
-                    onClick={() => setTagFilter(tagFilter === t ? null : t)}
-                  >#{t}</span>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <NavigatorTree
+        module="research"
+        title="资料"
+        items={filtered}
+        selectedId={selectedId}
+        getLabel={(card) => card.title}
+        getDetail={(card) => card.pinned ? '置顶' : card.category}
+        onSelect={setSelectedId}
+        onMove={(id, folderId) => updateCard(id, { folderId })}
+        onCreate={createCard}
+        createLabel="新建资料卡"
+        emptyLabel="还没有资料卡"
+      />
 
       <div className="pane-col">
         <div className="toolbar">
           <button className="primary" onClick={createCard}>＋ 新卡片</button>
+          <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
+            <option value="all">全部分类</option>
+            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <button className="ghost icon-btn" onClick={addCategory} title="新建分类">＋</button>
+          {catFilter !== 'all' && <button className="ghost icon-btn" onClick={() => removeCategory(catFilter)} title="删除当前分类">×</button>}
+          {allTags.length > 0 && (
+            <select value={tagFilter ?? ''} onChange={(event) => setTagFilter(event.target.value || null)} style={{ width: 120 }}>
+              <option value="">全部标签</option>
+              {allTags.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
+            </select>
+          )}
           <input placeholder="搜索标题、内容或标签…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 240 }} />
           {tagFilter && <span className="tag active clickable" onClick={() => setTagFilter(null)}>#{tagFilter} ×</span>}
           <span className="hint">动笔前把设定、考据、灵感来源都归档到这里</span>
@@ -158,6 +154,10 @@ export default function ResearchCards() {
                 {!categories.includes(selected.category) && <option value={selected.category}>{selected.category}</option>}
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
+            </div>
+            <div className="field">
+              <label>文件夹</label>
+              <FolderSelect module="research" value={selected.folderId} onChange={(folderId) => updateCard(selected.id, { folderId })} />
             </div>
             <div className="field">
               <label>标签(用逗号分隔)</label>

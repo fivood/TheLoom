@@ -27,6 +27,37 @@ export function normalizeProject(p: Project): Project {
   p.folders ??= [];
   p.nodeTemplates ??= {};
   p.palettes ??= [];
+  const folderById = new Map(p.folders.map((folder) => [folder.id, folder]));
+  for (const folder of p.folders) {
+    const parent = folder.parentId ? folderById.get(folder.parentId) : null;
+    if (folder.parentId === folder.id || (folder.parentId && (!parent || parent.module !== folder.module))) {
+      folder.parentId = null;
+    }
+  }
+  for (const folder of p.folders) {
+    const seen = new Set<string>([folder.id]);
+    let current = folder;
+    while (current.parentId) {
+      if (seen.has(current.parentId)) {
+        folder.parentId = null;
+        break;
+      }
+      seen.add(current.parentId);
+      const parent = folderById.get(current.parentId);
+      if (!parent) break;
+      current = parent;
+    }
+  }
+  const cleanAssignments = (items: { folderId?: string }[], module: import('./types').FolderModule) => {
+    for (const item of items) {
+      if (item.folderId && folderById.get(item.folderId)?.module !== module) item.folderId = undefined;
+    }
+  };
+  cleanAssignments(p.flows, 'flow');
+  cleanAssignments(p.entities, 'entity');
+  cleanAssignments(p.assets, 'asset');
+  cleanAssignments(p.documents, 'document');
+  cleanAssignments(p.researchCards, 'research');
   return p;
 }
 

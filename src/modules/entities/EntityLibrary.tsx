@@ -13,6 +13,7 @@ import FieldListEditor from '../../components/FieldListEditor';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 import EntityEditor from './EntityEditor';
+import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
 /** 归一化模板条目:老字符串等价于文本字段 */
 function normTpl(spec: EntityTemplateSpec): EntityTemplateField {
@@ -164,15 +165,16 @@ export default function EntityLibrary() {
     const t = useNav.getState().target;
     if (t?.tab === 'entities' && t.entityId) {
       setKindFilter('all');
+      setQuery('');
       setSelectedId(t.entityId);
       useNav.getState().clear();
     }
   }, [navSeq]);
 
-  const filtered = entities.filter((e) =>
+  const filtered = useMemo(() => entities.filter((e) =>
     (kindFilter === 'all' || e.kind === kindFilter) &&
     (!query || e.name.includes(query) || e.summary.includes(query)),
-  );
+  ), [entities, kindFilter, query]);
   const selected = entities.find((e) => e.id === selectedId) ?? null;
 
   const project = useLoom((s) => s.project);
@@ -197,6 +199,7 @@ export default function EntityLibrary() {
     const cols = activePaletteColors(useLoom.getState().project);
     const e: Entity = {
       id: uid(), kind, name: `新${ENTITY_KIND_LABEL[kind]}`,
+      folderId: selected?.folderId,
       color: cols[entities.length % cols.length] ?? PALETTE[0],
       emoji: '', summary: '',
       fields: tpl.map((tf) => ({ id: uid(), label: tf.label, value: '', type: tf.type, filterKind: tf.filterKind })),
@@ -210,29 +213,28 @@ export default function EntityLibrary() {
 
   return (
     <>
-      <div className="side-list">
-        <div className="side-head">
-          <span>实体类型</span>
-          <button className="ghost icon-btn" title="按类型设置字段模板" onClick={() => setEditingTemplate(true)}>模板</button>
-        </div>
-        <div className="items">
-          <div className={`side-item ${kindFilter === 'all' ? 'active' : ''}`} onClick={() => setKindFilter('all')}>
-            全部 <span style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>{entities.length}</span>
-          </div>
-          {KINDS.map((k) => (
-            <div key={k} className={`side-item ${kindFilter === k ? 'active' : ''}`} onClick={() => setKindFilter(k)}>
-              <Icon name={KIND_ICON[k]} /> {ENTITY_KIND_LABEL[k]}
-              <span style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>
-                {entities.filter((e) => e.kind === k).length}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <NavigatorTree
+        module="entity"
+        title="实体"
+        items={filtered}
+        selectedId={selectedId}
+        getLabel={(entity) => entity.name}
+        getDetail={(entity) => ENTITY_KIND_LABEL[entity.kind]}
+        onSelect={setSelectedId}
+        onMove={(id, folderId) => updateEntity(id, { folderId })}
+        onCreate={createEntity}
+        createLabel="新建实体"
+        emptyLabel="还没有实体"
+      />
 
       <div className="pane-col">
         <div className="toolbar">
           <button className="primary" onClick={createEntity}>＋ 新建实体</button>
+          <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as EntityKind | 'all')} style={{ width: 110 }}>
+            <option value="all">全部类型</option>
+            {KINDS.map((kind) => <option key={kind} value={kind}>{ENTITY_KIND_LABEL[kind]}</option>)}
+          </select>
+          <button className="ghost" title="按类型设置字段模板" onClick={() => setEditingTemplate(true)}>字段模板</button>
           <input placeholder="搜索名称或简介…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
           <span className="hint">实体库中的角色可在流程编辑器里作为说话人引用</span>
         </div>
@@ -322,6 +324,10 @@ export default function EntityLibrary() {
               <select value={selected.kind} onChange={(e) => updateEntity(selected.id, { kind: e.target.value as EntityKind })}>
                 {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
               </select>
+            </div>
+            <div className="field">
+              <label>文件夹</label>
+              <FolderSelect module="entity" value={selected.folderId} onChange={(folderId) => updateEntity(selected.id, { folderId })} />
             </div>
             <div className="field">
               <label>颜色</label>
