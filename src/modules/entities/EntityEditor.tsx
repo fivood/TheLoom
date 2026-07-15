@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useLoom } from '../../store';
 import { fileToAvatar } from '../../util';
 import { findEntityRefs, useNav } from '../../search';
+import { confirmDialog, alertDialog } from '../../dialog';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import Icon, { KIND_ICON } from '../../components/Icon';
@@ -34,7 +35,7 @@ export default function EntityEditor({ entityId, onClose }: { entityId: string; 
 
   const uploadAvatar = async (file: File) => {
     try { patch({ avatar: await fileToAvatar(file) }); }
-    catch { alert('无法读取该图片'); }
+    catch { await alertDialog('无法读取该图片'); }
   };
 
   return (
@@ -50,8 +51,8 @@ export default function EntityEditor({ entityId, onClose }: { entityId: string; 
           <button
             className="ghost"
             title="删除实体"
-            onClick={() => {
-              if (confirm(`删除实体「${entity.name}」?`)) {
+            onClick={async () => {
+              if (await confirmDialog({ message: `删除实体「${entity.name}」?`, danger: true, confirmText: '删除' })) {
                 removeEntity(entity.id);
                 onClose();
               }

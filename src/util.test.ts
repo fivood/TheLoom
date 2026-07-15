@@ -46,6 +46,25 @@ describe('normalizeProject', () => {
     expect(project.folders[2].parentId).toBeNull();
     expect(project.folders[3].parentId).toBeNull();
   });
+
+  it('规范化 order:非法值剔除,合法数字保留,旧项目无 order 不受影响', () => {
+    const project = sampleProject();
+    project.folders = [
+      { id: 'f1', name: '文件夹1', module: 'entity', order: 2 },
+      { id: 'f2', name: '文件夹2', module: 'entity', order: 'oops' as unknown as number },
+      { id: 'f3', name: '文件夹3', module: 'entity', order: NaN },
+    ];
+    project.entities[0].order = 5;
+    (project.entities[1] as { order: unknown }).order = 'bad';
+    normalizeProject(project);
+
+    expect(project.folders[0].order).toBe(2);
+    expect(project.folders[1].order).toBeUndefined();
+    expect(project.folders[2].order).toBeUndefined();
+    expect(project.entities[0].order).toBe(5);
+    expect(project.entities[1].order).toBeUndefined();
+    expect(project.entities[2]?.order).toBeUndefined();
+  });
 });
 
 describe('配色导入', () => {

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLoom, uid } from '../store';
 import { normalizeHex, parsePaletteJson } from '../util';
+import { confirmDialog } from '../dialog';
 import type { ColorPalette } from '../types';
 import { PALETTE } from '../types';
 import Icon from './Icon';
@@ -163,7 +164,7 @@ export default function PaletteManager({ onClose }: { onClose: () => void }) {
                       <button
                         className="ghost icon-btn"
                         title="删除该配色表"
-                        onClick={() => { if (confirm(`删除配色表「${pal.name}」?`)) removePalette(pal.id); }}
+                        onClick={async () => { if (await confirmDialog({ message: `删除配色表「${pal.name}」?`, danger: true, confirmText: '删除' })) removePalette(pal.id); }}
                       ><Icon name="trash" size={13} /></button>
                     </div>
                   </div>

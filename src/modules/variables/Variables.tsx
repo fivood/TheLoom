@@ -1,4 +1,5 @@
 import { uid, useLoom } from '../../store';
+import { confirmDialog } from '../../dialog';
 import type { VariableType } from '../../types';
 
 const TYPE_LABEL: Record<VariableType, string> = {
@@ -64,7 +65,7 @@ export default function Variables() {
                 <td>
                   <button
                     className="ghost icon-btn"
-                    onClick={() => { if (confirm(`删除变量 ${v.name}?`)) removeVariable(v.id); }}
+                    onClick={async () => { if (await confirmDialog({ message: `删除变量 ${v.name}?`, danger: true, confirmText: '删除' })) removeVariable(v.id); }}
                   >×</button>
                 </td>
               </tr>

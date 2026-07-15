@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLoom } from '../store';
 import { inspectProjectImport, type ImportInspection } from '../diagnostics';
+import { confirmDialog, alertDialog } from '../dialog';
 import Icon from './Icon';
 import ImportProjectDialog from './ImportProjectDialog';
 
@@ -42,16 +43,16 @@ export default function ProjectMenu() {
       setInspection(inspectProjectImport(data, file.name));
       setOpen(false);
     } catch (error) {
-      alert(`导入失败:${error instanceof Error ? error.message : '文件不是有效的 TheLoom 项目文件'}`);
+      await alertDialog(`导入失败:${error instanceof Error ? error.message : '文件不是有效的 TheLoom 项目文件'}`);
     } finally {
       setCheckingImport(false);
     }
   };
 
-  const confirmImport = () => {
+  const confirmImport = async () => {
     if (!inspection) return;
     if (!newSlot('blank')) {
-      alert('无法创建新项目，请先在“恢复与备份”中检查本地空间。当前项目没有被修改。');
+      await alertDialog('无法创建新项目，请先在“恢复与备份”中检查本地空间。当前项目没有被修改。');
       return;
     }
     replaceProject(inspection.project);
@@ -92,9 +93,9 @@ export default function ProjectMenu() {
                   <button
                     className="ghost icon-btn"
                     title="删除该项目(不可撤销)"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      if (confirm(`删除项目「${s.name || '未命名项目'}」?数据不可恢复。`)) deleteSlot(s.id);
+                      if (await confirmDialog({ message: `删除项目「${s.name || '未命名项目'}」?数据不可恢复。`, danger: true, confirmText: '删除' })) deleteSlot(s.id);
                     }}
                   >×</button>
                 </div>
@@ -105,9 +106,9 @@ export default function ProjectMenu() {
           <div className="project-dropdown-head">当前项目</div>
           <div
             className="project-slot danger-hover"
-            onClick={() => {
-              if (slots.length <= 1) { alert('至少要保留一个项目'); return; }
-              if (confirm(`删除当前项目「${project.name || '未命名项目'}」?数据不可恢复。`)) deleteSlot(currentSlotId);
+            onClick={async () => {
+              if (slots.length <= 1) { await alertDialog('至少要保留一个项目'); return; }
+              if (await confirmDialog({ message: `删除当前项目「${project.name || '未命名项目'}」?数据不可恢复。`, danger: true, confirmText: '删除' })) deleteSlot(currentSlotId);
               setOpen(false);
             }}
           >

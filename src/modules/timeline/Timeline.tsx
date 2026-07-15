@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
+import { confirmDialog, promptText } from '../../dialog';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import type { TimelineEvent } from '../../types';
 import { PALETTE } from '../../types';
@@ -26,8 +27,8 @@ export default function Timeline() {
 
   const selected = events.find((e) => e.id === selectedId) ?? null;
 
-  const addTrack = () => {
-    const name = prompt('新轨道名称(例如:主线、某角色的暗线、世界大事)');
+  const addTrack = async () => {
+    const name = await promptText({ message: '新轨道名称(例如:主线、某角色的暗线、世界大事)', placeholder: '轨道名称' });
     if (!name) return;
     update((p) => {
       const cols = activePaletteColors(p);
@@ -54,9 +55,12 @@ export default function Timeline() {
     });
   };
 
-  const removePoint = (id: string) => {
+  const removePoint = async (id: string) => {
     const used = events.filter((e) => e.pointId === id).length;
-    if (!confirm(used > 0 ? `该时间点上有 ${used} 个事件,将一并删除。继续?` : '删除该时间点?')) return;
+    if (!await confirmDialog({
+      message: used > 0 ? `该时间点上有 ${used} 个事件,将一并删除。继续?` : '删除该时间点?',
+      danger: true, confirmText: '删除',
+    })) return;
     update((p) => {
       p.timelinePoints = p.timelinePoints.filter((x) => x.id !== id);
       p.timelineEvents = p.timelineEvents.filter((e) => e.pointId !== id);
@@ -74,9 +78,12 @@ export default function Timeline() {
     });
   };
 
-  const removeTrack = (id: string, name: string) => {
+  const removeTrack = async (id: string, name: string) => {
     const used = events.filter((e) => e.trackId === id).length;
-    if (!confirm(used > 0 ? `轨道「${name}」上有 ${used} 个事件,将一并删除。继续?` : `删除轨道「${name}」?`)) return;
+    if (!await confirmDialog({
+      message: used > 0 ? `轨道「${name}」上有 ${used} 个事件,将一并删除。继续?` : `删除轨道「${name}」?`,
+      danger: true, confirmText: '删除',
+    })) return;
     update((p) => {
       p.timelineTracks = p.timelineTracks.filter((x) => x.id !== id);
       p.timelineEvents = p.timelineEvents.filter((e) => e.trackId !== id);
@@ -249,7 +256,7 @@ export default function Timeline() {
                 onChange={(c) => patchEvent(selected.id, { color: c })}
               />
             </div>
-            <button className="danger" onClick={() => { if (confirm(`删除事件「${selected.title}」?`)) removeEvent(selected.id); }}>
+            <button className="danger" onClick={async () => { if (await confirmDialog({ message: `删除事件「${selected.title}」?`, danger: true, confirmText: '删除' })) removeEvent(selected.id); }}>
               删除事件
             </button>
             <AttachmentEditor ownerId={selected.id} />

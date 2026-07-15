@@ -5,6 +5,7 @@ import type {
 } from './types';
 import { normalizeProject, uid, detachAssetEverywhere } from './util';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
+import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
 import {
   clearProjectRecovery, clearQuarantinedProject, parseProjectData, readProjectWithRecovery,
@@ -176,7 +177,7 @@ interface LoomState {
   quarantinedProject: RecoveryBackup | null;
   recoveryNotice: string | null;
   setFolder: (dir: string | null) => void;
-  restoreRecoveryBackup: () => void;
+  restoreRecoveryBackup: () => Promise<void>;
   dismissRecoveryNotice: () => void;
   discardQuarantinedProject: () => void;
   setRecoveryNotice: (message: string | null) => void;
@@ -239,7 +240,7 @@ interface LoomState {
   /** 版本历史快照 */
   snapshots: Snapshot[];
   createSnapshot: (name: string) => void;
-  restoreSnapshot: (id: string) => void;
+  restoreSnapshot: (id: string) => Promise<void>;
   deleteSnapshot: (id: string) => void;
 }
 
@@ -364,7 +365,7 @@ export const useLoom = create<LoomState>((set, get) => {
       clearQuarantinedProject(localStorage, slotId);
       set({ quarantinedProject: null });
     },
-    restoreRecoveryBackup: () => {
+    restoreRecoveryBackup: async () => {
       const cur = get();
       if (!cur.recoveryBackup) return;
       const project = parseProjectData(cur.recoveryBackup.data);
@@ -372,7 +373,7 @@ export const useLoom = create<LoomState>((set, get) => {
         set({ recoveryBackup: null, recoveryNotice: '自动恢复点已经损坏，无法恢复。' });
         return;
       }
-      if (!confirm(`恢复到 ${new Date(cur.recoveryBackup.createdAt).toLocaleString()} 的自动恢复点?当前状态会进入撤销栈。`)) return;
+      if (!await confirmDialog({ message: `恢复到 ${new Date(cur.recoveryBackup.createdAt).toLocaleString()} 的自动恢复点?当前状态会进入撤销栈。` })) return;
       undoStack.push(cur.project);
       if (undoStack.length > UNDO_LIMIT) undoStack.shift();
       redoStack = [];
@@ -605,7 +606,7 @@ export const useLoom = create<LoomState>((set, get) => {
       }
       set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
     },
-    restoreSnapshot: (id) => {
+    restoreSnapshot: async (id) => {
       const cur = get();
       const snap = cur.snapshots.find((s) => s.id === id);
       if (!snap) return;
@@ -613,14 +614,14 @@ export const useLoom = create<LoomState>((set, get) => {
         const p = JSON.parse(snap.data) as Project;
         if (!p || p.version !== 1) throw new Error('快照格式不正确');
         normalizeProject(p);
-        if (!confirm(`回滚到「${snap.name}」?当前状态会进入撤销栈(可用 Ctrl+Z 恢复)。`)) return;
+        if (!await confirmDialog({ message: `回滚到「${snap.name}」?当前状态会进入撤销栈(可用 Ctrl+Z 恢复)。` })) return;
         undoStack.push(cur.project);
         if (undoStack.length > UNDO_LIMIT) undoStack.shift();
         redoStack = [];
         lastUndoPush = 0;
         swapProject(p);
       } catch (e) {
-        alert(`回滚失败:${e}`);
+        await alertDialog(`回滚失败:${e}`);
       }
     },
     deleteSnapshot: (id) => {

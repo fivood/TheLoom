@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { fileToDataUrl } from './util';
 import { useNav } from '../../search';
+import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import type { MapDoc, MapMarker, MapRegion } from '../../types';
 import Icon from '../../components/Icon';
 import ColorPicker from '../../components/ColorPicker';
@@ -39,12 +40,12 @@ export default function MapEditor() {
     update((p) => { p.maps.push({ id, name: `新地图 ${p.maps.length + 1}`, markers: [], regions: [] }); });
     setActiveId(id);
   };
-  const renameMap = (id: string, current: string) => {
-    const name = prompt('地图名称', current);
+  const renameMap = async (id: string, current: string) => {
+    const name = await promptText({ message: '地图名称', defaultValue: current });
     if (name) update((p) => { const m = p.maps.find((x) => x.id === id); if (m) m.name = name; });
   };
-  const deleteMap = (id: string) => {
-    if (!confirm('删除该地图及全部标记与区域?')) return;
+  const deleteMap = async (id: string) => {
+    if (!await confirmDialog({ message: '删除该地图及全部标记与区域?', danger: true, confirmText: '删除' })) return;
     update((p) => { p.maps = p.maps.filter((x) => x.id !== id); });
     if (activeId === id) setActiveId(null);
   };
@@ -113,7 +114,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
     try {
       const { dataUrl, width, height } = await fileToDataUrl(file);
       patch((m) => { m.image = dataUrl; m.imageWidth = width; m.imageHeight = height; });
-    } catch { alert('无法读取该图片'); }
+    } catch { await alertDialog('无法读取该图片'); }
   };
 
   const clientToNormalized = (clientX: number, clientY: number) => {
@@ -222,7 +223,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
   const removeRegion = (id: string) => { patch((m) => { m.regions = m.regions.filter((x) => x.id !== id); }); setSelection(null); };
 
   const exportPng = async () => {
-    if (!map.image) { alert('先上传底图'); return; }
+    if (!map.image) { await alertDialog('先上传底图'); return; }
     const svg = svgRef.current!;
     const w = map.imageWidth ?? 1600, h = map.imageHeight ?? 900;
     const svgClone = svg.cloneNode(true) as SVGSVGElement;
@@ -334,9 +335,9 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
                             e.stopPropagation();
                             setDraggingVertex({ regionId: r.id, idx: i });
                           }}
-                          onContextMenu={(e) => {
+                          onContextMenu={async (e) => {
                             e.preventDefault(); e.stopPropagation();
-                            if (r.points.length <= 3) { alert('多边形至少 3 顶点'); return; }
+                            if (r.points.length <= 3) { await alertDialog('多边形至少 3 顶点'); return; }
                             patch((m) => {
                               const rr = m.regions.find((x) => x.id === r.id);
                               if (rr) rr.points.splice(i, 1);

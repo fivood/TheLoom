@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { uid, useLoom } from '../../store';
+import { confirmDialog, promptText } from '../../dialog';
 import { PALETTE } from '../../types';
 import { activePaletteColors } from '../../util';
 
@@ -36,8 +37,8 @@ export default function OutlineGrid() {
     addOutlineColumn, updateOutlineColumn, removeOutlineColumn,
   } = useLoom();
 
-  const addColumn = () => {
-    const title = prompt('新剧情线名称(例如:伏笔、感情线、某配角的暗线)');
+  const addColumn = async () => {
+    const title = await promptText({ message: '新剧情线名称(例如:伏笔、感情线、某配角的暗线)', placeholder: '剧情线名称' });
     if (!title) return;
     const cols = activePaletteColors(useLoom.getState().project);
     addOutlineColumn({ id: uid(), title, color: cols[columns.length % cols.length] ?? PALETTE[0] });
@@ -73,8 +74,8 @@ export default function OutlineGrid() {
                     <button
                       className="ghost icon-btn"
                       title="删除该剧情线"
-                      onClick={() => {
-                        if (confirm(`删除剧情线「${c.title}」及其所有单元格内容?`)) removeOutlineColumn(c.id);
+                      onClick={async () => {
+                        if (await confirmDialog({ message: `删除剧情线「${c.title}」及其所有单元格内容?`, danger: true, confirmText: '删除' })) removeOutlineColumn(c.id);
                       }}
                     >×</button>
                   </div>
@@ -91,7 +92,7 @@ export default function OutlineGrid() {
                   <button className="ghost icon-btn" title="在下方插入行" onClick={() => addOutlineRow(r.id)}>＋</button>
                   <button
                     className="ghost icon-btn" title="删除行"
-                    onClick={() => { if (confirm(`删除第 ${r.no || i + 1} 行?`)) removeOutlineRow(r.id); }}
+                    onClick={async () => { if (await confirmDialog({ message: `删除第 ${r.no || i + 1} 行?`, danger: true, confirmText: '删除' })) removeOutlineRow(r.id); }}
                   >×</button>
                 </td>
                 <td className="col-narrow">

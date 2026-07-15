@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
+import { confirmDialog, promptText } from '../../dialog';
 import Icon from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import type { ResearchCard } from '../../types';
@@ -13,7 +14,6 @@ export default function ResearchCards() {
   const cards = useLoom((s) => s.project.researchCards);
   const categories = useLoom((s) => s.project.researchCategories);
   const { addCard, updateCard, removeCard, update } = useLoom();
-
   const [catFilter, setCatFilter] = useState<string | 'all'>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -61,16 +61,20 @@ export default function ResearchCards() {
     setSelectedId(c.id);
   };
 
-  const addCategory = () => {
-    const name = prompt('新分类名称(例如:世界观 / 人物原型 / 地理 / 历史考据)');
+  const addCategory = async () => {
+    const name = await promptText({ message: '新分类名称(例如:世界观 / 人物原型 / 地理 / 历史考据)', placeholder: '分类名称' });
     if (!name) return;
     update((p) => { if (!p.researchCategories.includes(name)) p.researchCategories.push(name); });
     setCatFilter(name);
   };
 
-  const removeCategory = (name: string) => {
+  const removeCategory = async (name: string) => {
     const used = cards.filter((c) => c.category === name).length;
-    if (!confirm(used > 0 ? `分类「${name}」下有 ${used} 张卡片,删除后它们将变为「未分类」。继续?` : `删除分类「${name}」?`)) return;
+    if (!await confirmDialog({
+      message: used > 0 ? `分类「${name}」下有 ${used} 张卡片,删除后它们将变为「未分类」。继续?` : `删除分类「${name}」?`,
+      danger: true,
+      confirmText: '删除',
+    })) return;
     update((p) => {
       p.researchCategories = p.researchCategories.filter((c) => c !== name);
       for (const c of p.researchCards) if (c.category === name) c.category = '未分类';
@@ -89,6 +93,14 @@ export default function ResearchCards() {
         getDetail={(card) => card.pinned ? '置顶' : card.category}
         onSelect={setSelectedId}
         onMove={(id, folderId) => updateCard(id, { folderId })}
+        onMoveMany={(ids, folderId) => update((p) => {
+          const set = new Set(ids);
+          for (const c of p.researchCards) if (set.has(c.id)) { c.folderId = folderId; delete c.order; }
+        })}
+        onReorder={(_parentId, orderedIds) => update((p) => {
+          const map = new Map(orderedIds.map((id, i) => [id, i]));
+          for (const c of p.researchCards) if (map.has(c.id)) c.order = map.get(c.id);
+        })}
         onCreate={createCard}
         createLabel="新建资料卡"
         emptyLabel="还没有资料卡"
@@ -187,8 +199,8 @@ export default function ResearchCards() {
               </button>
               <button
                 className="danger"
-                onClick={() => {
-                  if (confirm(`删除卡片「${selected.title}」?`)) {
+                onClick={async () => {
+                  if (await confirmDialog({ message: `删除卡片「${selected.title}」?`, danger: true, confirmText: '删除' })) {
                     removeCard(selected.id);
                     setSelectedId(null);
                   }

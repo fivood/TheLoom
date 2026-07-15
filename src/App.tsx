@@ -5,6 +5,7 @@ import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
 } from './storage';
 import { useNav } from './search';
+import { confirmDialog, alertDialog } from './dialog';
 import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
 import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
 import SearchPalette from './components/SearchPalette';
@@ -15,6 +16,7 @@ import PaletteManager from './components/PaletteManager';
 import ProjectMenu from './components/ProjectMenu';
 import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
 import RecoveryPanel from './components/RecoveryPanel';
+import DialogHost from './components/Dialog';
 import Icon, { type IconName } from './components/Icon';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
@@ -135,8 +137,8 @@ export default function App() {
           ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
           : null);
       })
-      .catch(() => {
-        alert(`无法读取项目文件夹:\n${folder}\n\n已切换为浏览器本地存储。`);
+      .catch(async () => {
+        await alertDialog(`无法读取项目文件夹:\n${folder}\n\n已切换为浏览器本地存储。`);
         setSavedFolder(null);
         setFolder(null);
       });
@@ -148,20 +150,20 @@ export default function App() {
     if (!dir) return;
     try {
       if (await folderHasProject(dir)) {
-        if (!confirm(`该文件夹已有项目数据,加载它并替换当前打开的项目?\n\n${dir}`)) return;
+        if (!await confirmDialog({ message: `该文件夹已有项目数据,加载它并替换当前打开的项目?\n\n${dir}` })) return;
         const loaded = await loadFromFolder(dir);
         useLoom.getState().replaceProject(loaded.project);
         useLoom.getState().setRecoveryNotice(loaded.recoveredFromBackup
           ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
           : null);
       } else {
-        if (!confirm(`将当前项目「${project.name}」写入该文件夹?\n\n${dir}\n\n之后所有改动都会自动保存到这里。`)) return;
+        if (!await confirmDialog({ message: `将当前项目「${project.name}」写入该文件夹?\n\n${dir}\n\n之后所有改动都会自动保存到这里。` })) return;
         await saveToFolder(dir, project);
       }
       setSavedFolder(dir);
       setFolder(dir);
     } catch (e) {
-      alert(`操作失败:${e}`);
+      await alertDialog(`操作失败:${e}`);
     }
   };
 
@@ -174,7 +176,7 @@ export default function App() {
         ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
         : null);
     } catch (e) {
-      alert(`重新加载失败:${e}`);
+      await alertDialog(`重新加载失败:${e}`);
     }
   };
 
@@ -342,6 +344,7 @@ export default function App() {
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
       {recovering && <RecoveryPanel onClose={() => setRecovering(false)} />}
       {updateDialog && <UpdateDialog state={updateDialog} onClose={() => setUpdateDialog(null)} />}
+      <DialogHost />
     </div>
   );
 }

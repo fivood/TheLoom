@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { fileToAvatar } from '../../util';
 import { findEntityRefs, useNav } from '../../search';
+import { confirmDialog, alertDialog } from '../../dialog';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import { activePaletteColors } from '../../util';
@@ -154,7 +155,7 @@ function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onCl
 
 export default function EntityLibrary() {
   const entities = useLoom((s) => s.project.entities);
-  const { addEntity, updateEntity, removeEntity } = useLoom();
+  const { addEntity, updateEntity, removeEntity, update } = useLoom();
   const [kindFilter, setKindFilter] = useState<EntityKind | 'all'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -186,7 +187,7 @@ export default function EntityLibrary() {
     try {
       updateEntity(selected.id, { avatar: await fileToAvatar(file) });
     } catch {
-      alert('无法读取该图片');
+      await alertDialog('无法读取该图片');
     }
   };
 
@@ -222,6 +223,14 @@ export default function EntityLibrary() {
         getDetail={(entity) => ENTITY_KIND_LABEL[entity.kind]}
         onSelect={setSelectedId}
         onMove={(id, folderId) => updateEntity(id, { folderId })}
+        onMoveMany={(ids, folderId) => update((p) => {
+          const set = new Set(ids);
+          for (const e of p.entities) if (set.has(e.id)) { e.folderId = folderId; delete e.order; }
+        })}
+        onReorder={(_parentId, orderedIds) => update((p) => {
+          const map = new Map(orderedIds.map((id, i) => [id, i]));
+          for (const e of p.entities) if (map.has(e.id)) e.order = map.get(e.id);
+        })}
         onCreate={createEntity}
         createLabel="新建实体"
         emptyLabel="还没有实体"
@@ -372,8 +381,8 @@ export default function EntityLibrary() {
             </div>
             <button
               className="danger"
-              onClick={() => {
-                if (confirm(`删除实体「${selected.name}」?`)) {
+              onClick={async () => {
+                if (await confirmDialog({ message: `删除实体「${selected.name}」?`, danger: true, confirmText: '删除' })) {
                   removeEntity(selected.id);
                   setSelectedId(null);
                 }

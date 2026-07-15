@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { findAssetRefs, useNav } from '../../search';
+import { confirmDialog } from '../../dialog';
 import Icon from '../../components/Icon';
 import type { Asset, AssetKind } from '../../types';
 import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
@@ -13,7 +14,7 @@ const KINDS = Object.keys(ASSET_KIND_LABEL) as AssetKind[];
 export default function Assets() {
   const project = useLoom((s) => s.project);
   const assets = project.assets;
-  const { addAsset, updateAsset, removeAsset } = useLoom();
+  const { addAsset, updateAsset, removeAsset, update } = useLoom();
   const go = useNav((s) => s.go);
 
   const [kindFilter, setKindFilter] = useState<AssetKind | 'all'>('all');
@@ -95,6 +96,14 @@ export default function Assets() {
         getDetail={(asset) => ASSET_KIND_LABEL[asset.kind]}
         onSelect={setSelectedId}
         onMove={(id, folderId) => updateAsset(id, { folderId })}
+        onMoveMany={(ids, folderId) => update((p) => {
+          const set = new Set(ids);
+          for (const a of p.assets) if (set.has(a.id)) { a.folderId = folderId; delete a.order; }
+        })}
+        onReorder={(_parentId, orderedIds) => update((p) => {
+          const map = new Map(orderedIds.map((id, i) => [id, i]));
+          for (const a of p.assets) if (map.has(a.id)) a.order = map.get(a.id);
+        })}
         onCreate={() => fileRef.current?.click()}
         createLabel="导入资源"
         emptyLabel="还没有资源"
@@ -168,8 +177,8 @@ export default function Assets() {
             <button
               className="ghost icon-btn"
               title="删除资源(会从所有对象的附件中移除)"
-              onClick={() => {
-                if (!confirm(`删除资源「${selected.name}」?\n\n所有对象对它的附件引用都会被清理。`)) return;
+              onClick={async () => {
+                if (!await confirmDialog({ message: `删除资源「${selected.name}」?\n\n所有对象对它的附件引用都会被清理。`, danger: true, confirmText: '删除' })) return;
                 removeAsset(selected.id);
                 setSelectedId(null);
               }}

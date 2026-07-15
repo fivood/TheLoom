@@ -4,6 +4,7 @@ import {
   loadSyncConfig, pullProject, pushProject, saveSyncConfig, SyncError, type SyncConfig,
 } from '../sync';
 import { isTauri } from '../storage';
+import { confirmDialog } from '../dialog';
 import Icon from './Icon';
 
 export default function SyncPanel({ onClose }: { onClose: () => void }) {
@@ -24,7 +25,7 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
     setStatus('正在拉取…');
     try {
       const { project, version } = await pullProject(cfg);
-      if (!silent && !confirm(`拉取云端版本 v${version}「${project.name}」并替换当前打开的项目?`)) {
+      if (!silent && !await confirmDialog({ message: `拉取云端版本 v${version}「${project.name}」并替换当前打开的项目?` })) {
         setStatus('已取消');
         setBusy(null);
         return;
@@ -48,9 +49,9 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
     } catch (e) {
       if (e instanceof SyncError && e.status === 409) {
         setStatus(`冲突:云端已是 v${e.cloudVersion},比你的基线(v${cfg.lastVersion})新`);
-        if (confirm(`云端已有更新版本(v${e.cloudVersion}),可能是同伴推送的。\n\n【确定】拉取云端版本(覆盖你的本地改动)\n【取消】保留本地,稍后自行处理`)) {
+        if (await confirmDialog({ message: `云端已有更新版本(v${e.cloudVersion}),可能是同伴推送的。\n\n【确定】拉取云端版本(覆盖你的本地改动)\n【取消】保留本地,稍后自行处理`, confirmText: '拉取云端' })) {
           await doPull(true);
-        } else if (confirm(`要用你的本地版本强制覆盖云端 v${e.cloudVersion} 吗?\n对方未同步的改动将丢失!`)) {
+        } else if (await confirmDialog({ message: `要用你的本地版本强制覆盖云端 v${e.cloudVersion} 吗?\n对方未同步的改动将丢失!`, danger: true, confirmText: '强制覆盖' })) {
           patch({ lastVersion: e.cloudVersion ?? cfg.lastVersion });
           const next = { ...cfg, lastVersion: e.cloudVersion ?? cfg.lastVersion };
           try {

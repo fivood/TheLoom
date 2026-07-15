@@ -6,3 +6,9 @@ src-tauri/gen/schemas/
 .wrangler/
 *.local
 .DS_Store
+opencode.json
+.codex-import/
+imports/
+scripts/
+.playwright-mcp/
+npm-dev*.log

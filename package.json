@@ -1,7 +1,7 @@
 {
   "name": "theloom",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "description": "叙事织机 TheLoom — 叙事设计工具:流程编辑、实体库、头脑风暴、罗琳式大纲、资料卡片",
   "scripts": {

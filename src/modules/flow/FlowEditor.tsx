@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   applyNodeChanges, applyEdgeChanges, addEdge, useReactFlow, MarkerType,
@@ -6,10 +6,12 @@ import {
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
+import { confirmDialog, promptText } from '../../dialog';
 import { countSubNodes, resolveSub } from '../../util';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import ColorPicker from '../../components/ColorPicker';
+import NavigatorTree from '../../components/NavigatorTree';
 import { useLoom as useLoomStore } from '../../store';
 
 /** 条件/指令脚本的变量校验与快捷插入 */
@@ -293,7 +295,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               const withSub = delNodes.filter((n) => countSubNodes((n.data as FlowNodeData).sub) > 0);
               if (withSub.length === 0) return true;
               const total = withSub.reduce((s, n) => s + countSubNodes((n.data as FlowNodeData).sub), 0);
-              return confirm(`要删除的剧情片段里还有 ${total} 个子节点,将一并删除。继续?`);
+              return await confirmDialog({ message: `要删除的剧情片段里还有 ${total} 个子节点,将一并删除。继续?`, danger: true, confirmText: '删除' });
             }}
             onError={(code, msg) => console.warn('[RF]', code, msg)}
             zoomOnDoubleClick={false}
@@ -509,14 +511,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
 
 export default function FlowEditor() {
   const flows = useLoom((s) => s.project.flows);
-  const allFolders = useLoom((s) => s.project.folders);
-  const folders = useMemo(() => allFolders.filter((f) => f.module === 'flow'), [allFolders]);
   const update = useLoom((s) => s.update);
-  const { addFolder, updateFolder, removeFolder } = useLoom();
   const [activeId, setActiveId] = useState<string | null>(flows[0]?.id ?? null);
   const [path, setPath] = useState<string[]>([]);
   const [focusNodeId, setFocusNodeId] = useState<string | undefined>();
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(folders.map((f) => f.id)));
 
   // 消费搜索 / 反向引用的跳转目标
   const navSeq = useNav((s) => s.seq);
@@ -575,137 +573,64 @@ export default function FlowEditor() {
     update((p) => { p.flows.push({ id, name: `新流程 ${p.flows.length + 1}`, nodes: [], edges: [] }); });
     selectFlow(id);
   };
-  const renameFlow = (id: string, current: string) => {
-    const name = prompt('流程名称', current);
+  const renameFlow = async (id: string, current: string) => {
+    const name = await promptText({ message: '流程名称', defaultValue: current });
     if (name) update((p) => { const f = p.flows.find((x) => x.id === id); if (f) f.name = name; });
   };
-  const setFlowTechName = (id: string, current: string | undefined) => {
-    const tn = prompt('技术名(留空清除,只能含字母数字下划线)', current ?? '');
+  const setFlowTechName = async (id: string, current: string | undefined) => {
+    const tn = await promptText({
+      message: '技术名(留空清除,只能含字母数字下划线)',
+      defaultValue: current ?? '',
+      placeholder: '如 act1_rain',
+    });
     if (tn !== null) update((p) => { const f = p.flows.find((x) => x.id === id); if (f) f.technicalName = tn || undefined; });
   };
-  const removeFlow = (id: string) => {
-    if (!confirm('删除该流程及其全部节点?')) return;
+  const removeFlow = async (id: string) => {
+    if (!await confirmDialog({ message: '删除该流程及其全部节点?', danger: true, confirmText: '删除' })) return;
     update((p) => { p.flows = p.flows.filter((x) => x.id !== id); });
     if (activeId === id) { setActiveId(null); setPath([]); }
   };
 
-  /* ---------- 文件夹树 ---------- */
-  const toggleFolder = (id: string) => setExpanded((s) => {
-    const n = new Set(s);
-    if (n.has(id)) n.delete(id); else n.add(id);
-    return n;
-  });
-  const addTopFolder = () => {
-    const name = prompt('文件夹名称');
-    if (!name) return;
-    const id = uid();
-    addFolder({ id, name, module: 'flow', parentId: null });
-    setExpanded((s) => new Set(s).add(id));
-  };
-  const addSubFolder = (parentId: string) => {
-    const name = prompt('子文件夹名称');
-    if (!name) return;
-    const id = uid();
-    addFolder({ id, name, module: 'flow', parentId });
-    setExpanded((s) => new Set(s).add(id));
-  };
-  const renameFolder = (id: string, current: string) => {
-    const name = prompt('文件夹名称', current);
-    if (name) updateFolder(id, { name });
-  };
-  const moveFlowToFolder = (flowId: string, folderId: string | null) => {
-    update((p) => { const f = p.flows.find((x) => x.id === flowId); if (f) f.folderId = folderId ?? undefined; });
-    if (folderId) setExpanded((s) => new Set(s).add(folderId));
-  };
-  const countFlowsIn = (folderId: string): number => {
-    const direct = flows.filter((f) => f.folderId === folderId).length;
-    const subFolders = folders.filter((f) => f.parentId === folderId);
-    return direct + subFolders.reduce((s, sf) => s + countFlowsIn(sf.id), 0);
-  };
-
-  const renderTree = (parentId: string | null, depth: number): ReactNode => {
-    const subFolders = folders.filter((f) => (f.parentId ?? null) === parentId);
-    const flowsHere = flows.filter((f) => (f.folderId ?? null) === parentId);
-    const pad = { paddingLeft: 8 + depth * 14 };
-    return (
-      <>
-        {subFolders.map((folder) => {
-          const open = expanded.has(folder.id);
-          const cnt = countFlowsIn(folder.id);
-          return (
-            <div key={folder.id}>
-              <div
-                className={`side-item folder-row ${open ? 'open' : ''}`}
-                style={pad}
-                onClick={() => toggleFolder(folder.id)}
-              >
-                <span className="caret">{open ? '▾' : '▸'}</span>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
-                <span className="count" style={{ color: 'var(--text-faint)' }}>{cnt}</span>
-                <button className="ghost icon-btn" title="新建子文件夹" onClick={(e) => { e.stopPropagation(); addSubFolder(folder.id); }}>＋</button>
-                <button className="ghost icon-btn" title="重命名" onClick={(e) => { e.stopPropagation(); renameFolder(folder.id, folder.name); }}>✎</button>
-                <button className="ghost icon-btn" title="删除文件夹(其下流程归入未分组)" onClick={(e) => { e.stopPropagation(); if (confirm(`删除文件夹「${folder.name}」?其下子文件夹一并删除,流程归入未分组。`)) removeFolder(folder.id); }}>×</button>
-              </div>
-              {open && renderTree(folder.id, depth + 1)}
-            </div>
-          );
+  return (
+    <>
+      <NavigatorTree
+        module="flow"
+        title="流程"
+        items={flows}
+        selectedId={activeId}
+        getLabel={(flow) => flow.name}
+        onSelect={selectFlow}
+        onItemDoubleClick={(flow) => renameFlow(flow.id, flow.name)}
+        onMove={(id, folderId) => update((p) => { const f = p.flows.find((x) => x.id === id); if (f) { f.folderId = folderId; delete f.order; } })}
+        onMoveMany={(ids, folderId) => update((p) => {
+          const set = new Set(ids);
+          for (const f of p.flows) if (set.has(f.id)) { f.folderId = folderId; delete f.order; }
         })}
-        {flowsHere.map((f) => (
-          <div
-            key={f.id}
-            className={`side-item ${active?.id === f.id ? 'active' : ''}`}
-            style={{ ...pad, paddingLeft: 8 + depth * 14 + 16 }}
-            onClick={() => selectFlow(f.id)}
-            onDoubleClick={() => renameFlow(f.id, f.name)}
-            title="双击重命名"
-          >
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-            {f.technicalName && (
-              <code style={{ fontSize: 10, color: 'var(--text-faint)' }} title={`技术名:${f.technicalName}`}>{f.technicalName}</code>
-            )}
-            <select
-              className="move-to-folder"
-              value={f.folderId ?? ''}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => moveFlowToFolder(f.id, e.target.value || null)}
-              title="移到文件夹"
-            >
-              <option value="">未分组</option>
-              {folders.map((fo) => <option key={fo.id} value={fo.id}>{fo.name}</option>)}
-            </select>
+        onReorder={(_parentId, orderedIds) => update((p) => {
+          const map = new Map(orderedIds.map((id, i) => [id, i]));
+          for (const f of p.flows) if (map.has(f.id)) f.order = map.get(f.id);
+        })}
+        onCreate={addFlow}
+        createLabel="新建流程"
+        emptyLabel="还没有流程"
+        renderItemMeta={(flow) => flow.technicalName ? (
+          <code className="nav-tech-name" title={`技术名:${flow.technicalName}`}>{flow.technicalName}</code>
+        ) : null}
+        renderItemActions={(flow) => (
+          <>
             <button
               className="ghost icon-btn"
-              onClick={(e) => { e.stopPropagation(); setFlowTechName(f.id, f.technicalName); }}
+              onClick={(e) => { e.stopPropagation(); setFlowTechName(flow.id, flow.technicalName); }}
               title="设置技术名"
             >#</button>
             <button
               className="ghost icon-btn"
-              onClick={(e) => { e.stopPropagation(); removeFlow(f.id); }}
+              onClick={(e) => { e.stopPropagation(); removeFlow(flow.id); }}
               title="删除"
             >×</button>
-          </div>
-        ))}
-      </>
-    );
-  };
-
-  return (
-    <>
-      <div className="side-list">
-        <div className="side-head">
-          <span>流程</span>
-          <div style={{ display: 'flex', gap: 2 }}>
-            <button className="ghost icon-btn" onClick={addTopFolder} title="新建文件夹">▤＋</button>
-            <button className="ghost icon-btn" onClick={addFlow} title="新建流程">＋</button>
-          </div>
-        </div>
-        <div className="items">
-          {renderTree(null, 0)}
-          {flows.length === 0 && (
-            <div className="empty-hint" style={{ marginTop: 40 }}>还没有流程<br />点击「＋」新建,或「▤＋」建文件夹分组</div>
-          )}
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {active ? (
         <ReactFlowProvider key={`${active.id}/${validPath.join('/')}/${focusNodeId ?? ''}`}>

@@ -95,4 +95,37 @@ category: 正文
     expect(restored.blocks[0].choices?.[0].id).toHaveLength(12);
     expect(restored.blocks[0].choices?.[0].label).toBe('继续');
   });
+
+  it('order 字段在实体 / 资料 / 文档间无损往返', () => {
+    const entity: Entity = {
+      id: 'e-order', folderId: 'f1', order: 3, kind: 'character', name: '有序实体',
+      color: '#111', emoji: '', summary: '', fields: [], notes: '', createdAt: 1,
+    };
+    const restoredE = mdToEntity(`${entity.name}.md`, entityToMd(entity), 0);
+    expect(restoredE.order).toBe(3);
+    expect(restoredE.folderId).toBe('f1');
+
+    const card: ResearchCard = {
+      id: 'c-order', folderId: 'f2', order: 7, title: '有序卡片', content: '', category: '考据', tags: [],
+      color: '#333', source: '', pinned: false, createdAt: 2,
+    };
+    const restoredC = mdToCard(`${card.title}.md`, cardToMd(card), 0);
+    expect(restoredC.order).toBe(7);
+
+    const doc: Document = {
+      id: 'd-order', folderId: 'f3', order: 12, name: '有序文档', category: '正文', notes: '',
+      blocks: [{ id: 'b1', type: 'heading', text: '标题' }], createdAt: 3, updatedAt: 4,
+    };
+    const restoredD = mdToDocument(`${doc.name}.md`, documentToMd(doc, []), 0);
+    expect(restoredD.order).toBe(12);
+  });
+
+  it('order 缺失时往返保持 undefined', () => {
+    const entity: Entity = {
+      id: 'e-no-order', kind: 'character', name: '无序实体',
+      color: '#111', emoji: '', summary: '', fields: [], notes: '', createdAt: 1,
+    };
+    const restoredE = mdToEntity(`${entity.name}.md`, entityToMd(entity), 0);
+    expect(restoredE.order).toBeUndefined();
+  });
 });

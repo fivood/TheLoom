@@ -738,6 +738,42 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   white-space: nowrap;
 }
 
+/* ---------- 应用内对话框(prompt / confirm / alert) ---------- */
+
+.dialog-backdrop { z-index: 200; align-items: center; padding-top: 0; }
+.dialog-card {
+  width: min(440px, calc(100vw - 32px));
+  max-height: 80vh;
+  padding: 20px 20px 16px;
+  gap: 4px;
+}
+.dialog-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.dialog-message {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-y: auto;
+}
+.dialog-input, .dialog-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 13px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+}
+.dialog-textarea { resize: vertical; line-height: 1.5; font-family: inherit; }
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ---------- 协作同步面板 ---------- */
 
 .sync-panel { width: 460px; }
@@ -1287,7 +1323,48 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .navigator-folder-row:hover .navigator-folder-actions { display: inline-flex; }
 .navigator-folder-row:hover .count { display: none; }
 .navigator-object-row { gap: 4px; }
+.nav-tech-name {
+  font-size: 10px;
+  color: var(--text-faint);
+  background: var(--bg-hover);
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
 .navigator-empty { margin-top: 40px; }
+
+/* 拖拽指示线 */
+.drop-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent, #1b1b19);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.drop-line:first-child { top: -1px; }
+.drop-line:last-child { bottom: -1px; top: auto; }
+.side-item.drag-into { outline: 2px solid var(--accent, #1b1b19); outline-offset: -2px; }
+
+/* 多选批量操作条 */
+.navigator-batch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: 11px;
+}
+.navigator-batch-count { color: var(--text-dim); flex-shrink: 0; }
+.navigator-batch select {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 4px 6px;
+}
+.navigator-object-row { user-select: none; }
 
 /* ---------- 桌面更新 ---------- */
 

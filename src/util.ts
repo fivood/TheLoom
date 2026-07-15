@@ -58,6 +58,20 @@ export function normalizeProject(p: Project): Project {
   cleanAssignments(p.assets, 'asset');
   cleanAssignments(p.documents, 'document');
   cleanAssignments(p.researchCards, 'research');
+  // 规范化 order:非有限数字直接剔除,让旧项目保持默认排序
+  const cleanOrder = (items: { order?: unknown }[]) => {
+    for (const item of items) {
+      if (item.order !== undefined && (typeof item.order !== 'number' || !Number.isFinite(item.order))) {
+        delete item.order;
+      }
+    }
+  };
+  cleanOrder(p.folders);
+  cleanOrder(p.flows);
+  cleanOrder(p.entities);
+  cleanOrder(p.assets);
+  cleanOrder(p.documents);
+  cleanOrder(p.researchCards);
   return p;
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLoom } from '../store';
+import { confirmDialog } from '../dialog';
 import Icon from './Icon';
 
 export default function VersionHistory({ onClose }: { onClose: () => void }) {
@@ -60,7 +61,7 @@ export default function VersionHistory({ onClose }: { onClose: () => void }) {
                     <button
                       className="ghost icon-btn"
                       title="删除该快照"
-                      onClick={() => { if (confirm(`删除快照「${s.name}」?`)) deleteSnapshot(s.id); }}
+                      onClick={async () => { if (await confirmDialog({ message: `删除快照「${s.name}」?`, danger: true, confirmText: '删除' })) deleteSnapshot(s.id); }}
                     ><Icon name="trash" size={13} /></button>
                   </div>
                 </div>

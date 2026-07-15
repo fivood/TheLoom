@@ -86,6 +86,19 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 7. ~~Conflict Search 增强~~ ✅(重复技术名、损坏资产)
 8. Excel/FinalDraft 互通、矢量地点编辑、多窗口(CSV 导出已做;Excel xlsx/FinalDraft/矢量/多窗口待补)
 
+## 最近变更(R1-2)
+
+对话框统一 + Navigator 易用性:
+
+- `src/dialog.ts` + `src/components/Dialog.tsx`:应用内轻量弹窗(`promptText` / `confirmDialog` / `alertDialog`),返回 Promise;Esc 取消、Enter 确认、多行 Ctrl+Enter;`App.tsx` 挂载 `<DialogHost />`;全量替换原生 `prompt` / `confirm` / `alert`
+- `NavigatorTree` 扩展:`order` 稳定排序、HTML5 拖拽(对象→文件夹、文件夹重父 + 同级重排、对象同级重排)、Ctrl/Shift 多选 + 底部批量归档条;新增 `renderItemMeta` / `renderItemActions` / `onItemDoubleClick` / `onMoveMany` / `onReorder` props
+- FlowEditor 改用 `NavigatorTree`(原自带树删除),五个 Navigator 行为一致
+- `types.ts`:`Folder` / `Flow` / `Entity` / `Asset` / `Document` / `ResearchCard` 增 `order?: number`
+- `util.ts`:`normalizeProject` 剔除非法 `order`;旧项目无 `order` → 稳定排序保持原序
+- `storage.ts`:实体 / 资料 / 文档 Markdown frontmatter 无损往返 `order`
+- 文件夹删除确认文案统一,不级联删除正文或资源
+- 测试:`dialog.test.ts` + `order` 往返 / 规范化覆盖;合计 35 项通过
+
 ## 最近变更(R1 开发中)
 
 全模块 Navigator 与长篇项目组织:
@@ -152,5 +165,15 @@ cd src-tauri && cargo test --lib   # Rust 单元测试
 npm run tauri dev    # 桌面版调试
 npm run tauri build  # 桌面版打包
 ```
+
+## 界面改动自动检查(opencode + Playwright MCP)
+
+项目根 `opencode.json` 配了本地 `playwright` MCP server(浏览器自动化)。改了流程 / 实体 / 资源 / 文档 / 资料 Navigator、对话框或其它可见交互后,按顺序:
+
+1. 先起本地网页版:`npm run dev`(等待 `http://localhost:5173` 就绪)
+2. 用 `playwright` MCP 工具打开页面,实际点一遍受影响的交互(文件夹新建 / 重命名 / 删除、拖拽移动、Ctrl/Shift 多选、批量归档、弹窗 Esc/Enter)
+3. 再跑 `npm run build` 与 `npm test`;涉及桌面文件夹存储时加 `cd src-tauri && cargo test --lib`
+
+说明:网页版与桌面版(Tauri)共用前端,网页版点通即覆盖前端逻辑;桌面版 Rust 文件夹读写仍靠 `cargo test --lib`。提示 opencode 用浏览器时写「use the playwright tool」。
 
 发布、部署、协作后端启用见 [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)。

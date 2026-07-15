@@ -4,6 +4,7 @@ import {
   downloadDiagnosticReport, LOCAL_STORAGE_ASSUMED_LIMIT_BYTES, LOCAL_STORAGE_WARNING_BYTES,
 } from '../diagnostics';
 import { isTauri } from '../storage';
+import { confirmDialog } from '../dialog';
 import Icon from './Icon';
 
 function downloadRaw(filename: string, content: string) {
@@ -112,8 +113,8 @@ export default function RecoveryPanel({ onClose }: { onClose: () => void }) {
                 <button className="ghost" onClick={() => downloadRaw('theloom-corrupt-project.json', quarantine.data)}>下载原始数据</button>
                 <button
                   className="ghost"
-                  onClick={() => {
-                    if (confirm('清除已隔离的损坏存档?当前可用项目和自动恢复点不会受影响。')) discardQuarantine();
+                  onClick={async () => {
+                    if (await confirmDialog({ message: '清除已隔离的损坏存档?当前可用项目和自动恢复点不会受影响。', danger: true, confirmText: '清除' })) discardQuarantine();
                   }}
                 >清除</button>
               </div>

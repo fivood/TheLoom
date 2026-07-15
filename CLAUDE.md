@@ -14,18 +14,17 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.9.0` / `984000e`,R0 稳定性与恢复基线已上线,网页部署与桌面签名安装包均已验证
-- 当前本地提交:`adf90ca R1: 全模块 Navigator 与文件夹归档`
-- `main` 当前比 `origin/main` 超前 1 个提交;R1 尚未推送、未打标签、未发布,版本号仍是 `0.9.0`
-- R1 第一批已完成:流程 / 实体 / 资源 / 文档 / 资料均支持多级文件夹;新增通用 `NavigatorTree` / `FolderSelect`;修复文档模块缺少可见文档列表的问题
-- 最近验证基线:`npm test` 27 项通过、`npm run build` 通过、`cargo test --lib` 通过,并完成四个模块的实际界面检查
+- 已发布版本:`v0.10.0`,R1 全模块 Navigator + 对话框统一 + Navigator 易用性已发布
+- R1 第一批(全模块 Navigator 与文件夹归档)+ R1 第二批(R1-2:对话框统一 + Navigator 易用性)均已上线,网页部署与桌面签名安装包均由 CI 构建
+- 版本号已同步至 `0.10.0`(`package.json` / `tauri.conf.json` / `Cargo.toml`)
+- 最近验证基线:`npm test` 35 项通过、`npm run build` 通过、`cargo test --lib` 通过,并完成五个 Navigator + 对话框的 Playwright 实际交互验证
 
 ### 后续待办(按顺序开发)
 
 | 优先级 | 批次 | 待办 | 完成标准 |
 |---|---|---|---|
-| P0 | R1-2 Navigator 易用性 | 对象与文件夹拖拽移动;Ctrl/Shift 多选;批量归档;文件夹和对象自定义排序 | 五个 Navigator 行为一致;撤销/重做有效;旧项目顺序稳定;长列表可滚动 |
-| P0 | R1-2 对话框统一 | 把新建 / 重命名文件夹使用的原生 `prompt()` 改为应用内轻量弹窗,删除确认文案统一 | 网页、桌面和自动化检查均可操作;Esc 取消、Enter 确认;不误删文件夹内对象 |
+| ~~P0~~ | ~~R1-2 Navigator 易用性~~ | ~~拖拽移动;Ctrl/Shift 多选;批量归档;自定义排序~~ | ✅ 已完成:`order` 字段 + 稳定排序、HTML5 拖拽(对象→文件夹、文件夹重排 / 重父)、Ctrl/Shift 多选 + 批量归档条、五个 Navigator 一致 |
+| ~~P0~~ | ~~R1-2 对话框统一~~ | ~~替换原生 `prompt()`;删除确认文案统一~~ | ✅ 已完成:`src/dialog.ts` + `Dialog.tsx` 统一弹窗;全量替换 `prompt` / `confirm` / `alert`;Esc 取消 Enter 确认;文件夹删除文案统一且不级联删除正文 |
 | P0 | R1-3 长篇写作体验 | 文档富文本补段落级标题、列表、引用;保持结构化块与 Markdown 往返稳定 | 编辑、导出、文件夹重载后格式不丢;文档转流程不受影响 |
 | P1 | R1-4 导入导出 | Excel `.xlsx` 与 Final Draft 互通,先做可逆导出,再做带预检的导入 | 中文、分支、角色、稳定 ID 可往返;导入始终先预览且不覆盖当前项目 |
 | P1 | R1-5 Localization | 建立 UI 文案资源层和项目内容本地化模块 | 中文默认体验不退化;可添加语言、检查缺失条目并导出 |
@@ -42,16 +41,31 @@
 
 ### 实施注意事项
 
-- `folderId?` 已存在于 `Flow` / `Entity` / `Asset` / `Document` / `ResearchCard`;新增可归档对象时同步更新类型、`normalizeProject`、`removeFolder` 和存储往返
-- 实体 / 资料 / 文档的 `folderId` 写入 Markdown frontmatter;资源保留在 `project.json`;文件夹树本身保存在 `Project.folders`
-- 删除文件夹只删除目录结构,所有受影响对象必须回到“未分组”,不得级联删除正文或资源
-- `normalizeProject` 已清理失效、跨模块、自引用和循环文件夹关系;不要取消这层旧项目 / 损坏项目保护
+- `folderId?` 与 `order?` 已存在于 `Flow` / `Entity` / `Asset` / `Document` / `ResearchCard` / `Folder`;新增可归档对象时同步更新类型、`normalizeProject`、`removeFolder`、存储往返和 `NavigatorTree` 的 `onMove` / `onReorder`
+- 实体 / 资料 / 文档的 `folderId` 与 `order` 写入 Markdown frontmatter;资源 / 流程保留在 `project.json`;文件夹树本身保存在 `Project.folders`
+- 删除文件夹只删除目录结构,所有受影响对象必须回到"未分组",不得级联删除正文或资源
+- `normalizeProject` 已清理失效、跨模块、自引用和循环文件夹关系,并剔除非法 `order` 值;不要取消这层旧项目 / 损坏项目保护
 - `NavigatorTree` 当前接收筛选后的对象列表,因此目录计数反映当前类型 / 分类 / 标签 / 搜索条件;修改时保持这个语义一致
 - 跨模块搜索跳转到实体、资源、资料或文档时,先清空会隐藏目标的筛选和搜索词,再选中目标
-- 文件夹创建当前仍调用原生 `prompt()`;Codex 内置浏览器自动化不支持它,这是 R1-2 要替换弹窗的原因,不是普通浏览器运行故障
+- 所有原生 `prompt` / `confirm` / `alert` 已替换为 `src/dialog.ts` 的应用内弹窗;新增交互需要输入 / 确认时一律用 `promptText` / `confirmDialog` / `alertDialog`,不要再引入原生对话框
+- `NavigatorTree` 支持拖拽(对象 → 文件夹移动、文件夹重父 / 重排、对象在同级重排)、Ctrl/Shift 多选与批量归档;五个模块(流程 / 实体 / 资源 / 文档 / 资料)共用同一组件,FlowEditor 已不再自带树
 - 所有项目数据修改必须经过 store 的 `commit`,保证撤销栈、恢复点与持久化正常;不要直接修改 zustand state
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 R1、移动版本标签或发布安装包;发布前更新版本号、`RELEASE_NOTES.md` 并确认桌面更新清单
+
+## 最近变更(R1-2)
+
+对话框统一 + Navigator 易用性:
+
+- `src/dialog.ts` + `src/components/Dialog.tsx`:应用内轻量弹窗(`promptText` / `confirmDialog` / `alertDialog`),返回 Promise;Esc 取消、Enter 确认、多行 Ctrl+Enter 提交、危险操作标红;`App.tsx` 挂载 `<DialogHost />`
+- 全量替换原生 `prompt()` / `confirm()` / `alert()`(NavigatorTree、FlowEditor、EntityLibrary / EntityEditor、Assets、DocumentView、ResearchCards、Timeline、OutlineGrid、MapEditor、App、ProjectMenu、RecoveryPanel、PaletteManager、SyncPanel、VersionHistory、Variables、store)
+- `NavigatorTree` 扩展:`order` 稳定排序、HTML5 拖拽(对象→文件夹、文件夹重父 + 同级重排、对象同级重排)、Ctrl/Shift 多选 + 底部批量归档条;新增 `renderItemMeta` / `renderItemActions` / `onItemDoubleClick` / `onMoveMany` / `onReorder` props
+- FlowEditor 改用 `NavigatorTree`(原自带树删除),五个 Navigator 行为一致;流程行技术名走 `renderItemMeta`,# / × 走 `renderItemActions`,双击重命名
+- `types.ts`:`Folder` / `Flow` / `Entity` / `Asset` / `Document` / `ResearchCard` 增 `order?: number`
+- `util.ts`:`normalizeProject` 剔除非法 `order`(非有限数字);旧项目无 `order` → 稳定排序保持原序
+- `storage.ts`:实体 / 资料 / 文档 Markdown frontmatter 无损往返 `order`
+- 文件夹删除确认文案统一为「删除文件夹「X」?其下子文件夹一并删除,内容归入未分组(不会删除正文或资源)」
+- 测试:`dialog.test.ts`(5 项)、`storage.test.ts` 补 `order` 往返(2 项)、`util.test.ts` 补 `order` 规范化(1 项);合计 35 项通过
 
 ## 模块清单(8 + 2)
 

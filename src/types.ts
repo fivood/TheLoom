@@ -47,6 +47,8 @@ export interface Entity {
   id: ID;
   /** 所属实体文件夹 id;空 = 未分组 */
   folderId?: ID;
+  /** Navigator 树内手动排序序号;空 = 按默认(创建时间)排序 */
+  order?: number;
   kind: EntityKind;
   name: string;
   color: string;
@@ -149,6 +151,8 @@ export interface Flow {
   technicalName?: string;
   /** 所属文件夹 id(null / undefined = 未分组);Navigator 树用 */
   folderId?: ID;
+  /** Navigator 树内手动排序序号;空 = 按默认排序 */
+  order?: number;
   nodes: FlowNode[];
   edges: FlowEdge[];
 }
@@ -254,6 +258,8 @@ export interface ResearchCard {
   id: ID;
   /** 所属资料文件夹 id;空 = 未分组 */
   folderId?: ID;
+  /** Navigator 树内手动排序序号;空 = 按默认(置顶 + 创建时间)排序 */
+  order?: number;
   title: string;
   content: string;
   category: string;
@@ -298,6 +304,8 @@ export interface Asset {
   id: ID;
   /** 所属资源文件夹 id;空 = 未分组 */
   folderId?: ID;
+  /** Navigator 树内手动排序序号;空 = 按默认(创建时间倒序)排序 */
+  order?: number;
   name: string;
   kind: AssetKind;
   mime: string;
@@ -360,6 +368,8 @@ export interface Document {
   id: ID;
   /** 所属文档文件夹 id;空 = 未分组 */
   folderId?: ID;
+  /** Navigator 树内手动排序序号;空 = 按默认(更新时间倒序)排序 */
+  order?: number;
   name: string;
   /** 技术名:项目内唯一,用于导出,如 act1_draft */
   technicalName?: string;
@@ -381,6 +391,8 @@ export interface Folder {
   module: FolderModule;
   /** 父文件夹 id;null / undefined = 顶层 */
   parentId?: ID | null;
+  /** 同级排序序号;空 = 按默认(插入顺序)排序 */
+  order?: number;
 }
 
 /* ---------- 配色表 ---------- */

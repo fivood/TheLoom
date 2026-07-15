@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
+import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import Icon from '../../components/Icon';
 import TechNameField from '../../components/TechNameField';
 import { RichTextInput } from '../../components/RichText';
@@ -76,16 +77,20 @@ export default function DocumentView() {
     setActiveBlockId(d.blocks[0].id);
   };
 
-  const addCategory = () => {
-    const name = prompt('新分类名称(例如:剧本草稿 / 设计文档 / 处理)');
+  const addCategory = async () => {
+    const name = await promptText({ message: '新分类名称(例如:剧本草稿 / 设计文档 / 处理)', placeholder: '分类名称' });
     if (!name) return;
     update((p) => { if (!p.documentCategories.includes(name)) p.documentCategories.push(name); });
     setCatFilter(name);
   };
 
-  const removeCategory = (name: string) => {
+  const removeCategory = async (name: string) => {
     const used = documents.filter((d) => d.category === name).length;
-    if (!confirm(used > 0 ? `分类「${name}」下有 ${used} 篇文档,删除后它们将变为「未分类」。继续?` : `删除分类「${name}」?`)) return;
+    if (!await confirmDialog({
+      message: used > 0 ? `分类「${name}」下有 ${used} 篇文档,删除后它们将变为「未分类」。继续?` : `删除分类「${name}」?`,
+      danger: true,
+      confirmText: '删除',
+    })) return;
     update((p) => {
       p.documentCategories = p.documentCategories.filter((c) => c !== name);
       for (const d of p.documents) if (d.category === name) d.category = '未分类';
@@ -153,10 +158,10 @@ export default function DocumentView() {
     });
   };
 
-  const convertToFlow = () => {
+  const convertToFlow = async () => {
     if (!selected) return;
     if (selected.blocks.filter((b) => b.type !== 'note').length === 0) {
-      alert('文档里没有可转换的块(全是注释)。');
+      await alertDialog('文档里没有可转换的块(全是注释)。');
       return;
     }
     const flow = documentToFlow(selected);
@@ -194,6 +199,14 @@ export default function DocumentView() {
         getDetail={(document) => document.category}
         onSelect={(id) => { setSelectedId(id); setActiveBlockId(null); }}
         onMove={(id, folderId) => updateDocument(id, (document) => { document.folderId = folderId; })}
+        onMoveMany={(ids, folderId) => update((p) => {
+          const set = new Set(ids);
+          for (const d of p.documents) if (set.has(d.id)) { d.folderId = folderId; delete d.order; }
+        })}
+        onReorder={(_parentId, orderedIds) => update((p) => {
+          const map = new Map(orderedIds.map((id, i) => [id, i]));
+          for (const d of p.documents) if (map.has(d.id)) d.order = map.get(d.id);
+        })}
         onCreate={createDoc}
         createLabel="新建文档"
         emptyLabel="还没有文档"
@@ -356,8 +369,8 @@ export default function DocumentView() {
             <button
               className="ghost icon-btn"
               title="删除文档"
-              onClick={() => {
-                if (!confirm(`删除文档「${selected.name}」?`)) return;
+              onClick={async () => {
+                if (!await confirmDialog({ message: `删除文档「${selected.name}」?`, danger: true, confirmText: '删除' })) return;
                 removeDocument(selected.id);
                 setSelectedId(null);
               }}
