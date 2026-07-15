@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { importProject, useLoom } from '../store';
+import { useLoom } from '../store';
+import { inspectProjectImport, type ImportInspection } from '../diagnostics';
 import Icon from './Icon';
+import ImportProjectDialog from './ImportProjectDialog';
 
 /**
  * 顶栏项目切换菜单:项目名可直接改,点开抽屉列出全部槽位并新建/导入/删除。
@@ -11,6 +13,7 @@ export default function ProjectMenu() {
   const slots = useLoom((s) => s.slots);
   const currentSlotId = useLoom((s) => s.currentSlotId);
   const folder = useLoom((s) => s.folder);
+  const storageUsage = useLoom((s) => s.storageUsage);
   const update = useLoom((s) => s.update);
   const switchSlot = useLoom((s) => s.switchSlot);
   const newSlot = useLoom((s) => s.newSlot);
@@ -18,6 +21,8 @@ export default function ProjectMenu() {
   const replaceProject = useLoom((s) => s.replaceProject);
 
   const [open, setOpen] = useState(false);
+  const [checkingImport, setCheckingImport] = useState(false);
+  const [inspection, setInspection] = useState<ImportInspection | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -31,14 +36,26 @@ export default function ProjectMenu() {
   }, [open]);
 
   const onImport = async (file: File) => {
+    setCheckingImport(true);
     try {
-      const p = await importProject(file);
-      newSlot('blank');
-      replaceProject(p);
+      const data = await file.text();
+      setInspection(inspectProjectImport(data, file.name));
       setOpen(false);
-    } catch {
-      alert('导入失败:文件不是有效的 TheLoom 项目文件');
+    } catch (error) {
+      alert(`导入失败:${error instanceof Error ? error.message : '文件不是有效的 TheLoom 项目文件'}`);
+    } finally {
+      setCheckingImport(false);
     }
+  };
+
+  const confirmImport = () => {
+    if (!inspection) return;
+    if (!newSlot('blank')) {
+      alert('无法创建新项目，请先在“恢复与备份”中检查本地空间。当前项目没有被修改。');
+      return;
+    }
+    replaceProject(inspection.project);
+    setInspection(null);
   };
 
   const inFolder = !!folder;
@@ -103,8 +120,8 @@ export default function ProjectMenu() {
           <div className="project-slot" onClick={() => { newSlot('sample'); setOpen(false); }}>
             <Icon name="book" /> <span className="project-slot-name">新建 · 载入示例</span>
           </div>
-          <div className="project-slot" onClick={() => fileRef.current?.click()}>
-            <Icon name="upload" /> <span className="project-slot-name">从 JSON 文件导入</span>
+          <div className="project-slot" onClick={() => { if (!checkingImport) fileRef.current?.click(); }}>
+            <Icon name="upload" /> <span className="project-slot-name">{checkingImport ? '正在检查…' : '从 JSON 文件导入'}</span>
           </div>
           <input
             ref={fileRef}
@@ -118,6 +135,14 @@ export default function ProjectMenu() {
             }}
           />
         </div>
+      )}
+      {inspection && (
+        <ImportProjectDialog
+          inspection={inspection}
+          storageUsage={storageUsage}
+          onCancel={() => setInspection(null)}
+          onConfirm={confirmImport}
+        />
       )}
     </div>
   );

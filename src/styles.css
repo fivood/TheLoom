@@ -1266,3 +1266,162 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .side-item:hover .move-to-folder { opacity: 1; }
 .side-item .move-to-folder option { font-size: 12px; padding: 2px 6px; }
+
+/* ---------- 桌面更新 ---------- */
+
+.update-dialog {
+  width: min(620px, calc(100vw - 40px));
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: hidden;
+}
+.update-version-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px 10px;
+}
+.update-version {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: Consolas, 'SF Mono', monospace;
+  font-size: 13px;
+}
+.update-version.old { color: var(--text-faint); background: var(--bg); }
+.update-version.new { color: var(--text); background: var(--bg-hover); font-weight: 700; }
+.update-arrow { color: var(--text-faint); }
+.update-date { margin-left: auto; color: var(--text-faint); font-size: 12px; }
+.update-notes-field { padding: 8px 20px 0; }
+.update-notes {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.update-status-message,
+.update-success,
+.update-error {
+  margin: 18px 20px 4px;
+  padding: 11px 13px;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.update-status-message,
+.update-success { background: var(--bg-hover); color: var(--text-dim); }
+.update-error { border: 1px solid var(--danger); color: var(--danger); background: var(--bg); white-space: pre-wrap; }
+.update-progress { padding: 15px 20px 2px; }
+.update-progress-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: var(--text-dim); font-size: 12px; }
+.update-progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg-hover); }
+.update-progress-bar { height: 100%; border-radius: inherit; background: var(--text); transition: width 160ms ease; }
+.update-progress-bar.indeterminate { width: 34%; animation: update-progress 1.2s ease-in-out infinite; }
+.update-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 20px 8px; }
+.update-defer-hint { padding: 0 20px 16px; color: var(--text-faint); font-size: 11px; text-align: right; }
+
+@keyframes update-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(300%); }
+}
+
+.recovery-status { padding: 2px 6px; color: var(--danger); }
+.recovery-panel { width: min(580px, calc(100vw - 32px)); }
+.recovery-body { display: flex; flex-direction: column; gap: 10px; }
+.recovery-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 7px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.recovery-notice span { flex: 1; }
+.recovery-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.recovery-card-stack { align-items: stretch; flex-direction: column; gap: 7px; }
+.recovery-card-title { color: var(--text); font-size: 13px; font-weight: 650; }
+.recovery-card-meta { margin-top: 4px; color: var(--text-faint); font-size: 11px; line-height: 1.55; }
+.recovery-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.recovery-corrupt { border-color: var(--danger); }
+.recovery-storage-warning { border-color: var(--danger); }
+.recovery-storage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.recovery-storage-head span { color: var(--text-faint); font-size: 11px; }
+.recovery-storage-track { height: 6px; overflow: hidden; border-radius: 999px; background: var(--bg-hover); }
+.recovery-storage-track > div { height: 100%; border-radius: inherit; background: var(--text); }
+.recovery-storage-warning .recovery-storage-track > div { background: var(--danger); }
+.recovery-hint { padding: 4px 2px 0; color: var(--text-faint); font-size: 11px; }
+
+.crash-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+}
+.crash-card {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .12);
+}
+.crash-mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--danger);
+  border-radius: 50%;
+  color: var(--danger);
+  font-size: 18px;
+  font-weight: 700;
+}
+.crash-card h1 { margin: 16px 0 8px; font-size: 20px; }
+.crash-card p { margin: 0; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
+.crash-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.crash-card details { margin-top: 18px; color: var(--text-faint); font-size: 11px; }
+.crash-card pre { max-height: 140px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 560px) {
+  .recovery-card:not(.recovery-card-stack) { align-items: stretch; flex-direction: column; }
+  .recovery-card:not(.recovery-card-stack) button { align-self: flex-end; }
+}
+
+.import-dialog { width: min(590px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 32px)); overflow: hidden; }
+.import-body { padding: 18px 20px 4px; overflow-y: auto; }
+.import-project-name { color: var(--text); font-size: 18px; font-weight: 700; }
+.import-file-meta { margin-top: 4px; color: var(--text-faint); font-size: 11px; }
+.import-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-top: 16px; }
+.import-stats > div { padding: 10px 6px; border: 1px solid var(--border); border-radius: 7px; text-align: center; background: var(--bg); }
+.import-stats strong { display: block; color: var(--text); font-size: 15px; }
+.import-stats span { display: block; margin-top: 2px; color: var(--text-faint); font-size: 10px; }
+.import-warning { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--danger); border-radius: 7px; color: var(--danger); font-size: 12px; line-height: 1.55; }
+.import-check-result { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); }
+.import-check-title { color: var(--text); font-size: 12px; font-weight: 650; }
+.import-check-ok { margin-top: 6px; color: var(--text-dim); font-size: 11px; }
+.import-issue-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; color: var(--text-dim); font-size: 11px; line-height: 1.45; }
+.import-issue-list span { display: inline-block; margin-right: 7px; padding: 1px 5px; border-radius: 4px; background: var(--bg-hover); color: var(--text); }
+.import-note { margin-top: 12px; color: var(--text-faint); font-size: 11px; }
+
+@media (max-width: 520px) {
+  .import-stats { grid-template-columns: repeat(3, 1fr); }
+}

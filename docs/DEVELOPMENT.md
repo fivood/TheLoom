@@ -10,7 +10,11 @@ Vite · React 18 · TypeScript · @xyflow/react (React Flow) · zustand · yaml 
 npm install
 npm run dev      # 开发服务器 http://localhost:5173
 npm run build    # 产物输出到 dist/
+npm test         # 运行前端核心逻辑测试
+npm run test:watch  # 开发时监听测试
 ```
+
+推送到 `main` 或提交 Pull Request 时,[verify.yml](../.github/workflows/verify.yml) 会自动运行前端测试、生产构建和 Rust 单元测试。桌面版发布流程也会在打包前执行测试,失败时停止发布。
 
 ## 桌面版(Tauri)
 
@@ -60,6 +64,7 @@ npx wrangler pages dev dist --d1=SYNC_DB --port 8788
 ```
 我的小说/
 ├── project.json       流程、大纲、时间线、风暴、变量等结构化数据
+├── project.json.bak   自动恢复副本(由应用管理)
 ├── entities/          实体卡,每个实体一个 Markdown 文件(YAML frontmatter)
 ├── research/          资料卡,每张卡一个 Markdown 文件
 ├── documents/         文档,每篇一个 Markdown 文件(结构化块 + 剧本预览)
@@ -69,7 +74,10 @@ npx wrangler pages dev dist --d1=SYNC_DB --port 8788
 - `entities/`、`research/`、`documents/` 下新建的 `.md` 文件在下次加载时自动导入,文件名即名称,frontmatter 中 `kind: character` 可指定实体类型
 - 在应用内删除实体、资料卡或文档会同步删除对应文件
 - `project.json` 为结构化数据,不建议手工编辑
+- 文件写入先落到临时文件再替换;`project.json.bak` 最多每 10 分钟更新一次,主文件损坏时桌面端自动回退并在顶栏提示
 - 同一时间请只在一台设备上编辑同一文件夹(最后写入者获胜)
+
+浏览器存储与桌面端本地缓存都会在覆盖当前项目之前保留一个滚动恢复点,最多每 10 分钟更新一次。损坏的原始内容不会被自动覆盖,可从“工具 → 恢复与备份”下载或清除。
 
 ## 发布与自动更新
 
@@ -78,7 +86,8 @@ npx wrangler pages dev dist --d1=SYNC_DB --port 8788
 发布新版本的步骤:
 
 1. 同步修改三处版本号:`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`
-2. 提交后打标签并推送:`git tag v0.4.0 && git push origin v0.4.0`
+2. 更新根目录的 [`RELEASE_NOTES.md`](../RELEASE_NOTES.md),其内容会同时写入 GitHub Release 和桌面端更新弹窗
+3. 提交后打标签并推送:`git tag v0.4.0 && git push origin v0.4.0`
 
 密钥:
 

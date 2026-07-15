@@ -1,12 +1,14 @@
 {
   "name": "theloom",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "description": "叙事织机 TheLoom — 叙事设计工具:流程编辑、实体库、头脑风暴、罗琳式大纲、资料卡片",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "tauri": "tauri"
   },
@@ -27,6 +29,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.6.3",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

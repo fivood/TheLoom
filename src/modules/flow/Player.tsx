@@ -6,18 +6,10 @@ import { ANNOTATION_TYPES, FLOW_NODE_LABEL } from '../../types';
 import { TYPE_COLORS } from './nodes';
 import Icon from '../../components/Icon';
 import { RichText } from '../../components/RichText';
-
-type VarValue = boolean | number | string;
-
-/** seen("techName") / unseen("techName") 在条件表达式里判断玩家是否走过某节点 */
-type SeenFn = (techName: string) => boolean;
-
-/** 脚本求值上下文:seen/unseen 函数 + 实体属性对象(按技术名注入) */
-interface EvalCtx {
-  seen: SeenFn;
-  /** 技术名 → 属性对象(字段名 → 标量值或被引用实体的技术名) */
-  entityProps: Record<string, Record<string, VarValue>>;
-}
+import {
+  applyInstructions, coerceScalar, coerceVar, evalCondition, evalNumber,
+  type EvalCtx, type VarValue,
+} from '../../script';
 
 interface Beat {
   id: string;
@@ -34,88 +26,6 @@ interface Choice {
   edgeId?: string;
   effect?: string;
   once?: boolean;
-}
-
-function coerceVar(type: string, value: string): VarValue {
-  if (type === 'boolean') return value === 'true';
-  if (type === 'number') return Number(value) || 0;
-  return value;
-}
-
-/** 把字符串值按 true/false / 数字 / 文本 推断为标量 */
-function coerceScalar(raw: string): VarValue {
-  const v = raw.trim();
-  if (v === 'true' || v === 'false') return v === 'true';
-  if (v !== '' && !Number.isNaN(Number(v))) return Number(v);
-  return v;
-}
-
-/** 求值条件表达式;注入变量 + seen/unseen + 实体属性对象 */
-function evalCondition(expr: string, vars: Record<string, VarValue>, ctx: EvalCtx): boolean | null {
-  if (!expr.trim()) return null;
-  try {
-    const varNames = Object.keys(vars);
-    const entNames = Object.keys(ctx.entityProps);
-    const fn = new Function(
-      ...varNames, ...entNames, 'seen', 'unseen',
-      `"use strict"; return (${expr});`,
-    );
-    return Boolean(fn(
-      ...varNames.map((n) => vars[n]),
-      ...entNames.map((n) => ctx.entityProps[n]),
-      ctx.seen, (tn: string) => !ctx.seen(tn),
-    ));
-  } catch {
-    return null;
-  }
-}
-
-/** 数值表达式求值(检定的技能值);失败按 0 计 */
-function evalNumber(expr: string | undefined, vars: Record<string, VarValue>, ctx: EvalCtx): number {
-  if (!expr?.trim()) return 0;
-  try {
-    const varNames = Object.keys(vars);
-    const entNames = Object.keys(ctx.entityProps);
-    const fn = new Function(
-      ...varNames, ...entNames, 'seen', 'unseen',
-      `"use strict"; return (${expr});`,
-    );
-    const n = Number(fn(
-      ...varNames.map((x) => vars[x]),
-      ...entNames.map((n) => ctx.entityProps[n]),
-      ctx.seen, (tn: string) => !ctx.seen(tn),
-    ));
-    return Number.isFinite(n) ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** 解析并执行指令:`name = 值`、`name += 1` 等,分号或换行分隔 */
-function applyInstructions(text: string, vars: Record<string, VarValue>): string[] {
-  const warnings: string[] = [];
-  for (const raw of text.split(/[;\n]/)) {
-    const stmt = raw.trim();
-    if (!stmt) continue;
-    const m = stmt.match(/^([A-Za-z_]\w*)\s*(=|\+=|-=|\*=|\/=)\s*(.+)$/);
-    if (!m) { warnings.push(`无法解析:${stmt}`); continue; }
-    const [, name, op, rawVal] = m;
-    let val: VarValue;
-    const v = rawVal.trim();
-    if (v === 'true' || v === 'false') val = v === 'true';
-    else if (!Number.isNaN(Number(v))) val = Number(v);
-    else if (/^(['"]).*\1$/.test(v)) val = v.slice(1, -1);
-    else if (v in vars) val = vars[v];
-    else { warnings.push(`未知的值:${stmt}`); continue; }
-
-    if (op === '=') vars[name] = val;
-    else {
-      const cur = Number(vars[name]) || 0;
-      const n = Number(val) || 0;
-      vars[name] = op === '+=' ? cur + n : op === '-=' ? cur - n : op === '*=' ? cur * n : n === 0 ? cur : cur / n;
-    }
-  }
-  return warnings;
 }
 
 function startNodes(sub: SubFlow): FlowNode[] {
@@ -165,7 +75,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     walk(flow);
     return m;
   }, [flow]);
-  const seen: SeenFn = (tn) => seenRef.current.has(techToId.get(tn) ?? '__none__');
+  const seen: EvalCtx['seen'] = (tn) => seenRef.current.has(techToId.get(tn) ?? '__none__');
 
   /** 实体属性对象:技术名 → { 字段名 → 标量值 / 被引用实体技术名 } */
   const entityProps = useMemo(() => {

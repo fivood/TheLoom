@@ -16,6 +16,7 @@ import type { DocBlock, DocBlockType, Document, Entity, EntityField, EntityField
 import { ENTITY_KIND_LABEL, PALETTE } from './types';
 import { normalizeProject, uid } from './util';
 import { documentToMarkdown } from './export';
+import { parseProjectData } from './recovery';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -231,7 +232,7 @@ export function documentToMd(d: Document, entities: Entity[]): string {
   if (d.notes.trim()) meta.notes = d.notes;
   // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
   const blockYaml = stringifyYaml(d.blocks.map((b) => {
-    const out: Record<string, unknown> = { type: b.type };
+    const out: Record<string, unknown> = { id: b.id, type: b.type };
     if (b.speakerId) out.speakerId = b.speakerId;
     if (b.text) out.text = b.text;
     if (b.choices) out.choices = b.choices;
@@ -264,10 +265,17 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
       if (Array.isArray(arr)) {
         blocks = arr.map((raw) => {
           const r = raw as Record<string, unknown>;
-          const b: DocBlock = { id: uid(), type: (r.type as DocBlockType) ?? 'note', text: '' };
+          const b: DocBlock = {
+            id: typeof r.id === 'string' && r.id ? r.id : uid(),
+            type: (r.type as DocBlockType) ?? 'note',
+            text: '',
+          };
           if (typeof r.text === 'string') b.text = r.text;
           if (typeof r.speakerId === 'string') b.speakerId = r.speakerId;
-          if (Array.isArray(r.choices)) b.choices = (r.choices as { label: string }[]).map((c) => ({ id: uid(), label: c.label ?? '' }));
+          if (Array.isArray(r.choices)) b.choices = (r.choices as { id?: string; label: string }[]).map((c) => ({
+            id: typeof c.id === 'string' && c.id ? c.id : uid(),
+            label: c.label ?? '',
+          }));
           if (typeof r.condition === 'string') b.condition = r.condition;
           if (typeof r.instruction === 'string') b.instruction = r.instruction;
           return b;
@@ -319,6 +327,7 @@ function assignFilenames<T extends { id: string }>(items: T[], nameOf: (t: T) =>
 interface MdFile { name: string; content: string }
 interface ProjectFiles {
   projectJson: string | null;
+  recoveredFromBackup: boolean;
   entities: MdFile[];
   research: MdFile[];
   documents: MdFile[];
@@ -363,13 +372,19 @@ export async function folderHasProject(dir: string): Promise<boolean> {
   return files.projectJson !== null || files.entities.length > 0 || files.research.length > 0 || files.documents.length > 0;
 }
 
-export async function loadFromFolder(dir: string): Promise<Project> {
+export interface LoadedFolderProject {
+  project: Project;
+  recoveredFromBackup: boolean;
+}
+
+export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> {
   const files = await invoke<ProjectFiles>('load_project_dir', { dir });
   recordKnown(dir, files);
   let base: Project;
   if (files.projectJson) {
-    base = JSON.parse(files.projectJson) as Project;
-    if (!base || base.version !== 1) throw new Error('project.json 格式不正确');
+    const parsed = parseProjectData(files.projectJson);
+    if (!parsed) throw new Error('project.json 格式不正确');
+    base = parsed;
   } else {
     base = {
       version: 1, name: '未命名项目',
@@ -406,7 +421,7 @@ export async function loadFromFolder(dir: string): Promise<Project> {
     if (d.category && !base.documentCategories.includes(d.category)) base.documentCategories.push(d.category);
     docByName.delete(`${d.name}.md`); // 标记已消费
   }
-  return base;
+  return { project: base, recoveredFromBackup: files.recoveredFromBackup };
 }
 
 export async function saveToFolder(dir: string, project: Project): Promise<void> {

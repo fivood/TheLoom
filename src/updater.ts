@@ -1,29 +1,67 @@
-/**
- * 桌面版自动更新(仅 Tauri)
- *
- * 更新清单与安装包均经 theloom.pages.dev 中转(Cloudflare 边缘
- * 代理 GitHub Releases),更新包由 minisign 签名校验。
- */
+import type { DownloadEvent } from '@tauri-apps/plugin-updater';
 import { isTauri } from './storage';
 
-export async function checkForUpdates(silent = true): Promise<void> {
-  if (!isTauri) return;
+const DEFER_KEY = 'theloom-update-defer-v1';
+const DEFER_MS = 24 * 60 * 60 * 1000;
+
+export interface AvailableUpdate {
+  currentVersion: string;
+  version: string;
+  date?: string;
+  body?: string;
+  downloadAndInstall: (onEvent?: (event: DownloadEvent) => void) => Promise<void>;
+  close: () => Promise<void>;
+}
+
+interface DeferredUpdate {
+  version: string;
+  until: number;
+}
+
+export async function findAvailableUpdate(): Promise<AvailableUpdate | null> {
+  if (!isTauri) return null;
+  const { check } = await import('@tauri-apps/plugin-updater');
+  const update = await check();
+  if (!update) return null;
+  return {
+    currentVersion: update.currentVersion,
+    version: update.version,
+    date: update.date,
+    body: update.body,
+    downloadAndInstall: (onEvent) => update.downloadAndInstall(onEvent),
+    close: () => update.close(),
+  };
+}
+
+export function shouldAutoPromptUpdate(version: string): boolean {
   try {
-    const { check } = await import('@tauri-apps/plugin-updater');
-    const update = await check();
-    if (!update) {
-      if (!silent) alert('当前已是最新版本。');
-      return;
-    }
-    const notes = update.body ? `\n\n更新说明:\n${update.body.slice(0, 400)}` : '';
-    if (!confirm(`发现新版本 v${update.version}(当前 v${update.currentVersion}),现在下载并安装?${notes}`)) return;
-    await update.downloadAndInstall();
-    if (confirm('更新已安装完成,立即重启应用生效?')) {
-      const { relaunch } = await import('@tauri-apps/plugin-process');
-      await relaunch();
-    }
-  } catch (e) {
-    console.warn('检查更新失败', e);
-    if (!silent) alert(`检查更新失败:${e}`);
+    const raw = localStorage.getItem(DEFER_KEY);
+    if (!raw) return true;
+    const deferred = JSON.parse(raw) as DeferredUpdate;
+    return deferred.version !== version || deferred.until <= Date.now();
+  } catch {
+    return true;
   }
+}
+
+export function deferUpdate(version: string) {
+  const deferred: DeferredUpdate = { version, until: Date.now() + DEFER_MS };
+  localStorage.setItem(DEFER_KEY, JSON.stringify(deferred));
+}
+
+export function clearUpdateDeferral(version: string) {
+  try {
+    const raw = localStorage.getItem(DEFER_KEY);
+    if (!raw) return;
+    const deferred = JSON.parse(raw) as DeferredUpdate;
+    if (deferred.version === version) localStorage.removeItem(DEFER_KEY);
+  } catch {
+    localStorage.removeItem(DEFER_KEY);
+  }
+}
+
+export async function relaunchApp() {
+  if (!isTauri) return;
+  const { relaunch } = await import('@tauri-apps/plugin-process');
+  await relaunch();
 }

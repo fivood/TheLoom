@@ -6,6 +6,11 @@ import type {
 import { normalizeProject, uid, detachAssetEverywhere } from './util';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
 import { sampleProject } from './sample';
+import {
+  clearProjectRecovery, clearQuarantinedProject, parseProjectData, readProjectWithRecovery,
+  saveProjectWithRecovery, storedProjectKey, type RecoveryBackup,
+} from './recovery';
+import { getStorageUsage, type StorageUsage } from './diagnostics';
 
 export { uid, normalizeProject };
 
@@ -20,7 +25,7 @@ export { uid, normalizeProject };
 const SLOTS_KEY = 'theloom-slots-v1';
 const CURRENT_KEY = 'theloom-current-v1';
 const LEGACY_KEY = 'theloom-project-v1';
-const projectKey = (id: string) => `theloom-project-${id}`;
+const projectKey = storedProjectKey;
 const snapshotsKey = (slotId: string) => `theloom-snapshots-${slotId}`;
 
 export interface Snapshot {
@@ -38,8 +43,14 @@ function readSnapshots(slotId: string): Snapshot[] {
   } catch { /* 忽略 */ }
   return [];
 }
-function writeSnapshots(slotId: string, list: Snapshot[]) {
-  try { localStorage.setItem(snapshotsKey(slotId), JSON.stringify(list)); } catch (e) { console.error('快照写入失败', e); }
+function writeSnapshots(slotId: string, list: Snapshot[]): string | null {
+  try {
+    localStorage.setItem(snapshotsKey(slotId), JSON.stringify(list));
+    return null;
+  } catch (error) {
+    console.error('快照写入失败', error);
+    return error instanceof Error ? error.message : String(error);
+  }
 }
 
 export interface SlotMeta {
@@ -87,19 +98,15 @@ function readSlots(): SlotMeta[] {
 function writeSlots(slots: SlotMeta[]) {
   localStorage.setItem(SLOTS_KEY, JSON.stringify(slots));
 }
-function readProjectAt(id: string): Project | null {
-  try {
-    const raw = localStorage.getItem(projectKey(id));
-    if (raw) {
-      const p = JSON.parse(raw) as Project;
-      if (p && p.version === 1) return normalizeProject(p);
-    }
-  } catch { /* 忽略 */ }
-  return null;
-}
-
 /** 应用启动时的初始化:返回槽位列表、当前 id、当前项目 */
-function initSlots(): { slots: SlotMeta[]; currentId: string; project: Project } {
+function initSlots(): {
+  slots: SlotMeta[];
+  currentId: string;
+  project: Project;
+  recoveryBackup: RecoveryBackup | null;
+  quarantinedProject: RecoveryBackup | null;
+  recoveryNotice: string | null;
+} {
   let slots = readSlots();
   let id = localStorage.getItem(CURRENT_KEY);
 
@@ -138,8 +145,16 @@ function initSlots(): { slots: SlotMeta[]; currentId: string; project: Project }
     localStorage.setItem(CURRENT_KEY, id);
   }
 
-  const project = readProjectAt(id) ?? blankProject();
-  return { slots, currentId: id, project };
+  const loaded = readProjectWithRecovery(localStorage, id);
+  const project = loaded.project ?? blankProject();
+  return {
+    slots,
+    currentId: id,
+    project,
+    recoveryBackup: loaded.backup,
+    quarantinedProject: loaded.quarantine,
+    recoveryNotice: loaded.notice,
+  };
 }
 
 /* ---------- Store ---------- */
@@ -147,6 +162,9 @@ function initSlots(): { slots: SlotMeta[]; currentId: string; project: Project }
 interface LoomState {
   project: Project;
   savedAt: number;
+  saveStatus: 'saved' | 'saving' | 'error';
+  saveError: string | null;
+  storageUsage: StorageUsage;
   /** 撤销/重做后递增,用于强制画布类组件重新挂载 */
   revision: number;
   canUndo: boolean;
@@ -154,7 +172,14 @@ interface LoomState {
   /** Tauri 模式下的项目文件夹路径;null = 仅存浏览器 */
   folder: string | null;
   syncError: string | null;
+  recoveryBackup: RecoveryBackup | null;
+  quarantinedProject: RecoveryBackup | null;
+  recoveryNotice: string | null;
   setFolder: (dir: string | null) => void;
+  restoreRecoveryBackup: () => void;
+  dismissRecoveryNotice: () => void;
+  discardQuarantinedProject: () => void;
+  setRecoveryNotice: (message: string | null) => void;
   update: (fn: (p: Project) => void) => void;
   undo: () => void;
   redo: () => void;
@@ -166,7 +191,7 @@ interface LoomState {
   slots: SlotMeta[];
   currentSlotId: string;
   switchSlot: (id: string) => void;
-  newSlot: (kind: 'blank' | 'sample') => void;
+  newSlot: (kind: 'blank' | 'sample') => boolean;
   deleteSlot: (id: string) => void;
 
   updateFlow: (flowId: string, fn: (f: Flow) => void) => void;
@@ -234,15 +259,23 @@ export const useLoom = create<LoomState>((set, get) => {
     saveTimer = setTimeout(() => {
       const id = get().currentSlotId;
       try {
-        localStorage.setItem(projectKey(id), JSON.stringify(p));
+        const result = saveProjectWithRecovery(localStorage, id, p);
         // 同步更新槽位元数据(名称、更新时间)
         const slots = get().slots.map((s) =>
           s.id === id ? { ...s, name: p.name || '未命名项目', updatedAt: p.updatedAt } : s,
         );
         writeSlots(slots);
-        set({ slots });
+        set({
+          slots,
+          savedAt: Date.now(),
+          saveStatus: 'saved',
+          saveError: result.backupError ? `项目已保存，但自动恢复点写入失败:${result.backupError}` : null,
+          recoveryBackup: result.backup,
+          storageUsage: getStorageUsage(localStorage),
+        });
       } catch (e) {
         console.error('保存失败', e);
+        set({ saveStatus: 'error', saveError: e instanceof Error ? e.message : String(e) });
       }
       const folder = get().folder;
       if (folder && isTauri) {
@@ -259,16 +292,23 @@ export const useLoom = create<LoomState>((set, get) => {
     // 立即写入当前槽,避免防抖丢失
     try {
       const cur = get();
-      localStorage.setItem(projectKey(cur.currentSlotId), JSON.stringify(cur.project));
+      saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
     } catch { /* 忽略 */ }
     localStorage.setItem(CURRENT_KEY, targetId);
     undoStack = []; redoStack = []; lastUndoPush = 0;
-    const next = readProjectAt(targetId) ?? blankProject();
+    const loaded = readProjectWithRecovery(localStorage, targetId);
+    const next = loaded.project ?? blankProject();
     set((s) => ({
       project: next,
       currentSlotId: targetId,
       snapshots: readSnapshots(targetId),
       savedAt: Date.now(),
+      saveStatus: 'saved',
+      saveError: null,
+      recoveryBackup: loaded.backup,
+      quarantinedProject: loaded.quarantine,
+      recoveryNotice: loaded.notice,
+      storageUsage: getStorageUsage(localStorage),
       revision: s.revision + 1,
       canUndo: false,
       canRedo: false,
@@ -289,14 +329,14 @@ export const useLoom = create<LoomState>((set, get) => {
     fn(next);
     next.updatedAt = Date.now();
     persist(next);
-    set({ project: next, savedAt: Date.now(), canUndo: true, canRedo: false });
+    set({ project: next, saveStatus: 'saving', saveError: null, canUndo: true, canRedo: false });
   };
 
   /** 整项目替换(撤销/重做/导入/重置)后递增 revision,让画布重新挂载 */
   const swapProject = (p: Project, extra?: Partial<LoomState>) => {
     persist(p);
     set((s) => ({
-      project: p, savedAt: Date.now(), revision: s.revision + 1,
+      project: p, saveStatus: 'saving', saveError: null, revision: s.revision + 1,
       canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
       ...extra,
     }));
@@ -305,12 +345,40 @@ export const useLoom = create<LoomState>((set, get) => {
   return {
     project: boot.project,
     savedAt: Date.now(),
+    saveStatus: 'saved',
+    saveError: null,
+    storageUsage: getStorageUsage(localStorage),
     revision: 0,
     canUndo: false,
     canRedo: false,
     folder: isTauri ? getSavedFolder() : null,
     syncError: null,
+    recoveryBackup: boot.recoveryBackup,
+    quarantinedProject: boot.quarantinedProject,
+    recoveryNotice: boot.recoveryNotice,
     setFolder: (dir) => set({ folder: dir, syncError: null }),
+    dismissRecoveryNotice: () => set({ recoveryNotice: null }),
+    setRecoveryNotice: (message) => set({ recoveryNotice: message }),
+    discardQuarantinedProject: () => {
+      const slotId = get().currentSlotId;
+      clearQuarantinedProject(localStorage, slotId);
+      set({ quarantinedProject: null });
+    },
+    restoreRecoveryBackup: () => {
+      const cur = get();
+      if (!cur.recoveryBackup) return;
+      const project = parseProjectData(cur.recoveryBackup.data);
+      if (!project) {
+        set({ recoveryBackup: null, recoveryNotice: '自动恢复点已经损坏，无法恢复。' });
+        return;
+      }
+      if (!confirm(`恢复到 ${new Date(cur.recoveryBackup.createdAt).toLocaleString()} 的自动恢复点?当前状态会进入撤销栈。`)) return;
+      undoStack.push(cur.project);
+      if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+      redoStack = [];
+      lastUndoPush = 0;
+      swapProject(project, { recoveryNotice: null });
+    },
 
     slots: boot.slots,
     currentSlotId: boot.currentId,
@@ -324,13 +392,24 @@ export const useLoom = create<LoomState>((set, get) => {
     },
     newSlot: (kind) => {
       const newId = uid();
-      const proj = kind === 'sample' ? sampleProject() : blankProject();
-      localStorage.setItem(projectKey(newId), JSON.stringify(proj));
-      const meta: SlotMeta = { id: newId, name: proj.name, updatedAt: Date.now() };
-      const nextSlots = [...get().slots, meta];
-      writeSlots(nextSlots);
-      set({ slots: nextSlots });
-      flushAndSwitch(newId);
+      try {
+        const proj = kind === 'sample' ? sampleProject() : blankProject();
+        localStorage.setItem(projectKey(newId), JSON.stringify(proj));
+        const meta: SlotMeta = { id: newId, name: proj.name, updatedAt: Date.now() };
+        const nextSlots = [...get().slots, meta];
+        writeSlots(nextSlots);
+        set({ slots: nextSlots, storageUsage: getStorageUsage(localStorage) });
+        flushAndSwitch(newId);
+        return true;
+      } catch (error) {
+        try { localStorage.removeItem(projectKey(newId)); } catch {}
+        set({
+          saveStatus: 'error',
+          saveError: `无法创建新项目:${error instanceof Error ? error.message : String(error)}`,
+          storageUsage: getStorageUsage(localStorage),
+        });
+        return false;
+      }
     },
     deleteSlot: (id) => {
       const cur = get();
@@ -338,7 +417,9 @@ export const useLoom = create<LoomState>((set, get) => {
       const nextSlots = cur.slots.filter((s) => s.id !== id);
       writeSlots(nextSlots);
       localStorage.removeItem(projectKey(id));
-      set({ slots: nextSlots });
+      localStorage.removeItem(snapshotsKey(id));
+      clearProjectRecovery(localStorage, id);
+      set({ slots: nextSlots, storageUsage: getStorageUsage(localStorage) });
       if (cur.currentSlotId === id) flushAndSwitch(nextSlots[0].id);
     },
 
@@ -513,8 +594,12 @@ export const useLoom = create<LoomState>((set, get) => {
       const cur = get();
       const snap: Snapshot = { id: uid(), name: name || `版本 ${new Date().toLocaleString()}`, createdAt: Date.now(), data: JSON.stringify(cur.project) };
       const list = [snap, ...cur.snapshots].slice(0, 30); // 上限 30 个,避免 localStorage 爆
-      writeSnapshots(cur.currentSlotId, list);
-      set({ snapshots: list });
+      const error = writeSnapshots(cur.currentSlotId, list);
+      if (error) {
+        set({ saveError: `快照保存失败:${error}`, storageUsage: getStorageUsage(localStorage) });
+        return;
+      }
+      set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
     },
     restoreSnapshot: (id) => {
       const cur = get();
@@ -537,8 +622,12 @@ export const useLoom = create<LoomState>((set, get) => {
     deleteSnapshot: (id) => {
       const cur = get();
       const list = cur.snapshots.filter((s) => s.id !== id);
-      writeSnapshots(cur.currentSlotId, list);
-      set({ snapshots: list });
+      const error = writeSnapshots(cur.currentSlotId, list);
+      if (error) {
+        set({ saveError: `快照删除失败:${error}`, storageUsage: getStorageUsage(localStorage) });
+        return;
+      }
+      set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
     },
   };
 });

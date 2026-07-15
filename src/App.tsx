@@ -1,17 +1,20 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { exportProject, useLoom } from './store';
 import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
 } from './storage';
 import { useNav } from './search';
-import { checkForUpdates } from './updater';
+import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
+import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
 import SearchPalette from './components/SearchPalette';
 import SyncPanel from './components/SyncPanel';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
 import ProjectMenu from './components/ProjectMenu';
+import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
+import RecoveryPanel from './components/RecoveryPanel';
 import Icon, { type IconName } from './components/Icon';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
@@ -53,6 +56,10 @@ export default function App() {
   const [auditing, setAuditing] = useState(false);
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateDialog, setUpdateDialog] = useState<UpdateDialogState | null>(null);
+  const checkingUpdateRef = useRef(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
@@ -64,6 +71,10 @@ export default function App() {
   const project = useLoom((s) => s.project);
   const folder = useLoom((s) => s.folder);
   const syncError = useLoom((s) => s.syncError);
+  const saveStatus = useLoom((s) => s.saveStatus);
+  const saveError = useLoom((s) => s.saveError);
+  const recoveryNotice = useLoom((s) => s.recoveryNotice);
+  const storageUsage = useLoom((s) => s.storageUsage);
   const setFolder = useLoom((s) => s.setFolder);
   const revision = useLoom((s) => s.revision);
   const canUndo = useLoom((s) => s.canUndo);
@@ -84,16 +95,46 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // 桌面版:启动后静默检查更新
+  const runUpdateCheck = async (silent: boolean) => {
+    if (!isTauri || checkingUpdateRef.current) return;
+    checkingUpdateRef.current = true;
+    setCheckingUpdate(true);
+    try {
+      const update = await findAvailableUpdate();
+      if (!update) {
+        if (!silent) setUpdateDialog({ kind: 'latest' });
+        return;
+      }
+      if (!silent || shouldAutoPromptUpdate(update.version)) {
+        setUpdateDialog({ kind: 'available', update });
+      } else {
+        await update.close().catch(() => undefined);
+      }
+    } catch (e) {
+      console.warn('检查更新失败', e);
+      if (!silent) setUpdateDialog({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      checkingUpdateRef.current = false;
+      setCheckingUpdate(false);
+    }
+  };
+
   useEffect(() => {
-    if (isTauri) setTimeout(() => checkForUpdates(true), 3000);
+    if (!isTauri) return;
+    const timer = window.setTimeout(() => { runUpdateCheck(true); }, 3000);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Tauri 模式:启动时从上次的项目文件夹加载
   useEffect(() => {
     if (!isTauri || !folder) return;
     loadFromFolder(folder)
-      .then((p) => useLoom.getState().replaceProject(p))
+      .then((loaded) => {
+        useLoom.getState().replaceProject(loaded.project);
+        useLoom.getState().setRecoveryNotice(loaded.recoveredFromBackup
+          ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
+          : null);
+      })
       .catch(() => {
         alert(`无法读取项目文件夹:\n${folder}\n\n已切换为浏览器本地存储。`);
         setSavedFolder(null);
@@ -108,8 +149,11 @@ export default function App() {
     try {
       if (await folderHasProject(dir)) {
         if (!confirm(`该文件夹已有项目数据,加载它并替换当前打开的项目?\n\n${dir}`)) return;
-        const p = await loadFromFolder(dir);
-        useLoom.getState().replaceProject(p);
+        const loaded = await loadFromFolder(dir);
+        useLoom.getState().replaceProject(loaded.project);
+        useLoom.getState().setRecoveryNotice(loaded.recoveredFromBackup
+          ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
+          : null);
       } else {
         if (!confirm(`将当前项目「${project.name}」写入该文件夹?\n\n${dir}\n\n之后所有改动都会自动保存到这里。`)) return;
         await saveToFolder(dir, project);
@@ -124,8 +168,11 @@ export default function App() {
   const reloadFolder = async () => {
     if (!folder) return;
     try {
-      const p = await loadFromFolder(folder);
-      useLoom.getState().replaceProject(p);
+      const loaded = await loadFromFolder(folder);
+      useLoom.getState().replaceProject(loaded.project);
+      useLoom.getState().setRecoveryNotice(loaded.recoveredFromBackup
+        ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
+        : null);
     } catch (e) {
       alert(`重新加载失败:${e}`);
     }
@@ -161,8 +208,23 @@ export default function App() {
           <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}><Icon name="undo" /></button>
           <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}><Icon name="redo" /></button>
           <span className="spacer" />
-          {syncError ? (
+          {recoveryNotice ? (
+            <button className="ghost saved-hint recovery-status" onClick={() => setRecovering(true)} title={recoveryNotice}>⚠ 恢复提醒</button>
+          ) : saveStatus === 'error' ? (
+            <button className="ghost saved-hint" style={{ color: 'var(--danger)' }} onClick={() => setRecovering(true)} title={saveError ?? undefined}>⚠ 保存失败</button>
+          ) : saveError ? (
+            <button className="ghost saved-hint" style={{ color: 'var(--danger)' }} onClick={() => setRecovering(true)} title={saveError}>⚠ 备份失败</button>
+          ) : syncError ? (
             <span className="saved-hint" style={{ color: 'var(--danger)' }} title={syncError}>⚠ 同步失败</span>
+          ) : saveStatus === 'saving' ? (
+            <span className="saved-hint">正在保存…</span>
+          ) : storageUsage.available && storageUsage.bytes >= LOCAL_STORAGE_WARNING_BYTES ? (
+            <button
+              className="ghost saved-hint"
+              style={{ color: 'var(--danger)' }}
+              onClick={() => setRecovering(true)}
+              title={`本地数据约 ${(storageUsage.bytes / 1024 / 1024).toFixed(1)} MB，建议检查备份和大尺寸资源`}
+            >⚠ 本地空间偏高</button>
           ) : (
             <span className="saved-hint" title={folder ?? undefined}>
               {folder ? `已同步 · ${folder.split(/[\\/]/).pop()}` : '已自动保存到本地'}
@@ -172,9 +234,10 @@ export default function App() {
             className="ghost saved-hint"
             style={{ padding: '2px 6px' }}
             title={isTauri ? '点击检查更新' : '网页版随部署自动更新'}
-            onClick={() => { if (isTauri) checkForUpdates(false); }}
+            disabled={checkingUpdate}
+            onClick={() => { if (isTauri) runUpdateCheck(false); }}
           >
-            v{__APP_VERSION__}
+            {checkingUpdate ? '检查中…' : `v${__APP_VERSION__}`}
           </button>
           <div className="tools-wrap">
             <button className="ghost" onClick={() => setToolsOpen((o) => !o)} title="工具:文件 / 体检 / 历史 / 协作 / 导出">
@@ -202,6 +265,9 @@ export default function App() {
                   </button>
                   <button onClick={() => { setToolsOpen(false); setHistory(true); }}>
                     <Icon name="undo" size={14} /> 版本历史
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); setRecovering(true); }}>
+                    <Icon name="archive" size={14} /> 恢复与备份
                   </button>
                   <button onClick={() => { setToolsOpen(false); setPalettes(true); }}>
                     <Icon name="palette" size={14} /> 配色表
@@ -274,6 +340,8 @@ export default function App() {
       {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
       {history && <VersionHistory onClose={() => setHistory(false)} />}
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
+      {recovering && <RecoveryPanel onClose={() => setRecovering(false)} />}
+      {updateDialog && <UpdateDialog state={updateDialog} onClose={() => setUpdateDialog(null)} />}
     </div>
   );
 }

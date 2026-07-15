@@ -6,10 +6,19 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 
 /** 兼容旧版本数据:补齐后加字段 */
 export function normalizeProject(p: Project): Project {
+  p.flows ??= [];
+  p.entities ??= [];
+  p.brainstormNotes ??= [];
+  p.brainstormEdges ??= [];
+  p.outlineColumns ??= [];
+  p.outlineRows ??= [];
   p.timelineTracks ??= [];
   p.timelinePoints ??= [];
   p.timelineEvents ??= [];
   p.maps ??= [];
+  p.researchCards ??= [];
+  p.researchCategories ??= [];
+  p.variables ??= [];
   p.entityTemplates ??= {};
   p.assets ??= [];
   p.documents ??= [];

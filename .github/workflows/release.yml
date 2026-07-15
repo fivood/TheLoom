@@ -25,6 +25,16 @@ jobs:
           workspaces: src-tauri
 
       - run: npm ci
+      - run: npm test
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+      - name: Read release notes
+        id: release_notes
+        shell: pwsh
+        run: |
+          "body<<EOF" >> $env:GITHUB_OUTPUT
+          Get-Content -LiteralPath 'RELEASE_NOTES.md' -Raw >> $env:GITHUB_OUTPUT
+          "EOF" >> $env:GITHUB_OUTPUT
 
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
@@ -35,7 +45,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'TheLoom ${{ github.ref_name }}'
-          releaseBody: '安装包与自动更新清单见下方资产。大陆网络可经 https://theloom.pages.dev/api/download/latest 下载。'
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
