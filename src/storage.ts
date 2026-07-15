@@ -52,6 +52,14 @@ function withFrontmatter(meta: Record<string, unknown>, body: string): string {
 
 const SECTION_NOTES = '## 备注';
 
+/** 字段名与保留 meta key 冲突时,原样存进 _conflict_fields 避免覆盖实体身份信息 */
+interface ConflictField {
+  label: string;
+  value: string;
+  type?: EntityFieldType;
+  filterKind?: EntityKind;
+}
+
 export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string, string>): string {
   const meta: Record<string, unknown> = {
     loom: 'entity',
@@ -61,10 +69,19 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
     emoji: e.emoji,
     createdAt: e.createdAt,
   };
+  if (e.technicalName) meta.technicalName = e.technicalName;
   if (avatarPath) meta.avatar = avatarPath;
   const fieldTypes: Record<string, string> = {};
+  const conflicts: ConflictField[] = [];
   for (const f of e.fields) {
     if (!f.label) continue;
+    if (ENTITY_META_KEYS.has(f.label)) {
+      const c: ConflictField = { label: f.label, value: f.value };
+      if (f.type) c.type = f.type;
+      if (f.filterKind) c.filterKind = f.filterKind;
+      conflicts.push(c);
+      continue;
+    }
     const type = f.type ?? 'text';
     if (type === 'text') {
       meta[f.label] = f.value;
@@ -79,12 +96,13 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
     }
   }
   if (Object.keys(fieldTypes).length > 0) meta._field_types = fieldTypes;
+  if (conflicts.length > 0) meta._conflict_fields = conflicts;
   let body = e.summary.trim();
   if (e.notes.trim()) body += `\n\n${SECTION_NOTES}\n\n${e.notes.trim()}`;
   return withFrontmatter(meta, body);
 }
 
-const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'tags', 'aliases', 'cssclasses', '_field_types']);
+const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'technicalName', 'tags', 'aliases', 'cssclasses', '_field_types', '_conflict_fields']);
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
 /** [[Name]] → Name;非链接返回 null */
@@ -128,6 +146,15 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
       }
       return { id: uid(), label: k, value, type, filterKind };
     });
+  if (Array.isArray(meta._conflict_fields)) {
+    for (const raw of meta._conflict_fields as unknown[]) {
+      const c = raw as Record<string, unknown>;
+      if (typeof c.label !== 'string' || !c.label) continue;
+      const type = c.type === 'entity' || c.type === 'entities' ? c.type : undefined;
+      const filterKind = KINDS.includes(c.filterKind as EntityKind) ? (c.filterKind as EntityKind) : undefined;
+      fields.push({ id: uid(), label: c.label, value: typeof c.value === 'string' ? c.value : String(c.value ?? ''), type, filterKind });
+    }
+  }
   const avatarFile = typeof meta.avatar === 'string' ? meta.avatar.replace(/^assets\//, '') : null;
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
@@ -139,6 +166,7 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
     summary,
     fields,
     notes,
+    technicalName: typeof meta.technicalName === 'string' && meta.technicalName ? meta.technicalName : undefined,
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
   };
 }
@@ -199,6 +227,8 @@ export function documentToMd(d: Document, entities: Entity[]): string {
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
   };
+  if (d.technicalName) meta.technicalName = d.technicalName;
+  if (d.notes.trim()) meta.notes = d.notes;
   // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
   const blockYaml = stringifyYaml(d.blocks.map((b) => {
     const out: Record<string, unknown> = { type: b.type };
@@ -255,9 +285,10 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
     name,
+    technicalName: typeof meta.technicalName === 'string' && meta.technicalName ? meta.technicalName : undefined,
     category: typeof meta.category === 'string' && meta.category ? meta.category : '未分类',
     blocks,
-    notes: '',
+    notes: typeof meta.notes === 'string' ? meta.notes : '',
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
     updatedAt: typeof meta.updatedAt === 'number' ? meta.updatedAt : Date.now(),
   };
@@ -305,6 +336,22 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   return invoke<T>(cmd, args);
 }
 
+/**
+ * 每个项目文件夹当前由本应用管理的文件(相对路径)。
+ * 保存时只删除「本会话加载过 / 写入过、且这次不再保留」的文件;
+ * 外部新建的 md / 图片不在集合里,不会被误删,下次加载时自动导入。
+ */
+const knownManaged = new Map<string, Set<string>>();
+
+function recordKnown(dir: string, files: ProjectFiles) {
+  knownManaged.set(dir, new Set([
+    ...files.entities.map((f) => `entities/${f.name}`),
+    ...files.research.map((f) => `research/${f.name}`),
+    ...files.documents.map((f) => `documents/${f.name}`),
+    ...files.assets.map((f) => `assets/${f.name}`),
+  ]));
+}
+
 export async function pickFolder(): Promise<string | null> {
   const { open } = await import('@tauri-apps/plugin-dialog');
   const dir = await open({ directory: true, title: '选择项目文件夹(可以放在 OneDrive / Google Drive 里)' });
@@ -318,6 +365,7 @@ export async function folderHasProject(dir: string): Promise<boolean> {
 
 export async function loadFromFolder(dir: string): Promise<Project> {
   const files = await invoke<ProjectFiles>('load_project_dir', { dir });
+  recordKnown(dir, files);
   let base: Project;
   if (files.projectJson) {
     base = JSON.parse(files.projectJson) as Project;
@@ -398,5 +446,9 @@ export async function saveToFolder(dir: string, project: Project): Promise<void>
     keepMd.push(`documents/${name}`);
   }
 
-  await invoke('save_project_dir', { dir, files, keepMd });
+  const keep = new Set(keepMd);
+  const known = knownManaged.get(dir) ?? new Set<string>();
+  const deleteFiles = [...known].filter((p) => !keep.has(p));
+  await invoke('save_project_dir', { dir, files, deleteFiles });
+  knownManaged.set(dir, keep);
 }

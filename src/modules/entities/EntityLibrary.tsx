@@ -4,12 +4,15 @@ import { fileToAvatar } from '../../util';
 import { findEntityRefs, useNav } from '../../search';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
+import { activePaletteColors } from '../../util';
+import ColorPicker from '../../components/ColorPicker';
 import Icon, { KIND_ICON } from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
 import FieldListEditor from '../../components/FieldListEditor';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
+import EntityEditor from './EntityEditor';
 
 /** 归一化模板条目:老字符串等价于文本字段 */
 function normTpl(spec: EntityTemplateSpec): EntityTemplateField {
@@ -186,13 +189,15 @@ export default function EntityLibrary() {
   };
 
   const [editingTemplate, setEditingTemplate] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const createEntity = () => {
     const kind = kindFilter === 'all' ? 'character' : kindFilter;
     const tpl = (useLoom.getState().project.entityTemplates?.[kind] ?? []).map(normTpl);
+    const cols = activePaletteColors(useLoom.getState().project);
     const e: Entity = {
       id: uid(), kind, name: `新${ENTITY_KIND_LABEL[kind]}`,
-      color: PALETTE[entities.length % PALETTE.length],
+      color: cols[entities.length % cols.length] ?? PALETTE[0],
       emoji: '', summary: '',
       fields: tpl.map((tf) => ({ id: uid(), label: tf.label, value: '', type: tf.type, filterKind: tf.filterKind })),
       notes: '', createdAt: Date.now(),
@@ -238,6 +243,8 @@ export default function EntityLibrary() {
               className={`info-card ${selectedId === e.id ? 'selected' : ''}`}
               style={{ borderTopColor: e.color }}
               onClick={() => setSelectedId(e.id)}
+              onDoubleClick={() => { setSelectedId(e.id); setExpandedId(e.id); }}
+              title="单击选中 · 双击展开编辑窗"
             >
               <div className="card-title">
                 <span className="entity-avatar" style={{ background: `${e.color}1a` }}>
@@ -270,7 +277,14 @@ export default function EntityLibrary() {
       <aside className="inspector">
         {selected ? (
           <>
-            <h3>实体属性</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h3 style={{ margin: 0, flex: 1 }}>实体属性</h3>
+              <button
+                className="ghost"
+                title="打开宽版编辑窗(字段较多时更好用 · 也可双击卡片打开)"
+                onClick={() => setExpandedId(selected.id)}
+              >⤢ 展开</button>
+            </div>
             <div className="kv-row">
               <span
                 className="entity-avatar avatar-edit"
@@ -311,16 +325,11 @@ export default function EntityLibrary() {
             </div>
             <div className="field">
               <label>颜色</label>
-              <div className="color-row">
-                {PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    className={`color-swatch ${selected.color === c ? 'selected' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => updateEntity(selected.id, { color: c })}
-                  />
-                ))}
-              </div>
+              <ColorPicker
+                value={selected.color}
+                onChange={(c) => updateEntity(selected.id, { color: c ?? PALETTE[0] })}
+                allowClear={false}
+              />
             </div>
             <div className="field">
               <label>一句话简介</label>
@@ -375,6 +384,9 @@ export default function EntityLibrary() {
           initialKind={kindFilter === 'all' ? 'character' : kindFilter}
           onClose={() => setEditingTemplate(false)}
         />
+      )}
+      {expandedId && (
+        <EntityEditor entityId={expandedId} onClose={() => setExpandedId(null)} />
       )}
     </>
   );

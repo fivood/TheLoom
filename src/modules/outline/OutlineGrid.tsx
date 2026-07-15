@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { uid, useLoom } from '../../store';
 import { PALETTE } from '../../types';
+import { activePaletteColors } from '../../util';
 
 function AutoTextarea({ value, onChange, placeholder }: {
   value: string;
@@ -38,7 +39,8 @@ export default function OutlineGrid() {
   const addColumn = () => {
     const title = prompt('新剧情线名称(例如:伏笔、感情线、某配角的暗线)');
     if (!title) return;
-    addOutlineColumn({ id: uid(), title, color: PALETTE[columns.length % PALETTE.length] });
+    const cols = activePaletteColors(useLoom.getState().project);
+    addOutlineColumn({ id: uid(), title, color: cols[columns.length % cols.length] ?? PALETTE[0] });
   };
 
   return (

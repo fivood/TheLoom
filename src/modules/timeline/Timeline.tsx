@@ -4,6 +4,8 @@ import { useNav } from '../../search';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import type { TimelineEvent } from '../../types';
 import { PALETTE } from '../../types';
+import { activePaletteColors } from '../../util';
+import ColorPicker from '../../components/ColorPicker';
 
 export default function Timeline() {
   const tracks = useLoom((s) => s.project.timelineTracks);
@@ -28,7 +30,8 @@ export default function Timeline() {
     const name = prompt('新轨道名称(例如:主线、某角色的暗线、世界大事)');
     if (!name) return;
     update((p) => {
-      p.timelineTracks.push({ id: uid(), name, color: PALETTE[p.timelineTracks.length % PALETTE.length] });
+      const cols = activePaletteColors(p);
+      p.timelineTracks.push({ id: uid(), name, color: cols[p.timelineTracks.length % cols.length] ?? PALETTE[0] });
     });
   };
 
@@ -241,16 +244,10 @@ export default function Timeline() {
             </div>
             <div className="field">
               <label>颜色(默认跟随轨道)</label>
-              <div className="color-row">
-                {PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    className={`color-swatch ${selected.color === c ? 'selected' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => patchEvent(selected.id, { color: selected.color === c ? undefined : c })}
-                  />
-                ))}
-              </div>
+              <ColorPicker
+                value={selected.color}
+                onChange={(c) => patchEvent(selected.id, { color: c })}
+              />
             </div>
             <button className="danger" onClick={() => { if (confirm(`删除事件「${selected.title}」?`)) removeEvent(selected.id); }}>
               删除事件

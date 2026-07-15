@@ -10,6 +10,7 @@ import SearchPalette from './components/SearchPalette';
 import SyncPanel from './components/SyncPanel';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
+import PaletteManager from './components/PaletteManager';
 import ProjectMenu from './components/ProjectMenu';
 import Icon, { type IconName } from './components/Icon';
 
@@ -51,6 +52,7 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [auditing, setAuditing] = useState(false);
   const [history, setHistory] = useState(false);
+  const [palettes, setPalettes] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
@@ -201,6 +203,9 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); setHistory(true); }}>
                     <Icon name="undo" size={14} /> 版本历史
                   </button>
+                  <button onClick={() => { setToolsOpen(false); setPalettes(true); }}>
+                    <Icon name="palette" size={14} /> 配色表
+                  </button>
                   <button onClick={() => { setToolsOpen(false); setSyncing(true); }}>
                     <Icon name="cloud" size={14} /> 协作
                   </button>
@@ -218,6 +223,30 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-大纲表.csv`, outlineToCsv(project)); }}>
                     大纲表 CSV
                   </button>
+                  <div className="tools-sep" />
+                  <div className="tools-label">外部工具</div>
+                  <a
+                    className="tools-link"
+                    href="https://70015.net"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setToolsOpen(false)}
+                    title="70015 · 浏览器内运行的通用小工具集(图片压缩、格式转换、二维码等)"
+                  >
+                    <Icon name="archive" size={14} /> 70015 工具集 ↗
+                    <span className="tools-hint">图片/文件/编码 通用小工具</span>
+                  </a>
+                  <a
+                    className="tools-link"
+                    href="https://70015.net/palette"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setToolsOpen(false)}
+                    title="从图片提取主色 → 导出 JSON → 在「配色表」里导入,即可用作项目色板"
+                  >
+                    <Icon name="palette" size={14} /> Color Palette ↗
+                    <span className="tools-hint">图片提色 → 导入到配色表</span>
+                  </a>
                 </div>
               </>
             )}
@@ -244,6 +273,7 @@ export default function App() {
       {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
       {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
       {history && <VersionHistory onClose={() => setHistory(false)} />}
+      {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
     </div>
   );
 }

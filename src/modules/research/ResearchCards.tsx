@@ -5,6 +5,8 @@ import Icon from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import type { ResearchCard } from '../../types';
 import { PALETTE } from '../../types';
+import { activePaletteColors } from '../../util';
+import ColorPicker from '../../components/ColorPicker';
 
 export default function ResearchCards() {
   const cards = useLoom((s) => s.project.researchCards);
@@ -45,10 +47,11 @@ export default function ResearchCards() {
   const selected = cards.find((c) => c.id === selectedId) ?? null;
 
   const createCard = () => {
+    const cols = activePaletteColors(useLoom.getState().project);
     const c: ResearchCard = {
       id: uid(), title: '新资料卡片', content: '',
       category: catFilter === 'all' ? (categories[0] ?? '未分类') : catFilter,
-      tags: [], color: PALETTE[cards.length % PALETTE.length],
+      tags: [], color: cols[cards.length % cols.length] ?? PALETTE[0],
       source: '', pinned: false, createdAt: Date.now(),
     };
     addCard(c);
@@ -172,16 +175,11 @@ export default function ResearchCards() {
             </div>
             <div className="field">
               <label>颜色</label>
-              <div className="color-row">
-                {PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    className={`color-swatch ${selected.color === c ? 'selected' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => updateCard(selected.id, { color: c })}
-                  />
-                ))}
-              </div>
+              <ColorPicker
+                value={selected.color}
+                onChange={(c) => updateCard(selected.id, { color: c ?? PALETTE[0] })}
+                allowClear={false}
+              />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => updateCard(selected.id, { pinned: !selected.pinned })}>

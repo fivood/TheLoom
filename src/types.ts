@@ -375,6 +375,16 @@ export interface Folder {
   parentId?: ID | null;
 }
 
+/* ---------- 配色表 ---------- */
+
+/** 项目内可复用的配色表。default 内置一份灰阶,其余由用户创建 / 导入 zimg Palette JSON */
+export interface ColorPalette {
+  id: ID;
+  name: string;
+  /** HEX 字符串数组,如 ["#1b1b19", "#c9a86b", ...] */
+  colors: string[];
+}
+
 /* ---------- 项目 ---------- */
 
 export interface Project {
@@ -406,9 +416,14 @@ export interface Project {
   folders: Folder[];
   /** 流程节点模板:按节点类型预设字段 + 约束 */
   nodeTemplates?: Partial<Record<FlowNodeType, EntityTemplateSpec[]>>;
+  /** 项目内自定义配色表(可从 zimg Color Palette 的 JSON 导入) */
+  palettes?: ColorPalette[];
+  /** 当前激活的配色表 id(空 = 使用默认灰阶 PALETTE) */
+  activePaletteId?: ID;
   updatedAt: number;
 }
 
+/** 内置默认灰阶(始终存在,不可删) */
 export const PALETTE = [
   '#1b1b19', '#3a3936', '#565550', '#72716b',
   '#8e8d86', '#aaa9a1', '#c6c5bd', '#e0dfd8',

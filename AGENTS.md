@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-本文件供 AI 助手(Claude Code / opencode 等)快速进入项目上下文。详细文档见 [README.md](./README.md) 与 [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)。
+本文件供 AI 助手(Codex / opencode 等)快速进入项目上下文。详细文档见 [README.md](./README.md) 与 [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)。
 
 ## 项目定位
 

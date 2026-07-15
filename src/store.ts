@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  BrainEdge, BrainNote, Document, Entity, Flow, Folder,
+  BrainEdge, BrainNote, ColorPalette, Document, Entity, Flow, Folder,
   OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
 } from './types';
 import { normalizeProject, uid, detachAssetEverywhere } from './util';
@@ -72,6 +72,7 @@ function blankProject(): Project {
     documentCategories: [],
     attachments: {},
     folders: [],
+    palettes: [],
     updatedAt: Date.now(),
   };
 }
@@ -204,6 +205,11 @@ interface LoomState {
   addFolder: (f: Folder) => void;
   updateFolder: (id: string, patch: Partial<Folder>) => void;
   removeFolder: (id: string) => void;
+
+  addPalette: (p: ColorPalette) => void;
+  updatePalette: (id: string, patch: Partial<ColorPalette>) => void;
+  removePalette: (id: string) => void;
+  setActivePalette: (id: string | null) => void;
 
   /** 版本历史快照 */
   snapshots: Snapshot[];
@@ -492,6 +498,17 @@ export const useLoom = create<LoomState>((set, get) => {
       for (const fid of toDelete) clear(fid);
     }),
 
+    addPalette: (pal) => commit((p) => { p.palettes ??= []; p.palettes.push(pal); }),
+    updatePalette: (id, patch) => commit((p) => {
+      const pal = (p.palettes ?? []).find((x) => x.id === id);
+      if (pal) Object.assign(pal, patch);
+    }),
+    removePalette: (id) => commit((p) => {
+      p.palettes = (p.palettes ?? []).filter((x) => x.id !== id);
+      if (p.activePaletteId === id) p.activePaletteId = undefined;
+    }),
+    setActivePalette: (id) => commit((p) => { p.activePaletteId = id ?? undefined; }),
+
     createSnapshot: (name) => {
       const cur = get();
       const snap: Snapshot = { id: uid(), name: name || `版本 ${new Date().toLocaleString()}`, createdAt: Date.now(), data: JSON.stringify(cur.project) };
@@ -507,8 +524,11 @@ export const useLoom = create<LoomState>((set, get) => {
         const p = JSON.parse(snap.data) as Project;
         if (!p || p.version !== 1) throw new Error('快照格式不正确');
         normalizeProject(p);
-        if (!confirm(`回滚到「${snap.name}」?当前未保存的改动会进入撤销栈(可用 Ctrl+Z 恢复)。`)) return;
-        undoStack = []; redoStack = []; lastUndoPush = 0;
+        if (!confirm(`回滚到「${snap.name}」?当前状态会进入撤销栈(可用 Ctrl+Z 恢复)。`)) return;
+        undoStack.push(cur.project);
+        if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+        redoStack = [];
+        lastUndoPush = 0;
         swapProject(p);
       } catch (e) {
         alert(`回滚失败:${e}`);

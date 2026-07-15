@@ -8,7 +8,8 @@ import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { countSubNodes, resolveSub } from '../../util';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
-import { FLOW_NODE_LABEL, PALETTE } from '../../types';
+import { FLOW_NODE_LABEL } from '../../types';
+import ColorPicker from '../../components/ColorPicker';
 import { useLoom as useLoomStore } from '../../store';
 
 /** 条件/指令脚本的变量校验与快捷插入 */
@@ -415,16 +416,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             )}
             <div className="field">
               <label>标题栏颜色</label>
-              <div className="color-row">
-                {PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    className={`color-swatch ${selectedNode.data.color === c ? 'selected' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => patchSelectedNode({ color: selectedNode.data.color === c ? undefined : c })}
-                  />
-                ))}
-              </div>
+              <ColorPicker
+                value={selectedNode.data.color}
+                onChange={(c) => patchSelectedNode({ color: c })}
+              />
             </div>
             <TechNameField
               value={selectedNode.data.technicalName}

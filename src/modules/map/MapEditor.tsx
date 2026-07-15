@@ -3,8 +3,8 @@ import { uid, useLoom } from '../../store';
 import { fileToDataUrl } from './util';
 import { useNav } from '../../search';
 import type { MapDoc, MapMarker, MapRegion } from '../../types';
-import { PALETTE } from '../../types';
 import Icon from '../../components/Icon';
+import ColorPicker from '../../components/ColorPicker';
 
 type Mode = 'view' | 'marker' | 'region';
 type Selection =
@@ -491,12 +491,7 @@ function MarkerInspector({ marker, onChange, onDelete }: {
       </div>
       <div className="field">
         <label>颜色(默认跟随实体)</label>
-        <div className="color-row">
-          {PALETTE.map((c) => (
-            <button key={c} className={`color-swatch ${marker.color === c ? 'selected' : ''}`} style={{ background: c }}
-              onClick={() => onChange({ color: marker.color === c ? undefined : c })} />
-          ))}
-        </div>
+        <ColorPicker value={marker.color} onChange={(c) => onChange({ color: c })} />
       </div>
       <TimeRangeFields from={marker.fromPointId} to={marker.toPointId} onChange={onChange} />
       <button className="danger" onClick={onDelete}>删除标记</button>
@@ -522,12 +517,7 @@ function RegionInspector({ region, onChange, onDelete }: {
       </div>
       <div className="field">
         <label>填色</label>
-        <div className="color-row">
-          {PALETTE.map((c) => (
-            <button key={c} className={`color-swatch ${region.color === c ? 'selected' : ''}`} style={{ background: c }}
-              onClick={() => onChange({ color: c })} />
-          ))}
-        </div>
+        <ColorPicker value={region.color} onChange={(c) => onChange({ color: c })} allowClear={false} />
       </div>
       <TimeRangeFields from={region.fromPointId} to={region.toPointId} onChange={onChange} />
       <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>

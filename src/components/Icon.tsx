@@ -5,7 +5,8 @@ export type IconName =
   | 'logo' | 'flow' | 'entity' | 'bulb' | 'grid' | 'clock' | 'archive' | 'braces'
   | 'search' | 'undo' | 'redo' | 'folder' | 'refresh' | 'download' | 'upload' | 'reset'
   | 'play' | 'script' | 'pin' | 'image' | 'plus' | 'cloud'
-  | 'user' | 'mappin' | 'key' | 'flag' | 'book' | 'doc' | 'tag' | 'trash' | 'film' | 'music';
+  | 'user' | 'mappin' | 'key' | 'flag' | 'book' | 'doc' | 'tag' | 'trash' | 'film' | 'music'
+  | 'palette' | 'check';
 
 /** 实体类型 → 图标 */
 export const KIND_ICON: Record<EntityKind, IconName> = {
@@ -195,6 +196,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <circle cx="17" cy="16" r="3" />
     </>
   ),
+  palette: (
+    <>
+      <path d="M12 3a9 9 0 1 0 0 18c1 0 1.7-.9 1.5-1.9-.2-1.1.6-2.1 1.7-2.1H17a4 4 0 0 0 4-4 8 8 0 0 0-9-10z" />
+      <circle cx="7.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="9.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="14.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="17.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+    </>
+  ),
+  check: <path d="M5 12.5 10 17.5 19.5 7.5" />,
 };
 
 export default function Icon({ name, size = 16, strokeWidth = 1.7, className, style }: {

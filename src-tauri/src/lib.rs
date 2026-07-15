@@ -99,13 +99,15 @@ fn safe_join(base: &Path, rel: &str) -> Result<PathBuf, String> {
     Ok(base.join(rel))
 }
 
-/// 写入项目文件夹,并清理 entities/、research/ 下已删除条目的 .md
-/// 与 assets/ 下已删除的图片
+const MANAGED_DIRS: [&str; 4] = ["entities/", "research/", "documents/", "assets/"];
+
+/// 写入项目文件夹,并删除前端明确指出的已删除条目
+/// (只删本会话加载过 / 写入过的文件,外部新建的文件不受影响)
 #[tauri::command]
 fn save_project_dir(
     dir: String,
     files: Vec<WriteSpec>,
-    keep_md: Vec<String>,
+    delete_files: Vec<String>,
 ) -> Result<(), String> {
     let base = PathBuf::from(&dir);
     fs::create_dir_all(&base).map_err(|e| e.to_string())?;
@@ -125,30 +127,13 @@ fn save_project_dir(
         }
     }
 
-    for sub in ["entities", "research", "documents", "assets"] {
-        let d = base.join(sub);
-        if !d.is_dir() {
-            continue;
+    for rel in &delete_files {
+        if !MANAGED_DIRS.iter().any(|d| rel.starts_with(d)) {
+            return Err(format!("拒绝删除受管目录之外的文件:{rel}"));
         }
-        for entry in fs::read_dir(&d).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
-            let managed = path
-                .extension()
-                .map(|e| {
-                    if sub == "assets" {
-                        IMG_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))
-                    } else {
-                        e.eq_ignore_ascii_case("md")
-                    }
-                })
-                .unwrap_or(false);
-            if path.is_file() && managed {
-                let rel = format!("{}/{}", sub, entry.file_name().to_string_lossy());
-                if !keep_md.contains(&rel) {
-                    fs::remove_file(&path).map_err(|e| e.to_string())?;
-                }
-            }
+        let path = safe_join(&base, rel)?;
+        if path.is_file() {
+            fs::remove_file(&path).map_err(|e| format!("{rel}: {e}"))?;
         }
     }
     Ok(())
@@ -173,7 +158,7 @@ mod tests {
             WriteSpec { rel_path: "documents/草稿.md".into(), content: "---\nid: d1\n---\n正文".into(), base64: false },
             WriteSpec { rel_path: "assets/entity-e1.png".into(), content: png_b64.clone(), base64: true },
         ],
-        vec!["entities/林晚.md".into(), "research/织机.md".into(), "documents/草稿.md".into(), "assets/entity-e1.png".into()],
+        vec![],
     )
     .unwrap();
 
@@ -187,16 +172,20 @@ mod tests {
     assert_eq!(loaded.assets.len(), 1);
     assert_eq!(loaded.assets[0].content, png_b64); // 二进制往返一致
 
-        // 实体被删除后,对应 md 与头像图片应被清理
+        // 外部(如 Obsidian)新建的 md 不在删除列表里,必须原样保留
+        fs::write(dir.join("entities/外部新建.md"), "---\n---\n手写").unwrap();
+
+        // 实体被删除后,前端明确列出要清理的 md 与头像图片
         save_project_dir(
             dir_s.clone(),
             vec![WriteSpec { rel_path: "project.json".into(), content: "{}".into(), base64: false }],
-        vec!["research/织机.md".into()],
+        vec!["entities/林晚.md".into(), "documents/草稿.md".into(), "assets/entity-e1.png".into()],
     )
     .unwrap();
     let loaded = load_project_dir(dir_s.clone()).unwrap();
-    assert_eq!(loaded.entities.len(), 0);
-    assert_eq!(loaded.research.len(), 1);
+    assert_eq!(loaded.entities.len(), 1); // 外部新建的保留
+    assert_eq!(loaded.entities[0].name, "外部新建.md");
+    assert_eq!(loaded.research.len(), 1); // 未列入删除的保留
     assert_eq!(loaded.documents.len(), 0); // 删除已生效
     assert_eq!(loaded.assets.len(), 0);
 
@@ -206,6 +195,12 @@ mod tests {
             vec![WriteSpec { rel_path: "../escape.txt".into(), content: "x".into(), base64: false }],
             vec![],
         );
+        assert!(bad.is_err());
+
+        // 删除列表同样不允许路径穿越 / 受管目录之外的文件
+        let bad = save_project_dir(dir_s.clone(), vec![], vec!["entities/../project.json".into()]);
+        assert!(bad.is_err());
+        let bad = save_project_dir(dir_s.clone(), vec![], vec!["project.json".into()]);
         assert!(bad.is_err());
 
         std::fs::remove_dir_all(&dir).ok();

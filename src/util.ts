@@ -1,5 +1,6 @@
 import type { FlowEdge, FlowNode, Project, SubFlow } from './types';
 import type { AssetKind } from './types';
+import { PALETTE } from './types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -16,7 +17,65 @@ export function normalizeProject(p: Project): Project {
   p.attachments ??= {};
   p.folders ??= [];
   p.nodeTemplates ??= {};
+  p.palettes ??= [];
   return p;
+}
+
+/* ---------- 配色表 ---------- */
+
+const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/** 校验并规范化 hex(补 #、扩展 3 位为 6 位、小写);无效返回 null */
+export function normalizeHex(raw: string): string | null {
+  const s = raw.trim();
+  const withHash = s.startsWith('#') ? s : `#${s}`;
+  if (!HEX_RE.test(withHash)) return null;
+  if (withHash.length === 4) {
+    const [, r, g, b] = withHash;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return withHash.toLowerCase();
+}
+
+/** 项目当前生效的配色表颜色数组:激活的自定义 > 默认灰阶 */
+export function activePaletteColors(p: Project): string[] {
+  const list = p.palettes ?? [];
+  const active = p.activePaletteId ? list.find((x) => x.id === p.activePaletteId) : null;
+  if (active && active.colors.length > 0) return active.colors;
+  return PALETTE;
+}
+
+/**
+ * 解析 zimg Color Palette 导出的 JSON:
+ *   [{ name: "封面图.jpg", colors: ["#hex", ...] }, ...]
+ * 也接受单个对象或纯 hex 数组作为宽容格式,失败返回空数组
+ */
+export function parsePaletteJson(text: string): { name: string; colors: string[] }[] {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { return []; }
+  const out: { name: string; colors: string[] }[] = [];
+  const pushItem = (name: string, colorsRaw: unknown) => {
+    if (!Array.isArray(colorsRaw)) return;
+    const colors = colorsRaw
+      .map((c) => (typeof c === 'string' ? normalizeHex(c) : null))
+      .filter((c): c is string => !!c);
+    if (colors.length > 0) out.push({ name: name || '未命名配色', colors });
+  };
+  if (Array.isArray(raw)) {
+    // 纯 hex 数组
+    if (raw.every((x) => typeof x === 'string')) {
+      pushItem('导入配色', raw);
+    } else {
+      for (const item of raw) {
+        const o = item as Record<string, unknown>;
+        pushItem(typeof o.name === 'string' ? o.name : '', o.colors);
+      }
+    }
+  } else if (raw && typeof raw === 'object') {
+    const o = raw as Record<string, unknown>;
+    pushItem(typeof o.name === 'string' ? o.name : '', o.colors);
+  }
+  return out;
 }
 
 /** 图片文件 → 128px 方形头像 dataURL(居中裁剪) */
