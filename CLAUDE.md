@@ -25,8 +25,8 @@
 |---|---|---|---|
 | ~~P0~~ | ~~R1-2 Navigator 易用性~~ | ~~拖拽移动;Ctrl/Shift 多选;批量归档;自定义排序~~ | ✅ 已完成:`order` 字段 + 稳定排序、HTML5 拖拽(对象→文件夹、文件夹重排 / 重父)、Ctrl/Shift 多选 + 批量归档条、五个 Navigator 一致 |
 | ~~P0~~ | ~~R1-2 对话框统一~~ | ~~替换原生 `prompt()`;删除确认文案统一~~ | ✅ 已完成:`src/dialog.ts` + `Dialog.tsx` 统一弹窗;全量替换 `prompt` / `confirm` / `alert`;Esc 取消 Enter 确认;文件夹删除文案统一且不级联删除正文 |
-| P0 | R1-3 长篇写作体验 | 文档富文本补段落级标题、列表、引用;保持结构化块与 Markdown 往返稳定 | 编辑、导出、文件夹重载后格式不丢;文档转流程不受影响 |
-| P1 | R1-4 导入导出 | Excel `.xlsx` 与 Final Draft 互通,先做可逆导出,再做带预检的导入 | 中文、分支、角色、稳定 ID 可往返;导入始终先预览且不覆盖当前项目 |
+| ~~P0~~ | ~~R1-3 长篇写作体验~~ | ~~文档富文本补段落级标题、列表、引用;保持结构化块与 Markdown 往返稳定~~ | ✅ 已完成:新增 `subheading` / `quote` / `list` 三个写作块(不进入流程),`DOC_WRITING_TYPES` 集合统一过滤;Markdown 导出 H2/H3、`> 引用`、有序/无序列表;`yaml loom-blocks` 无损往返 `items`/`ordered`/`level`;测试新增 R1-3 往返用例 |
+| ~~P1~~ | ~~R1-4 导入导出~~ | ~~Excel `.xlsx` 与 Final Draft 互通,先做可逆导出,再做带预检的导入~~ | ✅ 已完成:全项目多 sheet xlsx 导入导出 + Final Draft fdx 导入导出;稳定 ID 匹配走更新,新增走 add;导入前 ImportPreview 模态展示差异统计与未识别项,用户确认才应用;fdx 导入生成新文档不覆盖 |
 | P1 | R1-5 Localization | 建立 UI 文案资源层和项目内容本地化模块 | 中文默认体验不退化;可添加语言、检查缺失条目并导出 |
 | P2 | 后续增强 | 矢量地点编辑、多窗口、音视频/大图原文件写入桌面项目文件夹 | 分批独立交付,不与 R1 核心改动混在同一版本 |
 
@@ -52,6 +52,34 @@
 - 所有项目数据修改必须经过 store 的 `commit`,保证撤销栈、恢复点与持久化正常;不要直接修改 zustand state
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 R1、移动版本标签或发布安装包;发布前更新版本号、`RELEASE_NOTES.md` 并确认桌面更新清单
+
+## 最近变更(R1-4)
+
+Excel / Final Draft 互通:
+
+- 新增 `src/interop/`:
+  - `zip.ts`:零依赖 zip 读写,DEFLATE 走浏览器原生 `CompressionStream('deflate-raw')`,UTF-8 文件名支持,不实现 zip64
+  - `xlsx.ts`:最小 OOXML 读写(inlineStr / 数字 / 布尔),单 sheet Sheet API,列名 A/Z/AA/AZ 转换
+  - `fdx.ts`:Final Draft 8-12 兼容 XML;`documentToParagraphs` / `flowToParagraphs` 生成段落;`parseFdx` 只吃 `<Content>` 内的段落(排除 TitlePage);`paragraphsToBlocks` 合并 Character + Parenthetical + Dialogue 为一个 dialogue 块
+  - `projectXlsx.ts`:全项目多 sheet 导出(实体 / 实体字段 / 大纲 / 大纲剧情线 / 变量 / 时间线轨道 / 时间线时间点 / 时间线事件 / 资源);`previewProjectXlsx` 按稳定 ID 匹配走更新、否则新增,返回差异统计与警告
+- 新增 `src/components/ImportPreview.tsx`:xlsx / fdx 通用预检模态,展示 add/update/skip 数、警告、未识别的说话人,用户确认才写入;xlsx 走 `replaceProject`,fdx 生成新文档不覆盖
+- `App.tsx` 工具菜单加 4 项:导出 xlsx / fdx、导入 xlsx / fdx(带预检);两个隐藏 file input 触发 ImportPreview
+- 修复两个正则 bug(否则空回读):xlsx `readXlsx` 里 `<Relationship>` 属性含 URL 里的 `/` 会让 `[^/]*` 提前中断 → 改为 `<Relationship\s[^>]*\/>` 匹配整个自闭标签;fdx `parseFdx` 全局匹配 `<Paragraph>` 会误吃 TitlePage 里嵌套的段落 → 先取 `<Content>` 内容再匹配
+- 测试:`interop/interop.test.ts` 覆盖 zip / xlsx / 列名 / 项目往返(空→add、自身→update)/ fdx 段落往返 / 文档-段落-块角色匹配 / 未识别说话人预检,合计 45 项通过
+
+## 最近变更(R1-3)
+
+长篇写作体验:
+
+- `types.ts`:`DocBlockType` 增 `subheading` / `quote` / `list`;`DocBlock` 增 `items?` / `ordered?` / `level?`;新增 `DOC_WRITING_TYPES` 集合(subheading / quote / list / note),统一"不进流程"判断
+- `DocumentView.tsx`:三种新块的编辑 UI —— 子标题带 H2/H3 切换 + 加粗大字体输入框;引用带左侧竖线的 textarea;列表带有序/无序切换、每项一行、回车新增、退格删空项;`convertToFlow` 用 `DOC_WRITING_TYPES.has()` 过滤(与原 `note` 语义等价扩展);Legend 拆成「剧本块」与「写作块」两列
+- `export.ts` `blockToLines`:子标题 → `## / ###`;引用多行 → 逐行 `> ` 前缀;列表 → `1. item` / `- item`
+- `storage.ts`:`documentToMd` 的 yaml 序列化写入 `items` / `ordered` / `level`;`mdToDocument` 恢复,校验 level ∈ {2,3}、ordered 为布尔、items 为字符串数组
+- `convert.ts`:`documentToFlow` 用 `DOC_WRITING_TYPES` 集合替代 `type === 'note'` 判断
+- `search.ts`:文档全文搜索把 `items` 加入检索
+- `audit.ts` + `DocumentView` 字数统计:把 `items` 长度纳入
+- `styles.css`:`.doc-subheading-2/3`(粗体 17/15px)、`.doc-quote`(左侧灰竖线 + 斜体 + 面板底色)、`.doc-list-row`(marker + input + 删除)
+- 测试:`storage.test.ts` 新增「R1-3 写作块 subheading/quote/list 无损往返」用例,合计 36 项通过
 
 ## 最近变更(R1-2)
 

@@ -162,7 +162,9 @@ export function searchProject(p: Project, query: string): SearchHit[] {
   }
 
   for (const d of p.documents) {
-    const hit = matches(q, d.name, d.notes, ...d.blocks.map((b) => b.text));
+    const hit = matches(q, d.name, d.notes,
+      ...d.blocks.flatMap((b) => [b.text, ...(b.items ?? [])]),
+    );
     if (hit) {
       push({
         module: '文档', kind: d.category, title: d.name,

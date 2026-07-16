@@ -120,6 +120,22 @@ category: 正文
     expect(restoredD.order).toBe(12);
   });
 
+  it('R1-3 写作块 subheading / quote / list 无损往返', () => {
+    const doc: Document = {
+      id: 'doc-writing', name: '长篇', category: '正文', notes: '',
+      createdAt: 1, updatedAt: 2,
+      blocks: [
+        { id: 'b-sh2', type: 'subheading', text: '第一章', level: 2 },
+        { id: 'b-sh3', type: 'subheading', text: '第一节', level: 3 },
+        { id: 'b-quote', type: 'quote', text: '一段引用\n跨两行' },
+        { id: 'b-ul', type: 'list', text: '', items: ['苹果', '梨子', '橙子'], ordered: false },
+        { id: 'b-ol', type: 'list', text: '', items: ['起', '承', '转', '合'], ordered: true },
+      ],
+    };
+    const restored = mdToDocument(`${doc.name}.md`, documentToMd(doc, []), 0);
+    expect(restored.blocks).toEqual(doc.blocks);
+  });
+
   it('order 缺失时往返保持 undefined', () => {
     const entity: Entity = {
       id: 'e-no-order', kind: 'character', name: '无序实体',

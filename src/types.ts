@@ -325,11 +325,17 @@ export interface Asset {
 }
 
 /* ---------- 文档视图 ---------- */
-/** 文档块类型:每类都能 1:1 映射到流程节点 */
+/**
+ * 文档块类型。剧本块(前 6 项)在「转为流程」时映射为对应节点;
+ * 写作块(subheading / list / quote)只用于长篇写作组织,转流程时跳过。
+ */
 export type DocBlockType =
   | 'heading'      // 场景标题 → fragment
+  | 'subheading'   // 子标题(不进入流程,写作层级组织)
   | 'action'       // 动作/旁白 → dialogue(无说话人)
   | 'dialogue'     // 对白 → dialogue(带说话人)
+  | 'quote'        // 引用块(不进入流程)
+  | 'list'         // 列表块(有序/无序,不进入流程)
   | 'choice'       // 选项点 → hub + 多个带 label 的出边
   | 'condition'    // 条件分支 → condition 节点
   | 'instruction'  // 指令 → instruction 节点
@@ -337,13 +343,19 @@ export type DocBlockType =
 
 export const DOC_BLOCK_LABEL: Record<DocBlockType, string> = {
   heading: '场景',
+  subheading: '子标题',
   action: '动作',
   dialogue: '对白',
+  quote: '引用',
+  list: '列表',
   choice: '选项',
   condition: '条件',
   instruction: '指令',
   note: '注释',
 };
+
+/** 不进入流程的写作组织块(排除在 documentToFlow 之外) */
+export const DOC_WRITING_TYPES: ReadonlySet<DocBlockType> = new Set(['subheading', 'quote', 'list', 'note']);
 
 export interface DocChoice {
   id: ID;
@@ -358,6 +370,12 @@ export interface DocBlock {
   text: string;
   /** 仅 choice:选项列表 */
   choices?: DocChoice[];
+  /** 仅 list:每项一行的文本(有序 / 无序由 ordered 决定) */
+  items?: string[];
+  /** 仅 list:true = 有序(1. 2. 3.),false / 缺省 = 无序(-) */
+  ordered?: boolean;
+  /** 仅 subheading:标题层级,2 = ##,3 = ###;缺省视为 3 */
+  level?: 2 | 3;
   /** 仅 condition:表达式 */
   condition?: string;
   /** 仅 instruction:指令 */

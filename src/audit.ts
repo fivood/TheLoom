@@ -62,7 +62,8 @@ export function projectStats(p: Project): ProjectStats {
   const documentWords = p.documents.reduce((s, d) =>
     s + countWords(d.name) + countWords(d.notes) + d.blocks.reduce((x, b) =>
       x + countWords(b.text) + countWords(b.instruction) + countWords(b.condition)
-        + (b.choices?.reduce((y, c) => y + countWords(c.label), 0) ?? 0), 0), 0);
+        + (b.choices?.reduce((y, c) => y + countWords(c.label), 0) ?? 0)
+        + (b.items?.reduce((y, item) => y + countWords(item), 0) ?? 0), 0), 0);
 
   return {
     flows,
@@ -81,10 +82,11 @@ export interface Issue {
 
 const RESERVED = new Set(['true', 'false', 'seen', 'unseen']);
 
-/** 收集某文本里出现的"独立标识符"(obj.prop 的 prop 不算),返回未知的 */
+/** 收集某文本里出现的"独立标识符"(obj.prop 的 prop 与字符串字面量不算),返回未知的 */
 function findUnknownIdentifiers(text: string, known: Set<string>): string[] {
-  // 负向后看:前面不是 . 或 word 字符 → 跳过 obj.prop 的 prop 部分
-  const tokens = text.match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
+  // 先剥离引号字符串(seen("tech_name") 的参数不是变量),再负向后看跳过 obj.prop 的 prop 部分
+  const stripped = text.replace(/'[^']*'|"[^"]*"/g, ' ');
+  const tokens = stripped.match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
   return [...new Set(tokens)].filter((x) => !RESERVED.has(x) && !known.has(x));
 }
 

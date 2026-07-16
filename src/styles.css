@@ -1198,6 +1198,35 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .doc-choice-mark { color: var(--text-faint); }
 .doc-choice-row input { flex: 1; }
 
+/* R1-3 写作块:子标题 / 引用 / 列表 */
+.doc-subheading { font-weight: 600 !important; }
+.doc-subheading-2 { font-size: 17px !important; }
+.doc-subheading-3 { font-size: 15px !important; }
+.doc-block.subheading { background: var(--bg-panel); }
+
+.doc-quote {
+  border-left: 3px solid var(--border-light) !important;
+  padding: 6px 10px !important;
+  font-style: italic;
+  color: var(--text-dim);
+  background: var(--bg-panel);
+  border-radius: 0 4px 4px 0 !important;
+  resize: vertical;
+  min-height: 44px;
+}
+.doc-block.quote { background: transparent; }
+
+.doc-list { display: flex; flex-direction: column; gap: 3px; }
+.doc-list-tools { display: flex; gap: 6px; margin-bottom: 2px; }
+.doc-list-tools select { width: auto; font-size: 12px; }
+.doc-list-row { display: flex; align-items: center; gap: 6px; }
+.doc-list-marker {
+  width: 22px; text-align: right; color: var(--text-faint);
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+.doc-list-row input { flex: 1; }
+.doc-block.list { background: transparent; }
+
 .doc-insert-bar {
   display: flex;
   flex-wrap: wrap;

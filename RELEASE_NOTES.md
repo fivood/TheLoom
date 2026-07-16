@@ -1,3 +1,16 @@
+TheLoom v0.11.0 · R1-4 Excel / Final Draft 互通
+
+- 新增「工具 → 导出 → Excel 工作簿 .xlsx」:一键把整个项目的实体、实体字段、大纲、变量、时间线(轨道 / 时间点 / 事件)、资源元数据导为多 sheet 工作簿;每 sheet 首列为稳定 ID,导出→改→导入不会新建重复对象。
+- 新增「工具 → 导出 → Final Draft .fdx」:全部流程与文档合并为一份 Final Draft 剧本文件,场景 / 动作 / 说话人 / 对白 / 转场按 FD 规范分段,可直接在 Final Draft、Fade In、WriterDuet 等软件里打开。
+- 新增「工具 → 导入 → Excel .xlsx(带预检)」:上传 xlsx 后先展示每类对象的新增 / 更新 / 跳过数、缺失列的警告与错误,用户确认才合并到项目;不删除任何现有对象。
+- 新增「工具 → 导入 → Final Draft .fdx(带预检)」:上传 fdx 后展示段落 / 场景 / 对白统计与未识别的说话人,确认后生成一份新文档(分类=剧本草稿),不覆盖现有。
+- xlsx 与 fdx 读写模块零第三方依赖:基于浏览器原生 CompressionStream 手写 zip,xlsx / OOXML XML、Final Draft XML 均为手写解析,项目体积无明显增加。
+- 已修:xlsx workbook 关系解析在遇到属性内 URL 时误终止(`[^/]*` → `[^>]*`);fdx 解析漏排除 TitlePage 嵌套的 Paragraph。
+
+安装包与自动更新清单见下方资产。大陆网络可经 https://theloom.pages.dev/api/download/latest 下载。
+
+---
+
 TheLoom v0.10.0 · R1 全模块 Navigator 与长篇组织
 
 - 五个模块(流程 / 实体 / 资源 / 文档 / 资料)统一为多级文件夹 Navigator,支持嵌套子文件夹与对象归档。

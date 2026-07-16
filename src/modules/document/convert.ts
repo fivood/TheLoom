@@ -1,5 +1,6 @@
 import { uid } from '../../store';
 import type { DocBlock, Document, Flow, FlowEdge, FlowNode, FlowNodeType } from '../../types';
+import { DOC_WRITING_TYPES } from '../../types';
 
 const SPACING_X = 280;
 
@@ -50,7 +51,8 @@ export function documentToFlow(doc: Document): Flow {
   };
 
   for (const b of doc.blocks) {
-    if (b.type === 'note') continue;
+    // 写作组织块(subheading / quote / list / note)不进入流程
+    if (DOC_WRITING_TYPES.has(b.type)) continue;
 
     let node: FlowNode | null = null;
     let branchHandles: HandleSpec[] = [{ id: null }];

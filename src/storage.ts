@@ -246,6 +246,9 @@ export function documentToMd(d: Document, entities: Entity[]): string {
     if (b.speakerId) out.speakerId = b.speakerId;
     if (b.text) out.text = b.text;
     if (b.choices) out.choices = b.choices;
+    if (b.items) out.items = b.items;
+    if (typeof b.ordered === 'boolean') out.ordered = b.ordered;
+    if (typeof b.level === 'number') out.level = b.level;
     if (b.condition !== undefined) out.condition = b.condition;
     if (b.instruction !== undefined) out.instruction = b.instruction;
     return out;
@@ -286,6 +289,9 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
             id: typeof c.id === 'string' && c.id ? c.id : uid(),
             label: c.label ?? '',
           }));
+          if (Array.isArray(r.items)) b.items = (r.items as unknown[]).map((x) => String(x ?? ''));
+          if (typeof r.ordered === 'boolean') b.ordered = r.ordered;
+          if (r.level === 2 || r.level === 3) b.level = r.level;
           if (typeof r.condition === 'string') b.condition = r.condition;
           if (typeof r.instruction === 'string') b.instruction = r.instruction;
           return b;

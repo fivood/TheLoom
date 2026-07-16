@@ -6,7 +6,7 @@ import Icon from '../../components/Icon';
 import TechNameField from '../../components/TechNameField';
 import { RichTextInput } from '../../components/RichText';
 import type { DocBlock, DocBlockType, Document } from '../../types';
-import { DOC_BLOCK_LABEL } from '../../types';
+import { DOC_BLOCK_LABEL, DOC_WRITING_TYPES } from '../../types';
 import { documentToFlow } from './convert';
 import { downloadMarkdown, documentToMarkdown } from '../../export';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
@@ -18,6 +18,8 @@ function emptyBlock(type: DocBlockType): DocBlock {
   if (type === 'choice') b.choices = [{ id: uid(), label: '' }];
   if (type === 'condition') b.condition = '';
   if (type === 'instruction') b.instruction = '';
+  if (type === 'subheading') b.level = 3;
+  if (type === 'list') { b.items = ['']; b.ordered = false; }
   return b;
 }
 
@@ -54,7 +56,10 @@ export default function DocumentView() {
       (!q ||
         d.name.toLowerCase().includes(q) ||
         d.notes.toLowerCase().includes(q) ||
-        d.blocks.some((b) => b.text.toLowerCase().includes(q))),
+        d.blocks.some((b) =>
+          b.text.toLowerCase().includes(q) ||
+          (b.items ?? []).some((item) => item.toLowerCase().includes(q)),
+        )),
     );
     return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
   }, [documents, catFilter, query]);
@@ -160,8 +165,9 @@ export default function DocumentView() {
 
   const convertToFlow = async () => {
     if (!selected) return;
-    if (selected.blocks.filter((b) => b.type !== 'note').length === 0) {
-      await alertDialog('文档里没有可转换的块(全是注释)。');
+    const flowable = selected.blocks.filter((b) => !DOC_WRITING_TYPES.has(b.type));
+    if (flowable.length === 0) {
+      await alertDialog('文档里没有可转换为流程节点的剧本块。写作块(子标题 / 引用 / 列表 / 注释)不进入流程。');
       return;
     }
     const flow = documentToFlow(selected);
@@ -175,7 +181,8 @@ export default function DocumentView() {
     const speakers = new Map<string, number>();
     for (const b of selected.blocks) {
       const len = b.text.length + (b.instruction?.length ?? 0) + (b.condition?.length ?? 0)
-        + (b.choices?.reduce((s, c) => s + c.label.length, 0) ?? 0);
+        + (b.choices?.reduce((s, c) => s + c.label.length, 0) ?? 0)
+        + (b.items?.reduce((s, item) => s + item.length, 0) ?? 0);
       words += len;
       if (b.type === 'dialogue') {
         dialogues++;
@@ -322,6 +329,88 @@ export default function DocumentView() {
                         onChange={(v) => patchBlock(b.id, { text: v })}
                         placeholder={b.type === 'dialogue' ? '台词内容(可用 **粗** *斜* ~~删~~)' : '动作 / 旁白描述'}
                       />
+                    ) : b.type === 'subheading' ? (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <select
+                          value={b.level ?? 3}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => patchBlock(b.id, { level: Number(e.target.value) as 2 | 3 })}
+                          style={{ width: 68 }}
+                          title="标题层级"
+                        >
+                          <option value={2}>H2</option>
+                          <option value={3}>H3</option>
+                        </select>
+                        <input
+                          className={`doc-subheading doc-subheading-${b.level ?? 3}`}
+                          value={b.text}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => patchBlock(b.id, { text: e.target.value })}
+                          placeholder="子标题"
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    ) : b.type === 'quote' ? (
+                      <textarea
+                        className="doc-quote"
+                        rows={Math.max(2, Math.ceil((b.text.length || 1) / 30))}
+                        value={b.text}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => patchBlock(b.id, { text: e.target.value })}
+                        placeholder="引用内容(导出为 Markdown 的 > 块)"
+                      />
+                    ) : b.type === 'list' ? (
+                      <div className="doc-list">
+                        <div className="doc-list-tools">
+                          <select
+                            value={b.ordered ? 'ol' : 'ul'}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => patchBlock(b.id, { ordered: e.target.value === 'ol' })}
+                            title="列表类型"
+                          >
+                            <option value="ul">• 无序</option>
+                            <option value="ol">1. 有序</option>
+                          </select>
+                        </div>
+                        {(b.items ?? []).map((item, ii) => (
+                          <div key={ii} className="doc-list-row">
+                            <span className="doc-list-marker">{b.ordered ? `${ii + 1}.` : '•'}</span>
+                            <input
+                              value={item}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => patchBlock(b.id, {
+                                items: (b.items ?? []).map((x, j) => (j === ii ? e.target.value : x)),
+                              })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const next = [...(b.items ?? [])];
+                                  next.splice(ii + 1, 0, '');
+                                  patchBlock(b.id, { items: next });
+                                } else if (e.key === 'Backspace' && item === '' && (b.items ?? []).length > 1) {
+                                  e.preventDefault();
+                                  patchBlock(b.id, { items: (b.items ?? []).filter((_, j) => j !== ii) });
+                                }
+                              }}
+                              placeholder="列表项(回车新增,退格删空项)"
+                            />
+                            <button
+                              className="ghost icon-btn"
+                              title="删除该项"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const next = (b.items ?? []).filter((_, j) => j !== ii);
+                                patchBlock(b.id, { items: next.length ? next : [''] });
+                              }}
+                            >×</button>
+                          </div>
+                        ))}
+                        <button
+                          className="ghost"
+                          style={{ alignSelf: 'start' }}
+                          onClick={(e) => { e.stopPropagation(); patchBlock(b.id, { items: [...(b.items ?? []), ''] }); }}
+                        >＋ 列表项</button>
+                      </div>
                     ) : (
                       <textarea
                         rows={b.type === 'heading' ? 1 : Math.max(2, Math.ceil((b.text.length || 1) / 30))}
@@ -415,7 +504,7 @@ export default function DocumentView() {
           </div>
 
           <div className="field">
-            <label>块类型说明</label>
+            <label>剧本块(参与转流程)</label>
             <ul className="doc-legend">
               <li><b>场景</b> → 片段节点(章节锚)</li>
               <li><b>动作</b> → 对白节点(无说话人)</li>
@@ -423,7 +512,13 @@ export default function DocumentView() {
               <li><b>选项</b> → 汇聚点(分支提示)</li>
               <li><b>条件</b> → 条件节点(真/假引脚)</li>
               <li><b>指令</b> → 指令节点(变量赋值)</li>
-              <li><b>注释</b> → 不进入流程</li>
+            </ul>
+            <label style={{ marginTop: 8 }}>写作块(仅长篇组织)</label>
+            <ul className="doc-legend">
+              <li><b>子标题</b> → H2 / H3,只影响排版和 Markdown</li>
+              <li><b>引用</b> → Markdown 的 <code>&gt;</code> 块</li>
+              <li><b>列表</b> → 有序 / 无序列表</li>
+              <li><b>注释</b> → 不导出,不进入流程</li>
             </ul>
           </div>
         </aside>

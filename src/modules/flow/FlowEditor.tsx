@@ -22,8 +22,8 @@ function ScriptHints({ text, onInsert }: { text: string; onInsert: (name: string
   // 设了技术名的实体作为对象注入脚本,其技术名是已知标识符
   for (const e of entities) if (e.technicalName) known.add(e.technicalName);
   const RESERVED = new Set(['true', 'false', 'seen', 'unseen']);
-  // 负向后看:跳过 obj.prop 的 prop 部分
-  const tokens = text.match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
+  // 先剥离引号字符串(seen("tech_name") 的参数不是变量),再负向后看跳过 obj.prop 的 prop 部分
+  const tokens = text.replace(/'[^']*'|"[^"]*"/g, ' ').match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
   const used = [...new Set(tokens)].filter((x) => !RESERVED.has(x));
   const unknown = used.filter((x) => !known.has(x));
   const namedEntities = entities.filter((e) => e.technicalName);

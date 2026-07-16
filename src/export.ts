@@ -189,11 +189,25 @@ function blockToLines(b: DocBlock, entities: Entity[]): string[] {
   switch (b.type) {
     case 'heading':
       return [`## ${b.text || '(未命名场景)'}`, ''];
+    case 'subheading': {
+      const prefix = (b.level ?? 3) === 2 ? '##' : '###';
+      return [`${prefix} ${b.text || '(未命名子标题)'}`, ''];
+    }
     case 'action':
       return [b.text || '(空动作)', ''];
     case 'dialogue': {
       const who = speakerName(b, entities);
       return who ? [`**${who}**:${b.text || '(空台词)'}`, ''] : [b.text || '(空对白)', ''];
+    }
+    case 'quote': {
+      const lines = (b.text || '').split('\n').map((l) => `> ${l}`.trimEnd());
+      return [...(lines.length ? lines : ['> (空引用)']), ''];
+    }
+    case 'list': {
+      const items = (b.items ?? []).filter((x) => x.trim() !== '');
+      if (items.length === 0) return [];
+      const out = items.map((item, i) => (b.ordered ? `${i + 1}. ${item}` : `- ${item}`));
+      return [...out, ''];
     }
     case 'choice': {
       const labels = (b.choices ?? []).map((c) => c.label).filter(Boolean);

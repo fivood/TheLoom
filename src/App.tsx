@@ -17,7 +17,10 @@ import ProjectMenu from './components/ProjectMenu';
 import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
 import RecoveryPanel from './components/RecoveryPanel';
 import DialogHost from './components/Dialog';
+import ImportPreview from './components/ImportPreview';
 import Icon, { type IconName } from './components/Icon';
+import { projectToXlsx } from './interop/projectXlsx';
+import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
 const FlowEditor = lazy(() => import('./modules/flow/FlowEditor'));
@@ -58,6 +61,9 @@ export default function App() {
   const [auditing, setAuditing] = useState(false);
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
+  const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx'; file: File } | null>(null);
+  const importXlsxRef = useRef<HTMLInputElement>(null);
+  const importFdxRef = useRef<HTMLInputElement>(null);
   const [recovering, setRecovering] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateDialog, setUpdateDialog] = useState<UpdateDialogState | null>(null);
@@ -291,6 +297,64 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-大纲表.csv`, outlineToCsv(project)); }}>
                     大纲表 CSV
                   </button>
+                  <button onClick={async () => {
+                    setToolsOpen(false);
+                    const blob = await projectToXlsx(project);
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `${project.name || 'theloom'}.xlsx`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  }}>
+                    Excel 工作簿 .xlsx
+                  </button>
+                  <button onClick={() => {
+                    setToolsOpen(false);
+                    // 全流程 + 全文档合并为一份 fdx
+                    const allParas = [
+                      ...project.flows.flatMap((f) => flowToParagraphs(f, project.entities)),
+                      ...project.documents.flatMap((d) => documentToParagraphs(d, project.entities)),
+                    ];
+                    const xml = paragraphsToFdx(allParas, project.name);
+                    const blob = new Blob([xml], { type: 'application/xml' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `${project.name || 'theloom'}.fdx`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  }}>
+                    Final Draft .fdx
+                  </button>
+                  <div className="tools-sep" />
+                  <div className="tools-label">导入</div>
+                  <button onClick={() => { setToolsOpen(false); importXlsxRef.current?.click(); }}>
+                    <Icon name="upload" size={12} /> Excel .xlsx(带预检)
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); importFdxRef.current?.click(); }}>
+                    <Icon name="upload" size={12} /> Final Draft .fdx(带预检)
+                  </button>
+                  <input
+                    ref={importXlsxRef}
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setImportFile({ mode: 'xlsx', file: f });
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                  <input
+                    ref={importFdxRef}
+                    type="file"
+                    accept=".fdx,application/xml,text/xml"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setImportFile({ mode: 'fdx', file: f });
+                      e.currentTarget.value = '';
+                    }}
+                  />
                   <div className="tools-sep" />
                   <div className="tools-label">外部工具</div>
                   <a
@@ -342,6 +406,9 @@ export default function App() {
       {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
       {history && <VersionHistory onClose={() => setHistory(false)} />}
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
+      {importFile && (
+        <ImportPreview mode={importFile.mode} file={importFile.file} onClose={() => setImportFile(null)} />
+      )}
       {recovering && <RecoveryPanel onClose={() => setRecovering(false)} />}
       {updateDialog && <UpdateDialog state={updateDialog} onClose={() => setUpdateDialog(null)} />}
       <DialogHost />
