@@ -1172,6 +1172,20 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   color: var(--text-dim);
 }
 .doc-block.note .doc-block-kind { background: #e3dcb8; color: #4a4636; }
+.doc-block-linked {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-dim);
+  cursor: help;
+}
+.unit-linked-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin: -4px 0 8px;
+}
 .doc-block-tools { display: flex; flex-direction: column; align-items: center; gap: 2px; opacity: 0.4; }
 .doc-block:hover .doc-block-tools { opacity: 1; }
 

@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.11.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.11.0):
+- 已发布版本:`v0.12.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.12.0):
+  - **v0.12.0 R1 统一叙事数据模型** ✅ — `NarrativeUnit` 权威内容对象 + `syncNarrativeUnits` 迁移/同步器;文档块与流程节点经 `unitId` 共享同一份内容,双向同步
   - **v0.9.0 R0 工程安全基线** ✅ — 测试框架、恢复面板、损坏隔离、诊断导出、大项目性能兜底、桌面项目文件原子替换
   - **v0.10.0 附加批** ✅ — 全模块 Navigator(五模块统一)+ 文件夹归档 + 对话框统一 + 拖拽 / 多选 / 批量
   - **v0.11.0 附加批** ✅ — 长篇写作块(subheading / quote / list,无损往返)+ Excel .xlsx 与 Final Draft .fdx 双向互通(带 ImportPreview 预检)+ 配色表系统(zimg JSON 集成)+ 实体宽版编辑窗 + 文件夹 md 往返修复
@@ -32,7 +33,7 @@
 | # | 版本 | 主题 | 主要工作 | 完成标准 | 规模 |
 |---|---|---|---|---|---|
 | ~~R0~~ | ~~v0.9.0~~ | ~~工程安全基线~~ | ~~测试 / 迁移器 / 大项目性能 / 完整性检查~~ | ✅ 已完成(实际交付于 v0.9.0,内容对齐) | M |
-| R1 | v0.12.0 | **统一叙事数据模型** | 引入稳定「叙事单元 / 场景」对象;文档块与流程节点通过 ID 引用同一份内容;写迁移器 | 同一段内容只有一份数据;旧文档 / 流程无引用断裂 | L |
+| ~~R1~~ | ~~v0.12.0~~ | ~~统一叙事数据模型~~ | ~~叙事单元对象 / unitId 引用 / 迁移器~~ | ✅ 已完成(NarrativeUnit + syncNarrativeUnits,详见「最近变更」) | L |
 | R2 | v0.13.0 | **长篇正文工作台** | 卷 / 章 / 场景树;拖拽排序;连续稿模式;场景元数据(字数目标 / 状态 / POV / 地点 / 时间) | 30 万字项目可流畅打开与连续编辑;重排不丢内容 | L |
 | R3 | v0.14.0 | **文档—流程双视图** | 两视图共享同一叙事单元;完整选项 / 条件 / 指令双向映射;流程反向查看为剧本 | 任一视图修改后另一视图立即同步;选择分支不再丢失 | L |
 | **R3-A** | **v0.15.0** | **🆕 外部知识库 + AI 抽取(轻量)** | Obsidian / md / 纯文本 / PDF 粘贴接入;AI 抽实体 / 事件 / 场景 / 时间点走 ImportPreview 预检;AI 按模板补字段;LLM 服务可切换(OpenAI / Anthropic / Ollama);API Key 本地存储 | AI 输出走稳定 ID 通道,不改结构;可粘贴长文自动生成初稿骨架;支持自建模型 | M |
@@ -89,6 +90,20 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R1 · v0.12.0)
+
+统一叙事数据模型(叙事单元):
+
+- `types.ts`:新增 `NarrativeUnit`(kind: scene / line / choice / condition / instruction;字段 title / text / speakerId / choices)+ `Project.units?`;`DocBlock.unitId?` 与 `FlowNodeData.unitId?` 引用单元
+- `util.ts` `syncNarrativeUnits(project, prev?)`:单一同步器承担四件事 —— ① 迁移:无 unitId 的剧本块 / 叙事节点(dialogue / fragment / condition / instruction,hub 仅在转换时链接)自动建单元,含所有层级子流程;② 断裂修复:unitId 指向丢失单元时按原 id 从当前内容重建;③ 变更传播:传 prev(commit 前项目)时按前后内容投影差异判定哪侧被编辑写入单元,同 commit 双侧冲突时文档胜;不传 prev(加载 / 导入)时以与单元不一致者为准、文档优先(覆盖 Obsidian 外部编辑场景);④ 镜像刷新 + GC:所有引用者字段统一从单元刷新,无人引用的单元回收。已接入 `normalizeProject` 末尾(旧项目自动迁移)
+- **架构**:单元是权威数据,块 / 节点上的 text / title / speakerId 等是同步镜像 —— 所有 UI / 导出 / 搜索 / 体检 / 演出读路径不需要改,写路径照旧 mutate 镜像,由 `commit` 里的 `syncNarrativeUnits(next, prev)` 统一收敛;镜像与单元不可能发散
+- 字段映射:heading.text ↔ unit.title;action / dialogue.text ↔ unit.text(dialogue 另 speakerId);choice.text ↔ unit.text + choices;condition.condition / instruction.instruction ↔ unit.text;fragment.title/text ↔ unit.title/text;条件 / 指令节点 data.text ↔ unit.text;hub.title ↔ unit.text
+- `convert.ts` `documentToFlow`:生成节点携带块的 unitId → 转换后的流程与文档共享内容;`uid` 改从 `util` 导入(避免测试环境拉起 store 副作用)
+- `storage.ts`:documentToMd / mdToDocument 往返 `unitId`(loom-blocks yaml)
+- UI:文档块侧栏与流程节点 inspector 显示 ⇄ 标识(`.doc-block-linked` / `.unit-linked-hint`),提示内容已共享、双向同步
+- 测试:`units.test.ts` 12 项(迁移 / 幂等 / 断裂重建 / GC / 转换共享 / 双向同步 / 说话人 / 条件表达式 / 无 prev 文档优先 / md 往返 / walkFlowNodes);合计 57 项通过
+- 已实测(浏览器):新建文档 → 转为流程 → 文档改台词流程节点即时变、节点 inspector 改台词文档块即时变、⇄ 标识两侧显示、刷新后 localStorage 中 units 与双侧 unitId 一致
 
 ## 最近变更(R1-4)
 

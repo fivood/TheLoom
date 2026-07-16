@@ -1,4 +1,4 @@
-import { uid } from '../../store';
+import { uid } from '../../util';
 import type { DocBlock, Document, Flow, FlowEdge, FlowNode, FlowNodeType } from '../../types';
 import { DOC_WRITING_TYPES } from '../../types';
 
@@ -59,26 +59,26 @@ export function documentToFlow(doc: Document): Flow {
 
     switch (b.type) {
       case 'heading':
-        node = makeNode('fragment', { title: b.text }, x, y);
+        node = makeNode('fragment', { title: b.text, unitId: b.unitId }, x, y);
         break;
       case 'action':
-        node = makeNode('dialogue', { text: b.text, title: '' }, x, y);
+        node = makeNode('dialogue', { text: b.text, title: '', unitId: b.unitId }, x, y);
         break;
       case 'dialogue':
-        node = makeNode('dialogue', { text: b.text, speakerId: b.speakerId, title: '' }, x, y);
+        node = makeNode('dialogue', { text: b.text, speakerId: b.speakerId, title: '', unitId: b.unitId }, x, y);
         break;
       case 'condition':
-        node = makeNode('condition', { text: b.condition ?? '' }, x, y);
+        node = makeNode('condition', { text: b.condition ?? '', unitId: b.unitId }, x, y);
         branchHandles = [
           { id: 'true', label: '✓ 真' },
           { id: 'false', label: '✗ 假' },
         ];
         break;
       case 'instruction':
-        node = makeNode('instruction', { text: b.instruction ?? '' }, x, y);
+        node = makeNode('instruction', { text: b.instruction ?? '', unitId: b.unitId }, x, y);
         break;
       case 'choice': {
-        node = makeNode('hub', { title: b.text || '选项点' }, x, y);
+        node = makeNode('hub', { title: b.text || '选项点', unitId: b.unitId }, x, y);
         // 选项点暂用默认出边串联;选项列表作为备注挂到 data 上,后续可生成命名引脚
         // 这里不强行制造多个 handle,留给用户在流程编辑器里继续画分支
         const labels = (b.choices ?? []).map((c) => c.label).filter(Boolean);

@@ -8,6 +8,7 @@ import { RichTextInput } from '../../components/RichText';
 import type { DocBlock, DocBlockType, Document } from '../../types';
 import { DOC_BLOCK_LABEL, DOC_WRITING_TYPES } from '../../types';
 import { documentToFlow } from './convert';
+import { walkFlowNodes } from '../../util';
 import { downloadMarkdown, documentToMarkdown } from '../../export';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
@@ -27,6 +28,7 @@ export default function DocumentView() {
   const documents = useLoom((s) => s.project.documents);
   const categories = useLoom((s) => s.project.documentCategories);
   const entities = useLoom((s) => s.project.entities);
+  const flows = useLoom((s) => s.project.flows);
   const { addDocument, updateDocument, removeDocument, update } = useLoom();
   const go = useNav((s) => s.go);
 
@@ -48,6 +50,17 @@ export default function DocumentView() {
   }, [navSeq]);
 
   const characters = useMemo(() => entities.filter((e) => e.kind === 'character'), [entities]);
+
+  // 被流程节点共享的叙事单元 id:文档块显示 ⇄ 标识,提示双向同步
+  const flowUnitIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of flows) {
+      walkFlowNodes(f.nodes, (n) => {
+        if (typeof n.data.unitId === 'string') set.add(n.data.unitId);
+      });
+    }
+    return set;
+  }, [flows]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -268,6 +281,9 @@ export default function DocumentView() {
                 <div key={b.id} className={`doc-block ${b.type} ${activeBlockId === b.id ? 'active' : ''}`} onClick={() => setActiveBlockId(b.id)}>
                   <div className="doc-block-side">
                     <span className="doc-block-kind" title={DOC_BLOCK_LABEL[b.type]}>{DOC_BLOCK_LABEL[b.type]}</span>
+                    {b.unitId && flowUnitIds.has(b.unitId) && (
+                      <span className="doc-block-linked" title="已与流程节点共享同一叙事单元:任一处修改会双向同步">⇄</span>
+                    )}
                     <div className="doc-block-tools">
                       <button className="ghost icon-btn" title="上移" onClick={(e) => { e.stopPropagation(); moveBlock(b.id, -1); }}>↑</button>
                       <button className="ghost icon-btn" title="下移" onClick={(e) => { e.stopPropagation(); moveBlock(b.id, 1); }}>↓</button>

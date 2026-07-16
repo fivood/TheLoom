@@ -1,4 +1,6 @@
-import type { FlowEdge, FlowNode, Project, SubFlow } from './types';
+import type {
+  DocBlock, DocChoice, FlowEdge, FlowNode, NarrativeUnit, NarrativeUnitKind, Project, SubFlow,
+} from './types';
 import type { AssetKind } from './types';
 import { PALETTE } from './types';
 
@@ -72,7 +74,212 @@ export function normalizeProject(p: Project): Project {
   cleanOrder(p.assets);
   cleanOrder(p.documents);
   cleanOrder(p.researchCards);
+  syncNarrativeUnits(p);
   return p;
+}
+
+/* ---------- 叙事单元同步(R1) ---------- */
+
+/**
+ * 单元视角下的内容投影。undefined 字段表示该引用者不管理这块内容
+ * (例如文档场景块只管理 title,不动 text)。
+ */
+interface UnitContent {
+  kind: NarrativeUnitKind;
+  title?: string;
+  text?: string;
+  manageSpeaker?: boolean;
+  speakerId?: string;
+  choices?: DocChoice[];
+}
+
+function contentOfBlock(b: DocBlock): UnitContent | null {
+  switch (b.type) {
+    case 'heading': return { kind: 'scene', title: b.text };
+    case 'action': return { kind: 'line', text: b.text };
+    case 'dialogue': return { kind: 'line', text: b.text, manageSpeaker: true, speakerId: b.speakerId };
+    case 'choice': return { kind: 'choice', text: b.text, choices: b.choices ?? [] };
+    case 'condition': return { kind: 'condition', text: b.condition ?? '' };
+    case 'instruction': return { kind: 'instruction', text: b.instruction ?? '' };
+    default: return null;
+  }
+}
+
+function contentOfNode(n: FlowNode): UnitContent | null {
+  switch (n.type) {
+    case 'fragment': return { kind: 'scene', title: n.data.title, text: n.data.text };
+    case 'dialogue': return { kind: 'line', title: n.data.title, text: n.data.text, manageSpeaker: true, speakerId: n.data.speakerId };
+    case 'condition': return { kind: 'condition', text: n.data.text };
+    case 'instruction': return { kind: 'instruction', text: n.data.text };
+    // 汇聚点本身没有内容,只有由文档「选项」块转换而来的才共享单元
+    case 'hub': return n.data.unitId ? { kind: 'choice', text: n.data.title } : null;
+    default: return null;
+  }
+}
+
+function unitDiffers(u: NarrativeUnit, c: UnitContent): boolean {
+  if (u.kind !== c.kind) return true;
+  if (c.title !== undefined && u.title !== c.title) return true;
+  if (c.text !== undefined && u.text !== c.text) return true;
+  if (c.manageSpeaker && (u.speakerId ?? undefined) !== (c.speakerId ?? undefined)) return true;
+  if (c.choices !== undefined && JSON.stringify(u.choices ?? []) !== JSON.stringify(c.choices)) return true;
+  return false;
+}
+
+function applyContent(u: NarrativeUnit, c: UnitContent) {
+  u.kind = c.kind;
+  if (c.title !== undefined) u.title = c.title;
+  if (c.text !== undefined) u.text = c.text;
+  if (c.manageSpeaker) u.speakerId = c.speakerId ?? undefined;
+  if (c.choices !== undefined) u.choices = structuredClone(c.choices);
+  u.updatedAt = Date.now();
+}
+
+function createUnit(id: string, c: UnitContent): NarrativeUnit {
+  const now = Date.now();
+  return {
+    id,
+    kind: c.kind,
+    title: c.title ?? '',
+    text: c.text ?? '',
+    speakerId: c.manageSpeaker ? c.speakerId ?? undefined : undefined,
+    choices: c.choices !== undefined ? structuredClone(c.choices) : undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function writeBlockFromUnit(b: DocBlock, u: NarrativeUnit) {
+  switch (b.type) {
+    case 'heading': b.text = u.title; break;
+    case 'action': b.text = u.text; break;
+    case 'dialogue': b.text = u.text; b.speakerId = u.speakerId; break;
+    case 'choice': b.text = u.text; b.choices = structuredClone(u.choices ?? []); break;
+    case 'condition': b.condition = u.text; break;
+    case 'instruction': b.instruction = u.text; break;
+  }
+}
+
+function writeNodeFromUnit(n: FlowNode, u: NarrativeUnit) {
+  switch (n.type) {
+    case 'fragment': n.data.title = u.title; n.data.text = u.text; break;
+    case 'dialogue': n.data.title = u.title; n.data.text = u.text; n.data.speakerId = u.speakerId; break;
+    case 'condition':
+    case 'instruction': n.data.text = u.text; break;
+    case 'hub': n.data.title = u.text; break;
+  }
+}
+
+/** 遍历流程节点(含所有层级的子流程) */
+export function walkFlowNodes(nodes: FlowNode[], fn: (n: FlowNode) => void) {
+  for (const n of nodes) {
+    fn(n);
+    if (n.data.sub) walkFlowNodes(n.data.sub.nodes, fn);
+  }
+}
+
+interface UnitRef {
+  key: string;
+  unitId: string | undefined;
+  content: UnitContent;
+  attach: (unitId: string) => void;
+  write: (u: NarrativeUnit) => void;
+}
+
+/**
+ * 叙事单元同步器:迁移 + 变更传播 + 镜像刷新 + 回收。
+ *
+ * - 无 unitId 的剧本块 / 叙事节点自动建单元(旧项目迁移与新建对象共用此路径)
+ * - unitId 指向的单元丢失时按当前内容原 id 重建,旧引用不断裂
+ * - 传入 prev(上一次 commit 前的项目)时按前后差异判定哪一侧发生编辑,
+ *   把编辑写入单元;不传 prev(加载 / 导入)时以与单元不一致的内容为准,
+ *   文档块后应用,即文档优先(覆盖外部 Obsidian 编辑的场景)
+ * - 最后所有引用者的镜像字段统一从单元刷新,并回收无人引用的单元
+ */
+export function syncNarrativeUnits(p: Project, prev?: Project): void {
+  p.units ??= [];
+  const unitById = new Map(p.units.map((u) => [u.id, u]));
+
+  const docRefs: UnitRef[] = [];
+  const nodeRefs: UnitRef[] = [];
+  for (const d of p.documents ?? []) {
+    for (const b of d.blocks) {
+      const content = contentOfBlock(b);
+      if (!content) continue;
+      docRefs.push({
+        key: `b:${b.id}`,
+        unitId: b.unitId,
+        content,
+        attach: (id) => { b.unitId = id; },
+        write: (u) => writeBlockFromUnit(b, u),
+      });
+    }
+  }
+  for (const f of p.flows ?? []) {
+    walkFlowNodes(f.nodes, (n) => {
+      const content = contentOfNode(n);
+      if (!content) return;
+      nodeRefs.push({
+        key: `n:${n.id}`,
+        unitId: typeof n.data.unitId === 'string' ? n.data.unitId : undefined,
+        content,
+        attach: (id) => { n.data.unitId = id; },
+        write: (u) => writeNodeFromUnit(n, u),
+      });
+    });
+  }
+
+  // 建单元 / 修复断裂引用:文档块先行,共享单元以文档内容为种子
+  for (const r of [...docRefs, ...nodeRefs]) {
+    let u = r.unitId ? unitById.get(r.unitId) : undefined;
+    if (!u) {
+      u = createUnit(r.unitId ?? uid(), r.content);
+      p.units.push(u);
+      unitById.set(u.id, u);
+      r.attach(u.id);
+      r.unitId = u.id;
+    }
+  }
+
+  // 上一状态的内容投影,用于判定本次 commit 改动了哪一侧
+  const prevContents = new Map<string, string>();
+  if (prev) {
+    for (const d of prev.documents ?? []) {
+      for (const b of d.blocks) {
+        const c = contentOfBlock(b);
+        if (c) prevContents.set(`b:${b.id}`, JSON.stringify(c));
+      }
+    }
+    for (const f of prev.flows ?? []) {
+      walkFlowNodes(f.nodes, (n) => {
+        const c = contentOfNode(n);
+        if (c) prevContents.set(`n:${n.id}`, JSON.stringify(c));
+      });
+    }
+  }
+
+  // 变更传播:节点先应用、文档块后应用 → 同一 commit 双侧冲突时文档胜
+  for (const r of [...nodeRefs, ...docRefs]) {
+    const u = unitById.get(r.unitId!)!;
+    if (!unitDiffers(u, r.content)) continue;
+    if (prev) {
+      const before = prevContents.get(r.key);
+      // 新引用者(如刚由转换生成)以单元为准;内容未变的引用者不回写
+      if (before === undefined || before === JSON.stringify(r.content)) continue;
+    }
+    applyContent(u, r.content);
+  }
+
+  // 镜像刷新 + 回收无人引用的单元
+  const referenced = new Set<string>();
+  for (const r of [...docRefs, ...nodeRefs]) {
+    const u = unitById.get(r.unitId!)!;
+    r.write(u);
+    referenced.add(u.id);
+  }
+  if (p.units.length !== referenced.size) {
+    p.units = p.units.filter((u) => referenced.has(u.id));
+  }
 }
 
 /* ---------- 配色表 ---------- */

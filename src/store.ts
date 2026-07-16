@@ -3,7 +3,7 @@ import type {
   BrainEdge, BrainNote, ColorPalette, Document, Entity, Flow, Folder,
   OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
 } from './types';
-import { normalizeProject, uid, detachAssetEverywhere } from './util';
+import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
 import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
@@ -84,6 +84,7 @@ function blankProject(): Project {
     documentCategories: [],
     attachments: {},
     folders: [],
+    units: [],
     palettes: [],
     updatedAt: Date.now(),
   };
@@ -328,6 +329,7 @@ export const useLoom = create<LoomState>((set, get) => {
     redoStack = [];
     const next = structuredClone(prev);
     fn(next);
+    syncNarrativeUnits(next, prev);
     next.updatedAt = Date.now();
     persist(next);
     set({ project: next, saveStatus: 'saving', saveError: null, canUndo: true, canRedo: false });

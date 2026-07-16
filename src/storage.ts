@@ -243,6 +243,7 @@ export function documentToMd(d: Document, entities: Entity[]): string {
   // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
   const blockYaml = stringifyYaml(d.blocks.map((b) => {
     const out: Record<string, unknown> = { id: b.id, type: b.type };
+    if (b.unitId) out.unitId = b.unitId;
     if (b.speakerId) out.speakerId = b.speakerId;
     if (b.text) out.text = b.text;
     if (b.choices) out.choices = b.choices;
@@ -283,6 +284,7 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
             type: (r.type as DocBlockType) ?? 'note',
             text: '',
           };
+          if (typeof r.unitId === 'string' && r.unitId) b.unitId = r.unitId;
           if (typeof r.text === 'string') b.text = r.text;
           if (typeof r.speakerId === 'string') b.speakerId = r.speakerId;
           if (Array.isArray(r.choices)) b.choices = (r.choices as { id?: string; label: string }[]).map((c) => ({

@@ -115,6 +115,8 @@ export interface FlowNodeData {
   checkRed?: boolean;
   /** 技术名:用于 seen("xxx") / unseen("xxx") 在脚本中引用本节点 */
   technicalName?: string;
+  /** 引用的叙事单元 id:与文档块共享同一份内容(对白 / 片段 / 条件 / 指令等) */
+  unitId?: ID;
   /** 模板驱动的自定义字段(与实体同构,便于跨对象复用) */
   fields?: EntityField[];
   [key: string]: unknown;
@@ -324,6 +326,38 @@ export interface Asset {
   createdAt: number;
 }
 
+/* ---------- 叙事单元(R1:文档块与流程节点共享的同一份内容) ---------- */
+
+export type NarrativeUnitKind = 'scene' | 'line' | 'choice' | 'condition' | 'instruction';
+
+export const NARRATIVE_UNIT_KIND_LABEL: Record<NarrativeUnitKind, string> = {
+  scene: '场景',
+  line: '台词',
+  choice: '选项',
+  condition: '条件',
+  instruction: '指令',
+};
+
+/**
+ * 叙事单元:文档块与流程节点通过 unitId 引用的权威内容对象。
+ * 同一段对白 / 场景在项目里只有一份数据;各视图上的字段是同步镜像,
+ * 由 syncNarrativeUnits 在每次 commit 与项目加载时维护一致。
+ */
+export interface NarrativeUnit {
+  id: ID;
+  kind: NarrativeUnitKind;
+  /** 标题:scene 的场景名;line 的舞台提示(流程节点标题) */
+  title: string;
+  /** 正文:对白 / 动作文本;condition / instruction 的表达式;choice 的引导语 */
+  text: string;
+  /** 仅 line:说话人(实体 id) */
+  speakerId?: ID;
+  /** 仅 choice:选项列表 */
+  choices?: DocChoice[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 /* ---------- 文档视图 ---------- */
 /**
  * 文档块类型。剧本块(前 6 项)在「转为流程」时映射为对应节点;
@@ -365,6 +399,8 @@ export interface DocChoice {
 export interface DocBlock {
   id: ID;
   type: DocBlockType;
+  /** 引用的叙事单元 id(剧本块专用):与流程节点共享同一份内容 */
+  unitId?: ID;
   /** 对白:说话人(实体 id) */
   speakerId?: ID;
   text: string;
@@ -454,6 +490,8 @@ export interface Project {
   folders: Folder[];
   /** 流程节点模板:按节点类型预设字段 + 约束 */
   nodeTemplates?: Partial<Record<FlowNodeType, EntityTemplateSpec[]>>;
+  /** 叙事单元:文档块与流程节点共享内容的权威存储(R1) */
+  units?: NarrativeUnit[];
   /** 项目内自定义配色表(可从 zimg Color Palette 的 JSON 导入) */
   palettes?: ColorPalette[];
   /** 当前激活的配色表 id(空 = 使用默认灰阶 PALETTE) */

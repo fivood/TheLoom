@@ -104,6 +104,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   const updateFlow = useLoom((s) => s.updateFlow);
   const entities = useLoom((s) => s.project.entities);
   const nodeTemplates = useLoom((s) => s.project.nodeTemplates);
+  const documents = useLoom((s) => s.project.documents);
+  // 被文档块共享的叙事单元 id:节点 inspector 显示双向同步提示
+  const docUnitIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of documents) for (const b of d.blocks) if (b.unitId) set.add(b.unitId);
+    return set;
+  }, [documents]);
   const [playing, setPlaying] = useState(false);
   const [editingTpl, setEditingTpl] = useState<FlowNodeType | null>(null);
   const sub = resolveSub(flow, path) ?? { nodes: [], edges: [] };
@@ -329,6 +336,9 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         {selectedNode ? (
           <>
             <h3>节点属性 · {FLOW_NODE_LABEL[(selectedNode.type ?? 'fragment') as FlowNodeType]}</h3>
+            {typeof selectedNode.data.unitId === 'string' && docUnitIds.has(selectedNode.data.unitId) && (
+              <div className="unit-linked-hint" title="该节点与文档块引用同一叙事单元">⇄ 已与文档共享内容,任一处修改会双向同步</div>
+            )}
             <div className="field">
               <label>标题</label>
               <input value={selectedNode.data.title} onChange={(e) => patchSelectedNode({ title: e.target.value })} />
