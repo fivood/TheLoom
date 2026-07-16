@@ -14,6 +14,7 @@ import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
+import ProjectImportWizard from './components/ProjectImportWizard';
 import ProjectMenu from './components/ProjectMenu';
 import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
 import RecoveryPanel from './components/RecoveryPanel';
@@ -68,6 +69,7 @@ export default function App() {
   const [aiSettings, setAiSettings] = useState(false);
   const [findReplace, setFindReplace] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
+  const [projectImport, setProjectImport] = useState(false);
   const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx'; file: File } | null>(null);
   const importXlsxRef = useRef<HTMLInputElement>(null);
   const importFdxRef = useRef<HTMLInputElement>(null);
@@ -310,6 +312,12 @@ export default function App() {
                   <div className="tools-sep" />
                   <div className="tools-label">AI</div>
                   <button
+                    title="多份材料(正文/设定/笔记/AI记录)→ 生成计划 → 审阅 → 完整预检 → 事务式导入整个小说项目"
+                    onClick={() => { setToolsOpen(false); setProjectImport(true); }}
+                  >
+                    <Icon name="archive" size={14} /> 完整项目导入(小说)
+                  </button>
+                  <button
                     title="粘贴长文或读入 md / txt,AI 抽取实体 / 场景 / 时间线,预检确认后写入"
                     onClick={() => { setToolsOpen(false); setAiExtract(true); }}
                   >
@@ -447,6 +455,7 @@ export default function App() {
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
+      {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
       {findReplace && <FindReplace onClose={() => setFindReplace(false)} />}
       {importFile && (
         <ImportPreview mode={importFile.mode} file={importFile.file} onClose={() => setImportFile(null)} />

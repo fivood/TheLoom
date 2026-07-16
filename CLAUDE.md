@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.17.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.17.0):
+- 已发布版本:`v0.18.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.18.0):
+  - **v0.18.0 R5-A 完整项目导入(小说版)** ✅ — 多材料(类型+可信度标注)→ 项目生成计划(用户审阅)→ 分模块候选数据 → 完整差异预检 → 单次事务导入;覆盖卷章树/场景文档/实体/关系/弧线/伏笔/大纲/时间线/资料备份/待定设定/风暴板/地图占位;不生成游戏机制
   - **v0.17.0 R5 正文修订系统** ✅ — 批注(块级锚定 + 解决状态)、场景快照(每篇 20 个上限 + 恢复可撤销)、版本差异(行级 LCS 对比)、修订轮次(元数据 + 列表筛选)、全局查找替换(跨文档、勾选精确替换、单步撤销)
   - **v0.16.0 R4 小说规划增强** ✅ — 规划模块六视图:关系图(React Flow 浮动边)、角色弧线、伏笔台账(状态推导)、登场统计矩阵、场景卡片墙(章内拖拽排序)、节奏图(字数 + 张力);`Document.tension` 场景元数据
   - **v0.15.0 R3-A 外部知识库 + AI 抽取(轻量)** ✅ — 可切换 LLM 层(OpenAI 兼容/Anthropic/Ollama,Key 仅本机);长文抽取实体/场景/时间线走预检通道;实体 AI 补字段(只填空白)
@@ -44,7 +45,7 @@
 | ~~R3-A~~ | ~~v0.15.0~~ | ~~外部知识库 + AI 抽取(轻量)~~ | ~~LLM 层 / 长文抽取预检 / AI 补字段~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R4~~ | ~~v0.16.0~~ | ~~小说规划增强~~ | ~~人物关系图;角色弧线;伏笔台账;章节登场统计;场景卡片墙;节奏图~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R5~~ | ~~v0.17.0~~ | ~~正文修订系统~~ | ~~批注 / 修订轮次 / 文档快照 / 版本差异 / 全局查找替换~~ | ✅ 已完成(详见「最近变更」) | M |
-| **R5-A** | **v0.18.0** | **完整项目导入(小说版)** | 多材料批量输入;来源分类与证据定位;小说 / 短篇生成配置;项目生成计划;完整差异预检;事务式导入 | 可从正文、设定、笔记和 AI 咨询材料生成包含文档树 / 实体 / 资料 / 大纲 / 时间线 / 规划 / 地图 / 风暴板的完整项目;候选设定与冲突不被擅自定稿;不生成游戏机制 | L |
+| ~~R5-A~~ | ~~v0.18.0~~ | ~~完整项目导入(小说版)~~ | ~~多材料 / 生成计划 / 完整预检 / 事务式导入~~ | ✅ 已完成(详见「最近变更」) | L |
 | **R5-B** | **v0.19.0** | **深色主题切换** | 浅色 / 深色 / 跟随系统;主题偏好本机持久化;全模块语义色令牌;画布 / 图表 / 弹窗 / 编辑器适配 | 网页版与桌面版可即时切换;重启后保持选择;全部主要界面在两套主题下可读且项目自定义配色不被改写 | M |
 | R6 | v0.20.0 | **脚本语言重构** | 自有解析器 / AST / 类型检查 / 属性读写 / 语法高亮 / 自动补全 / 重命名联动 | 不再动态执行字符串;错误精确到表达式位置;支持实体属性修改 | L |
 | R7 | v0.21.0 | **演出与路径测试** | 演出存档;固定随机种子;断点;变量监视;批量路径遍历;路径覆盖率 | 自动发现不可达分支 / 死循环 / 无出口路径;测试结果可复现 | M |
@@ -113,6 +114,21 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R5-A · v0.18.0)
+
+完整项目导入(小说版):
+
+- 新增 `src/ai/projectImport.ts` 管线纯逻辑:
+  - `SourceMaterial`(kind: manuscript/setting/note/ai + trust: canon/normal/draft);`materialsToText` 带来源标注拼接、总量 20 万字截断
+  - **阶段一** `buildPlanPrompt` / `normalizePlan`:产出 `ImportPlan`(projectName / volumes→chapters→scenes / entities / timelineTracks / pending);prompt 明确「正文权威、草案与 AI 记录的冲突方案一律进 pending 不采纳」
+  - **阶段二** `buildGeneratePrompt`(计划 JSON 内嵌,要求 structure 与计划一致、名称引用与 entities 一致)/ `normalizeGenerated`:场景块(heading/action/dialogue)、实体(source+evidence)、relations / arcs / foreshadows / outline / timeline / brainstorm / pending
+  - `buildProjectImportPreview`:卷→章两级 document 文件夹 + 场景文档(order / status=outline / povId / locationId / timeLabel,说话人按名匹配);实体同名只补空白、evidence 写入 notes;关系 / 弧线名称解析失败丢弃并告警;伏笔 plants/payoffs 场景名→docId;每份材料→「原始材料」资料卡备份原文;plan+generated 的 pending 去重合并→置顶「待定设定」卡(含出处引文)+ 风暴板便签;无轨道建轨(名取计划第一轨);有地点实体且无地图时建空地图占位(MapEditor 需底图才能放标记)
+  - `applyProjectImport` 单事务:全部 push structuredClone;空白项目名以计划名命名;分类注册;**不写 flows / variables**
+- 新增 `src/components/ProjectImportWizard.tsx` 四步向导(材料→配置→计划审阅→预检导入);项目类型 `suggestProjectKind` 只建议不静默切换;两阶段各记一条 aiLog(purpose: plan / generate,union 已扩)
+- `App.tsx` 工具菜单 AI 区新增「完整项目导入(小说)」
+- 测试:`ai/projectImport.test.ts` 7 项(标注拼接与截断 / 计划校验 / 生成校验+全模块预检 / 事务 apply 后 normalize 单元齐全 / 类型建议);合计 94 项通过
+- 已实测(浏览器,双阶段 stub fetch 按 system 内容分流):向导四步 → 计划审阅(卷章树/实体/待定)→ 预检 12 模块计数 → 事务导入后 localStorage 中文件夹树、场景元数据、关系/弧线/伏笔、大纲、时间线、备份卡、待定卡(置顶)、便签、地图占位全部正确;flows 数量不变(未生成游戏机制);应用后跳转首个场景
 
 ## 最近变更(R5 · v0.17.0)
 

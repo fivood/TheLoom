@@ -568,8 +568,8 @@ export interface AiLogEntry {
   at: number;
   provider: string;
   model: string;
-  /** 用途:extract = 长文抽取;fields = 按模板补字段 */
-  purpose: 'extract' | 'fields';
+  /** 用途:extract = 长文抽取;fields = 按模板补字段;plan / generate = 完整项目导入两阶段 */
+  purpose: 'extract' | 'fields' | 'plan' | 'generate';
   inChars: number;
   outChars: number;
   ok: boolean;
