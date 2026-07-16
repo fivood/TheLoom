@@ -1,8 +1,9 @@
 import type {
-  DocBlock, DocChoice, FlowEdge, FlowNode, NarrativeUnit, NarrativeUnitKind, Project, SubFlow,
+  DocBlock, DocChoice, Document, Folder, FolderModule,
+  FlowEdge, FlowNode, NarrativeUnit, NarrativeUnitKind, Project, SubFlow,
 } from './types';
 import type { AssetKind } from './types';
-import { PALETTE } from './types';
+import { DOC_STATUS_LABEL, PALETTE } from './types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -74,8 +75,72 @@ export function normalizeProject(p: Project): Project {
   cleanOrder(p.assets);
   cleanOrder(p.documents);
   cleanOrder(p.researchCards);
+  // 场景元数据:剔除非法值,保持旧项目 / 手改文件安全
+  for (const d of p.documents) {
+    if (d.status !== undefined && !(d.status in DOC_STATUS_LABEL)) delete d.status;
+    if (d.wordTarget !== undefined && (typeof d.wordTarget !== 'number' || !Number.isFinite(d.wordTarget) || d.wordTarget < 0)) delete d.wordTarget;
+  }
   syncNarrativeUnits(p);
   return p;
+}
+
+/** 文档字数:正文 + 表达式 + 选项 + 列表项(与文档统计口径一致) */
+export function documentWordCount(d: Document): number {
+  let words = 0;
+  for (const b of d.blocks) {
+    words += b.text.length + (b.instruction?.length ?? 0) + (b.condition?.length ?? 0)
+      + (b.choices?.reduce((s, c) => s + c.label.length, 0) ?? 0)
+      + (b.items?.reduce((s, item) => s + item.length, 0) ?? 0);
+  }
+  return words;
+}
+
+/**
+ * 按 Navigator 树的展示顺序线性化对象:每层先走子文件夹(递归)、再走本层对象,
+ * 文件夹与对象都按 order 稳定排序。连续稿模式 / 章节编译按这个顺序拼接。
+ */
+export function linearizeByFolders<T extends { id: string; folderId?: string; order?: number }>(
+  items: T[], folders: Folder[], module: FolderModule,
+): T[] {
+  const byOrder = <U extends { order?: number }>(arr: U[]): U[] =>
+    [...arr].sort((a, b) => (a.order ?? Number.POSITIVE_INFINITY) - (b.order ?? Number.POSITIVE_INFINITY));
+  const moduleFolders = folders.filter((f) => f.module === module);
+  const folderIds = new Set(moduleFolders.map((f) => f.id));
+  const foldersByParent = new Map<string | null, Folder[]>();
+  for (const f of moduleFolders) {
+    const pid = f.parentId ?? null;
+    foldersByParent.set(pid, [...(foldersByParent.get(pid) ?? []), f]);
+  }
+  const itemsByFolder = new Map<string | null, T[]>();
+  for (const item of items) {
+    const fid = item.folderId && folderIds.has(item.folderId) ? item.folderId : null;
+    itemsByFolder.set(fid, [...(itemsByFolder.get(fid) ?? []), item]);
+  }
+  const out: T[] = [];
+  const visit = (parentId: string | null, trail: Set<string>) => {
+    for (const f of byOrder(foldersByParent.get(parentId) ?? [])) {
+      if (trail.has(f.id)) continue;
+      visit(f.id, new Set(trail).add(f.id));
+    }
+    out.push(...byOrder(itemsByFolder.get(parentId) ?? []));
+  };
+  visit(null, new Set());
+  return out;
+}
+
+/** 文件夹路径(如「第一卷 · 第三章」),用于连续稿场景头 */
+export function folderPath(folderId: string | undefined, folders: Folder[]): string {
+  if (!folderId) return '';
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  const names: string[] = [];
+  let cur = byId.get(folderId);
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    names.unshift(cur.name);
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return names.join(' · ');
 }
 
 /* ---------- 叙事单元同步(R1) ---------- */
@@ -202,12 +267,15 @@ export function syncNarrativeUnits(p: Project, prev?: Project): void {
 
   const docRefs: UnitRef[] = [];
   const nodeRefs: UnitRef[] = [];
+  const docOfRef = new Map<string, Document>();
   for (const d of p.documents ?? []) {
     for (const b of d.blocks) {
       const content = contentOfBlock(b);
       if (!content) continue;
+      const key = `b:${b.id}`;
+      docOfRef.set(key, d);
       docRefs.push({
-        key: `b:${b.id}`,
+        key,
         unitId: b.unitId,
         content,
         attach: (id) => { b.unitId = id; },
@@ -241,41 +309,54 @@ export function syncNarrativeUnits(p: Project, prev?: Project): void {
     }
   }
 
-  // 上一状态的内容投影,用于判定本次 commit 改动了哪一侧
-  const prevContents = new Map<string, string>();
-  if (prev) {
-    for (const d of prev.documents ?? []) {
-      for (const b of d.blocks) {
-        const c = contentOfBlock(b);
-        if (c) prevContents.set(`b:${b.id}`, JSON.stringify(c));
+  // 上一状态的内容投影,用于判定本次 commit 改动了哪一侧。
+  // 懒构建:只有确实出现镜像与单元不一致时才遍历 prev(大项目普通编辑零额外成本)
+  let prevIndex: Map<string, UnitContent> | null = null;
+  const getPrevContent = (key: string): UnitContent | undefined => {
+    if (!prevIndex) {
+      const index = new Map<string, UnitContent>();
+      for (const d of prev?.documents ?? []) {
+        for (const b of d.blocks) {
+          const c = contentOfBlock(b);
+          if (c) index.set(`b:${b.id}`, c);
+        }
       }
+      for (const f of prev?.flows ?? []) {
+        walkFlowNodes(f.nodes, (n) => {
+          const c = contentOfNode(n);
+          if (c) index.set(`n:${n.id}`, c);
+        });
+      }
+      prevIndex = index;
     }
-    for (const f of prev.flows ?? []) {
-      walkFlowNodes(f.nodes, (n) => {
-        const c = contentOfNode(n);
-        if (c) prevContents.set(`n:${n.id}`, JSON.stringify(c));
-      });
-    }
-  }
+    return prevIndex.get(key);
+  };
 
   // 变更传播:节点先应用、文档块后应用 → 同一 commit 双侧冲突时文档胜
+  const changedUnits = new Set<string>();
   for (const r of [...nodeRefs, ...docRefs]) {
     const u = unitById.get(r.unitId!)!;
     if (!unitDiffers(u, r.content)) continue;
     if (prev) {
-      const before = prevContents.get(r.key);
+      const before = getPrevContent(r.key);
       // 新引用者(如刚由转换生成)以单元为准;内容未变的引用者不回写
-      if (before === undefined || before === JSON.stringify(r.content)) continue;
+      if (before === undefined || JSON.stringify(before) === JSON.stringify(r.content)) continue;
     }
     applyContent(u, r.content);
+    changedUnits.add(u.id);
   }
 
-  // 镜像刷新 + 回收无人引用的单元
+  // 镜像刷新 + 回收无人引用的单元;被变更单元波及的文档 touch 更新时间,
+  // 让「按更新时间排序」与连续稿的场景记忆化都能感知到这次内容变化
   const referenced = new Set<string>();
   for (const r of [...docRefs, ...nodeRefs]) {
     const u = unitById.get(r.unitId!)!;
     r.write(u);
     referenced.add(u.id);
+    if (changedUnits.has(u.id)) {
+      const owner = docOfRef.get(r.key);
+      if (owner) owner.updatedAt = Date.now();
+    }
   }
   if (p.units.length !== referenced.size) {
     p.units = p.units.filter((u) => referenced.has(u.id));

@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.12.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.12.0):
+- 已发布版本:`v0.13.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.13.0):
+  - **v0.13.0 R2 长篇正文工作台** ✅ — 卷/章 = 文档文件夹树;场景元数据(状态/字数目标/POV/地点/故事时间);连续稿模式(树序连读 + 就地编辑);30 万字实测流畅
   - **v0.12.0 R1 统一叙事数据模型** ✅ — `NarrativeUnit` 权威内容对象 + `syncNarrativeUnits` 迁移/同步器;文档块与流程节点经 `unitId` 共享同一份内容,双向同步
   - **v0.9.0 R0 工程安全基线** ✅ — 测试框架、恢复面板、损坏隔离、诊断导出、大项目性能兜底、桌面项目文件原子替换
   - **v0.10.0 附加批** ✅ — 全模块 Navigator(五模块统一)+ 文件夹归档 + 对话框统一 + 拖拽 / 多选 / 批量
@@ -34,7 +35,7 @@
 |---|---|---|---|---|---|
 | ~~R0~~ | ~~v0.9.0~~ | ~~工程安全基线~~ | ~~测试 / 迁移器 / 大项目性能 / 完整性检查~~ | ✅ 已完成(实际交付于 v0.9.0,内容对齐) | M |
 | ~~R1~~ | ~~v0.12.0~~ | ~~统一叙事数据模型~~ | ~~叙事单元对象 / unitId 引用 / 迁移器~~ | ✅ 已完成(NarrativeUnit + syncNarrativeUnits,详见「最近变更」) | L |
-| R2 | v0.13.0 | **长篇正文工作台** | 卷 / 章 / 场景树;拖拽排序;连续稿模式;场景元数据(字数目标 / 状态 / POV / 地点 / 时间) | 30 万字项目可流畅打开与连续编辑;重排不丢内容 | L |
+| ~~R2~~ | ~~v0.13.0~~ | ~~长篇正文工作台~~ | ~~卷/章/场景树 / 连续稿 / 场景元数据~~ | ✅ 已完成(详见「最近变更」;30 万字实测通过) | L |
 | R3 | v0.14.0 | **文档—流程双视图** | 两视图共享同一叙事单元;完整选项 / 条件 / 指令双向映射;流程反向查看为剧本 | 任一视图修改后另一视图立即同步;选择分支不再丢失 | L |
 | **R3-A** | **v0.15.0** | **🆕 外部知识库 + AI 抽取(轻量)** | Obsidian / md / 纯文本 / PDF 粘贴接入;AI 抽实体 / 事件 / 场景 / 时间点走 ImportPreview 预检;AI 按模板补字段;LLM 服务可切换(OpenAI / Anthropic / Ollama);API Key 本地存储 | AI 输出走稳定 ID 通道,不改结构;可粘贴长文自动生成初稿骨架;支持自建模型 | M |
 | R4 | v0.16.0 | **小说规划增强** | 人物关系图;角色弧线;伏笔台账;章节登场统计;场景卡片墙;节奏图 | 可追踪伏笔埋设 / 回收;可查看人物每章状态与登场情况 | M |
@@ -90,6 +91,21 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R2 · v0.13.0)
+
+长篇正文工作台:
+
+- **建模决策**:场景 = `Document`,卷 / 章 = 文档模块的 `Folder` 树 —— 复用 NavigatorTree 的多级目录、拖拽、order 排序,不新建平行结构
+- `types.ts`:`DocStatus`('outline'/'draft'/'revising'/'done')+ `DOC_STATUS_LABEL` / `DOC_STATUS_ORDER`;`Document` 增 `status?` / `wordTarget?` / `povId?` / `locationId?` / `timeLabel?`
+- `util.ts`:`documentWordCount`(正文+表达式+选项+列表项口径)、`linearizeByFolders`(按 Navigator 树序线性化:每层子文件夹递归优先、order 稳定排序,循环防护)、`folderPath`(「第一卷 · 第三章」);`normalizeProject` 剔除非法 status / wordTarget
+- 拆分 `DocumentView.tsx` → `BlocksEditor.tsx`(块编辑器 + 插入栏,自带激活块状态,单文档与连续稿共用)+ `Manuscript.tsx`(连续稿)
+- **连续稿模式**:工具栏「连续稿」切换;`linearizeByFolders(filtered)` 顺序渲染全部场景;非活动场景 `StaticScene` 轻量静态 DOM(memo 按 `doc.id + doc.updatedAt + 实体名 key` 比较,不随 commit 引用更替重渲染)+ CSS `content-visibility: auto` 跳过屏外绘制;点击场景就地换成 BlocksEditor;场景头显示路径 / 状态 / 时间 / POV / 字数目标
+- inspector 增「场景元数据」区(状态 / 字数目标带进度条 / POV 角色 / 地点 / 故事时间);Navigator `renderItemMeta` 显示状态徽标 + 字数
+- `storage.ts`:五个元数据字段 frontmatter 无损往返,非法值丢弃
+- **性能**(30 万字 / 150 场 / 2252 单元实测):加载 395ms;连续稿滚动即时;按键 136ms → ~55ms。两处优化:① `syncNarrativeUnits` 的 prev 投影索引懒构建(无差异的 commit 零成本);② 同步器在镜像被共享单元变更波及时 touch 所属 `doc.updatedAt`(兼顾排序语义与 StaticScene 记忆化失效)。剩余 ~50ms 主要在 NavigatorTree 全量 re-render,可接受,深度优化留给 R16
+- 测试:util(normalize 元数据 / documentWordCount / linearizeByFolders / folderPath)+ storage(元数据往返 / 非法值丢弃),合计 63 项通过
+- 已实测(浏览器):脚本生成 2 卷 × 10 章 × 150 场 30.6 万字项目;连续稿树序正确、就地编辑、状态徽标三处联动、场景跨章移动内容与字数不丢、R1 迁移器同场景压测通过(2252 单元)
 
 ## 最近变更(R1 · v0.12.0)
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { sampleProject } from './sample';
 import type { Project } from './types';
 import {
-  addAttachment, detachAssetEverywhere, normalizeHex, normalizeProject,
-  parsePaletteJson, removeAttachment,
+  addAttachment, detachAssetEverywhere, documentWordCount, folderPath, linearizeByFolders,
+  normalizeHex, normalizeProject, parsePaletteJson, removeAttachment,
 } from './util';
 
 describe('normalizeProject', () => {
@@ -64,6 +64,74 @@ describe('normalizeProject', () => {
     expect(project.entities[0].order).toBe(5);
     expect(project.entities[1].order).toBeUndefined();
     expect(project.entities[2]?.order).toBeUndefined();
+  });
+});
+
+describe('R2 长篇正文工作台', () => {
+  it('normalizeProject 剔除非法场景元数据', () => {
+    const project = sampleProject();
+    const doc = project.documents[0];
+    (doc as { status: unknown }).status = 'nonsense';
+    (doc as { wordTarget: unknown }).wordTarget = -3;
+    normalizeProject(project);
+    expect(doc.status).toBeUndefined();
+    expect(doc.wordTarget).toBeUndefined();
+
+    doc.status = 'draft';
+    doc.wordTarget = 2000;
+    normalizeProject(project);
+    expect(doc.status).toBe('draft');
+    expect(doc.wordTarget).toBe(2000);
+  });
+
+  it('documentWordCount 统计正文 / 表达式 / 选项 / 列表项', () => {
+    const doc = {
+      id: 'd', name: '', category: '', notes: '', createdAt: 0, updatedAt: 0,
+      blocks: [
+        { id: 'a', type: 'action', text: '12345' },
+        { id: 'b', type: 'condition', text: '', condition: '123' },
+        { id: 'c', type: 'choice', text: '12', choices: [{ id: 'x', label: '1234' }] },
+        { id: 'e', type: 'list', text: '', items: ['12', '3'] },
+      ],
+    } as unknown as import('./types').Document;
+    expect(documentWordCount(doc)).toBe(5 + 3 + 2 + 4 + 3);
+  });
+
+  it('linearizeByFolders 按文件夹树序排列:子文件夹优先、order 稳定', () => {
+    const folders: import('./types').Folder[] = [
+      { id: 'vol1', name: '第一卷', module: 'document', order: 0 },
+      { id: 'vol2', name: '第二卷', module: 'document', order: 1 },
+      { id: 'ch1', name: '第一章', module: 'document', parentId: 'vol1', order: 0 },
+      { id: 'ch2', name: '第二章', module: 'document', parentId: 'vol1', order: 1 },
+      { id: 'other', name: '其他模块', module: 'entity' },
+    ];
+    const docs = [
+      { id: 'root-late', order: 1 },
+      { id: 'root-early', order: 0 },
+      { id: 's-ch2', folderId: 'ch2' },
+      { id: 's-ch1-b', folderId: 'ch1', order: 2 },
+      { id: 's-ch1-a', folderId: 'ch1', order: 1 },
+      { id: 's-vol1', folderId: 'vol1' },
+      { id: 's-vol2', folderId: 'vol2' },
+      { id: 's-lost', folderId: 'missing' },
+    ];
+    const ordered = linearizeByFolders(docs, folders, 'document').map((d) => d.id);
+    expect(ordered).toEqual([
+      's-ch1-a', 's-ch1-b', 's-ch2', 's-vol1', 's-vol2',
+      'root-early', 'root-late', 's-lost',
+    ]);
+  });
+
+  it('folderPath 拼出卷 · 章路径并容忍循环', () => {
+    const folders: import('./types').Folder[] = [
+      { id: 'vol1', name: '第一卷', module: 'document' },
+      { id: 'ch1', name: '第三章', module: 'document', parentId: 'vol1' },
+      { id: 'loop-a', name: 'A', module: 'document', parentId: 'loop-b' },
+      { id: 'loop-b', name: 'B', module: 'document', parentId: 'loop-a' },
+    ];
+    expect(folderPath('ch1', folders)).toBe('第一卷 · 第三章');
+    expect(folderPath(undefined, folders)).toBe('');
+    expect(folderPath('loop-a', folders)).toBe('B · A');
   });
 });
 

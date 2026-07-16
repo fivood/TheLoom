@@ -418,6 +418,18 @@ export interface DocBlock {
   instruction?: string;
 }
 
+/** 场景写作状态(R2 长篇正文工作台) */
+export type DocStatus = 'outline' | 'draft' | 'revising' | 'done';
+
+export const DOC_STATUS_LABEL: Record<DocStatus, string> = {
+  outline: '大纲',
+  draft: '草稿',
+  revising: '修订中',
+  done: '完成',
+};
+
+export const DOC_STATUS_ORDER: DocStatus[] = ['outline', 'draft', 'revising', 'done'];
+
 export interface Document {
   id: ID;
   /** 所属文档文件夹 id;空 = 未分组 */
@@ -430,6 +442,16 @@ export interface Document {
   category: string;
   blocks: DocBlock[];
   notes: string;
+  /** 场景元数据(R2):写作状态 */
+  status?: DocStatus;
+  /** 场景元数据:字数目标 */
+  wordTarget?: number;
+  /** 场景元数据:POV 角色(实体 id) */
+  povId?: ID;
+  /** 场景元数据:地点(实体 id) */
+  locationId?: ID;
+  /** 场景元数据:故事时间(自由文本,如「雨夜」「第7日」) */
+  timeLabel?: string;
   createdAt: number;
   updatedAt: number;
 }

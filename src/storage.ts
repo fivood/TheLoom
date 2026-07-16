@@ -12,8 +12,8 @@
  * 会在下次加载时自动导入为实体 / 资料卡。
  */
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import type { DocBlock, DocBlockType, Document, Entity, EntityField, EntityFieldType, EntityKind, Project, ResearchCard } from './types';
-import { ENTITY_KIND_LABEL, PALETTE } from './types';
+import type { DocBlock, DocBlockType, DocStatus, Document, Entity, EntityField, EntityFieldType, EntityKind, Project, ResearchCard } from './types';
+import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL, PALETTE } from './types';
 import { normalizeProject, uid } from './util';
 import { documentToMarkdown } from './export';
 import { parseProjectData } from './recovery';
@@ -239,6 +239,11 @@ export function documentToMd(d: Document, entities: Entity[]): string {
   if (d.technicalName) meta.technicalName = d.technicalName;
   if (d.folderId) meta.folderId = d.folderId;
   if (typeof d.order === 'number' && Number.isFinite(d.order)) meta.order = d.order;
+  if (d.status) meta.status = d.status;
+  if (typeof d.wordTarget === 'number' && Number.isFinite(d.wordTarget)) meta.wordTarget = d.wordTarget;
+  if (d.povId) meta.povId = d.povId;
+  if (d.locationId) meta.locationId = d.locationId;
+  if (d.timeLabel) meta.timeLabel = d.timeLabel;
   if (d.notes.trim()) meta.notes = d.notes;
   // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
   const blockYaml = stringifyYaml(d.blocks.map((b) => {
@@ -317,6 +322,11 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
     category: typeof meta.category === 'string' && meta.category ? meta.category : '未分类',
     blocks,
     notes: typeof meta.notes === 'string' ? meta.notes : '',
+    status: typeof meta.status === 'string' && meta.status in DOC_STATUS_LABEL ? meta.status as DocStatus : undefined,
+    wordTarget: typeof meta.wordTarget === 'number' && Number.isFinite(meta.wordTarget) && meta.wordTarget >= 0 ? meta.wordTarget : undefined,
+    povId: typeof meta.povId === 'string' && meta.povId ? meta.povId : undefined,
+    locationId: typeof meta.locationId === 'string' && meta.locationId ? meta.locationId : undefined,
+    timeLabel: typeof meta.timeLabel === 'string' && meta.timeLabel ? meta.timeLabel : undefined,
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
     updatedAt: typeof meta.updatedAt === 'number' ? meta.updatedAt : Date.now(),
   };

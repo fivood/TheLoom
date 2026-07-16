@@ -145,3 +145,35 @@ category: 正文
     expect(restoredE.order).toBeUndefined();
   });
 });
+
+describe('R2 场景元数据往返', () => {
+  it('status / wordTarget / povId / locationId / timeLabel 无损往返', () => {
+    const doc: Document = {
+      id: 'doc-scene', name: '场景一', category: '正文', notes: '',
+      status: 'revising', wordTarget: 3000, povId: 'entity-pov', locationId: 'entity-loc', timeLabel: '雨夜',
+      createdAt: 1, updatedAt: 2,
+      blocks: [{ id: 'b1', type: 'action', text: '门被推开。' }],
+    };
+    const restored = mdToDocument(`${doc.name}.md`, documentToMd(doc, []), 0);
+    expect(restored.status).toBe('revising');
+    expect(restored.wordTarget).toBe(3000);
+    expect(restored.povId).toBe('entity-pov');
+    expect(restored.locationId).toBe('entity-loc');
+    expect(restored.timeLabel).toBe('雨夜');
+  });
+
+  it('元数据缺失时往返保持 undefined,非法 status 被丢弃', () => {
+    const doc: Document = {
+      id: 'doc-plain', name: '普通文档', category: '正文', notes: '',
+      createdAt: 1, updatedAt: 2,
+      blocks: [{ id: 'b1', type: 'action', text: 'x' }],
+    };
+    const restored = mdToDocument(`${doc.name}.md`, documentToMd(doc, []), 0);
+    expect(restored.status).toBeUndefined();
+    expect(restored.wordTarget).toBeUndefined();
+    const bad = documentToMd(doc, []).replace('loom: document', "loom: document\nstatus: nonsense\nwordTarget: -5");
+    const restoredBad = mdToDocument(`${doc.name}.md`, bad, 0);
+    expect(restoredBad.status).toBeUndefined();
+    expect(restoredBad.wordTarget).toBeUndefined();
+  });
+});

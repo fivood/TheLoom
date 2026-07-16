@@ -1,41 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import Icon from '../../components/Icon';
 import TechNameField from '../../components/TechNameField';
-import { RichTextInput } from '../../components/RichText';
-import type { DocBlock, DocBlockType, Document } from '../../types';
-import { DOC_BLOCK_LABEL, DOC_WRITING_TYPES } from '../../types';
+import type { DocStatus, Document } from '../../types';
+import { DOC_STATUS_LABEL, DOC_STATUS_ORDER, DOC_WRITING_TYPES } from '../../types';
 import { documentToFlow } from './convert';
-import { walkFlowNodes } from '../../util';
+import { documentWordCount, linearizeByFolders } from '../../util';
 import { downloadMarkdown, documentToMarkdown } from '../../export';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
-
-const BLOCK_TYPES = Object.keys(DOC_BLOCK_LABEL) as DocBlockType[];
-
-function emptyBlock(type: DocBlockType): DocBlock {
-  const b: DocBlock = { id: uid(), type, text: '' };
-  if (type === 'choice') b.choices = [{ id: uid(), label: '' }];
-  if (type === 'condition') b.condition = '';
-  if (type === 'instruction') b.instruction = '';
-  if (type === 'subheading') b.level = 3;
-  if (type === 'list') { b.items = ['']; b.ordered = false; }
-  return b;
-}
+import BlocksEditor, { emptyBlock } from './BlocksEditor';
+import Manuscript from './Manuscript';
 
 export default function DocumentView() {
   const documents = useLoom((s) => s.project.documents);
   const categories = useLoom((s) => s.project.documentCategories);
   const entities = useLoom((s) => s.project.entities);
-  const flows = useLoom((s) => s.project.flows);
+  const folders = useLoom((s) => s.project.folders);
   const { addDocument, updateDocument, removeDocument, update } = useLoom();
   const go = useNav((s) => s.go);
 
   const [catFilter, setCatFilter] = useState<string | 'all'>('all');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(documents[0]?.id ?? null);
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
+  const [mode, setMode] = useState<'single' | 'manuscript'>('single');
 
   const navSeq = useNav((s) => s.seq);
   useEffect(() => {
@@ -44,23 +34,10 @@ export default function DocumentView() {
       setCatFilter('all');
       setQuery('');
       setSelectedId(t.docId);
-      setActiveBlockId(t.blockId ?? null);
+      setFocusBlockId(t.blockId ?? null);
       useNav.getState().clear();
     }
   }, [navSeq]);
-
-  const characters = useMemo(() => entities.filter((e) => e.kind === 'character'), [entities]);
-
-  // 被流程节点共享的叙事单元 id:文档块显示 ⇄ 标识,提示双向同步
-  const flowUnitIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const f of flows) {
-      walkFlowNodes(f.nodes, (n) => {
-        if (typeof n.data.unitId === 'string') set.add(n.data.unitId);
-      });
-    }
-    return set;
-  }, [flows]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -77,6 +54,12 @@ export default function DocumentView() {
     return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
   }, [documents, catFilter, query]);
 
+  // 连续稿顺序:与 Navigator 树一致(卷 / 章文件夹递归,场景按 order)
+  const manuscriptDocs = useMemo(
+    () => linearizeByFolders(filtered, folders, 'document'),
+    [filtered, folders],
+  );
+
   const selected = documents.find((d) => d.id === selectedId) ?? null;
 
   const createDoc = () => {
@@ -92,7 +75,7 @@ export default function DocumentView() {
     };
     addDocument(d);
     setSelectedId(d.id);
-    setActiveBlockId(d.blocks[0].id);
+    setFocusBlockId(d.blocks[0].id);
   };
 
   const addCategory = async () => {
@@ -121,61 +104,6 @@ export default function DocumentView() {
     updateDocument(selectedId, fn);
   };
 
-  const patchBlock = (blockId: string, patch: Partial<DocBlock>) => {
-    patchDoc((d) => {
-      const b = d.blocks.find((x) => x.id === blockId);
-      if (b) Object.assign(b, patch);
-    });
-  };
-
-  const insertBlockAfter = (blockId: string, type: DocBlockType) => {
-    patchDoc((d) => {
-      const i = d.blocks.findIndex((x) => x.id === blockId);
-      if (i < 0) return;
-      const nb = emptyBlock(type);
-      d.blocks.splice(i + 1, 0, nb);
-      setActiveBlockId(nb.id);
-    });
-  };
-
-  const appendBlock = (type: DocBlockType) => {
-    patchDoc((d) => {
-      const nb = emptyBlock(type);
-      d.blocks.push(nb);
-      setActiveBlockId(nb.id);
-    });
-  };
-
-  const removeBlock = (blockId: string) => {
-    patchDoc((d) => {
-      if (d.blocks.length <= 1) return;
-      d.blocks = d.blocks.filter((x) => x.id !== blockId);
-    });
-  };
-
-  const moveBlock = (blockId: string, dir: -1 | 1) => {
-    patchDoc((d) => {
-      const i = d.blocks.findIndex((x) => x.id === blockId);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= d.blocks.length) return;
-      const [b] = d.blocks.splice(i, 1);
-      d.blocks.splice(j, 0, b);
-    });
-  };
-
-  const addChoice = (blockId: string) => {
-    patchDoc((d) => {
-      const b = d.blocks.find((x) => x.id === blockId);
-      if (b && b.choices) b.choices.push({ id: uid(), label: '' });
-    });
-  };
-  const removeChoice = (blockId: string, choiceId: string) => {
-    patchDoc((d) => {
-      const b = d.blocks.find((x) => x.id === blockId);
-      if (b && b.choices) b.choices = b.choices.filter((c) => c.id !== choiceId);
-    });
-  };
-
   const convertToFlow = async () => {
     if (!selected) return;
     const flowable = selected.blocks.filter((b) => !DOC_WRITING_TYPES.has(b.type));
@@ -190,13 +118,10 @@ export default function DocumentView() {
 
   const stats = useMemo(() => {
     if (!selected) return null;
-    let words = 0, dialogues = 0;
+    const words = documentWordCount(selected);
+    let dialogues = 0;
     const speakers = new Map<string, number>();
     for (const b of selected.blocks) {
-      const len = b.text.length + (b.instruction?.length ?? 0) + (b.condition?.length ?? 0)
-        + (b.choices?.reduce((s, c) => s + c.label.length, 0) ?? 0)
-        + (b.items?.reduce((s, item) => s + item.length, 0) ?? 0);
-      words += len;
       if (b.type === 'dialogue') {
         dialogues++;
         if (b.speakerId) {
@@ -208,6 +133,9 @@ export default function DocumentView() {
     return { words, dialogues, speakers: [...speakers.entries()].sort((a, b) => b[1] - a[1]) };
   }, [selected, entities]);
 
+  const characters = useMemo(() => entities.filter((e) => e.kind === 'character'), [entities]);
+  const locations = useMemo(() => entities.filter((e) => e.kind === 'location'), [entities]);
+
   return (
     <>
       <NavigatorTree
@@ -217,7 +145,17 @@ export default function DocumentView() {
         selectedId={selectedId}
         getLabel={(document) => document.name}
         getDetail={(document) => document.category}
-        onSelect={(id) => { setSelectedId(id); setActiveBlockId(null); }}
+        renderItemMeta={(document) => (
+          <span className="doc-nav-meta">
+            {document.status && (
+              <span className={`ms-status ms-status-${document.status}`} title={`状态:${DOC_STATUS_LABEL[document.status]}`}>
+                {DOC_STATUS_LABEL[document.status]}
+              </span>
+            )}
+            <span className="doc-nav-words">{documentWordCount(document)}字</span>
+          </span>
+        )}
+        onSelect={(id) => { setSelectedId(id); setFocusBlockId(null); }}
         onMove={(id, folderId) => updateDocument(id, (document) => { document.folderId = folderId; })}
         onMoveMany={(ids, folderId) => update((p) => {
           const set = new Set(ids);
@@ -235,6 +173,13 @@ export default function DocumentView() {
       <div className="pane-col">
         <div className="toolbar">
           <button className="primary" onClick={createDoc}>＋ 新文档</button>
+          <button
+            className={mode === 'manuscript' ? 'primary' : undefined}
+            title="连续稿:按卷 / 章 / 场景树顺序连成一篇稿子,点击任意场景就地编辑"
+            onClick={() => setMode((m) => (m === 'manuscript' ? 'single' : 'manuscript'))}
+          >
+            <Icon name="book" size={13} /> 连续稿
+          </button>
           <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -247,10 +192,18 @@ export default function DocumentView() {
             onChange={(e) => setQuery(e.target.value)}
             style={{ width: 260 }}
           />
-          <span className="hint">在结构化剧本块里起草,再「转为流程」生成节点图</span>
+          <span className="hint">
+            {mode === 'manuscript' ? '左侧文件夹是卷 / 章,拖拽即可重排场景' : '在结构化剧本块里起草,再「转为流程」生成节点图'}
+          </span>
         </div>
 
-        {selected ? (
+        {mode === 'manuscript' ? (
+          <Manuscript
+            docs={manuscriptDocs}
+            selectedId={selectedId}
+            onSelect={(id) => { setSelectedId(id); setFocusBlockId(null); }}
+          />
+        ) : selected ? (
           <div className="doc-editor">
             <div className="doc-head">
               <input
@@ -275,182 +228,7 @@ export default function DocumentView() {
                 <Icon name="flow" size={13} /> 转为流程
               </button>
             </div>
-
-            <div className="doc-blocks">
-              {selected.blocks.map((b, i) => (
-                <div key={b.id} className={`doc-block ${b.type} ${activeBlockId === b.id ? 'active' : ''}`} onClick={() => setActiveBlockId(b.id)}>
-                  <div className="doc-block-side">
-                    <span className="doc-block-kind" title={DOC_BLOCK_LABEL[b.type]}>{DOC_BLOCK_LABEL[b.type]}</span>
-                    {b.unitId && flowUnitIds.has(b.unitId) && (
-                      <span className="doc-block-linked" title="已与流程节点共享同一叙事单元:任一处修改会双向同步">⇄</span>
-                    )}
-                    <div className="doc-block-tools">
-                      <button className="ghost icon-btn" title="上移" onClick={(e) => { e.stopPropagation(); moveBlock(b.id, -1); }}>↑</button>
-                      <button className="ghost icon-btn" title="下移" onClick={(e) => { e.stopPropagation(); moveBlock(b.id, 1); }}>↓</button>
-                      <button className="ghost icon-btn" title="删除块" onClick={(e) => { e.stopPropagation(); removeBlock(b.id); }}><Icon name="trash" size={12} /></button>
-                    </div>
-                  </div>
-                  <div className="doc-block-main">
-                    {b.type === 'dialogue' && (
-                      <div className="doc-speaker-row">
-                        <select
-                          value={b.speakerId ?? ''}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => patchBlock(b.id, { speakerId: e.target.value || undefined })}
-                        >
-                          <option value="">(无说话人 / 旁白)</option>
-                          {characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {b.type === 'choice' ? (
-                      <div className="doc-choices">
-                        {b.choices?.map((c) => (
-                          <div key={c.id} className="doc-choice-row">
-                            <span className="doc-choice-mark">▸</span>
-                            <input
-                              value={c.label}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => patchDoc((d) => {
-                                const bb = d.blocks.find((x) => x.id === b.id);
-                                const cc = bb?.choices?.find((x) => x.id === c.id);
-                                if (cc) cc.label = e.target.value;
-                              })}
-                              placeholder="选项文本(如:接受 / 拒绝)"
-                            />
-                            <button className="ghost icon-btn" onClick={(e) => { e.stopPropagation(); removeChoice(b.id, c.id); }}>×</button>
-                          </div>
-                        ))}
-                        <button className="ghost" style={{ alignSelf: 'start' }} onClick={(e) => { e.stopPropagation(); addChoice(b.id); }}>＋ 选项</button>
-                      </div>
-                    ) : b.type === 'condition' ? (
-                      <input
-                        className="doc-code-input"
-                        value={b.condition ?? ''}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => patchBlock(b.id, { condition: e.target.value })}
-                        placeholder="变量表达式,如:met_jiang && trust > 5"
-                      />
-                    ) : b.type === 'instruction' ? (
-                      <input
-                        className="doc-code-input"
-                        value={b.instruction ?? ''}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => patchBlock(b.id, { instruction: e.target.value })}
-                        placeholder="指令,如:trust = trust + 1"
-                      />
-                    ) : b.type === 'action' || b.type === 'dialogue' ? (
-                      <RichTextInput
-                        value={b.text}
-                        onChange={(v) => patchBlock(b.id, { text: v })}
-                        placeholder={b.type === 'dialogue' ? '台词内容(可用 **粗** *斜* ~~删~~)' : '动作 / 旁白描述'}
-                      />
-                    ) : b.type === 'subheading' ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <select
-                          value={b.level ?? 3}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => patchBlock(b.id, { level: Number(e.target.value) as 2 | 3 })}
-                          style={{ width: 68 }}
-                          title="标题层级"
-                        >
-                          <option value={2}>H2</option>
-                          <option value={3}>H3</option>
-                        </select>
-                        <input
-                          className={`doc-subheading doc-subheading-${b.level ?? 3}`}
-                          value={b.text}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => patchBlock(b.id, { text: e.target.value })}
-                          placeholder="子标题"
-                          style={{ flex: 1 }}
-                        />
-                      </div>
-                    ) : b.type === 'quote' ? (
-                      <textarea
-                        className="doc-quote"
-                        rows={Math.max(2, Math.ceil((b.text.length || 1) / 30))}
-                        value={b.text}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => patchBlock(b.id, { text: e.target.value })}
-                        placeholder="引用内容(导出为 Markdown 的 > 块)"
-                      />
-                    ) : b.type === 'list' ? (
-                      <div className="doc-list">
-                        <div className="doc-list-tools">
-                          <select
-                            value={b.ordered ? 'ol' : 'ul'}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => patchBlock(b.id, { ordered: e.target.value === 'ol' })}
-                            title="列表类型"
-                          >
-                            <option value="ul">• 无序</option>
-                            <option value="ol">1. 有序</option>
-                          </select>
-                        </div>
-                        {(b.items ?? []).map((item, ii) => (
-                          <div key={ii} className="doc-list-row">
-                            <span className="doc-list-marker">{b.ordered ? `${ii + 1}.` : '•'}</span>
-                            <input
-                              value={item}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => patchBlock(b.id, {
-                                items: (b.items ?? []).map((x, j) => (j === ii ? e.target.value : x)),
-                              })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const next = [...(b.items ?? [])];
-                                  next.splice(ii + 1, 0, '');
-                                  patchBlock(b.id, { items: next });
-                                } else if (e.key === 'Backspace' && item === '' && (b.items ?? []).length > 1) {
-                                  e.preventDefault();
-                                  patchBlock(b.id, { items: (b.items ?? []).filter((_, j) => j !== ii) });
-                                }
-                              }}
-                              placeholder="列表项(回车新增,退格删空项)"
-                            />
-                            <button
-                              className="ghost icon-btn"
-                              title="删除该项"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const next = (b.items ?? []).filter((_, j) => j !== ii);
-                                patchBlock(b.id, { items: next.length ? next : [''] });
-                              }}
-                            >×</button>
-                          </div>
-                        ))}
-                        <button
-                          className="ghost"
-                          style={{ alignSelf: 'start' }}
-                          onClick={(e) => { e.stopPropagation(); patchBlock(b.id, { items: [...(b.items ?? []), ''] }); }}
-                        >＋ 列表项</button>
-                      </div>
-                    ) : (
-                      <textarea
-                        rows={b.type === 'heading' ? 1 : Math.max(2, Math.ceil((b.text.length || 1) / 30))}
-                        value={b.text}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => patchBlock(b.id, { text: e.target.value })}
-                        placeholder={
-                          b.type === 'heading' ? '场景标题,如:雨夜酒馆' :
-                          '注释内容(不进入流程)'
-                        }
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="doc-insert-bar">
-              {BLOCK_TYPES.map((t) => (
-                <button key={t} className="ghost" onClick={() => appendBlock(t)} title={`追加「${DOC_BLOCK_LABEL[t]}」块`}>
-                  ＋ {DOC_BLOCK_LABEL[t]}
-                </button>
-              ))}
-            </div>
+            <BlocksEditor doc={selected} focusBlockId={focusBlockId} />
           </div>
         ) : (
           <div className="empty-hint" style={{ margin: 'auto' }}>
@@ -484,7 +262,18 @@ export default function DocumentView() {
 
           {stats && (
             <div className="doc-stats">
-              <div>字数 {stats.words} · 对白 {stats.dialogues} 段</div>
+              <div>
+                字数 {stats.words}
+                {typeof selected.wordTarget === 'number' && selected.wordTarget > 0 && (
+                  <> / 目标 {selected.wordTarget}({Math.round((stats.words / selected.wordTarget) * 100)}%)</>
+                )}
+                · 对白 {stats.dialogues} 段
+              </div>
+              {typeof selected.wordTarget === 'number' && selected.wordTarget > 0 && (
+                <div className="doc-progress">
+                  <div className="doc-progress-fill" style={{ width: `${Math.min(100, (stats.words / selected.wordTarget) * 100)}%` }} />
+                </div>
+              )}
               {stats.speakers.length > 0 && (
                 <table className="var-table" style={{ marginTop: 6 }}>
                   <thead><tr><th>角色</th><th>台词</th></tr></thead>
@@ -497,6 +286,65 @@ export default function DocumentView() {
               )}
             </div>
           )}
+
+          <div className="field">
+            <label>场景元数据</label>
+            <div className="kv-row">
+              <div className="field" style={{ flex: 1 }}>
+                <label>状态</label>
+                <select
+                  value={selected.status ?? ''}
+                  onChange={(e) => patchDoc((d) => { d.status = (e.target.value || undefined) as DocStatus | undefined; })}
+                >
+                  <option value="">(未设置)</option>
+                  {DOC_STATUS_ORDER.map((s) => <option key={s} value={s}>{DOC_STATUS_LABEL[s]}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>字数目标</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={selected.wordTarget ?? ''}
+                  onChange={(e) => patchDoc((d) => {
+                    const v = Number(e.target.value);
+                    d.wordTarget = e.target.value === '' || !Number.isFinite(v) || v <= 0 ? undefined : Math.floor(v);
+                  })}
+                  placeholder="如 3000"
+                />
+              </div>
+            </div>
+            <div className="kv-row">
+              <div className="field" style={{ flex: 1 }}>
+                <label>POV 角色</label>
+                <select
+                  value={selected.povId ?? ''}
+                  onChange={(e) => patchDoc((d) => { d.povId = e.target.value || undefined; })}
+                >
+                  <option value="">(无)</option>
+                  {characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>地点</label>
+                <select
+                  value={selected.locationId ?? ''}
+                  onChange={(e) => patchDoc((d) => { d.locationId = e.target.value || undefined; })}
+                >
+                  <option value="">(无)</option>
+                  {locations.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="field">
+              <label>故事时间</label>
+              <input
+                value={selected.timeLabel ?? ''}
+                onChange={(e) => patchDoc((d) => { d.timeLabel = e.target.value || undefined; })}
+                placeholder="如:雨夜 / 第 7 日 / 三年前"
+              />
+            </div>
+          </div>
 
           <TechNameField
             value={selected.technicalName}
