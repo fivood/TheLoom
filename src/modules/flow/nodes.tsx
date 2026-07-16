@@ -1,4 +1,4 @@
-import { Handle, NodeResizer, Position, useReactFlow, type NodeProps, type Node } from '@xyflow/react';
+import { Handle, NodeResizer, Position, useEdges, useReactFlow, type NodeProps, type Node } from '@xyflow/react';
 import type { FlowNodeData, FlowNodeType } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import { useLoom } from '../../store';
@@ -129,11 +129,31 @@ export function JumpNode(props: NodeProps<LoomNode>) {
   );
 }
 
-export function HubNode({ data, selected }: NodeProps<LoomNode>) {
+export function HubNode({ id, data, selected }: NodeProps<LoomNode>) {
+  const unit = useLoom((s) =>
+    typeof data.unitId === 'string' ? (s.project.units ?? []).find((u) => u.id === data.unitId) : undefined,
+  );
+  const edges = useEdges();
+  const choices = unit?.choices ?? [];
+  const bound = new Set(
+    edges
+      .filter((e) => e.source === id)
+      .map((e) => (e.data as { choiceId?: string } | undefined)?.choiceId)
+      .filter(Boolean),
+  );
   return (
     <div className={`flow-node hub-node ${selected ? 'selected' : ''}`} style={{ background: data.color || 'var(--bg-raised)' }}>
       <Handle type="target" position={Position.Left} />
       <span>{data.title || '◈'}</span>
+      {choices.length > 0 && (
+        <div className="hub-choices">
+          {choices.map((c) => (
+            <div key={c.id} className={`hub-choice${bound.has(c.id) ? ' bound' : ''}`} title={bound.has(c.id) ? '已连线的选项' : '尚未连线的选项:从节点右侧引出连线会自动绑定'}>
+              {bound.has(c.id) ? '●' : '○'} {c.label || '(未命名选项)'}
+            </div>
+          ))}
+        </div>
+      )}
       <Handle type="source" position={Position.Right} />
     </div>
   );

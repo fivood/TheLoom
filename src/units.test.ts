@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { sampleProject } from './sample';
 import type { Document, Flow, Project } from './types';
-import { normalizeProject, syncNarrativeUnits, walkFlowNodes } from './util';
-import { documentToFlow } from './modules/document/convert';
+import { normalizeProject, syncNarrativeUnits, uid, walkFlowNodes } from './util';
+import { documentToFlow, flowToDocument } from './modules/document/convert';
 import { documentToMd, mdToDocument } from './storage';
 
 function fixture(): { project: Project; doc: Document; flow: Flow } {
@@ -177,6 +177,117 @@ describe('叙事单元双向同步(commit 语义)', () => {
     const node = converted.nodes.find((n) => n.data.unitId === doc.blocks[1].unitId)!;
     expect(node.data.text).toBe('Obsidian 里改的');
     expect(project.units!.find((u) => u.id === doc.blocks[1].unitId)!.text).toBe('Obsidian 里改的');
+  });
+});
+
+describe('R3 选项结构双向同步', () => {
+  function choiceFixture() {
+    const project = sampleProject();
+    const doc: Document = {
+      id: 'doc-c', name: '选项文档', category: '未分类', notes: '', createdAt: 1, updatedAt: 1,
+      blocks: [
+        { id: 'b-choice', type: 'choice', text: '怎么办?', choices: [{ id: 'c-a', label: '追上去' }, { id: 'c-b', label: '留下' }] },
+        { id: 'b-after', type: 'action', text: '雨更大了。' },
+      ],
+    };
+    project.documents.push(doc);
+    normalizeProject(project);
+    const flow = documentToFlow(doc);
+    project.flows.push(flow);
+    syncNarrativeUnits(project);
+    const hub = flow.nodes.find((n) => n.type === 'hub')!;
+    const after = flow.nodes.find((n) => n.type === 'dialogue')!;
+    return { project, doc, flow, hub, after };
+  }
+
+  it('给未绑定出边写标签 → 升级为文档选项', () => {
+    const { project, doc, flow, hub, after } = choiceFixture();
+    const prev = structuredClone(project);
+    const edge = flow.edges.find((e) => e.source === hub.id)!;
+    edge.label = '第三条路';
+    syncNarrativeUnits(project, prev);
+    expect(edge.choiceId).toBeTruthy();
+    expect(doc.blocks[0].choices!.map((c) => c.label)).toEqual(['追上去', '留下', '第三条路']);
+    expect(after).toBeTruthy();
+  });
+
+  it('绑定边与选项标签双向同步', () => {
+    const { project, doc, flow, hub, after } = choiceFixture();
+    flow.edges.push({ id: uid(), source: hub.id, target: after.id, label: '追上去', choiceId: 'c-a' });
+    syncNarrativeUnits(project);
+
+    // 文档侧改标签 → 边跟随
+    let prev = structuredClone(project);
+    doc.blocks[0].choices![0].label = '拔腿就追';
+    syncNarrativeUnits(project, prev);
+    const edge = flow.edges.find((e) => e.choiceId === 'c-a')!;
+    expect(edge.label).toBe('拔腿就追');
+
+    // 边侧改标签 → 文档跟随
+    prev = structuredClone(project);
+    edge.label = '悄悄跟上';
+    syncNarrativeUnits(project, prev);
+    expect(doc.blocks[0].choices![0].label).toBe('悄悄跟上');
+  });
+
+  it('文档删除选项 → 对应边解绑并清标签,不复活', () => {
+    const { project, doc, flow, hub, after } = choiceFixture();
+    flow.edges.push({ id: 'e-bound', source: hub.id, target: after.id, label: '追上去', choiceId: 'c-a' });
+    syncNarrativeUnits(project);
+
+    const prev = structuredClone(project);
+    doc.blocks[0].choices = doc.blocks[0].choices!.filter((c) => c.id !== 'c-a');
+    syncNarrativeUnits(project, prev);
+    const edge = flow.edges.find((e) => e.id === 'e-bound')!;
+    expect(edge.choiceId).toBeUndefined();
+    expect(edge.label).toBeUndefined();
+    expect(doc.blocks[0].choices!.map((c) => c.id)).toEqual(['c-b']);
+
+    // 再同步一轮不会把已删除的选项复活
+    const prev2 = structuredClone(project);
+    syncNarrativeUnits(project, prev2);
+    expect(doc.blocks[0].choices!.map((c) => c.id)).toEqual(['c-b']);
+  });
+});
+
+describe('R3 流程反向剧本视图', () => {
+  it('flowToDocument 生成共享单元的文档,按边序线性化', () => {
+    const { project } = (() => {
+      const project = sampleProject();
+      normalizeProject(project);
+      return { project };
+    })();
+    const flow: Flow = {
+      id: 'f-view', name: '夜谈',
+      nodes: [
+        { id: 'n1', type: 'fragment', position: { x: 0, y: 0 }, data: { title: '开场', text: '' } },
+        { id: 'n2', type: 'dialogue', position: { x: 0, y: 0 }, data: { title: '', text: '你来了。', speakerId: project.entities[0]?.id } },
+        { id: 'n3', type: 'dialogue', position: { x: 0, y: 0 }, data: { title: '', text: '门开了。' } },
+        { id: 'n4', type: 'condition', position: { x: 0, y: 0 }, data: { title: '', text: 'trust > 5' } },
+        { id: 'n5', type: 'note', position: { x: 0, y: 0 }, data: { title: '', text: '画布备注' } },
+      ],
+      edges: [
+        { id: 'e1', source: 'n1', target: 'n2' },
+        { id: 'e2', source: 'n2', target: 'n3' },
+        { id: 'e3', source: 'n3', target: 'n4' },
+      ],
+    };
+    project.flows.push(flow);
+    syncNarrativeUnits(project);
+
+    const doc = flowToDocument(flow, project.units ?? []);
+    expect(doc.blocks.map((b) => b.type)).toEqual(['heading', 'dialogue', 'action', 'condition']);
+    expect(doc.blocks.map((b) => b.unitId)).toEqual([
+      flow.nodes[0].data.unitId, flow.nodes[1].data.unitId, flow.nodes[2].data.unitId, flow.nodes[3].data.unitId,
+    ]);
+
+    // 挂进项目后:文档侧编辑 → 节点同步
+    project.documents.push(doc);
+    syncNarrativeUnits(project);
+    const prev = structuredClone(project);
+    doc.blocks[1].text = '你终于来了。';
+    syncNarrativeUnits(project, prev);
+    expect(flow.nodes[1].data.text).toBe('你终于来了。');
   });
 });
 

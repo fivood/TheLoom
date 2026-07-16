@@ -7,7 +7,8 @@ import {
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { confirmDialog, promptText } from '../../dialog';
-import { countSubNodes, resolveSub } from '../../util';
+import { countSubNodes, resolveSub, walkFlowNodes } from '../../util';
+import { flowToDocument } from '../document/convert';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import ColorPicker from '../../components/ColorPicker';
@@ -79,6 +80,8 @@ interface EdgeData {
   effect: string;
   once: boolean;
   fallback: boolean;
+  /** 绑定的文档选项 id(hub 出边 ↔ 文档「选项」块) */
+  choiceId?: string;
   [key: string]: unknown;
 }
 
@@ -124,7 +127,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   const [edges, setEdges] = useState<Edge[]>(() => sub.edges.map((e) => {
     const data: EdgeData = {
       label: e.label ?? '', condition: e.condition ?? '', effect: e.effect ?? '',
-      once: e.once === true, fallback: e.fallback === true,
+      once: e.once === true, fallback: e.fallback === true, choiceId: e.choiceId,
     };
     return {
       id: e.id, source: e.source, target: e.target,
@@ -166,6 +169,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
           effect: d.effect || undefined,
           once: d.once || undefined,
           fallback: d.fallback || undefined,
+          choiceId: d.choiceId || undefined,
         };
       });
     });
@@ -189,10 +193,24 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   }, []);
   const onConnect = useCallback((conn: Connection) => {
     dirty.current = true;
-    setEdges((es) => addEdge({
-      ...conn, id: uid(), ...EDGE_STYLE,
-      data: { label: '', condition: '', effect: '', once: false, fallback: false } satisfies EdgeData,
-    }, es));
+    setEdges((es) => {
+      const data: EdgeData = { label: '', condition: '', effect: '', once: false, fallback: false };
+      // 从共享选项单元的汇聚点引出连线时,自动绑定第一个尚未连线的选项
+      const source = latest.current.nodes.find((n) => n.id === conn.source);
+      if (source?.type === 'hub' && typeof source.data.unitId === 'string' && !conn.sourceHandle) {
+        const unit = (useLoom.getState().project.units ?? []).find((u) => u.id === source.data.unitId);
+        const used = new Set(es.map((e) => (e.data as EdgeData | undefined)?.choiceId).filter(Boolean));
+        const free = (unit?.choices ?? []).find((c) => !used.has(c.id));
+        if (free) {
+          data.choiceId = free.id;
+          data.label = free.label;
+        }
+      }
+      return addEdge({
+        ...conn, id: uid(), ...EDGE_STYLE,
+        data, label: edgeDisplayLabel(data),
+      }, es);
+    });
   }, []);
 
   const addNode = (type: FlowNodeType) => {
@@ -270,6 +288,27 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               }
             }}
           ><Icon name="script" size={14} /> 导出剧本</button>
+          <button
+            title="生成(或打开)与此流程共享叙事单元的剧本视图文档:文档里改内容,节点即时同步"
+            onClick={() => {
+              writeBack();
+              const p = useLoom.getState().project;
+              const f = p.flows.find((x) => x.id === flow.id) ?? flow;
+              const unitIds = new Set<string>();
+              walkFlowNodes(f.nodes, (n) => { if (typeof n.data.unitId === 'string') unitIds.add(n.data.unitId); });
+              const existing = p.documents.find((d) => d.blocks.some((b) => b.unitId && unitIds.has(b.unitId)));
+              if (existing) {
+                useNav.getState().go({ tab: 'documents', docId: existing.id });
+                return;
+              }
+              const doc = flowToDocument(f, p.units ?? []);
+              useLoom.getState().update((p2) => {
+                p2.documents.push(doc);
+                if (doc.category && !p2.documentCategories.includes(doc.category)) p2.documentCategories.push(doc.category);
+              });
+              useNav.getState().go({ tab: 'documents', docId: doc.id });
+            }}
+          ><Icon name="doc" size={14} /> 查看为剧本</button>
           <span className="hint">双击剧情片段进入子流程 · Delete 删除选中</span>
         </div>
         {crumbs.length > 1 && (
@@ -457,6 +496,9 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         ) : selectedEdge ? (
           <>
             <h3>连线属性(玩家选项)</h3>
+            {selEdgeData.choiceId && (
+              <div className="unit-linked-hint" title="该连线与文档「选项」块的选项双向绑定">⇄ 已绑定文档选项,标签修改会双向同步</div>
+            )}
             <div className="field">
               <label>选项文本 / 标签</label>
               <input

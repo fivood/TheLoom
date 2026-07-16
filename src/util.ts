@@ -283,18 +283,26 @@ export function syncNarrativeUnits(p: Project, prev?: Project): void {
       });
     }
   }
+  // hub 引用额外携带所在容器的边列表:选项 ↔ 出边 的结构同步需要
+  const hubRefs: { node: FlowNode; edges: FlowEdge[] }[] = [];
   for (const f of p.flows ?? []) {
-    walkFlowNodes(f.nodes, (n) => {
-      const content = contentOfNode(n);
-      if (!content) return;
-      nodeRefs.push({
-        key: `n:${n.id}`,
-        unitId: typeof n.data.unitId === 'string' ? n.data.unitId : undefined,
-        content,
-        attach: (id) => { n.data.unitId = id; },
-        write: (u) => writeNodeFromUnit(n, u),
-      });
-    });
+    const walkContainer = (container: { nodes: FlowNode[]; edges: FlowEdge[] }) => {
+      for (const n of container.nodes) {
+        const content = contentOfNode(n);
+        if (content) {
+          nodeRefs.push({
+            key: `n:${n.id}`,
+            unitId: typeof n.data.unitId === 'string' ? n.data.unitId : undefined,
+            content,
+            attach: (id) => { n.data.unitId = id; },
+            write: (u) => writeNodeFromUnit(n, u),
+          });
+          if (n.type === 'hub') hubRefs.push({ node: n, edges: container.edges });
+        }
+        if (n.data.sub) walkContainer(n.data.sub);
+      }
+    };
+    walkContainer(f);
   }
 
   // 建单元 / 修复断裂引用:文档块先行,共享单元以文档内容为种子
@@ -334,6 +342,8 @@ export function syncNarrativeUnits(p: Project, prev?: Project): void {
 
   // 变更传播:节点先应用、文档块后应用 → 同一 commit 双侧冲突时文档胜
   const changedUnits = new Set<string>();
+  const docChangedUnits = new Set<string>();
+  const docRefSet = new Set(docRefs);
   for (const r of [...nodeRefs, ...docRefs]) {
     const u = unitById.get(r.unitId!)!;
     if (!unitDiffers(u, r.content)) continue;
@@ -344,6 +354,65 @@ export function syncNarrativeUnits(p: Project, prev?: Project): void {
     }
     applyContent(u, r.content);
     changedUnits.add(u.id);
+    if (docRefSet.has(r)) docChangedUnits.add(u.id);
+  }
+
+  // R3 · 选项结构同步:hub 出边 ↔ unit.choices(文档「选项」块经内容同步已写入单元)
+  // - 绑定边(choiceId)与选项标签双向同步:边侧本次编辑且文档未动 → 边胜,否则单元胜
+  // - 选项在文档侧被删除 → 对应边解绑并清标签(边本身保留,不破坏结构)
+  // - 本次给未绑定出边新写标签 → 追加为新选项(演出中标签本来就是玩家选项)
+  let prevEdgeIndex: Map<string, { label?: string; choiceId?: string }> | null = null;
+  const getPrevEdge = (id: string) => {
+    if (!prevEdgeIndex) {
+      const index = new Map<string, { label?: string; choiceId?: string }>();
+      for (const f of prev?.flows ?? []) {
+        const walkEdges = (container: { nodes: FlowNode[]; edges: FlowEdge[] }) => {
+          for (const e of container.edges) index.set(e.id, { label: e.label, choiceId: e.choiceId });
+          for (const n of container.nodes) if (n.data.sub) walkEdges(n.data.sub);
+        };
+        walkEdges(f);
+      }
+      prevEdgeIndex = index;
+    }
+    return prevEdgeIndex.get(id);
+  };
+  for (const h of hubRefs) {
+    const unitId = h.node.data.unitId;
+    const u = typeof unitId === 'string' ? unitById.get(unitId) : undefined;
+    if (!u || u.kind !== 'choice') continue;
+    for (const e of h.edges) {
+      if (e.source !== h.node.id) continue;
+      if (e.choiceId) {
+        const c = (u.choices ?? []).find((x) => x.id === e.choiceId);
+        if (!c) {
+          e.choiceId = undefined;
+          e.label = undefined;
+          continue;
+        }
+        if ((e.label ?? '') !== c.label) {
+          const before = prev ? getPrevEdge(e.id) : undefined;
+          const edgeChanged = !!prev && !!before && (before.label ?? '') !== (e.label ?? '');
+          if (edgeChanged && !docChangedUnits.has(u.id)) {
+            c.label = e.label ?? '';
+            u.updatedAt = Date.now();
+            changedUnits.add(u.id);
+          } else {
+            e.label = c.label || undefined;
+          }
+        }
+      } else if (e.label && prev && !e.fallback) {
+        const before = getPrevEdge(e.id);
+        // 之前绑定过的边(选项被删时解绑)不再自动升级回选项,避免复活已删除选项
+        if (before?.choiceId) continue;
+        if (!before || (before.label ?? '') !== e.label) {
+          const nc: DocChoice = { id: uid(), label: e.label };
+          u.choices = [...(u.choices ?? []), nc];
+          e.choiceId = nc.id;
+          u.updatedAt = Date.now();
+          changedUnits.add(u.id);
+        }
+      }
+    }
   }
 
   // 镜像刷新 + 回收无人引用的单元;被变更单元波及的文档 touch 更新时间,

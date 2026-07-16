@@ -1187,6 +1187,22 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   margin: -4px 0 8px;
 }
 
+/* ---------- 汇聚点选项引脚(R3) ---------- */
+
+.hub-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+  font-size: 10px;
+  text-align: left;
+  max-width: 170px;
+}
+.hub-choice { color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hub-choice.bound { color: var(--text-dim); }
+
 /* ---------- 连续稿模式(R2) ---------- */
 
 .manuscript {

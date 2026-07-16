@@ -144,6 +144,8 @@ export interface FlowEdge {
   once?: boolean;
   /** 兜底分支:当其他出边都不满足时才走这条;有其他可用候选时被遮蔽 */
   fallback?: boolean;
+  /** 绑定的文档选项 id(R3):hub 出边与文档「选项」块的选项双向映射 */
+  choiceId?: ID;
 }
 
 export interface Flow {

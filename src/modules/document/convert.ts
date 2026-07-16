@@ -1,6 +1,8 @@
 import { uid } from '../../util';
-import type { DocBlock, Document, Flow, FlowEdge, FlowNode, FlowNodeType } from '../../types';
-import { DOC_WRITING_TYPES } from '../../types';
+import type {
+  DocBlock, Document, Flow, FlowEdge, FlowNode, FlowNodeType, NarrativeUnit,
+} from '../../types';
+import { ANNOTATION_TYPES, DOC_WRITING_TYPES } from '../../types';
 
 const SPACING_X = 280;
 
@@ -77,14 +79,10 @@ export function documentToFlow(doc: Document): Flow {
       case 'instruction':
         node = makeNode('instruction', { text: b.instruction ?? '', unitId: b.unitId }, x, y);
         break;
-      case 'choice': {
+      case 'choice':
+        // 选项列表存在共享单元上,汇聚点节点直接展示;从节点引出连线时自动绑定选项
         node = makeNode('hub', { title: b.text || '选项点', unitId: b.unitId }, x, y);
-        // 选项点暂用默认出边串联;选项列表作为备注挂到 data 上,后续可生成命名引脚
-        // 这里不强行制造多个 handle,留给用户在流程编辑器里继续画分支
-        const labels = (b.choices ?? []).map((c) => c.label).filter(Boolean);
-        if (labels.length) node.data.text = labels.map((l) => `• ${l}`).join('\n');
         break;
-      }
     }
 
     if (!node) continue;
@@ -104,4 +102,96 @@ export function documentToFlow(doc: Document): Flow {
   }
 
   return { id: uid(), name: doc.name || '新流程', nodes, edges };
+}
+
+interface FlowContainer {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
+/**
+ * 流程 → 剧本视图文档:生成的块引用与节点相同的叙事单元,
+ * 之后在任一侧编辑内容都会双向同步(结构编辑互不影响)。
+ *
+ * 线性化:从没有入边的节点出发,沿出边深度优先、每个节点只访问一次;
+ * 剧情片段先输出场景块,再展开其子流程;跳转 / 检定降级为注释块;
+ * 画布注释与分区跳过。
+ */
+export function flowToDocument(flow: Flow, units: NarrativeUnit[]): Document {
+  const unitById = new Map(units.map((u) => [u.id, u]));
+  const blocks: DocBlock[] = [];
+
+  const emitContainer = (container: FlowContainer) => {
+    const narrative = container.nodes.filter((n) => !ANNOTATION_TYPES.has(n.type));
+    const hasIncoming = new Set(container.edges.map((e) => e.target));
+    const visited = new Set<string>();
+
+    const emitNode = (n: FlowNode) => {
+      if (visited.has(n.id)) return;
+      visited.add(n.id);
+      const unitId = typeof n.data.unitId === 'string' ? n.data.unitId : undefined;
+      switch (n.type) {
+        case 'fragment':
+          blocks.push({ id: uid(), type: 'heading', text: n.data.title, unitId });
+          if (n.data.sub) emitContainer(n.data.sub);
+          break;
+        case 'dialogue':
+          if (n.data.speakerId) {
+            blocks.push({ id: uid(), type: 'dialogue', text: n.data.text, speakerId: n.data.speakerId, unitId });
+          } else {
+            blocks.push({ id: uid(), type: 'action', text: n.data.text, unitId });
+          }
+          break;
+        case 'hub': {
+          const unit = unitId ? unitById.get(unitId) : undefined;
+          blocks.push({
+            id: uid(),
+            type: 'choice',
+            text: n.data.title,
+            choices: structuredClone(unit?.choices ?? []),
+            unitId,
+          });
+          break;
+        }
+        case 'condition':
+          blocks.push({ id: uid(), type: 'condition', text: '', condition: n.data.text, unitId });
+          break;
+        case 'instruction':
+          blocks.push({ id: uid(), type: 'instruction', text: '', instruction: n.data.text, unitId });
+          break;
+        case 'jump':
+          blocks.push({ id: uid(), type: 'note', text: `→ 跳转:${n.data.title || n.data.text || ''}`.trim() });
+          break;
+        case 'check':
+          blocks.push({
+            id: uid(),
+            type: 'note',
+            text: `检定:${n.data.checkExpr ?? ''} vs ${n.data.checkDc ?? 10}${n.data.checkRed ? '(红)' : ''}`,
+          });
+          break;
+      }
+      for (const e of container.edges) {
+        if (e.source !== n.id) continue;
+        const next = narrative.find((x) => x.id === e.target);
+        if (next) emitNode(next);
+      }
+    };
+
+    for (const n of narrative) {
+      if (!hasIncoming.has(n.id)) emitNode(n);
+    }
+    for (const n of narrative) emitNode(n);
+  };
+
+  emitContainer(flow);
+
+  return {
+    id: uid(),
+    name: `${flow.name || '流程'} · 剧本视图`,
+    category: '剧本草稿',
+    blocks: blocks.length ? blocks : [{ id: uid(), type: 'note', text: '(此流程没有可展示的叙事节点)' }],
+    notes: `由流程「${flow.name}」生成的剧本视图;正文与流程节点共享叙事单元,双向同步。`,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
 }
