@@ -34,8 +34,9 @@ const Timeline = lazy(() => import('./modules/timeline/Timeline'));
 const MapEditor = lazy(() => import('./modules/map/MapEditor'));
 const ResearchCards = lazy(() => import('./modules/research/ResearchCards'));
 const Variables = lazy(() => import('./modules/variables/Variables'));
+const Planning = lazy(() => import('./modules/planning/Planning'));
 
-type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
+type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
 type TabGroup = 'build' | 'library' | 'plan' | 'logic';
 
 const GROUP_LABEL: Record<TabGroup, string> = {
@@ -48,6 +49,7 @@ const TABS: { key: Tab; icon: IconName; label: string; group: TabGroup }[] = [
   { key: 'entities', icon: 'entity', label: '实体', group: 'library' },
   { key: 'assets', icon: 'image', label: '资源', group: 'library' },
   { key: 'research', icon: 'archive', label: '资料', group: 'library' },
+  { key: 'planning', icon: 'flag', label: '规划', group: 'plan' },
   { key: 'outline', icon: 'grid', label: '大纲', group: 'plan' },
   { key: 'timeline', icon: 'clock', label: '时间线', group: 'plan' },
   { key: 'map', icon: 'mappin', label: '地图', group: 'plan' },
@@ -425,6 +427,7 @@ export default function App() {
             {tab === 'map' && <MapEditor />}
             {tab === 'research' && <ResearchCards />}
             {tab === 'variables' && <Variables />}
+            {tab === 'planning' && <Planning />}
           </Suspense>
         </div>
       </div>

@@ -336,13 +336,27 @@ export default function DocumentView() {
                 </select>
               </div>
             </div>
-            <div className="field">
-              <label>故事时间</label>
-              <input
-                value={selected.timeLabel ?? ''}
-                onChange={(e) => patchDoc((d) => { d.timeLabel = e.target.value || undefined; })}
-                placeholder="如:雨夜 / 第 7 日 / 三年前"
-              />
+            <div className="kv-row">
+              <div className="field" style={{ flex: 1 }}>
+                <label>故事时间</label>
+                <input
+                  value={selected.timeLabel ?? ''}
+                  onChange={(e) => patchDoc((d) => { d.timeLabel = e.target.value || undefined; })}
+                  placeholder="如:雨夜 / 第 7 日 / 三年前"
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>情节张力(节奏图)</label>
+                <select
+                  value={selected.tension ?? ''}
+                  onChange={(e) => patchDoc((d) => { d.tension = e.target.value ? Number(e.target.value) : undefined; })}
+                >
+                  <option value="">(未设置)</option>
+                  {[1, 2, 3, 4, 5].map((t) => (
+                    <option key={t} value={t}>{t}{t === 1 ? '(平缓)' : t === 5 ? '(高潮)' : ''}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 

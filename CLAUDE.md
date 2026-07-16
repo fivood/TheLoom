@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.15.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.15.0):
+- 已发布版本:`v0.16.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.16.0):
+  - **v0.16.0 R4 小说规划增强** ✅ — 规划模块六视图:关系图(React Flow 浮动边)、角色弧线、伏笔台账(状态推导)、登场统计矩阵、场景卡片墙(章内拖拽排序)、节奏图(字数 + 张力);`Document.tension` 场景元数据
   - **v0.15.0 R3-A 外部知识库 + AI 抽取(轻量)** ✅ — 可切换 LLM 层(OpenAI 兼容/Anthropic/Ollama,Key 仅本机);长文抽取实体/场景/时间线走预检通道;实体 AI 补字段(只填空白)
   - **v0.14.0 R3 文档—流程双视图** ✅ — 选项结构双向同步(doc choices ↔ hub 出边,连线自动绑定);`flowToDocument` 剧本视图;条件/指令双向映射
   - **v0.13.0 R2 长篇正文工作台** ✅ — 卷/章 = 文档文件夹树;场景元数据(状态/字数目标/POV/地点/故事时间);连续稿模式(树序连读 + 就地编辑);30 万字实测流畅
@@ -40,7 +41,7 @@
 | ~~R2~~ | ~~v0.13.0~~ | ~~长篇正文工作台~~ | ~~卷/章/场景树 / 连续稿 / 场景元数据~~ | ✅ 已完成(详见「最近变更」;30 万字实测通过) | L |
 | ~~R3~~ | ~~v0.14.0~~ | ~~文档—流程双视图~~ | ~~选项/条件/指令双向映射 / 剧本视图~~ | ✅ 已完成(详见「最近变更」) | L |
 | ~~R3-A~~ | ~~v0.15.0~~ | ~~外部知识库 + AI 抽取(轻量)~~ | ~~LLM 层 / 长文抽取预检 / AI 补字段~~ | ✅ 已完成(详见「最近变更」) | M |
-| R4 | v0.16.0 | **小说规划增强** | 人物关系图;角色弧线;伏笔台账;章节登场统计;场景卡片墙;节奏图 | 可追踪伏笔埋设 / 回收;可查看人物每章状态与登场情况 | M |
+| ~~R4~~ | ~~v0.16.0~~ | ~~小说规划增强~~ | ~~人物关系图;角色弧线;伏笔台账;章节登场统计;场景卡片墙;节奏图~~ | ✅ 已完成(详见「最近变更」) | M |
 | R5 | v0.17.0 | **正文修订系统** | 批注 / 作者备注 / 修订状态 / 文档快照 / 版本差异 / 全局查找替换 | 可比较两版正文;可按修订轮次筛选场景;替换可撤销 | M |
 | R6 | v0.18.0 | **脚本语言重构** | 自有解析器 / AST / 类型检查 / 属性读写 / 语法高亮 / 自动补全 / 重命名联动 | 不再动态执行字符串;错误精确到表达式位置;支持实体属性修改 | L |
 | R7 | v0.19.0 | **演出与路径测试** | 演出存档;固定随机种子;断点;变量监视;批量路径遍历;路径覆盖率 | 自动发现不可达分支 / 死循环 / 无出口路径;测试结果可复现 | M |
@@ -93,6 +94,20 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R4 · v0.16.0)
+
+小说规划增强 —— 新增「规划」tab(`src/modules/planning/`,懒加载),六个子视图:
+
+- `types.ts`:`EntityRelation`(fromId / toId / label / bidirectional / color / note)、`ArcStage`(entityId / title / note / docId? / order?)、`Foreshadow` + `ForeshadowRef`(plants / payoffs 指向文档,abandoned 手动标记)、`ForeshadowStatus` + 标签;`Document.tension?`(1-5);`Project` 增 `relations?` / `arcs?` / `foreshadows?` / `relationLayout?`(关系图节点位置)
+- `util.ts` `normalizeProject`:三数组兜底;剔除指向缺失实体 / 文档的关系(含自环)、弧线(docId 缺失置空)、伏笔引用;relationLayout 清理非法项;tension 非 1-5 剔除、取整
+- `store.ts`:relation / arcStage / foreshadow 三组 CRUD 动作 + `setRelationLayout`;`removeEntity` 级联清关系 / 弧线 / 布局,`removeDocument` 级联清弧线 docId 与伏笔引用
+- 新增 `src/planning.ts` 纯计算层:`foreshadowStatus` 推导(abandoned > resolved > planted > idea);`groupDocsByChapter`(linearizeByFolders 树序 + 按文件夹分组,未分组殿后);`appearanceMatrix`(角色 × 章节:说话块数 / 提及块数 / POV 场数 / 登场场景列表 / 落点弧线阶段,按总登场排序);`pacingPoints`(树序字数 + 张力 + 章节起点标记);`arcStagesOf`
+- `src/modules/planning/`:`Planning.tsx` 子视图切换 + nav 消费;`RelationGraph.tsx`(React Flow,**浮动边** FloatingEdge 沿节点矩形边框直连避免反向绕线,连线时 promptText 输入关系名,inspector 编辑 + 全部关系列表,拖拽位置 commit 到 relationLayout);`ArcBoard.tsx`(角色列表 + 阶段卡,场景下拉按章节 optgroup,移动时物化 order);`ForeshadowLedger.tsx`(状态筛选 chips + 埋设 / 回收场景 chips 点击跳转);`AppearanceGrid.tsx`(灰阶深浅格子,● POV / ★ 弧线,点击下钻);`SceneWall.tsx`(章节分组卡片,同章 HTML5 拖拽重排物化 order);`PacingChart.tsx`(手写 SVG:字数柱灰阶编码状态、张力独立轨道 1-5、章节分隔线 + 按可用宽度截断的章节标签、点击柱子设张力)
+- `search.ts`:NavTab 增 `planning`,NavTarget 增 `foreshadowId` / `planningView`;全文搜索覆盖伏笔与弧线;`findEntityRefs` 列出关系与弧线阶段
+- `storage.ts`:`tension` frontmatter 无损往返(非法值丢弃);DocumentView inspector 场景元数据增「情节张力」下拉
+- 测试:`planning.test.ts` 6 项(章节分组树序 / 登场统计口径与排序 / 弧线落章 / 节奏数据 / 伏笔状态推导 / normalize 清理)+ storage tension 往返断言,合计 80 项通过
+- 已实测(浏览器,Playwright):关系图节点 / 双向与单向边 / inspector 编辑;弧线阶段与章节标签;伏笔加回收状态即时变 + 新建;登场矩阵格子与下钻;卡片墙分组与跳转;节奏图点柱设张力;localStorage 中 relations / arcs / foreshadows / tension 持久化正确
 
 ## 最近变更(R3-A · v0.15.0)
 

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Asset, Entity, FlowNode, Project, SubFlow } from './types';
 import { ENTITY_KIND_LABEL, FLOW_NODE_LABEL } from './types';
 
-export type NavTab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables';
+export type NavTab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
 
 export interface NavTarget {
   tab: NavTab;
@@ -17,6 +17,10 @@ export interface NavTarget {
   assetId?: string;
   docId?: string;
   blockId?: string;
+  /** 规划模块:定位伏笔台账条目 */
+  foreshadowId?: string;
+  /** 规划模块:打开的子视图 */
+  planningView?: 'relations' | 'arcs' | 'foreshadow' | 'appearance' | 'wall' | 'pacing';
 }
 
 interface NavState {
@@ -174,6 +178,29 @@ export function searchProject(p: Project, query: string): SearchHit[] {
     }
   }
 
+  for (const f of p.foreshadows ?? []) {
+    const hit = matches(q, f.title, f.note);
+    if (hit) {
+      push({
+        module: '规划', kind: '伏笔', title: f.title || '(未命名伏笔)',
+        snippet: snippetOf(hit, q),
+        nav: { tab: 'planning', planningView: 'foreshadow', foreshadowId: f.id },
+      });
+    }
+  }
+
+  for (const a of p.arcs ?? []) {
+    const hit = matches(q, a.title, a.note);
+    if (hit) {
+      const owner = p.entities.find((e) => e.id === a.entityId);
+      push({
+        module: '规划', kind: `弧线 · ${owner?.name ?? '?'}`, title: a.title || '(未命名阶段)',
+        snippet: snippetOf(hit, q),
+        nav: { tab: 'planning', planningView: 'arcs', entityId: a.entityId },
+      });
+    }
+  }
+
   return hits;
 }
 
@@ -248,6 +275,28 @@ export function findEntityRefs(p: Project, entity: Entity): SearchHit[] {
         module: '风暴', kind: '便签', title: snippetOf(n.text, name).slice(0, 24),
         snippet: snippetOf(n.text, name),
         nav: { tab: 'brainstorm' },
+      });
+    }
+  }
+
+  for (const rel of p.relations ?? []) {
+    if (rel.fromId === entity.id || rel.toId === entity.id) {
+      const otherId = rel.fromId === entity.id ? rel.toId : rel.fromId;
+      const other = p.entities.find((e) => e.id === otherId);
+      push({
+        module: '规划', kind: '关系', title: `${rel.label || '(未命名关系)'} · ${other?.name ?? '?'}`,
+        snippet: rel.note ?? '',
+        nav: { tab: 'planning', planningView: 'relations' },
+      });
+    }
+  }
+
+  for (const a of p.arcs ?? []) {
+    if (a.entityId === entity.id) {
+      push({
+        module: '规划', kind: '弧线阶段', title: a.title || '(未命名阶段)',
+        snippet: (a.note || '').slice(0, 50),
+        nav: { tab: 'planning', planningView: 'arcs', entityId: entity.id },
       });
     }
   }

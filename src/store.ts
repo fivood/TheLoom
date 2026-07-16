@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
-  BrainEdge, BrainNote, ColorPalette, Document, Entity, Flow, Folder,
-  OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
+  ArcStage, BrainEdge, BrainNote, ColorPalette, Document, Entity, EntityRelation,
+  Flow, Folder, Foreshadow, OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
 } from './types';
 import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
@@ -232,6 +232,19 @@ interface LoomState {
   addFolder: (f: Folder) => void;
   updateFolder: (id: string, patch: Partial<Folder>) => void;
   removeFolder: (id: string) => void;
+
+  addRelation: (r: EntityRelation) => void;
+  updateRelation: (id: string, patch: Partial<EntityRelation>) => void;
+  removeRelation: (id: string) => void;
+  setRelationLayout: (positions: Record<string, { x: number; y: number }>) => void;
+
+  addArcStage: (a: ArcStage) => void;
+  updateArcStage: (id: string, patch: Partial<ArcStage>) => void;
+  removeArcStage: (id: string) => void;
+
+  addForeshadow: (f: Foreshadow) => void;
+  updateForeshadow: (id: string, fn: (f: Foreshadow) => void) => void;
+  removeForeshadow: (id: string) => void;
 
   addPalette: (p: ColorPalette) => void;
   updatePalette: (id: string, patch: Partial<ColorPalette>) => void;
@@ -466,6 +479,9 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeEntity: (id) => commit((p) => {
       p.entities = p.entities.filter((x) => x.id !== id);
+      p.relations = (p.relations ?? []).filter((r) => r.fromId !== id && r.toId !== id);
+      p.arcs = (p.arcs ?? []).filter((a) => a.entityId !== id);
+      if (p.relationLayout) delete p.relationLayout[id];
     }),
 
     setBrainstorm: (notes, edges) => commit((p) => {
@@ -554,6 +570,11 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeDocument: (id) => commit((p) => {
       p.documents = p.documents.filter((x) => x.id !== id);
+      for (const a of p.arcs ?? []) if (a.docId === id) a.docId = undefined;
+      for (const f of p.foreshadows ?? []) {
+        f.plants = f.plants.filter((ref) => ref.docId !== id);
+        f.payoffs = f.payoffs.filter((ref) => ref.docId !== id);
+      }
     }),
 
     addFolder: (f) => commit((p) => { p.folders.push(f); }),
@@ -584,6 +605,36 @@ export const useLoom = create<LoomState>((set, get) => {
         for (const card of p.researchCards) if (card.folderId === fid) card.folderId = undefined;
       };
       for (const fid of toDelete) clear(fid);
+    }),
+
+    addRelation: (r) => commit((p) => { p.relations ??= []; p.relations.push(r); }),
+    updateRelation: (id, patch) => commit((p) => {
+      const r = (p.relations ?? []).find((x) => x.id === id);
+      if (r) Object.assign(r, patch);
+    }),
+    removeRelation: (id) => commit((p) => {
+      p.relations = (p.relations ?? []).filter((x) => x.id !== id);
+    }),
+    setRelationLayout: (positions) => commit((p) => {
+      p.relationLayout = { ...(p.relationLayout ?? {}), ...positions };
+    }),
+
+    addArcStage: (a) => commit((p) => { p.arcs ??= []; p.arcs.push(a); }),
+    updateArcStage: (id, patch) => commit((p) => {
+      const a = (p.arcs ?? []).find((x) => x.id === id);
+      if (a) Object.assign(a, patch);
+    }),
+    removeArcStage: (id) => commit((p) => {
+      p.arcs = (p.arcs ?? []).filter((x) => x.id !== id);
+    }),
+
+    addForeshadow: (f) => commit((p) => { p.foreshadows ??= []; p.foreshadows.push(f); }),
+    updateForeshadow: (id, fn) => commit((p) => {
+      const f = (p.foreshadows ?? []).find((x) => x.id === id);
+      if (f) fn(f);
+    }),
+    removeForeshadow: (id) => commit((p) => {
+      p.foreshadows = (p.foreshadows ?? []).filter((x) => x.id !== id);
     }),
 
     addPalette: (pal) => commit((p) => { p.palettes ??= []; p.palettes.push(pal); }),

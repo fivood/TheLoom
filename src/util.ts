@@ -79,6 +79,34 @@ export function normalizeProject(p: Project): Project {
   for (const d of p.documents) {
     if (d.status !== undefined && !(d.status in DOC_STATUS_LABEL)) delete d.status;
     if (d.wordTarget !== undefined && (typeof d.wordTarget !== 'number' || !Number.isFinite(d.wordTarget) || d.wordTarget < 0)) delete d.wordTarget;
+    if (d.tension !== undefined && (typeof d.tension !== 'number' || !Number.isFinite(d.tension) || d.tension < 1 || d.tension > 5)) delete d.tension;
+    else if (d.tension !== undefined) d.tension = Math.round(d.tension);
+  }
+  // 小说规划(R4):清理指向已删除实体 / 文档的关系、弧线、伏笔引用
+  p.relations ??= [];
+  p.arcs ??= [];
+  p.foreshadows ??= [];
+  const entityIds = new Set(p.entities.map((e) => e.id));
+  const docIds = new Set(p.documents.map((d) => d.id));
+  p.relations = p.relations.filter((r) =>
+    entityIds.has(r.fromId) && entityIds.has(r.toId) && r.fromId !== r.toId);
+  p.arcs = p.arcs.filter((a) => entityIds.has(a.entityId));
+  for (const a of p.arcs) {
+    if (a.docId && !docIds.has(a.docId)) a.docId = undefined;
+  }
+  cleanOrder(p.arcs);
+  for (const f of p.foreshadows) {
+    f.plants = (f.plants ?? []).filter((ref) => docIds.has(ref.docId));
+    f.payoffs = (f.payoffs ?? []).filter((ref) => docIds.has(ref.docId));
+  }
+  if (p.relationLayout) {
+    for (const id of Object.keys(p.relationLayout)) {
+      const pos = p.relationLayout[id];
+      if (!entityIds.has(id) || typeof pos?.x !== 'number' || typeof pos?.y !== 'number'
+        || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+        delete p.relationLayout[id];
+      }
+    }
   }
   syncNarrativeUnits(p);
   return p;

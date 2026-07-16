@@ -454,6 +454,8 @@ export interface Document {
   locationId?: ID;
   /** 场景元数据:故事时间(自由文本,如「雨夜」「第7日」) */
   timeLabel?: string;
+  /** 场景元数据(R4):情节张力 1-5,节奏图用 */
+  tension?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -471,6 +473,62 @@ export interface Folder {
   parentId?: ID | null;
   /** 同级排序序号;空 = 按默认(插入顺序)排序 */
   order?: number;
+}
+
+/* ---------- 小说规划(R4) ---------- */
+
+/** 人物关系:两个实体之间的一条有标签连线,展示在关系图 */
+export interface EntityRelation {
+  id: ID;
+  fromId: ID;
+  toId: ID;
+  /** 关系名,如「兄妹」「暗恋」「宿敌」 */
+  label: string;
+  /** 双向关系(两端对等,不画箭头);单向如「暗恋」画 from → to 箭头 */
+  bidirectional?: boolean;
+  color?: string;
+  note?: string;
+}
+
+/** 角色弧线阶段:角色发展轨迹上的一个节点,可关联具体场景(文档) */
+export interface ArcStage {
+  id: ID;
+  entityId: ID;
+  /** 阶段名,如「拒绝召唤」「跌入谷底」 */
+  title: string;
+  note: string;
+  /** 关联场景(文档 id);登场统计按其所在章节聚合显示 */
+  docId?: ID;
+  order?: number;
+}
+
+/** 伏笔的一处埋设 / 回收位置(指向场景文档) */
+export interface ForeshadowRef {
+  id: ID;
+  docId: ID;
+  note?: string;
+}
+
+/** 伏笔状态(由埋设 / 回收记录推导,abandoned 为手动标记) */
+export type ForeshadowStatus = 'idea' | 'planted' | 'resolved' | 'abandoned';
+
+export const FORESHADOW_STATUS_LABEL: Record<ForeshadowStatus, string> = {
+  idea: '未埋设',
+  planted: '待回收',
+  resolved: '已回收',
+  abandoned: '已弃用',
+};
+
+/** 伏笔台账条目:追踪一条伏笔从埋设到回收的全程 */
+export interface Foreshadow {
+  id: ID;
+  title: string;
+  note: string;
+  /** 手动标记弃用(不再打算回收) */
+  abandoned?: boolean;
+  plants: ForeshadowRef[];
+  payoffs: ForeshadowRef[];
+  createdAt: number;
 }
 
 /* ---------- AI 集成(R3-A) ---------- */
@@ -536,6 +594,14 @@ export interface Project {
   aiPrompts?: { extract?: string };
   /** AI 调用记录(仅元信息,上限 50 条) */
   aiLog?: AiLogEntry[];
+  /** 人物关系(R4 关系图) */
+  relations?: EntityRelation[];
+  /** 角色弧线阶段(R4) */
+  arcs?: ArcStage[];
+  /** 伏笔台账(R4) */
+  foreshadows?: Foreshadow[];
+  /** 关系图上实体节点的手动布局位置 */
+  relationLayout?: Record<ID, { x: number; y: number }>;
   /** 项目内自定义配色表(可从 zimg Color Palette 的 JSON 导入) */
   palettes?: ColorPalette[];
   /** 当前激活的配色表 id(空 = 使用默认灰阶 PALETTE) */
