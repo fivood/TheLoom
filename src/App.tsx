@@ -255,6 +255,17 @@ export default function App() {
               <>
                 <div className="backdrop" onClick={() => setToolsOpen(false)} />
                 <div className="tools-menu">
+                  {!isTauri && (
+                    <>
+                      <button
+                        title="下载 Windows 安装包(自动跳转最新版本,大陆网络可直连);桌面版支持绑定本地文件夹与 Obsidian 互通"
+                        onClick={() => { setToolsOpen(false); window.open('/api/download/latest', '_blank'); }}
+                      >
+                        <Icon name="download" size={14} /> 下载桌面版(Windows)
+                      </button>
+                      <div className="tools-sep" />
+                    </>
+                  )}
                   {isTauri && (
                     <>
                       <button onClick={() => { setToolsOpen(false); chooseFolder(); }}>
