@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import type {
-  ArcStage, BrainEdge, BrainNote, ColorPalette, Document, Entity, EntityRelation,
+  Annotation, ArcStage, BrainEdge, BrainNote, ColorPalette, Document, Entity, EntityRelation,
   Flow, Folder, Foreshadow, OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
 } from './types';
+import { DOC_SNAPSHOT_LIMIT } from './types';
 import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
 import { confirmDialog, alertDialog } from './dialog';
@@ -232,6 +233,14 @@ interface LoomState {
   addFolder: (f: Folder) => void;
   updateFolder: (id: string, patch: Partial<Folder>) => void;
   removeFolder: (id: string) => void;
+
+  addAnnotation: (a: Annotation) => void;
+  updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
+  removeAnnotation: (id: string) => void;
+
+  createDocSnapshot: (docId: string, label: string) => void;
+  removeDocSnapshot: (id: string) => void;
+  restoreDocSnapshot: (id: string) => void;
 
   addRelation: (r: EntityRelation) => void;
   updateRelation: (id: string, patch: Partial<EntityRelation>) => void;
@@ -575,6 +584,47 @@ export const useLoom = create<LoomState>((set, get) => {
         f.plants = f.plants.filter((ref) => ref.docId !== id);
         f.payoffs = f.payoffs.filter((ref) => ref.docId !== id);
       }
+      p.annotations = (p.annotations ?? []).filter((a) => a.docId !== id);
+      p.docSnapshots = (p.docSnapshots ?? []).filter((s) => s.docId !== id);
+    }),
+
+    addAnnotation: (a) => commit((p) => { p.annotations ??= []; p.annotations.push(a); }),
+    updateAnnotation: (id, patch) => commit((p) => {
+      const a = (p.annotations ?? []).find((x) => x.id === id);
+      if (a) Object.assign(a, patch);
+    }),
+    removeAnnotation: (id) => commit((p) => {
+      p.annotations = (p.annotations ?? []).filter((x) => x.id !== id);
+    }),
+
+    createDocSnapshot: (docId, label) => commit((p) => {
+      const d = p.documents.find((x) => x.id === docId);
+      if (!d) return;
+      p.docSnapshots ??= [];
+      p.docSnapshots.push({
+        id: uid(), docId, label, revision: d.revision,
+        blocks: structuredClone(d.blocks), createdAt: Date.now(),
+      });
+      // 每篇上限:超出丢最旧
+      const mine = p.docSnapshots.filter((s) => s.docId === docId);
+      if (mine.length > DOC_SNAPSHOT_LIMIT) {
+        const drop = new Set(
+          [...mine].sort((a, b) => a.createdAt - b.createdAt)
+            .slice(0, mine.length - DOC_SNAPSHOT_LIMIT).map((s) => s.id),
+        );
+        p.docSnapshots = p.docSnapshots.filter((s) => !drop.has(s.id));
+      }
+    }),
+    removeDocSnapshot: (id) => commit((p) => {
+      p.docSnapshots = (p.docSnapshots ?? []).filter((s) => s.id !== id);
+    }),
+    restoreDocSnapshot: (id) => commit((p) => {
+      const snap = (p.docSnapshots ?? []).find((s) => s.id === id);
+      if (!snap) return;
+      const d = p.documents.find((x) => x.id === snap.docId);
+      if (!d) return;
+      d.blocks = structuredClone(snap.blocks);
+      d.updatedAt = Date.now();
     }),
 
     addFolder: (f) => commit((p) => { p.folders.push(f); }),

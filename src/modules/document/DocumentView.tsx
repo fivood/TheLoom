@@ -12,19 +12,30 @@ import { downloadMarkdown, documentToMarkdown } from '../../export';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 import BlocksEditor, { emptyBlock } from './BlocksEditor';
 import Manuscript from './Manuscript';
+import RevisionDiff from './RevisionDiff';
 
 export default function DocumentView() {
   const documents = useLoom((s) => s.project.documents);
   const categories = useLoom((s) => s.project.documentCategories);
   const entities = useLoom((s) => s.project.entities);
   const folders = useLoom((s) => s.project.folders);
-  const { addDocument, updateDocument, removeDocument, update } = useLoom();
+  const annotations = useLoom((s) => s.project.annotations);
+  const docSnapshots = useLoom((s) => s.project.docSnapshots);
+  const {
+    addDocument, updateDocument, removeDocument, update,
+    addAnnotation, updateAnnotation, removeAnnotation,
+    createDocSnapshot, removeDocSnapshot, restoreDocSnapshot,
+  } = useLoom();
   const go = useNav((s) => s.go);
 
   const [catFilter, setCatFilter] = useState<string | 'all'>('all');
+  const [revFilter, setRevFilter] = useState<'all' | 'none' | number>('all');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(documents[0]?.id ?? null);
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [annoDraft, setAnnoDraft] = useState('');
+  const [diffOpen, setDiffOpen] = useState<{ leftId?: string } | null>(null);
   const [mode, setMode] = useState<'single' | 'manuscript'>('single');
 
   const navSeq = useNav((s) => s.seq);
@@ -32,6 +43,7 @@ export default function DocumentView() {
     const t = useNav.getState().target;
     if (t?.tab === 'documents' && t.docId) {
       setCatFilter('all');
+      setRevFilter('all');
       setQuery('');
       setSelectedId(t.docId);
       setFocusBlockId(t.blockId ?? null);
@@ -39,10 +51,23 @@ export default function DocumentView() {
     }
   }, [navSeq]);
 
+  // 切换文档时清空批注锚点与草稿
+  useEffect(() => {
+    setActiveBlockId(null);
+    setAnnoDraft('');
+  }, [selectedId]);
+
+  const revisionsInUse = useMemo(() => {
+    const set = new Set<number>();
+    for (const d of documents) if (typeof d.revision === 'number') set.add(d.revision);
+    return [...set].sort((a, b) => a - b);
+  }, [documents]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = documents.filter((d) =>
       (catFilter === 'all' || d.category === catFilter) &&
+      (revFilter === 'all' || (revFilter === 'none' ? d.revision === undefined : d.revision === revFilter)) &&
       (!q ||
         d.name.toLowerCase().includes(q) ||
         d.notes.toLowerCase().includes(q) ||
@@ -52,7 +77,7 @@ export default function DocumentView() {
         )),
     );
     return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [documents, catFilter, query]);
+  }, [documents, catFilter, revFilter, query]);
 
   // 连续稿顺序:与 Navigator 树一致(卷 / 章文件夹递归,场景按 order)
   const manuscriptDocs = useMemo(
@@ -61,6 +86,54 @@ export default function DocumentView() {
   );
 
   const selected = documents.find((d) => d.id === selectedId) ?? null;
+
+  // R5:当前文档的批注与快照
+  const docAnnotations = useMemo(
+    () => (annotations ?? []).filter((a) => a.docId === selectedId)
+      .sort((a, b) => Number(!!a.resolved) - Number(!!b.resolved) || b.createdAt - a.createdAt),
+    [annotations, selectedId],
+  );
+  const docSnaps = useMemo(
+    () => (docSnapshots ?? []).filter((s) => s.docId === selectedId)
+      .sort((a, b) => b.createdAt - a.createdAt),
+    [docSnapshots, selectedId],
+  );
+  const annotationCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of docAnnotations) {
+      if (a.blockId && !a.resolved) map.set(a.blockId, (map.get(a.blockId) ?? 0) + 1);
+    }
+    return map;
+  }, [docAnnotations]);
+
+  const blockExcerpt = (blockId?: string): string => {
+    if (!blockId || !selected) return '';
+    const b = selected.blocks.find((x) => x.id === blockId);
+    if (!b) return '';
+    const text = b.text || b.condition || b.instruction || (b.items ?? []).join(' ') || '(空块)';
+    return text.slice(0, 18);
+  };
+
+  const addAnno = () => {
+    if (!selectedId || !annoDraft.trim()) return;
+    addAnnotation({
+      id: uid(), docId: selectedId,
+      blockId: activeBlockId && selected?.blocks.some((b) => b.id === activeBlockId) ? activeBlockId : undefined,
+      text: annoDraft.trim(), createdAt: Date.now(),
+    });
+    setAnnoDraft('');
+  };
+
+  const saveSnapshot = async () => {
+    if (!selected) return;
+    const label = await promptText({
+      message: '快照名称(存档当前正文,之后可对比差异或恢复)',
+      defaultValue: selected.revision ? `第 ${selected.revision} 稿` : `${new Date().toLocaleDateString()} 存档`,
+      confirmText: '保存快照',
+    });
+    if (label === null) return;
+    createDocSnapshot(selected.id, label.trim() || new Date().toLocaleString());
+  };
 
   const createDoc = () => {
     const d: Document = {
@@ -186,6 +259,21 @@ export default function DocumentView() {
           </select>
           <button className="ghost icon-btn" onClick={addCategory} title="新建分类">＋</button>
           {catFilter !== 'all' && <button className="ghost icon-btn" onClick={() => removeCategory(catFilter)} title="删除当前分类">×</button>}
+          {(revisionsInUse.length > 0 || revFilter !== 'all') && (
+            <select
+              value={String(revFilter)}
+              title="按修订轮次筛选场景(轮次在右侧场景元数据里设置)"
+              onChange={(e) => {
+                const v = e.target.value;
+                setRevFilter(v === 'all' ? 'all' : v === 'none' ? 'none' : Number(v));
+              }}
+              style={{ width: 110 }}
+            >
+              <option value="all">全部轮次</option>
+              {revisionsInUse.map((r) => <option key={r} value={r}>第 {r} 稿</option>)}
+              <option value="none">未设轮次</option>
+            </select>
+          )}
           <input
             placeholder="搜索文档…"
             value={query}
@@ -228,7 +316,12 @@ export default function DocumentView() {
                 <Icon name="flow" size={13} /> 转为流程
               </button>
             </div>
-            <BlocksEditor doc={selected} focusBlockId={focusBlockId} />
+            <BlocksEditor
+              doc={selected}
+              focusBlockId={focusBlockId}
+              annotationCounts={annotationCounts}
+              onActiveChange={setActiveBlockId}
+            />
           </div>
         ) : (
           <div className="empty-hint" style={{ margin: 'auto' }}>
@@ -358,6 +451,113 @@ export default function DocumentView() {
                 </select>
               </div>
             </div>
+            <div className="kv-row">
+              <div className="field" style={{ flex: 1 }}>
+                <label>修订轮次(第几稿)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={selected.revision ?? ''}
+                  onChange={(e) => patchDoc((d) => {
+                    const v = Number(e.target.value);
+                    d.revision = e.target.value === '' || !Number.isFinite(v) || v < 1 ? undefined : Math.floor(v);
+                  })}
+                  placeholder="如 1 / 2 / 3"
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }} />
+            </div>
+          </div>
+
+          <div className="field">
+            <label>批注({docAnnotations.filter((a) => !a.resolved).length} 未解决)</label>
+            <div className="anno-add">
+              <textarea
+                rows={2}
+                value={annoDraft}
+                placeholder={activeBlockId ? `批注当前块「${blockExcerpt(activeBlockId) || '…'}」` : '批注整篇(先点选正文中的块可精确锚定)'}
+                onChange={(e) => setAnnoDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addAnno(); }}
+              />
+              <button className="primary" disabled={!annoDraft.trim()} onClick={addAnno}>添加</button>
+            </div>
+            <div className="anno-list">
+              {docAnnotations.map((a) => (
+                <div key={a.id} className={`anno-item ${a.resolved ? 'resolved' : ''}`}>
+                  <div className="anno-text">{a.text}</div>
+                  <div className="anno-meta">
+                    {a.blockId ? (
+                      <button
+                        className="anno-anchor"
+                        title="跳到锚定的块"
+                        onClick={() => setFocusBlockId(a.blockId!)}
+                      >@{blockExcerpt(a.blockId) || '(块已删除)'}</button>
+                    ) : (
+                      <span className="anno-anchor-none">整篇</span>
+                    )}
+                    <span className="anno-time">{new Date(a.createdAt).toLocaleDateString()}</span>
+                    <span className="spacer" />
+                    <button
+                      className="ghost icon-btn"
+                      title={a.resolved ? '重新打开' : '标记已解决'}
+                      onClick={() => updateAnnotation(a.id, { resolved: !a.resolved || undefined })}
+                    >{a.resolved ? '↺' : '✓'}</button>
+                    <button
+                      className="ghost icon-btn"
+                      title="删除批注"
+                      onClick={() => removeAnnotation(a.id)}
+                    >×</button>
+                  </div>
+                </div>
+              ))}
+              {docAnnotations.length === 0 && <div className="empty-hint" style={{ padding: '6px 0' }}>还没有批注</div>}
+            </div>
+          </div>
+
+          <div className="field">
+            <label>场景快照({docSnaps.length})</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="ghost" style={{ flex: 1 }} onClick={saveSnapshot}>存快照</button>
+              <button
+                className="ghost"
+                style={{ flex: 1 }}
+                disabled={docSnaps.length === 0}
+                title="比较任意两个版本(含当前正文)的差异"
+                onClick={() => setDiffOpen({ leftId: docSnaps[0]?.id })}
+              >比较版本</button>
+            </div>
+            <div className="snap-list">
+              {docSnaps.map((s) => (
+                <div key={s.id} className="snap-item">
+                  <div className="snap-meta">
+                    <span className="snap-label">{s.label}</span>
+                    <span className="snap-time">
+                      {new Date(s.createdAt).toLocaleString()}{s.revision ? ` · 第 ${s.revision} 稿` : ''}
+                    </span>
+                  </div>
+                  <button className="ghost icon-btn" title="与当前正文比较" onClick={() => setDiffOpen({ leftId: s.id })}>⇆</button>
+                  <button
+                    className="ghost icon-btn"
+                    title="恢复到这个版本(当前正文会被替换,可 Ctrl+Z 撤销)"
+                    onClick={async () => {
+                      if (await confirmDialog({ message: `把正文恢复到快照「${s.label}」?当前内容会被替换(可用 Ctrl+Z 撤销)。`, confirmText: '恢复' })) {
+                        restoreDocSnapshot(s.id);
+                      }
+                    }}
+                  >↩</button>
+                  <button
+                    className="ghost icon-btn"
+                    title="删除快照"
+                    onClick={async () => {
+                      if (await confirmDialog({ message: `删除快照「${s.label}」?`, danger: true, confirmText: '删除' })) removeDocSnapshot(s.id);
+                    }}
+                  >×</button>
+                </div>
+              ))}
+              {docSnaps.length === 0 && (
+                <div className="empty-hint" style={{ padding: '6px 0' }}>改稿前先「存快照」,之后可对比差异或一键恢复</div>
+              )}
+            </div>
           </div>
 
           <TechNameField
@@ -400,6 +600,10 @@ export default function DocumentView() {
             </ul>
           </div>
         </aside>
+      )}
+
+      {diffOpen && selected && (
+        <RevisionDiff doc={selected} initialLeftId={diffOpen.leftId} onClose={() => setDiffOpen(null)} />
       )}
     </>
   );

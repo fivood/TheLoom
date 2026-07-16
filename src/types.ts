@@ -456,6 +456,8 @@ export interface Document {
   timeLabel?: string;
   /** 场景元数据(R4):情节张力 1-5,节奏图用 */
   tension?: number;
+  /** 场景元数据(R5):修订轮次(第几稿,≥1 整数);列表可按轮次筛选 */
+  revision?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -474,6 +476,33 @@ export interface Folder {
   /** 同级排序序号;空 = 按默认(插入顺序)排序 */
   order?: number;
 }
+
+/* ---------- 正文修订(R5) ---------- */
+
+/** 批注:挂在文档上的评论,可精确锚定到某个块;块被删除后退化为整篇批注 */
+export interface Annotation {
+  id: ID;
+  docId: ID;
+  blockId?: ID;
+  text: string;
+  resolved?: boolean;
+  createdAt: number;
+}
+
+/** 文档快照:单个场景正文的版本存档(区别于整项目 Snapshot),用于版本差异对比与恢复 */
+export interface DocSnapshot {
+  id: ID;
+  docId: ID;
+  /** 版本名,如「第一稿」 */
+  label: string;
+  /** 存档时的修订轮次 */
+  revision?: number;
+  blocks: DocBlock[];
+  createdAt: number;
+}
+
+/** 每篇文档最多保留的快照数,超出丢最旧 */
+export const DOC_SNAPSHOT_LIMIT = 20;
 
 /* ---------- 小说规划(R4) ---------- */
 
@@ -594,6 +623,10 @@ export interface Project {
   aiPrompts?: { extract?: string };
   /** AI 调用记录(仅元信息,上限 50 条) */
   aiLog?: AiLogEntry[];
+  /** 批注(R5 正文修订) */
+  annotations?: Annotation[];
+  /** 文档快照(R5 正文修订) */
+  docSnapshots?: DocSnapshot[];
   /** 人物关系(R4 关系图) */
   relations?: EntityRelation[];
   /** 角色弧线阶段(R4) */

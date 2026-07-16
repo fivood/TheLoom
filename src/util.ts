@@ -81,6 +81,8 @@ export function normalizeProject(p: Project): Project {
     if (d.wordTarget !== undefined && (typeof d.wordTarget !== 'number' || !Number.isFinite(d.wordTarget) || d.wordTarget < 0)) delete d.wordTarget;
     if (d.tension !== undefined && (typeof d.tension !== 'number' || !Number.isFinite(d.tension) || d.tension < 1 || d.tension > 5)) delete d.tension;
     else if (d.tension !== undefined) d.tension = Math.round(d.tension);
+    if (d.revision !== undefined && (typeof d.revision !== 'number' || !Number.isFinite(d.revision) || d.revision < 1)) delete d.revision;
+    else if (d.revision !== undefined) d.revision = Math.round(d.revision);
   }
   // 小说规划(R4):清理指向已删除实体 / 文档的关系、弧线、伏笔引用
   p.relations ??= [];
@@ -88,6 +90,15 @@ export function normalizeProject(p: Project): Project {
   p.foreshadows ??= [];
   const entityIds = new Set(p.entities.map((e) => e.id));
   const docIds = new Set(p.documents.map((d) => d.id));
+  // 正文修订(R5):批注 / 快照指向已删除文档时剔除;块被删除的批注退化为整篇批注
+  p.annotations ??= [];
+  p.docSnapshots ??= [];
+  p.annotations = p.annotations.filter((a) => docIds.has(a.docId));
+  const blockIdsByDoc = new Map(p.documents.map((d) => [d.id, new Set(d.blocks.map((b) => b.id))]));
+  for (const a of p.annotations) {
+    if (a.blockId && !blockIdsByDoc.get(a.docId)?.has(a.blockId)) a.blockId = undefined;
+  }
+  p.docSnapshots = p.docSnapshots.filter((s) => docIds.has(s.docId));
   p.relations = p.relations.filter((r) =>
     entityIds.has(r.fromId) && entityIds.has(r.toId) && r.fromId !== r.toId);
   p.arcs = p.arcs.filter((a) => entityIds.has(a.entityId));

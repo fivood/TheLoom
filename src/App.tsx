@@ -19,6 +19,7 @@ import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog'
 import RecoveryPanel from './components/RecoveryPanel';
 import DialogHost from './components/Dialog';
 import ImportPreview from './components/ImportPreview';
+import FindReplace from './components/FindReplace';
 import Icon, { type IconName } from './components/Icon';
 import { projectToXlsx } from './interop/projectXlsx';
 import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
@@ -65,6 +66,7 @@ export default function App() {
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
+  const [findReplace, setFindReplace] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
   const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx'; file: File } | null>(null);
   const importXlsxRef = useRef<HTMLInputElement>(null);
@@ -287,6 +289,12 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); setAuditing(true); }}>
                     <Icon name="script" size={14} /> 体检
                   </button>
+                  <button
+                    title="在全部文档正文里查找并替换;替换是一步操作,可撤销"
+                    onClick={() => { setToolsOpen(false); setFindReplace(true); }}
+                  >
+                    <Icon name="search" size={14} /> 查找替换
+                  </button>
                   <button onClick={() => { setToolsOpen(false); setHistory(true); }}>
                     <Icon name="undo" size={14} /> 版本历史
                   </button>
@@ -439,6 +447,7 @@ export default function App() {
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
+      {findReplace && <FindReplace onClose={() => setFindReplace(false)} />}
       {importFile && (
         <ImportPreview mode={importFile.mode} file={importFile.file} onClose={() => setImportFile(null)} />
       )}

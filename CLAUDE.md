@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.16.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.16.0):
+- 已发布版本:`v0.17.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.17.0):
+  - **v0.17.0 R5 正文修订系统** ✅ — 批注(块级锚定 + 解决状态)、场景快照(每篇 20 个上限 + 恢复可撤销)、版本差异(行级 LCS 对比)、修订轮次(元数据 + 列表筛选)、全局查找替换(跨文档、勾选精确替换、单步撤销)
   - **v0.16.0 R4 小说规划增强** ✅ — 规划模块六视图:关系图(React Flow 浮动边)、角色弧线、伏笔台账(状态推导)、登场统计矩阵、场景卡片墙(章内拖拽排序)、节奏图(字数 + 张力);`Document.tension` 场景元数据
   - **v0.15.0 R3-A 外部知识库 + AI 抽取(轻量)** ✅ — 可切换 LLM 层(OpenAI 兼容/Anthropic/Ollama,Key 仅本机);长文抽取实体/场景/时间线走预检通道;实体 AI 补字段(只填空白)
   - **v0.14.0 R3 文档—流程双视图** ✅ — 选项结构双向同步(doc choices ↔ hub 出边,连线自动绑定);`flowToDocument` 剧本视图;条件/指令双向映射
@@ -42,7 +43,7 @@
 | ~~R3~~ | ~~v0.14.0~~ | ~~文档—流程双视图~~ | ~~选项/条件/指令双向映射 / 剧本视图~~ | ✅ 已完成(详见「最近变更」) | L |
 | ~~R3-A~~ | ~~v0.15.0~~ | ~~外部知识库 + AI 抽取(轻量)~~ | ~~LLM 层 / 长文抽取预检 / AI 补字段~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R4~~ | ~~v0.16.0~~ | ~~小说规划增强~~ | ~~人物关系图;角色弧线;伏笔台账;章节登场统计;场景卡片墙;节奏图~~ | ✅ 已完成(详见「最近变更」) | M |
-| R5 | v0.17.0 | **正文修订系统** | 批注 / 作者备注 / 修订状态 / 文档快照 / 版本差异 / 全局查找替换 | 可比较两版正文;可按修订轮次筛选场景;替换可撤销 | M |
+| ~~R5~~ | ~~v0.17.0~~ | ~~正文修订系统~~ | ~~批注 / 修订轮次 / 文档快照 / 版本差异 / 全局查找替换~~ | ✅ 已完成(详见「最近变更」) | M |
 | R6 | v0.18.0 | **脚本语言重构** | 自有解析器 / AST / 类型检查 / 属性读写 / 语法高亮 / 自动补全 / 重命名联动 | 不再动态执行字符串;错误精确到表达式位置;支持实体属性修改 | L |
 | R7 | v0.19.0 | **演出与路径测试** | 演出存档;固定随机种子;断点;变量监视;批量路径遍历;路径覆盖率 | 自动发现不可达分支 / 死循环 / 无出口路径;测试结果可复现 | M |
 | R8 | v0.20.0 | **资源原文件闭环** | 图片 / 音频 / 视频 / 文件落盘 / 播放 / 缩略图 / 哈希去重 / 替换 / 缺失重定位 / 授权字段 | 桌面项目迁移后所有媒体仍可用;资源替换不破坏引用 | M |
@@ -94,6 +95,21 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R5 · v0.17.0)
+
+正文修订系统:
+
+- `types.ts`:`Annotation`(docId / blockId? / text / resolved,块删除后退化为整篇批注)、`DocSnapshot`(docId / label / revision / blocks 深拷贝)+ `DOC_SNAPSHOT_LIMIT = 20`;`Document.revision?`(第几稿,≥1 整数);`Project` 增 `annotations?` / `docSnapshots?`
+- `util.ts` `normalizeProject`:批注 / 快照指向缺失文档剔除;批注 blockId 失效置空(退化整篇);revision 非法剔除、取整
+- `store.ts`:annotation CRUD、`createDocSnapshot`(blocks structuredClone + 每篇上限丢最旧)/ `removeDocSnapshot` / `restoreDocSnapshot`(commit 内替换 blocks,可撤销);`removeDocument` 级联清批注与快照
+- 新增 `src/revision.ts` 纯计算层:`blockLines` / `docLines`(块 → 可读行:对白带说话人、列表带序号、引用带 `>` 前缀);`diffLines` 行级 LCS(先裁剪公共首尾,中段 DP,超 1e6 规模退化为整段删加)+ `diffStats`;`findDocMatches` / `replaceInDocs`(跨 text / items / choices / condition / instruction 五类字段,正则转义 + 大小写开关 + 替换文本 `$` 字面写入,按 key 精确替换,须在 commit 回调里调用故单步可撤销)
+- `RevisionDiff.tsx`:两版本选择(含「当前正文」)+ 行级差异渲染(+绿底 / −删除线)。**注意 zustand selector 不要在 selector 里 filter 返回新数组**(会无限重渲染),先取原始引用再 useMemo
+- `FindReplace.tsx` + App 工具菜单「查找替换」:查找 → 按文档分组勾选 → 替换选中(单 commit),完成提示可 Ctrl+Z;点击结果跳转文档块
+- `DocumentView`:inspector 增「修订轮次」「批注」「场景快照」三区;工具栏增轮次筛选(全部 / 第 N 稿 / 未设轮次,作用于列表与连续稿);`BlocksEditor` 增可选 props `annotationCounts`(块上 💬 徽标)与 `onActiveChange`(批注锚定当前块)
+- `storage.ts`:`revision` frontmatter 无损往返(非法值丢弃);`.sync-body input { width:100% }` 会波及模态里的 checkbox,需 `width:auto` 覆盖
+- 测试:`revision.test.ts` 8 项(行渲染 / diff 增删改 / 跨字段查找 / 全量与按 key 替换 / 大小写 / `$` 字面 / normalize 清理)+ storage revision 往返断言,合计 88 项通过
+- 已实测(浏览器,Playwright):批注徽标与锚点跳转 / 新增块级批注 / 标记解决;存快照 → 改稿 → 差异 +1/−1 → 恢复;轮次筛选只显示对应稿;查找替换 2 处 + Ctrl+Z 撤销;localStorage 中 annotations / docSnapshots 持久化正确
 
 ## 最近变更(R4 · v0.16.0)
 

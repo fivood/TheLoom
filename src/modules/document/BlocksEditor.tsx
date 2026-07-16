@@ -19,11 +19,22 @@ export function emptyBlock(type: DocBlockType): DocBlock {
 }
 
 /** 文档块编辑器:单文档模式与连续稿模式共用(自带插入栏与激活块状态) */
-export default function BlocksEditor({ doc, focusBlockId }: { doc: Document; focusBlockId?: string | null }) {
+export default function BlocksEditor({ doc, focusBlockId, annotationCounts, onActiveChange }: {
+  doc: Document;
+  focusBlockId?: string | null;
+  /** 每个块上的未解决批注数(R5),显示 💬 徽标 */
+  annotationCounts?: Map<string, number>;
+  /** 活动块变化回调(R5 批注锚定用) */
+  onActiveChange?: (blockId: string | null) => void;
+}) {
   const entities = useLoom((s) => s.project.entities);
   const flows = useLoom((s) => s.project.flows);
   const updateDocument = useLoom((s) => s.updateDocument);
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(focusBlockId ?? null);
+  const [activeBlockId, setActiveBlockIdRaw] = useState<string | null>(focusBlockId ?? null);
+  const setActiveBlockId = (id: string | null) => {
+    setActiveBlockIdRaw(id);
+    onActiveChange?.(id);
+  };
 
   useEffect(() => {
     if (focusBlockId !== undefined) setActiveBlockId(focusBlockId);
@@ -98,6 +109,11 @@ export default function BlocksEditor({ doc, focusBlockId }: { doc: Document; foc
               <span className="doc-block-kind" title={DOC_BLOCK_LABEL[b.type]}>{DOC_BLOCK_LABEL[b.type]}</span>
               {b.unitId && flowUnitIds.has(b.unitId) && (
                 <span className="doc-block-linked" title="已与流程节点共享同一叙事单元:任一处修改会双向同步">⇄</span>
+              )}
+              {(annotationCounts?.get(b.id) ?? 0) > 0 && (
+                <span className="doc-block-anno" title={`${annotationCounts!.get(b.id)} 条未解决批注(见右侧批注区)`}>
+                  💬{annotationCounts!.get(b.id)}
+                </span>
               )}
               <div className="doc-block-tools">
                 <button className="ghost icon-btn" title="上移" onClick={(e) => { e.stopPropagation(); moveBlock(b.id, -1); }}>↑</button>

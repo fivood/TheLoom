@@ -245,6 +245,7 @@ export function documentToMd(d: Document, entities: Entity[]): string {
   if (d.locationId) meta.locationId = d.locationId;
   if (d.timeLabel) meta.timeLabel = d.timeLabel;
   if (typeof d.tension === 'number' && Number.isFinite(d.tension)) meta.tension = d.tension;
+  if (typeof d.revision === 'number' && Number.isFinite(d.revision)) meta.revision = d.revision;
   if (d.notes.trim()) meta.notes = d.notes;
   // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
   const blockYaml = stringifyYaml(d.blocks.map((b) => {
@@ -329,6 +330,7 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
     locationId: typeof meta.locationId === 'string' && meta.locationId ? meta.locationId : undefined,
     timeLabel: typeof meta.timeLabel === 'string' && meta.timeLabel ? meta.timeLabel : undefined,
     tension: typeof meta.tension === 'number' && Number.isFinite(meta.tension) && meta.tension >= 1 && meta.tension <= 5 ? Math.round(meta.tension) : undefined,
+    revision: typeof meta.revision === 'number' && Number.isFinite(meta.revision) && meta.revision >= 1 ? Math.round(meta.revision) : undefined,
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
     updatedAt: typeof meta.updatedAt === 'number' ? meta.updatedAt : Date.now(),
   };
