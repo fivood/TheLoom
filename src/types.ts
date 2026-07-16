@@ -473,6 +473,22 @@ export interface Folder {
   order?: number;
 }
 
+/* ---------- AI 集成(R3-A) ---------- */
+
+/** AI 调用记录:只记元信息不记正文,随项目保存、可导出;API Key 永不入项目 */
+export interface AiLogEntry {
+  id: ID;
+  at: number;
+  provider: string;
+  model: string;
+  /** 用途:extract = 长文抽取;fields = 按模板补字段 */
+  purpose: 'extract' | 'fields';
+  inChars: number;
+  outChars: number;
+  ok: boolean;
+  error?: string;
+}
+
 /* ---------- 配色表 ---------- */
 
 /** 项目内可复用的配色表。default 内置一份灰阶,其余由用户创建 / 导入 zimg Palette JSON */
@@ -516,6 +532,10 @@ export interface Project {
   nodeTemplates?: Partial<Record<FlowNodeType, EntityTemplateSpec[]>>;
   /** 叙事单元:文档块与流程节点共享内容的权威存储(R1) */
   units?: NarrativeUnit[];
+  /** AI 提示词模板(随项目保存、可导出);extract = 长文抽取提示词 */
+  aiPrompts?: { extract?: string };
+  /** AI 调用记录(仅元信息,上限 50 条) */
+  aiLog?: AiLogEntry[];
   /** 项目内自定义配色表(可从 zimg Color Palette 的 JSON 导入) */
   palettes?: ColorPalette[];
   /** 当前激活的配色表 id(空 = 使用默认灰阶 PALETTE) */

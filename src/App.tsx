@@ -13,6 +13,7 @@ import SyncPanel from './components/SyncPanel';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
+import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
 import ProjectMenu from './components/ProjectMenu';
 import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
 import RecoveryPanel from './components/RecoveryPanel';
@@ -61,6 +62,8 @@ export default function App() {
   const [auditing, setAuditing] = useState(false);
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
+  const [aiSettings, setAiSettings] = useState(false);
+  const [aiExtract, setAiExtract] = useState(false);
   const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx'; file: File } | null>(null);
   const importXlsxRef = useRef<HTMLInputElement>(null);
   const importFdxRef = useRef<HTMLInputElement>(null);
@@ -295,6 +298,20 @@ export default function App() {
                     <Icon name="cloud" size={14} /> 协作
                   </button>
                   <div className="tools-sep" />
+                  <div className="tools-label">AI</div>
+                  <button
+                    title="粘贴长文或读入 md / txt,AI 抽取实体 / 场景 / 时间线,预检确认后写入"
+                    onClick={() => { setToolsOpen(false); setAiExtract(true); }}
+                  >
+                    <Icon name="bulb" size={14} /> AI 抽取(长文 → 骨架)
+                  </button>
+                  <button
+                    title="配置 LLM 服务:OpenAI 兼容 / Anthropic / Ollama 本地;Key 只存本机"
+                    onClick={() => { setToolsOpen(false); setAiSettings(true); }}
+                  >
+                    <Icon name="braces" size={14} /> AI 设置
+                  </button>
+                  <div className="tools-sep" />
                   <div className="tools-label">导出</div>
                   <button onClick={() => { setToolsOpen(false); exportProject(project); }}>
                     JSON 完整备份
@@ -417,6 +434,8 @@ export default function App() {
       {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
       {history && <VersionHistory onClose={() => setHistory(false)} />}
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
+      {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
+      {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
       {importFile && (
         <ImportPreview mode={importFile.mode} file={importFile.file} onClose={() => setImportFile(null)} />
       )}

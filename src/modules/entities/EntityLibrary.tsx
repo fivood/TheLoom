@@ -11,6 +11,7 @@ import Icon, { KIND_ICON } from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
 import FieldListEditor from '../../components/FieldListEditor';
+import { AiFillFieldsButton } from '../../components/AiPanel';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 import EntityEditor from './EntityEditor';
@@ -360,6 +361,9 @@ export default function EntityLibrary() {
               specs={entityTemplates?.[selected.kind]}
               onChange={(fields) => updateEntity(selected.id, { fields })}
             />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+              <AiFillFieldsButton entity={selected} />
+            </div>
             <div className="field">
               <label>备注</label>
               <textarea rows={5} value={selected.notes} onChange={(e) => updateEntity(selected.id, { notes: e.target.value })} />

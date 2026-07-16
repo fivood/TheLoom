@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.14.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.14.0):
+- 已发布版本:`v0.15.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.15.0):
+  - **v0.15.0 R3-A 外部知识库 + AI 抽取(轻量)** ✅ — 可切换 LLM 层(OpenAI 兼容/Anthropic/Ollama,Key 仅本机);长文抽取实体/场景/时间线走预检通道;实体 AI 补字段(只填空白)
   - **v0.14.0 R3 文档—流程双视图** ✅ — 选项结构双向同步(doc choices ↔ hub 出边,连线自动绑定);`flowToDocument` 剧本视图;条件/指令双向映射
   - **v0.13.0 R2 长篇正文工作台** ✅ — 卷/章 = 文档文件夹树;场景元数据(状态/字数目标/POV/地点/故事时间);连续稿模式(树序连读 + 就地编辑);30 万字实测流畅
   - **v0.12.0 R1 统一叙事数据模型** ✅ — `NarrativeUnit` 权威内容对象 + `syncNarrativeUnits` 迁移/同步器;文档块与流程节点经 `unitId` 共享同一份内容,双向同步
@@ -38,7 +39,7 @@
 | ~~R1~~ | ~~v0.12.0~~ | ~~统一叙事数据模型~~ | ~~叙事单元对象 / unitId 引用 / 迁移器~~ | ✅ 已完成(NarrativeUnit + syncNarrativeUnits,详见「最近变更」) | L |
 | ~~R2~~ | ~~v0.13.0~~ | ~~长篇正文工作台~~ | ~~卷/章/场景树 / 连续稿 / 场景元数据~~ | ✅ 已完成(详见「最近变更」;30 万字实测通过) | L |
 | ~~R3~~ | ~~v0.14.0~~ | ~~文档—流程双视图~~ | ~~选项/条件/指令双向映射 / 剧本视图~~ | ✅ 已完成(详见「最近变更」) | L |
-| **R3-A** | **v0.15.0** | **🆕 外部知识库 + AI 抽取(轻量)** | Obsidian / md / 纯文本 / PDF 粘贴接入;AI 抽实体 / 事件 / 场景 / 时间点走 ImportPreview 预检;AI 按模板补字段;LLM 服务可切换(OpenAI / Anthropic / Ollama);API Key 本地存储 | AI 输出走稳定 ID 通道,不改结构;可粘贴长文自动生成初稿骨架;支持自建模型 | M |
+| ~~R3-A~~ | ~~v0.15.0~~ | ~~外部知识库 + AI 抽取(轻量)~~ | ~~LLM 层 / 长文抽取预检 / AI 补字段~~ | ✅ 已完成(详见「最近变更」) | M |
 | R4 | v0.16.0 | **小说规划增强** | 人物关系图;角色弧线;伏笔台账;章节登场统计;场景卡片墙;节奏图 | 可追踪伏笔埋设 / 回收;可查看人物每章状态与登场情况 | M |
 | R5 | v0.17.0 | **正文修订系统** | 批注 / 作者备注 / 修订状态 / 文档快照 / 版本差异 / 全局查找替换 | 可比较两版正文;可按修订轮次筛选场景;替换可撤销 | M |
 | R6 | v0.18.0 | **脚本语言重构** | 自有解析器 / AST / 类型检查 / 属性读写 / 语法高亮 / 自动补全 / 重命名联动 | 不再动态执行字符串;错误精确到表达式位置;支持实体属性修改 | L |
@@ -92,6 +93,19 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R3-A · v0.15.0)
+
+外部知识库 + AI 抽取(轻量):
+
+- 新增 `src/ai/llm.ts`:零依赖 LLM 服务层 —— `LlmConfig`(provider/baseUrl/apiKey/model)存 `theloom-llm-v1` localStorage,**永不入项目**;`chatComplete` 三后端(OpenAI 兼容 `/chat/completions` Bearer、Anthropic `/v1/messages` 带 `anthropic-dangerous-direct-browser-access` 头、Ollama `/api/chat`);`testLlmConnection`;`parseModelJson`(剥围栏 / 截取大括号)。Anthropic 默认模型 `claude-opus-4-8`;请求不带 temperature / thinking,兼容全系模型
+- 新增 `src/ai/extract.ts`:`DEFAULT_EXTRACT_PROMPT`(严格 JSON 模式,kind 白名单);`normalizeExtracted` 防御性校验(非法 kind 降级 concept、空条目丢弃进 warnings、实体去重);`buildAiImportPreview` 稳定 ID 匹配 —— 同名实体(大小写宽容)只补空简介 + 缺失字段、新实体 uid 新建、场景 → `AI 初稿` 分类文档(status=outline,说话人按名匹配角色)、时间点按 label 去重、无轨道时建「AI 导入」轨道;`applyAiImportPreview`(在 commit 回调里 push structuredClone);`pushAiLog`(仅元信息,50 条封顶);`buildFieldFillPrompt` / `normalizeFieldFill`(只保留请求过的空字段)
+- `types.ts`:`AiLogEntry` + `Project.aiPrompts?`(extract 提示词随项目保存可导出)+ `Project.aiLog?`
+- 新增 `src/components/AiPanel.tsx`:`AiSettingsModal`(服务商切换重置默认、Key 密码框带「仅本机」提示、测试连接显示耗时);`AiExtractModal`(粘贴 + .md/.txt 多选读入、可编辑提示词模板、20 万字截断、差异表 + 警告 + 未识别说话人、应用后跳转首个文档);`AiFillFieldsButton`(实体 inspector,confirmDialog 逐项列出、只填空白文本字段)
+- `App.tsx` 工具菜单新增「AI」区:AI 抽取 / AI 设置;`EntityLibrary` 字段编辑器下挂补字段按钮
+- **设计准则落实**:AI 输出必须过 `normalizeExtracted` → `buildAiImportPreview` → 用户确认 → `applyAiImportPreview`,无直接写项目路径;新块经 `normalizeProject` 自动获得叙事单元(与 R1/R3 体系无缝)
+- 测试:`ai/extract.test.ts` 7 项(JSON 宽容解析 / 校验降级 / 匹配更新与新增 / 说话人映射 / 自动轨道 / 补字段过滤 / 日志封顶);合计 74 项通过
+- 已实测(浏览器,stub fetch):配置 mock 网关 → AI 抽取 → 预检表(+2 实体 / +1 场景 / +1 时间点 / +1 事件)→ 应用 → localStorage 中实体字段、AI 初稿文档、speakerId 关联、全部块带 unitId、aiLog 记录均正确;项目 JSON 中不含 API Key
 
 ## 最近变更(R3 · v0.14.0)
 
