@@ -5,6 +5,7 @@ import type { NavTarget } from './search';
 import { buildScriptScope } from './script';
 import { checkCondition, checkInstructions, checkNumberExpr } from './script/check';
 import type { Diagnostic } from './script/ast';
+import { createIssue, type IssueScope, type IssueSeverity, type ProjectIssue, type ProjectIssueInput } from './issues';
 
 /** 中文按字计,拉丁与数字按词计 */
 export function countWords(text: string | undefined): number {
@@ -77,14 +78,50 @@ export function projectStats(p: Project): ProjectStats {
   };
 }
 
-export interface Issue {
+interface RawIssue {
   kind: string;
   message: string;
   nav?: NavTarget;
+  severity?: IssueSeverity;
+  source?: ProjectIssueInput['source'];
+  code?: string;
+  scope?: IssueScope;
+  objectId?: string;
 }
 
-export function auditProject(p: Project): Issue[] {
-  const issues: Issue[] = [];
+export type Issue = ProjectIssue;
+
+function inferScope(nav?: NavTarget): IssueScope {
+  if (!nav) return 'project';
+  if (nav.tab === 'flow') return 'flow';
+  if (nav.tab === 'documents') return 'document';
+  if (nav.tab === 'entities') return 'entity';
+  if (nav.tab === 'assets') return 'asset';
+  return 'project';
+}
+
+function normalizeIssue(raw: RawIssue): ProjectIssue {
+  const source = raw.source ?? (raw.kind.startsWith('脚本') ? 'script' : 'audit');
+  const severity = raw.severity ?? (
+    raw.kind === '脚本警告' || raw.kind === '孤儿节点' || raw.kind === '空对白'
+      || raw.kind === '图片缺缩略图' || raw.kind === '资产大小异常'
+      ? 'warning'
+      : 'error'
+  );
+  return createIssue({
+    code: raw.code ?? `${source}.${raw.kind}`,
+    source,
+    severity,
+    scope: raw.scope ?? inferScope(raw.nav),
+    kind: raw.kind,
+    message: raw.message,
+    nav: raw.nav,
+    objectId: raw.objectId,
+  });
+}
+
+export function auditProject(p: Project): ProjectIssue[] {
+  const issues: RawIssue[] = [];
   const scope = buildScriptScope(p);
 
   // 脚本诊断:错误精确到表达式位置(字符区间 1 起)
@@ -95,6 +132,9 @@ export function auditProject(p: Project): Issue[] {
         kind: d.severity === 'error' ? '脚本错误' : '脚本警告',
         message: `${where}:${at}${d.message}`,
         nav,
+        source: 'script',
+        severity: d.severity,
+        code: `script.${d.severity}`,
       });
     }
   };
@@ -202,5 +242,5 @@ export function auditProject(p: Project): Issue[] {
     issues.push({ kind: '重复技术名', message: `${dup.name} → ${where}` });
   }
 
-  return issues;
+  return issues.map(normalizeIssue);
 }

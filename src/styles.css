@@ -2520,3 +2520,26 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   white-space: nowrap;
 }
 .pathtest-issue-row.bad .pathtest-issue-kind { background: var(--danger-bg); color: var(--danger); }
+.audit-filters {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.audit-filters button {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.audit-filters button.active {
+  background: var(--text);
+  color: var(--bg);
+}
+.audit-severity {
+  flex: 0 0 auto;
+  min-width: 30px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.audit-issue-error .audit-severity { color: var(--danger); }
+.audit-issue-warning .audit-severity { color: var(--warning, #9a6a00); }
+.audit-issue-info .audit-severity { color: var(--muted); }

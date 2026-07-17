@@ -1,12 +1,20 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useLoom } from '../store';
 import { auditProject, projectStats } from '../audit';
 import { useNav } from '../search';
+import { ISSUE_SEVERITY_LABEL, type IssueSeverity } from '../issues';
 
 export default function AuditPanel({ onClose }: { onClose: () => void }) {
   const project = useLoom((s) => s.project);
   const stats = useMemo(() => projectStats(project), [project]);
   const issues = useMemo(() => auditProject(project), [project]);
+  const [severity, setSeverity] = useState<IssueSeverity | 'all'>('all');
+  const visibleIssues = severity === 'all' ? issues : issues.filter((issue) => issue.severity === severity);
+  const severityCounts = useMemo(() => ({
+    error: issues.filter((issue) => issue.severity === 'error').length,
+    warning: issues.filter((issue) => issue.severity === 'warning').length,
+    info: issues.filter((issue) => issue.severity === 'info').length,
+  }), [issues]);
   const go = useNav((s) => s.go);
 
   return (
@@ -53,14 +61,27 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
 
           <div className="audit-section">
             <h4>问题检测({issues.length})</h4>
+            {issues.length > 0 && (
+              <div className="audit-filters">
+                <button className={severity === 'all' ? 'active' : ''} onClick={() => setSeverity('all')}>全部 {issues.length}</button>
+                {(['error', 'warning', 'info'] as IssueSeverity[]).map((level) => (
+                  severityCounts[level] > 0 && (
+                    <button key={level} className={severity === level ? 'active' : ''} onClick={() => setSeverity(level)}>
+                      {ISSUE_SEVERITY_LABEL[level]} {severityCounts[level]}
+                    </button>
+                  )
+                ))}
+              </div>
+            )}
             {issues.length === 0 && <div className="audit-ok">没有发现问题:无孤儿节点、无分支缺口、无未定义变量、无空对白、无悬挂附件、无重复技术名、无必填缺失、无损坏资产。</div>}
-            {issues.map((it, i) => (
+            {visibleIssues.map((it) => (
               <div
-                key={i}
-                className="ref-item"
+                key={it.id}
+                className={`ref-item audit-issue-${it.severity}`}
                 onClick={() => { if (it.nav) { go(it.nav); onClose(); } }}
                 title={it.nav ? '点击定位' : undefined}
               >
+                <span className="audit-severity">{ISSUE_SEVERITY_LABEL[it.severity]}</span>
                 <span className="palette-kind">{it.kind}</span>
                 <span className="ref-title">{it.message}</span>
               </div>

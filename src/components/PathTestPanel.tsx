@@ -3,7 +3,8 @@ import { useLoom } from '../store';
 import { useNav } from '../search';
 import Icon from './Icon';
 import type { Flow } from '../types';
-import { simulateFlow, type SimNodeRef } from '../simulate';
+import { simulateFlow } from '../simulate';
+import { pathReportIssues, type ProjectIssue } from '../issues';
 
 /**
  * R7 路径测试报告:批量遍历当前流程的全部分支,
@@ -18,27 +19,31 @@ export default function PathTestPanel({ flow, onClose }: { flow: Flow; onClose: 
     () => simulateFlow(flow, project.variables, project.entities),
     [flow, project.variables, project.entities],
   );
+  const issues = useMemo(() => pathReportIssues(flow.id, report), [flow.id, report]);
 
-  const jump = (ref: SimNodeRef) => {
+  const jump = (issue: ProjectIssue) => {
+    if (!issue.nav) return;
     onClose();
-    go({ tab: 'flow', flowId: flow.id, path: ref.path, nodeId: ref.nodeId });
+    go(issue.nav);
   };
 
   const issueGroup = (
-    label: string, kind: string, refs: SimNodeRef[], bad: boolean, hint: string,
-  ) => refs.length > 0 && (
-    <div className="field">
-      <label>{label}({refs.length})</label>
-      <div className="hint" style={{ fontSize: 11, marginBottom: 4 }}>{hint}</div>
-      {refs.map((r) => (
-        <div key={r.nodeId} className={`pathtest-issue-row${bad ? ' bad' : ''}`} onClick={() => jump(r)} title="点击定位到节点">
-          <span className="pathtest-issue-kind">{kind}</span>
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-          <span className="hint" style={{ fontSize: 10 }}>{r.kind}{r.path.length > 0 ? ` · 子流程内` : ''}</span>
-        </div>
-      ))}
-    </div>
-  );
+    label: string, code: string, hint: string,
+  ) => {
+    const group = issues.filter((issue) => issue.code === code);
+    return group.length > 0 && (
+      <div className="field">
+        <label>{label}({group.length})</label>
+        <div className="hint" style={{ fontSize: 11, marginBottom: 4 }}>{hint}</div>
+        {group.map((issue) => (
+          <div key={issue.id} className="pathtest-issue-row bad" onClick={() => jump(issue)} title="点击定位到节点">
+            <span className="pathtest-issue-kind">{issue.kind}</span>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.message}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const pct = Math.round(report.coverage * 100);
   const clean = report.unreachable.length === 0 && report.stuck.length === 0 && report.loops.length === 0;
@@ -76,11 +81,11 @@ export default function PathTestPanel({ flow, onClose }: { flow: Flow; onClose: 
             </div>
           )}
 
-          {issueGroup('不可达节点', '不可达', report.unreachable, true,
+          {issueGroup('不可达节点', 'path.unreachable',
             '任何路径都走不到这些节点:检查连线、条件表达式或变量初值。')}
-          {issueGroup('无出口卡死', '卡死', report.stuck, true,
+          {issueGroup('无出口卡死', 'path.stuck',
             '这些节点有出边,但存在一条路径让所有出边都被条件 / 一次性过滤掉,玩家会被困住;考虑加 fallback 兜底分支。')}
-          {issueGroup('死循环', '循环', report.loops, true,
+          {issueGroup('死循环', 'path.loop',
             '存在一条路径回到完全相同的状态(变量 / 一次性选项都没变化),会无限打转;在环上加状态变化或出口。')}
 
           <div className="hint" style={{ fontSize: 11, marginTop: 8 }}>
