@@ -100,4 +100,29 @@ describe('AI 受控上下文包', () => {
     expect(await fingerprintValue({ b: 2, a: 1 })).toBe(await fingerprintValue({ a: 1, b: 2 }));
     expect(await fingerprintValue({ a: 2 })).not.toBe(await fingerprintValue({ a: 1 }));
   });
+
+  it('体检问题作为不可信主上下文并附带可定位对象', async () => {
+    const project = sampleProject();
+    const entity = project.entities[0];
+    const bundle = await buildAiContextBundle(project, {
+      issue: {
+        id: 'audit:test',
+        code: 'test.issue',
+        source: 'audit',
+        severity: 'warning',
+        scope: 'entity',
+        kind: '一致性问题',
+        message: '角色动机与设定冲突',
+        nav: { tab: 'entities', entityId: entity.id },
+        objectId: entity.id,
+      },
+    });
+
+    expect(bundle.items[0].sourceRef).toMatchObject({
+      key: 'issue:audit:test',
+      kind: 'project-issue',
+    });
+    expect(bundle.items[0].text).toContain('角色动机与设定冲突');
+    expect(bundle.items.some((item) => item.sourceRef.key === `entity:${entity.id}`)).toBe(true);
+  });
 });

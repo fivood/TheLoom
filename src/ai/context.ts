@@ -1,6 +1,7 @@
 import { queryProject } from '../query';
 import type { QueryHit } from '../query';
 import type { NavTarget } from '../search';
+import type { ProjectIssue } from '../issues';
 import type {
   Asset,
   DocBlock,
@@ -26,7 +27,8 @@ export type AiContextKind =
   | 'document'
   | 'document-block'
   | 'research'
-  | 'timeline-event';
+  | 'timeline-event'
+  | 'project-issue';
 
 export type AiContextRelation = 'primary' | 'selected' | 'query' | 'reference';
 
@@ -35,7 +37,7 @@ export interface AiSourceRef {
   kind: AiContextKind;
   id: string;
   title: string;
-  nav: NavTarget;
+  nav?: NavTarget;
 }
 
 export interface AiContextItem {
@@ -72,6 +74,7 @@ export interface BuildAiContextOptions {
   primary?: NavTarget;
   selected?: NavTarget[];
   query?: ProjectQuery;
+  issue?: ProjectIssue;
   includeReferences?: boolean;
   charBudget?: number;
   perItemLimit?: number;
@@ -131,6 +134,32 @@ function describeFields(fields: EntityField[], p: Project): string {
 
 function sourceHeader(ref: AiSourceRef): string {
   return `[来源 ${ref.kind}] ${ref.title}\n来源键: ${ref.key}\n对象 ID: ${ref.id}`;
+}
+
+function issueCandidate(issue: ProjectIssue): ContextCandidate {
+  const sourceRef: AiSourceRef = {
+    key: `issue:${issue.id}`,
+    kind: 'project-issue',
+    id: issue.id,
+    title: `${issue.kind}: ${issue.message.slice(0, 80)}`,
+    nav: issue.nav,
+  };
+  return {
+    sourceRef,
+    module: '体检',
+    body: compactLines([
+      sourceHeader(sourceRef),
+      `严重级别: ${issue.severity}`,
+      `问题代码: ${issue.code}`,
+      `问题范围: ${issue.scope}`,
+      `检测来源: ${issue.source}`,
+      issue.objectId && `关联对象 ID: ${issue.objectId}`,
+      `问题描述: ${issue.message}`,
+    ]),
+    refIds: issue.objectId ? [issue.objectId] : [],
+    containsBody: false,
+    containsResearch: false,
+  };
 }
 
 function entityCandidate(p: Project, entity: Entity): ContextCandidate {
@@ -457,6 +486,10 @@ export async function buildAiContextBundle(p: Project, options: BuildAiContextOp
   const ranked = new Map<string, RankedCandidate>();
 
   addRanked(ranked, options.primary ? resolveAiContextSource(p, options.primary) : null, 'primary');
+  if (options.issue) {
+    addRanked(ranked, issueCandidate(options.issue), 'primary');
+    addRanked(ranked, options.issue.nav ? resolveAiContextSource(p, options.issue.nav) : null, 'selected');
+  }
   for (const nav of options.selected ?? []) addRanked(ranked, resolveAiContextSource(p, nav), 'selected');
   for (const hit of options.query ? queryProject(p, options.query) : []) {
     addRanked(ranked, candidateFromQueryHit(p, hit), 'query');

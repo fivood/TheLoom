@@ -37,7 +37,7 @@ function validSourceRef(value: unknown): value is AiSourceRef {
     && typeof ref.kind === 'string'
     && typeof ref.id === 'string'
     && typeof ref.title === 'string'
-    && Boolean(ref.nav && typeof ref.nav === 'object' && typeof ref.nav.tab === 'string');
+    && (ref.nav === undefined || Boolean(typeof ref.nav === 'object' && typeof ref.nav.tab === 'string'));
 }
 
 function normalizeMessage(value: unknown): AiSessionMessage | null {
