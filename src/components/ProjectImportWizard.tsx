@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../store';
 import { useNav } from '../search';
 import Icon from './Icon';
-import { chatComplete, loadLlmConfig, parseModelJson } from '../ai/llm';
+import { chatComplete, llmNeedsApiKey, loadLlmConfig, parseModelJson } from '../ai/llm';
 import { pushAiLog } from '../ai/extract';
 import {
   applyProjectImport, buildGeneratePrompt, buildPlanPrompt, buildProjectImportPreview,
@@ -54,7 +54,7 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
 
   const callLlm = async (purpose: 'plan' | 'generate', system: string, user: string, maxTokens: number): Promise<string> => {
     const cfg = loadLlmConfig();
-    if (cfg.provider !== 'ollama' && !cfg.apiKey) {
+    if (llmNeedsApiKey(cfg) && !cfg.apiKey) {
       throw new Error('还没有配置 API Key。请先在「工具 → AI 设置」里完成配置。');
     }
     try {

@@ -5,7 +5,7 @@ import { alertDialog, confirmDialog } from '../dialog';
 import Icon from './Icon';
 import type { Entity } from '../types';
 import {
-  chatComplete, loadLlmConfig, parseModelJson, PROVIDER_DEFAULTS, PROVIDER_LABEL,
+  chatComplete, llmNeedsApiKey, loadLlmConfig, parseModelJson, PROVIDER_DEFAULTS, PROVIDER_LABEL, PROVIDER_META,
   saveLlmConfig, testLlmConnection, type LlmConfig, type LlmProvider,
 } from '../ai/llm';
 import {
@@ -21,7 +21,7 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
   const [testResult, setTestResult] = useState<string | null>(null);
 
   const switchProvider = (provider: LlmProvider) => {
-    setCfg((c) => ({ ...PROVIDER_DEFAULTS[provider], apiKey: c.apiKey }));
+    setCfg({ ...PROVIDER_DEFAULTS[provider], apiKey: '' });
     setTestResult(null);
   };
 
@@ -57,16 +57,38 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
             <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
-              OpenAI 兼容可接 DeepSeek / Moonshot / SiliconFlow 等任意兼容网关;Ollama 为本机模型,需设置 OLLAMA_ORIGINS 允许跨域
+              {PROVIDER_META[cfg.provider].hint}
             </div>
           </div>
+          {(cfg.provider === 'custom-openai' || cfg.provider === 'custom-anthropic') && (
+            <div className="field">
+              <label>认证方式</label>
+              <select value={cfg.authMode} onChange={(e) => setCfg({ ...cfg, authMode: e.target.value as LlmConfig['authMode'] })}>
+                <option value="bearer">Bearer API Key</option>
+                <option value="x-api-key">x-api-key</option>
+                <option value="none">无需认证</option>
+              </select>
+            </div>
+          )}
           <div className="field">
             <label>API 地址</label>
             <input value={cfg.baseUrl} onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })} placeholder={PROVIDER_DEFAULTS[cfg.provider].baseUrl} />
           </div>
-          {cfg.provider !== 'ollama' && (
+          {llmNeedsApiKey(cfg) && (
             <div className="field">
-              <label>API Key</label>
+              <label>
+                API Key
+                {PROVIDER_META[cfg.provider].consoleUrl && (
+                  <a
+                    href={PROVIDER_META[cfg.provider].consoleUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ marginLeft: 10, fontSize: 11 }}
+                  >
+                    打开官方控制台 ↗
+                  </a>
+                )}
+              </label>
               <input
                 type="password"
                 value={cfg.apiKey}
@@ -75,7 +97,7 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
                 autoComplete="off"
               />
               <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
-                只保存在本浏览器 / 本机,不写入项目文件,不随云协作同步
+                当前只保存在本浏览器 / 本机，不写入项目文件或云协作；桌面安全凭据存储将在后续批次接入
               </div>
             </div>
           )}
@@ -128,7 +150,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
 
   const run = async () => {
     const cfg = loadLlmConfig();
-    if (cfg.provider !== 'ollama' && !cfg.apiKey) {
+    if (llmNeedsApiKey(cfg) && !cfg.apiKey) {
       setError('还没有配置 API Key。请先在「工具 → AI 设置」里完成配置。');
       return;
     }
@@ -303,7 +325,7 @@ export function AiFillFieldsButton({ entity }: { entity: Entity }) {
 
   const run = async () => {
     const cfg = loadLlmConfig();
-    if (cfg.provider !== 'ollama' && !cfg.apiKey) {
+    if (llmNeedsApiKey(cfg) && !cfg.apiKey) {
       await alertDialog('还没有配置 API Key。请先在「工具 → AI 设置」里完成配置。');
       return;
     }

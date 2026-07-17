@@ -13,6 +13,8 @@ const resultSchema: JsonSchema = {
 
 const config = (provider: LlmConfig['provider']): LlmConfig => ({
   provider,
+  protocol: provider === 'anthropic' ? 'anthropic' : provider === 'ollama' ? 'ollama' : 'openai',
+  authMode: provider === 'anthropic' ? 'x-api-key' : provider === 'ollama' ? 'none' : 'bearer',
   baseUrl: provider === 'ollama' ? 'http://localhost:11434' : `https://${provider}.example`,
   apiKey: 'secret',
   model: 'test-model',
@@ -134,5 +136,41 @@ describe('AI Provider 结构化输出', () => {
       kind: 'cancelled',
       retryable: false,
     }));
+  });
+
+  it('国产模型预设使用 OpenAI 兼容协议和正确端点', async () => {
+    const { PROVIDER_DEFAULTS } = await import('./llm');
+
+    expect(PROVIDER_DEFAULTS.deepseek).toMatchObject({
+      protocol: 'openai',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-v4-flash',
+    });
+    expect(PROVIDER_DEFAULTS.kimi).toMatchObject({
+      protocol: 'openai',
+      baseUrl: 'https://api.moonshot.cn/v1',
+      model: 'kimi-k3',
+    });
+    expect(PROVIDER_DEFAULTS.glm.model).toBe('glm-5.2');
+  });
+
+  it('Anthropic 兼容网关可改用 Bearer 认证', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      content: [{ type: 'text', text: 'OK' }],
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const cfg: LlmConfig = {
+      ...config('custom-anthropic'),
+      protocol: 'anthropic',
+      authMode: 'bearer',
+    };
+
+    await chatComplete(cfg, { user: '测试' });
+
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+      authorization: 'Bearer secret',
+      'anthropic-version': '2023-06-01',
+    });
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('x-api-key');
   });
 });

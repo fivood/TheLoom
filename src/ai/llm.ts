@@ -1,14 +1,29 @@
 /**
- * LLM 服务层:本地优先,三种可切换后端,零第三方依赖(原生 fetch)。
+ * LLM 服务层:本地优先,多服务商兼容后端,零第三方依赖(原生 fetch)。
  * API Key 只存 localStorage(本浏览器 / 本机),不写入项目数据,不随云协作同步。
  */
 
 import { validateJsonSchema, type JsonSchema, type SchemaIssue } from './schema';
 
-export type LlmProvider = 'openai' | 'anthropic' | 'ollama';
+export type LlmProvider =
+  | 'openai'
+  | 'anthropic'
+  | 'deepseek'
+  | 'kimi'
+  | 'qwen'
+  | 'glm'
+  | 'minimax'
+  | 'ollama'
+  | 'custom-openai'
+  | 'custom-anthropic';
+
+export type LlmProtocol = 'openai' | 'anthropic' | 'ollama';
+export type LlmAuthMode = 'bearer' | 'x-api-key' | 'none';
 
 export interface LlmConfig {
   provider: LlmProvider;
+  protocol: LlmProtocol;
+  authMode: LlmAuthMode;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -17,26 +32,63 @@ export interface LlmConfig {
 export const PROVIDER_LABEL: Record<LlmProvider, string> = {
   openai: 'OpenAI 兼容 API',
   anthropic: 'Anthropic',
+  deepseek: 'DeepSeek',
+  kimi: 'Kimi',
+  qwen: '通义千问 · 阿里百炼',
+  glm: '智谱 GLM',
+  minimax: 'MiniMax',
   ollama: 'Ollama(本地)',
+  'custom-openai': '自定义 · OpenAI 兼容',
+  'custom-anthropic': '自定义 · Anthropic 兼容',
 };
 
 export const PROVIDER_DEFAULTS: Record<LlmProvider, Omit<LlmConfig, 'apiKey'>> = {
-  openai: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-  anthropic: { provider: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-opus-4-8' },
-  ollama: { provider: 'ollama', baseUrl: 'http://localhost:11434', model: 'qwen3:8b' },
+  openai: { provider: 'openai', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  anthropic: { provider: 'anthropic', protocol: 'anthropic', authMode: 'x-api-key', baseUrl: 'https://api.anthropic.com', model: 'claude-opus-4-8' },
+  deepseek: { provider: 'deepseek', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
+  kimi: { provider: 'kimi', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
+  qwen: { provider: 'qwen', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  glm: { provider: 'glm', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.2' },
+  minimax: { provider: 'minimax', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.minimaxi.com/v1', model: 'MiniMax-M2.7' },
+  ollama: { provider: 'ollama', protocol: 'ollama', authMode: 'none', baseUrl: 'http://localhost:11434', model: 'qwen3:8b' },
+  'custom-openai': { provider: 'custom-openai', protocol: 'openai', authMode: 'bearer', baseUrl: '', model: '' },
+  'custom-anthropic': { provider: 'custom-anthropic', protocol: 'anthropic', authMode: 'x-api-key', baseUrl: '', model: '' },
 };
 
-const CONFIG_KEY = 'theloom-llm-v1';
+export const PROVIDER_META: Record<LlmProvider, { consoleUrl?: string; hint: string }> = {
+  openai: { consoleUrl: 'https://platform.openai.com/api-keys', hint: 'OpenAI API 与 ChatGPT 订阅分开计费' },
+  anthropic: { consoleUrl: 'https://console.anthropic.com/settings/keys', hint: 'Claude API 与 Claude 网页订阅分开计费' },
+  deepseek: { consoleUrl: 'https://platform.deepseek.com/api_keys', hint: '支持 OpenAI / Anthropic 兼容协议；此处默认使用 OpenAI 兼容' },
+  kimi: { consoleUrl: 'https://platform.kimi.com/', hint: 'Kimi K3，OpenAI 兼容，适合长上下文叙事任务' },
+  qwen: { consoleUrl: 'https://bailian.console.aliyun.com/', hint: '默认使用中国大陆百炼公共端点；工作空间端点可手动替换' },
+  glm: { consoleUrl: 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys', hint: '智谱 OpenAI 兼容接口' },
+  minimax: { consoleUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key', hint: '默认使用 OpenAI 兼容；也可通过自定义 Anthropic 兼容接入' },
+  ollama: { consoleUrl: 'https://ollama.com/library', hint: '模型在本机运行，不需要 API Key' },
+  'custom-openai': { hint: '适用于硅基流动、火山方舟、企业代理和自建 OpenAI 兼容网关' },
+  'custom-anthropic': { hint: '适用于提供 Anthropic Messages 兼容协议的代理或模型服务' },
+};
+
+const CONFIG_KEY = 'theloom-llm-v2';
+const LEGACY_CONFIG_KEY = 'theloom-llm-v1';
+const PROVIDERS = new Set<LlmProvider>(Object.keys(PROVIDER_DEFAULTS) as LlmProvider[]);
 
 export function loadLlmConfig(): LlmConfig {
   try {
-    const raw = localStorage.getItem(CONFIG_KEY);
+    const raw = localStorage.getItem(CONFIG_KEY) ?? localStorage.getItem(LEGACY_CONFIG_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<LlmConfig>;
-      const provider: LlmProvider = parsed.provider === 'anthropic' || parsed.provider === 'ollama' ? parsed.provider : 'openai';
+      const provider = typeof parsed.provider === 'string' && PROVIDERS.has(parsed.provider as LlmProvider)
+        ? parsed.provider as LlmProvider
+        : 'openai';
       const defaults = PROVIDER_DEFAULTS[provider];
       return {
         provider,
+        protocol: parsed.protocol === 'anthropic' || parsed.protocol === 'ollama' || parsed.protocol === 'openai'
+          ? parsed.protocol
+          : defaults.protocol,
+        authMode: parsed.authMode === 'x-api-key' || parsed.authMode === 'none' || parsed.authMode === 'bearer'
+          ? parsed.authMode
+          : defaults.authMode,
         baseUrl: typeof parsed.baseUrl === 'string' && parsed.baseUrl ? parsed.baseUrl : defaults.baseUrl,
         apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
         model: typeof parsed.model === 'string' && parsed.model ? parsed.model : defaults.model,
@@ -50,7 +102,16 @@ export function saveLlmConfig(cfg: LlmConfig) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 }
 
+export const llmNeedsApiKey = (cfg: LlmConfig) => cfg.authMode !== 'none';
+
 const trimSlash = (s: string) => s.replace(/\/+$/, '');
+
+function authHeaders(cfg: LlmConfig): Record<string, string> {
+  if (!cfg.apiKey || cfg.authMode === 'none') return {};
+  return cfg.authMode === 'x-api-key'
+    ? { 'x-api-key': cfg.apiKey }
+    : { authorization: `Bearer ${cfg.apiKey}` };
+}
 
 export interface ChatRequest {
   system?: string;
@@ -127,15 +188,15 @@ async function requestJson(provider: string, url: string, init: RequestInit): Pr
 /** 单轮补全:按配置分发到对应后端,返回纯文本 */
 export async function chatComplete(cfg: LlmConfig, req: ChatRequest): Promise<string> {
   const maxTokens = req.maxTokens ?? 16000;
-  if (cfg.provider === 'anthropic') {
+  if (cfg.protocol === 'anthropic') {
     const { data: raw } = await requestJson('Anthropic', `${trimSlash(cfg.baseUrl)}/v1/messages`, {
       method: 'POST',
       signal: req.signal,
       headers: {
         'content-type': 'application/json',
-        'x-api-key': cfg.apiKey,
+        ...authHeaders(cfg),
         'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
+        ...(cfg.provider === 'anthropic' ? { 'anthropic-dangerous-direct-browser-access': 'true' } : {}),
       },
       body: JSON.stringify({
         model: cfg.model,
@@ -150,7 +211,7 @@ export async function chatComplete(cfg: LlmConfig, req: ChatRequest): Promise<st
     if (!text) throw new LlmRequestError(`模型没有返回文本(stop_reason: ${data.stop_reason ?? '未知'})`, 'invalid_response', false);
     return text;
   }
-  if (cfg.provider === 'ollama') {
+  if (cfg.protocol === 'ollama') {
     const { data: raw } = await requestJson('Ollama', `${trimSlash(cfg.baseUrl)}/api/chat`, {
       method: 'POST',
       signal: req.signal,
@@ -179,7 +240,7 @@ export async function chatComplete(cfg: LlmConfig, req: ChatRequest): Promise<st
     signal: req.signal,
     headers: {
       'content-type': 'application/json',
-      ...(cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {}),
+      ...authHeaders(cfg),
     },
     body: JSON.stringify({
       model: cfg.model,
@@ -197,8 +258,8 @@ export async function chatComplete(cfg: LlmConfig, req: ChatRequest): Promise<st
   return text;
 }
 
-function usageFrom(raw: Record<string, unknown>, provider: LlmProvider): LlmUsage | undefined {
-  if (provider === 'ollama') {
+function usageFrom(raw: Record<string, unknown>, protocol: LlmProtocol): LlmUsage | undefined {
+  if (protocol === 'ollama') {
     const inputTokens = typeof raw.prompt_eval_count === 'number' ? raw.prompt_eval_count : undefined;
     const outputTokens = typeof raw.eval_count === 'number' ? raw.eval_count : undefined;
     return inputTokens === undefined && outputTokens === undefined
@@ -207,7 +268,7 @@ function usageFrom(raw: Record<string, unknown>, provider: LlmProvider): LlmUsag
   }
   const usage = raw.usage as Record<string, unknown> | undefined;
   if (!usage) return undefined;
-  if (provider === 'anthropic') {
+  if (protocol === 'anthropic') {
     const inputTokens = typeof usage.input_tokens === 'number' ? usage.input_tokens : undefined;
     const outputTokens = typeof usage.output_tokens === 'number' ? usage.output_tokens : undefined;
     return { inputTokens, outputTokens, totalTokens: inputTokens !== undefined && outputTokens !== undefined ? inputTokens + outputTokens : undefined };
@@ -230,15 +291,15 @@ function ensureStructured<T>(value: unknown, schema: JsonSchema): T {
 
 async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Promise<StructuredResponse<T>> {
   const maxTokens = req.maxTokens ?? 16000;
-  if (cfg.provider === 'anthropic') {
+  if (cfg.protocol === 'anthropic') {
     const { data: unknownData, response } = await requestJson('Anthropic', `${trimSlash(cfg.baseUrl)}/v1/messages`, {
       method: 'POST',
       signal: req.signal,
       headers: {
         'content-type': 'application/json',
-        'x-api-key': cfg.apiKey,
+        ...authHeaders(cfg),
         'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
+        ...(cfg.provider === 'anthropic' ? { 'anthropic-dangerous-direct-browser-access': 'true' } : {}),
       },
       body: JSON.stringify({
         model: cfg.model,
@@ -261,12 +322,12 @@ async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Prom
     return {
       data: ensureStructured<T>(tool.input, req.schema),
       mode: 'native',
-      usage: usageFrom(data, cfg.provider),
+      usage: usageFrom(data, cfg.protocol),
       stopReason: typeof data.stop_reason === 'string' ? data.stop_reason : undefined,
       requestId: response.headers.get('request-id') ?? response.headers.get('x-request-id') ?? undefined,
     };
   }
-  if (cfg.provider === 'ollama') {
+  if (cfg.protocol === 'ollama') {
     const { data: unknownData, response } = await requestJson('Ollama', `${trimSlash(cfg.baseUrl)}/api/chat`, {
       method: 'POST',
       signal: req.signal,
@@ -292,7 +353,7 @@ async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Prom
     return {
       data: ensureStructured<T>(parseModelJson(content), req.schema),
       mode: 'native',
-      usage: usageFrom(data, cfg.provider),
+      usage: usageFrom(data, cfg.protocol),
       stopReason: typeof data.done_reason === 'string' ? data.done_reason : undefined,
       requestId: response.headers.get('x-request-id') ?? undefined,
     };
@@ -302,7 +363,7 @@ async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Prom
     signal: req.signal,
     headers: {
       'content-type': 'application/json',
-      ...(cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {}),
+      ...authHeaders(cfg),
     },
     body: JSON.stringify({
       model: cfg.model,
@@ -326,7 +387,7 @@ async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Prom
   return {
     data: ensureStructured<T>(parseModelJson(content), req.schema),
     mode: 'native',
-    usage: usageFrom(data, cfg.provider),
+    usage: usageFrom(data, cfg.protocol),
     stopReason: typeof choices[0]?.finish_reason === 'string' ? choices[0].finish_reason as string : undefined,
     requestId: response.headers.get('x-request-id') ?? response.headers.get('request-id') ?? undefined,
   };
