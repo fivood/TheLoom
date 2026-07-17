@@ -15,6 +15,7 @@ import {
   saveProjectWithRecovery, storedProjectKey, type RecoveryBackup,
 } from './recovery';
 import { getStorageUsage, type StorageUsage } from './diagnostics';
+import type { AiProposalApplyResult, ApplyAiProposalOptions } from './ai/proposal';
 
 export { uid, normalizeProject };
 
@@ -189,6 +190,7 @@ interface LoomState {
   discardQuarantinedProject: () => void;
   setRecoveryNotice: (message: string | null) => void;
   update: (fn: (p: Project) => void) => void;
+  applyAiProposal: (proposal: unknown, options?: ApplyAiProposalOptions) => Promise<AiProposalApplyResult>;
   undo: () => void;
   redo: () => void;
   replaceProject: (p: Project) => void;
@@ -357,14 +359,14 @@ export const useLoom = create<LoomState>((set, get) => {
     }));
   };
 
-  const commit = (fn: (p: Project) => void) => {
+  const commit = (fn: (p: Project) => void, isolated = false) => {
     const prev = get().project;
     // 快速连续的编辑(如打字)合并为一步撤销
     const now = Date.now();
-    if (now - lastUndoPush > UNDO_COALESCE_MS) {
+    if (isolated || now - lastUndoPush > UNDO_COALESCE_MS) {
       undoStack.push(prev);
       if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-      lastUndoPush = now;
+      lastUndoPush = isolated ? 0 : now;
     }
     redoStack = [];
     const next = structuredClone(prev);
@@ -491,6 +493,25 @@ export const useLoom = create<LoomState>((set, get) => {
     },
 
     update: commit,
+    applyAiProposal: async (proposal, options = {}) => {
+      const projectAtStart = get().project;
+      const { dryRunAiProposal } = await import('./ai/proposal');
+      const dryRun = await dryRunAiProposal(projectAtStart, proposal, options);
+      if (dryRun.status === 'blocked' || !dryRun.preview) {
+        return { applied: false, reason: 'blocked', dryRun };
+      }
+      if (dryRun.status === 'warning' && !options.confirmWarnings) {
+        return { applied: false, reason: 'warning-confirmation-required', dryRun };
+      }
+      if (get().project !== projectAtStart) {
+        return { applied: false, reason: 'project-changed', dryRun };
+      }
+      const preview = dryRun.preview;
+      commit((project) => {
+        Object.assign(project, structuredClone(preview));
+      }, true);
+      return { applied: true, reason: 'applied', dryRun };
+    },
     undo: () => {
       const prev = undoStack.pop();
       if (!prev) return;

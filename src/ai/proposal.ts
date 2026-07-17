@@ -148,6 +148,22 @@ export interface DryRunAiProposalOptions {
   maxChangedChars?: number;
 }
 
+export interface ApplyAiProposalOptions extends DryRunAiProposalOptions {
+  confirmWarnings?: boolean;
+}
+
+export type AiProposalApplyReason =
+  | 'applied'
+  | 'blocked'
+  | 'warning-confirmation-required'
+  | 'project-changed';
+
+export interface AiProposalApplyResult {
+  applied: boolean;
+  reason: AiProposalApplyReason;
+  dryRun: AiProposalDryRun;
+}
+
 const ID = { type: 'string', minLength: 1, maxLength: 160 } satisfies JsonSchema;
 const SHORT_TEXT = { type: 'string', maxLength: 500 } satisfies JsonSchema;
 const BODY_TEXT = { type: 'string', maxLength: 50_000 } satisfies JsonSchema;

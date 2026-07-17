@@ -217,6 +217,11 @@ export interface StructuredResponse<T> {
   requestId?: string;
 }
 
+export interface LlmClient {
+  chatComplete: (request: ChatRequest) => Promise<string>;
+  structuredComplete: <T>(request: StructuredRequest) => Promise<StructuredResponse<T>>;
+}
+
 function classifyStatus(status: number): { kind: LlmErrorKind; retryable: boolean } {
   if (status === 401 || status === 403) return { kind: 'auth', retryable: false };
   if (status === 429) return { kind: 'rate_limit', retryable: true };
@@ -498,6 +503,13 @@ export async function structuredComplete<T>(cfg: LlmConfig, req: StructuredReque
     system: [req.system, `只输出一个符合以下 JSON Schema 的 JSON 对象,不要 Markdown 或解释:\n${schemaText}`].filter(Boolean).join('\n\n'),
   });
   return { data: ensureStructured<T>(parseModelJson(text), req.schema), mode: 'fallback' };
+}
+
+export function createLlmClient(cfg: LlmConfig): LlmClient {
+  return {
+    chatComplete: (request) => chatComplete(cfg, request),
+    structuredComplete: <T>(request: StructuredRequest) => structuredComplete<T>(cfg, request),
+  };
 }
 
 /** 连接测试:发一个极小请求,返回耗时毫秒;失败抛错 */
