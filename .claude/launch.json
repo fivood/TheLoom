@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5273", "--strictPort"],
       "port": 5273
+    },
+    {
+      "name": "theloom-dev-b",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5274", "--strictPort"],
+      "port": 5274
     }
   ]
 }
