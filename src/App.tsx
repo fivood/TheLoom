@@ -25,6 +25,7 @@ import DialogHost from './components/Dialog';
 import ImportPreview from './components/ImportPreview';
 import FindReplace from './components/FindReplace';
 import EngineExportModal from './components/EngineExportModal';
+import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { projectToXlsx } from './interop/projectXlsx';
 import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
@@ -68,6 +69,7 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [auditing, setAuditing] = useState(false);
+  const [querying, setQuerying] = useState(false);
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
@@ -305,6 +307,9 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); setAuditing(true); }}>
                     <Icon name="script" size={14} /> 体检
                   </button>
+                  <button onClick={() => { setToolsOpen(false); setQuerying(true); }}>
+                    <Icon name="search" size={14} /> 组合查询
+                  </button>
                   <button
                     title="在全部文档正文里查找并替换;替换是一步操作,可撤销"
                     onClick={() => { setToolsOpen(false); setFindReplace(true); }}
@@ -471,6 +476,7 @@ export default function App() {
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
       {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
+      {querying && <QueryPanel onClose={() => setQuerying(false)} />}
       {history && <VersionHistory onClose={() => setHistory(false)} />}
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
