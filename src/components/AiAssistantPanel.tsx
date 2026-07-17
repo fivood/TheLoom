@@ -13,6 +13,8 @@ import {
   loadLlmConfig,
   PROVIDER_LABEL,
 } from '../ai/llm';
+import { ANALYSIS_KIND_LABEL, analysisTargets, type AnalysisKind } from '../ai/analysis';
+import { ANALYSIS_FINDING_LABEL, runNarrativeAnalysis, type AnalysisResult } from '../ai/analysisAssistant';
 import { generateFixProposal } from '../ai/fixAssistant';
 import { useAiPanelBus } from '../ai/panelBus';
 import {
@@ -36,7 +38,7 @@ import { uid, useLoom } from '../store';
 import Icon from './Icon';
 
 type ContextMode = 'current' | 'references' | 'query' | 'issue';
-type AssistantTask = 'ask' | 'query' | 'fix';
+type AssistantTask = 'ask' | 'query' | 'fix' | 'analysis';
 
 interface FixState {
   proposal: AiProposal;
@@ -108,6 +110,9 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
   const [error, setError] = useState<string | null>(null);
   const [fix, setFix] = useState<FixState | null>(null);
   const [fixBusy, setFixBusy] = useState(false);
+  const [analysisKind, setAnalysisKind] = useState<AnalysisKind>('paths');
+  const [analysisTarget, setAnalysisTarget] = useState('');
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const applyAiProposal = useLoom((state) => state.applyAiProposal);
   const panelRequest = useAiPanelBus((state) => state.request);
   const consumePanelRequest = useAiPanelBus((state) => state.consume);
@@ -217,6 +222,72 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
     }));
   };
 
+  useEffect(() => {
+    const targets = analysisTargets(project, analysisKind);
+    setAnalysisTarget((current) => targets.options.some((option) => option.id === current)
+      ? current
+      : targets.options[0]?.id ?? '');
+  }, [project, analysisKind]);
+
+  const runAnalysis = async () => {
+    if (fixBusy || busy) return;
+    const targets = analysisTargets(project, analysisKind);
+    if (targets.required && !analysisTarget) {
+      setError(`请先选择要分析的${targets.label}`);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setAnalysis(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const cfg = await hydrateDesktopLlmConfig(loadLlmConfig());
+      if (!llmHasCredential(cfg)) throw new Error('还没有配置 API Key');
+      const client = createLlmClient(cfg);
+      const focus = question.trim() || undefined;
+      const nav = analysisKind === 'paths' && analysisTarget
+        ? { tab: 'flow' as const, flowId: analysisTarget }
+        : analysisKind === 'voice' && analysisTarget
+          ? { tab: 'entities' as const, entityId: analysisTarget }
+          : null;
+      const analysisBundle = nav
+        ? await buildAiContextBundle(project, { primary: nav, includeReferences: analysisKind === 'voice', charBudget: 16_000 })
+        : null;
+      const result = await runNarrativeAnalysis(
+        client, project, analysisKind, analysisTarget || undefined, analysisBundle, focus, controller.signal,
+      );
+      setAnalysis(result);
+      const counts = {
+        fact: result.findings.filter((finding) => finding.type === 'fact').length,
+        inference: result.findings.filter((finding) => finding.type === 'inference').length,
+        suggestion: result.findings.filter((finding) => finding.type === 'suggestion').length,
+      };
+      appendSessionMessages([
+        {
+          id: messageId(),
+          role: 'user',
+          text: `${ANALYSIS_KIND_LABEL[analysisKind]}分析${focus ? `:${focus}` : ''}`,
+          createdAt: Date.now(),
+          contextSourceKeys: result.blocks.map((block) => block.key),
+        },
+        {
+          id: messageId(),
+          role: 'assistant',
+          text: `${result.summary}\n\n事实 ${counts.fact} · 推断 ${counts.inference} · 建议 ${counts.suggestion}`,
+          createdAt: Date.now(),
+          usage: result.usage,
+        },
+      ]);
+      setQuestion('');
+    } catch (cause) {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setBusy(false);
+    }
+  };
+
   const generateFix = async () => {
     if (!bundle || !selectedIssue || fixBusy || busy) return;
     setFixBusy(true);
@@ -317,6 +388,7 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
 
   const send = async () => {
     if (task === 'fix') { void generateFix(); return; }
+    if (task === 'analysis') { void runAnalysis(); return; }
     const text = question.trim();
     if (!text || !activeSession || busy || (task === 'ask' && !bundle)) return;
     setBusy(true);
@@ -429,9 +501,32 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
         <button className={task === 'ask' ? 'active' : 'ghost'} onClick={() => setTask('ask')}>项目问答</button>
         <button className={task === 'query' ? 'active' : 'ghost'} onClick={() => setTask('query')}>自然语言查询</button>
         <button className={task === 'fix' ? 'active' : 'ghost'} onClick={() => { setTask('fix'); setMode('issue'); }}>修复提案</button>
+        <button className={task === 'analysis' ? 'active' : 'ghost'} onClick={() => setTask('analysis')}>叙事分析</button>
       </div>
 
-      {task !== 'query' ? <div className="ai-context-card">
+      {task === 'analysis' ? (
+        <div className="ai-context-card">
+          <div className="ai-section-title">分析类型</div>
+          <select aria-label="分析类型" value={analysisKind} onChange={(event) => { setAnalysisKind(event.target.value as AnalysisKind); setAnalysis(null); }}>
+            {(Object.keys(ANALYSIS_KIND_LABEL) as AnalysisKind[]).map((value) => (
+              <option key={value} value={value}>{ANALYSIS_KIND_LABEL[value]}</option>
+            ))}
+          </select>
+          {analysisTargets(project, analysisKind).required && (
+            <select aria-label="分析对象" value={analysisTarget} onChange={(event) => { setAnalysisTarget(event.target.value); setAnalysis(null); }}>
+              <option value="">选择{analysisTargets(project, analysisKind).label}…</option>
+              {analysisTargets(project, analysisKind).options.map((option) => (
+                <option key={option.id} value={option.id}>{option.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="ai-context-flags">
+            <span>统计先在本地算好</span>
+            <span>事实必须带依据</span>
+            <span>无依据自动标为推断</span>
+          </div>
+        </div>
+      ) : task !== 'query' ? <div className="ai-context-card">
         <div className="ai-section-title">{task === 'fix' ? '要修复的问题' : '发送范围'}</div>
         {task === 'ask' && (
           <select aria-label="AI 上下文范围" value={mode} onChange={(event) => setMode(event.target.value as ContextMode)}>
@@ -522,6 +617,50 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
             <input aria-label="保存查询名称" value={queryName} onChange={(event) => setQueryName(event.target.value)} />
             <button className="primary" onClick={saveGeneratedQuery}>保存查询</button>
             <button className="ghost" onClick={() => setQueryResult(null)}>放弃</button>
+          </div>
+        </div>
+      )}
+
+      {task === 'analysis' && analysis && (
+        <div className="ai-analysis-card">
+          <div className="ai-section-title">{ANALYSIS_KIND_LABEL[analysis.kind]}分析</div>
+          <div className="ai-fix-summary">{analysis.summary}</div>
+          {(['fact', 'inference', 'suggestion'] as const).map((type) => {
+            const findings = analysis.findings.filter((finding) => finding.type === type);
+            if (findings.length === 0) return null;
+            return (
+              <div key={type} className={`ai-analysis-group ai-analysis-${type}`}>
+                <div className="ai-analysis-group-head">{ANALYSIS_FINDING_LABEL[type]} · {findings.length}</div>
+                {findings.map((finding, index) => (
+                  <div key={index} className="ai-analysis-finding">
+                    <div className="ai-analysis-text">
+                      {finding.text}
+                      {finding.downgraded && <span className="ai-analysis-downgraded" title="模型标为事实但未给出有效依据,已按推断处理">未给依据</span>}
+                    </div>
+                    {finding.citations.length > 0 && (
+                      <div className="ai-citations">
+                        {finding.citations.map((citation) => (
+                          <button
+                            key={citation.key}
+                            className="ghost"
+                            disabled={!citation.nav}
+                            onClick={() => { if (citation.nav) go(citation.nav); }}
+                          >
+                            ↗ {citation.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          {analysis.ignoredCitationKeys.length > 0 && (
+            <div className="hint">已忽略 {analysis.ignoredCitationKeys.length} 个未知引用来源</div>
+          )}
+          <div className="ai-fix-actions">
+            <button className="ghost" onClick={() => setAnalysis(null)}>清除结果</button>
           </div>
         </div>
       )}
@@ -640,12 +779,17 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
           </div>
         )) : (
           <div className="ai-empty">
-            <strong>{task === 'ask' ? '从当前叙事对象开始提问' : task === 'query' ? '用自然语言描述要找的内容' : '选择一个体检问题,生成修复提案'}</strong>
+            <strong>{task === 'ask' ? '从当前叙事对象开始提问'
+              : task === 'query' ? '用自然语言描述要找的内容'
+              : task === 'analysis' ? '选择分析类型,让 AI 解读本地统计'
+              : '选择一个体检问题,生成修复提案'}</strong>
             <span>{task === 'ask'
               ? '助手只会收到上方列出的内容，并用可点击来源回答。'
               : task === 'query'
                 ? '模型只生成固定查询条件，真实结果由本地索引计算。'
-                : '提案先在项目副本上通过脚本、引用、体检和路径验证,预览差异后才能应用;应用可一步撤销。'}</span>
+                : task === 'analysis'
+                  ? '路径覆盖、台词样本、一致性、伏笔、节奏先由本地算好;结论分为事实(带依据)、推断和创意建议。'
+                  : '提案先在项目副本上通过脚本、引用、体检和路径验证,预览差异后才能应用;应用可一步撤销。'}</span>
           </div>
         )}
       </div>
@@ -672,7 +816,9 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
             ? '询问当前对象、检查矛盾或梳理线索…'
             : task === 'query'
               ? '例如：找出仍在草稿状态且未被引用的文档'
-              : '可选:补充修复要求(如「优先复用已有变量」)…'}
+              : task === 'analysis'
+                ? '可选:分析关注点(如「重点看第二卷的节奏」)…'
+                : '可选:补充修复要求(如「优先复用已有变量」)…'}
           rows={3}
         />
         <div>
@@ -681,6 +827,8 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
               ? `${PROVIDER_LABEL[loadLlmConfig().provider]} · 结果本地执行`
               : task === 'fix'
                 ? `${PROVIDER_LABEL[loadLlmConfig().provider]} · 应用前本地验证`
+                : task === 'analysis'
+                  ? `${PROVIDER_LABEL[loadLlmConfig().provider]} · 统计本地计算`
               : bundle ? `${PROVIDER_LABEL[loadLlmConfig().provider]} · 发送前可见` : '等待上下文'}
           </span>
           {busy || fixBusy ? (
@@ -690,10 +838,12 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
               className="primary"
               disabled={task === 'fix'
                 ? (!bundle || contextBusy || !selectedIssue)
+                : task === 'analysis'
+                  ? (analysisTargets(project, analysisKind).required && !analysisTarget)
                 : (!question.trim() || (task === 'ask' && (!bundle || contextBusy)))}
               onClick={() => void send()}
             >
-              {task === 'ask' ? '发送' : task === 'query' ? '生成查询' : '生成修复提案'}
+              {task === 'ask' ? '发送' : task === 'query' ? '生成查询' : task === 'analysis' ? '开始分析' : '生成修复提案'}
             </button>
           )}
         </div>

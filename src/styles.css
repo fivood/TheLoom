@@ -482,6 +482,41 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .ai-fix-confirm-warnings input { width: auto; }
 .ai-fix-actions { display: flex; gap: 6px; }
 .ai-fix-applied { color: var(--diff-add-ink); font-size: 12px; font-weight: 600; }
+.ai-analysis-card {
+  margin: 0 10px 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--focus);
+  border-radius: 10px;
+  background: var(--bg-card);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.ai-analysis-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.ai-analysis-group-head { font-size: 11px; font-weight: 700; color: var(--text-dim); letter-spacing: 1px; }
+.ai-analysis-fact .ai-analysis-group-head { color: var(--diff-add-ink); }
+.ai-analysis-inference .ai-analysis-group-head { color: var(--note-focus); }
+.ai-analysis-finding { display: flex; flex-direction: column; gap: 3px; }
+.ai-analysis-finding + .ai-analysis-finding { border-top: 1px dashed var(--border); padding-top: 6px; }
+.ai-analysis-text { font-size: 12px; line-height: 1.6; color: var(--text); }
+.ai-analysis-downgraded {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--note-bg);
+  color: var(--note-fg);
+  font-size: 10px;
+  white-space: nowrap;
+}
 .audit-ai-fix {
   margin-left: auto;
   flex-shrink: 0;

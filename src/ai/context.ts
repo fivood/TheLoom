@@ -28,7 +28,8 @@ export type AiContextKind =
   | 'document-block'
   | 'research'
   | 'timeline-event'
-  | 'project-issue';
+  | 'project-issue'
+  | 'analysis-data';
 
 export type AiContextRelation = 'primary' | 'selected' | 'query' | 'reference';
 
