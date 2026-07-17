@@ -2,6 +2,9 @@ import type { FlowNode, Project, SubFlow } from './types';
 import { ANNOTATION_TYPES } from './types';
 import { findDuplicateTechnicalNames } from './util';
 import type { NavTarget } from './search';
+import { buildScriptScope } from './script';
+import { checkCondition, checkInstructions, checkNumberExpr } from './script/check';
+import type { Diagnostic } from './script/ast';
 
 /** 中文按字计,拉丁与数字按词计 */
 export function countWords(text: string | undefined): number {
@@ -80,28 +83,29 @@ export interface Issue {
   nav?: NavTarget;
 }
 
-const RESERVED = new Set(['true', 'false', 'seen', 'unseen']);
-
-/** 收集某文本里出现的"独立标识符"(obj.prop 的 prop 与字符串字面量不算),返回未知的 */
-function findUnknownIdentifiers(text: string, known: Set<string>): string[] {
-  // 先剥离引号字符串(seen("tech_name") 的参数不是变量),再负向后看跳过 obj.prop 的 prop 部分
-  const stripped = text.replace(/'[^']*'|"[^"]*"/g, ' ');
-  const tokens = stripped.match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
-  return [...new Set(tokens)].filter((x) => !RESERVED.has(x) && !known.has(x));
-}
-
 export function auditProject(p: Project): Issue[] {
   const issues: Issue[] = [];
-  const known = new Set(p.variables.map((v) => v.name));
-  // 设了技术名的实体作为对象注入脚本,其技术名是已知标识符
-  for (const e of p.entities) if (e.technicalName) known.add(e.technicalName);
+  const scope = buildScriptScope(p);
 
-  const checkVars = (text: string | undefined, where: string, nav?: NavTarget) => {
-    if (!text) return;
-    const used = findUnknownIdentifiers(text, known);
-    if (used.length > 0) {
-      issues.push({ kind: '未定义变量', message: `${where}:${used.join('、')}`, nav });
+  // 脚本诊断:错误精确到表达式位置(字符区间 1 起)
+  const pushDiags = (diags: Diagnostic[], text: string, where: string, nav?: NavTarget) => {
+    for (const d of diags) {
+      const at = text.length > d.end - d.start ? `第 ${d.start + 1}–${d.end} 字符,` : '';
+      issues.push({
+        kind: d.severity === 'error' ? '脚本错误' : '脚本警告',
+        message: `${where}:${at}${d.message}`,
+        nav,
+      });
     }
+  };
+  const checkCond = (text: string | undefined, where: string, nav?: NavTarget) => {
+    if (text?.trim()) pushDiags(checkCondition(text, scope), text, where, nav);
+  };
+  const checkNum = (text: string | undefined, where: string, nav?: NavTarget) => {
+    if (text?.trim()) pushDiags(checkNumberExpr(text, scope), text, where, nav);
+  };
+  const checkInstr = (text: string | undefined, where: string, nav?: NavTarget) => {
+    if (text?.trim()) pushDiags(checkInstructions(text, scope), text, where, nav);
   };
 
   for (const flow of p.flows) {
@@ -125,14 +129,14 @@ export function auditProject(p: Project): Issue[] {
         if (n.type === 'condition') {
           if (!outs.includes('true')) issues.push({ kind: '分支缺口', message: `${label}(缺「真」分支)`, nav });
           if (!outs.includes('false')) issues.push({ kind: '分支缺口', message: `${label}(缺「假」分支)`, nav });
-          checkVars(n.data.text, label, nav);
+          checkCond(n.data.text, label, nav);
         }
         if (n.type === 'check') {
           if (!outs.includes('success')) issues.push({ kind: '分支缺口', message: `${label}(缺「成功」分支)`, nav });
           if (!outs.includes('fail')) issues.push({ kind: '分支缺口', message: `${label}(缺「失败」分支)`, nav });
-          checkVars(n.data.checkExpr, label, nav);
+          checkNum(n.data.checkExpr, label, nav);
         }
-        if (n.type === 'instruction') checkVars(n.data.text, label, nav);
+        if (n.type === 'instruction') checkInstr(n.data.text, label, nav);
         if (n.type === 'dialogue' && !n.data.text.trim()) {
           issues.push({ kind: '空对白', message: label, nav });
         }
@@ -141,11 +145,20 @@ export function auditProject(p: Project): Issue[] {
       for (const e of sub.edges) {
         const src = sub.nodes.find((x) => x.id === e.source);
         const nav: NavTarget = src ? { tab: 'flow', flowId: flow.id, path, nodeId: src.id } : { tab: 'flow', flowId: flow.id, path };
-        checkVars(e.condition, `${crumb} · 选项「${e.label || '(未命名)'}」条件`, nav);
-        checkVars(e.effect, `${crumb} · 选项「${e.label || '(未命名)'}」效果`, nav);
+        checkCond(e.condition, `${crumb} · 选项「${e.label || '(未命名)'}」条件`, nav);
+        checkInstr(e.effect, `${crumb} · 选项「${e.label || '(未命名)'}」效果`, nav);
       }
     };
     walk(flow, [], flow.name);
+  }
+
+  // 文档里的条件 / 指令块
+  for (const doc of p.documents) {
+    for (const b of doc.blocks) {
+      const nav: NavTarget = { tab: 'documents', docId: doc.id, blockId: b.id };
+      if (b.type === 'condition') checkCond(b.condition, `${doc.name} · 条件块`, nav);
+      if (b.type === 'instruction') checkInstr(b.instruction, `${doc.name} · 指令块`, nav);
+    }
   }
 
   // 悬挂附件引用:attachments 里指向了已删除的 asset

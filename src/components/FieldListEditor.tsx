@@ -14,12 +14,14 @@ const normTpl = (s: EntityTemplateSpec): EntityTemplateField =>
  * 按 specs 约束渲染:enum 下拉、readonly 只读、required 标记。
  * 自动算出模板中缺失的字段并提供"按模板补齐"。
  */
-export default function FieldListEditor({ fields, specs, onChange, refKindLabel = '实体' }: {
+export default function FieldListEditor({ fields, specs, onChange, refKindLabel = '实体', onFieldRenamed }: {
   fields: EntityField[];
   specs: EntityTemplateSpec[] | undefined;
   onChange: (fields: EntityField[]) => void;
   /** 引用字段 filterKind 的候选标签前缀(展示用) */
   refKindLabel?: string;
+  /** 字段名编辑结束(blur)且新旧都非空时回调,用于脚本重命名联动 */
+  onFieldRenamed?: (oldLabel: string, newLabel: string) => void;
 }) {
   const tplSpecs = useMemo(() => (specs ?? []).map(normTpl), [specs]);
   const specFor = (label: string) => tplSpecs.find((s) => s.label === label);
@@ -45,6 +47,14 @@ export default function FieldListEditor({ fields, specs, onChange, refKindLabel 
                 placeholder="字段名"
                 readOnly={spec?.readonly === true}
                 onChange={(e) => patchField(f.id, { label: e.target.value })}
+                onFocus={(e) => { e.currentTarget.dataset.focusLabel = f.label; }}
+                onBlur={(e) => {
+                  const oldLabel = e.currentTarget.dataset.focusLabel;
+                  if (onFieldRenamed && oldLabel && f.label && oldLabel !== f.label) {
+                    onFieldRenamed(oldLabel, f.label);
+                  }
+                  delete e.currentTarget.dataset.focusLabel;
+                }}
               />
               {spec?.required && <span className="req-mark" title="必填">*</span>}
               {spec?.readonly ? (

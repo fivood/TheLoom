@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.19.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.19.0):
+- 已发布版本:`v0.20.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.20.0):
+  - **v0.20.0 R6 脚本语言重构** ✅ — 自有 lexer/parser/AST/类型检查/解释器(`src/script/`),不再动态执行字符串;错误精确到字符区间;指令支持实体属性读写;ScriptInput 高亮+诊断+补全;变量/实体技术名/字段名/节点技术名重命名联动
   - **v0.19.0 R5-B 深色主题切换** ✅ — 浅色 / 深色 / 跟随系统三态(`theloom-theme-v1` 本机持久化,不入项目);语义色令牌全收敛 + 深色变量表;React Flow colorMode 响应式;内容色不改写、渲染层按亮度反色;防白闪 head 脚本;Tauri 标题栏同步;深色下侧栏加深为 #161413 + logo 反白
   - **v0.18.0 R5-A 完整项目导入(小说版)** ✅ — 多材料(类型+可信度标注)→ 项目生成计划(用户审阅)→ 分模块候选数据 → 完整差异预检 → 单次事务导入;覆盖卷章树/场景文档/实体/关系/弧线/伏笔/大纲/时间线/资料备份/待定设定/风暴板/地图占位;不生成游戏机制
   - **v0.17.0 R5 正文修订系统** ✅ — 批注(块级锚定 + 解决状态)、场景快照(每篇 20 个上限 + 恢复可撤销)、版本差异(行级 LCS 对比)、修订轮次(元数据 + 列表筛选)、全局查找替换(跨文档、勾选精确替换、单步撤销)
@@ -48,7 +49,7 @@
 | ~~R5~~ | ~~v0.17.0~~ | ~~正文修订系统~~ | ~~批注 / 修订轮次 / 文档快照 / 版本差异 / 全局查找替换~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R5-A~~ | ~~v0.18.0~~ | ~~完整项目导入(小说版)~~ | ~~多材料 / 生成计划 / 完整预检 / 事务式导入~~ | ✅ 已完成(详见「最近变更」) | L |
 | ~~R5-B~~ | ~~v0.19.0~~ | ~~深色主题切换~~ | ~~三态切换 / 本机持久化 / 语义色令牌 / 全模块适配~~ | ✅ 已完成(详见「最近变更」) | M |
-| R6 | v0.20.0 | **脚本语言重构** | 自有解析器 / AST / 类型检查 / 属性读写 / 语法高亮 / 自动补全 / 重命名联动 | 不再动态执行字符串;错误精确到表达式位置;支持实体属性修改 | L |
+| ~~R6~~ | ~~v0.20.0~~ | ~~脚本语言重构~~ | ~~解析器 / AST / 类型检查 / 属性读写 / 高亮 / 补全 / 重命名联动~~ | ✅ 已完成(详见「最近变更」) | L |
 | R7 | v0.21.0 | **演出与路径测试** | 演出存档;固定随机种子;断点;变量监视;批量路径遍历;路径覆盖率 | 自动发现不可达分支 / 死循环 / 无出口路径;测试结果可复现 | M |
 | R8 | v0.22.0 | **资源原文件闭环** | 图片 / 音频 / 视频 / 文件落盘 / 播放 / 缩略图 / 哈希去重 / 替换 / 缺失重定位 / 授权字段 | 桌面项目迁移后所有媒体仍可用;资源替换不破坏引用 | M |
 | R9 | v0.23.0 | **通用游戏引擎导出** | 带版本的 JSON Schema;导出规则;引用索引;增量导出;类型生成;独立流程运行库 | 示例游戏可在无 React 环境读取项目并运行对白流程 | L |
@@ -115,6 +116,26 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R6 · v0.20.0)
+
+脚本语言重构 —— 不再动态执行字符串:
+
+- 新增 `src/script/` 纯逻辑层:
+  - `ast.ts` 带 `Span`(字符区间)的 Token / Expr / Stmt / Diagnostic 类型 + `ScriptError`
+  - `lexer.ts` 词法:标识符支持 Unicode 字母(中文字段名),字符串转义,error token 不抛出
+  - `parser.ts` 递归下降:优先级爬升(`|| && 比较 加减 乘除模`)+ 三元 + 一元 + `seen()/unseen()` 调用 + 单层 `实体.字段`;`parseExpression`(条件 / 数字)与 `parseInstructions`(`目标 (=|+=|-=|*=|/=) 表达式`,分号 / 换行分隔,单条失败不拖累其余);所有错误带精确 Span
+  - `check.ts` 类型检查:`ScriptScope`(变量类型表 / 实体字段类型表 / 节点技术名集);`checkCondition`(根应为布尔)/ `checkNumberExpr` / `checkInstructions`(目标存在性、复合赋值须数字、`=` 类型不匹配警告);text 字段类型为 unknown(内容动态),与一切兼容
+  - `eval.ts` AST 解释器:`==` 宽松(数字文本互比按数值)、`===` 严格、`&&/||` 短路返回操作数、除零回 0;`runStmt` 支持**实体属性写入**(`实体.字段 = 值`)
+  - `rename.ts` 基于 token 的联动重写:`renameIdentifier`(跳过 `.` 后字段位与字符串)/ `renameEntityField`(只改指定实体的字段)/ `renameSeenTarget`(只改 seen/unseen 字符串参数)
+- `src/script.ts` 变为门面,旧 API 签名不变(`evalCondition`/`evalNumber`/`applyInstructions`,错误仍回 null/0/警告数组);新增 `buildEntityProps`(从 Player 抽出)、`buildScriptScope`、`mapProjectScripts`(遍历改写全部脚本表面:各层流程节点 text / checkExpr、各层边 condition / effect、文档条件 / 指令块、叙事单元镜像)
+- `Player.tsx`:entityProps 改为演出运行态副本(`entityPropsRef`,重新开始时还原);`applyInstructions` 传入 evalCtx → 指令可改实体属性
+- **重命名联动**(blur 时触发,避免逐键误伤):store 新增 `renameScriptIdentifier` / `renameScriptEntityField` / `renameScriptSeenTarget`;`TechNameField` 新增 `onRenamed`(聚焦值 vs blur 值,格式非法不触发;实体两处 → identifier,流程节点 → seen 目标);`FieldListEditor` 新增 `onFieldRenamed`(实体有技术名才挂);变量名输入 focus/blur 同模式
+- 新增 `src/components/ScriptInput.tsx`:叠层语法高亮(透明 textarea + 底层 pre,token 分类上色,诊断红 / 黄波浪线)+ 诊断列表(带「第 N–M 字符」)+ 自动补全(前缀出变量 / 实体 / 关键字,`实体.` 后出字段,↑↓ Enter/Tab Esc,seen 插入后光标进引号);替换 FlowEditor 三处 ScriptHints(条件 / 指令节点 text、检定 checkExpr、边条件 / 效果)与 BlocksEditor 文档条件 / 指令块,ScriptHints 已删除
+- `audit.ts`:正则标识符检查替换为类型检查器,新增「脚本错误 / 脚本警告」类目,消息带精确字符区间;新覆盖文档条件 / 指令块(nav 直达块)
+- 测试:`script/script.test.ts` 18 项(词法位置 / 优先级 / 错误定位 / 指令解析 / 类型规则 / seen 校验 / 解释器语义 / 属性读写 / 门面兼容 / 三种重命名);旧 `script.test.ts` 断言更新为新警告文案;合计 122 项通过
+- 已实测(浏览器):高亮分色与未定义标识符红波浪、诊断列表精确到字符、自动补全菜单 + Enter 接受、变量改名后条件节点脚本自动重写并持久化、演出中条件求值走 AST 解释器、体检面板显示带位置的脚本警告
+- 注意:`ScriptInput` 的高亮层与 textarea 必须字体 / 内边距 / 行高完全一致;新增脚本表面(节点字段 / 块类型)时同步扩 `mapProjectScripts` 与 audit
 
 ## 最近变更(R5-B · v0.19.0)
 

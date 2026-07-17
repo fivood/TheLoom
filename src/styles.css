@@ -2187,6 +2187,90 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   font-size: 10px;
 }
 
+/* ---------- R6 脚本输入框 ---------- */
+
+.script-input { display: flex; flex-direction: column; gap: 4px; }
+.script-input-box { position: relative; }
+.script-input-box textarea,
+.script-input-hl {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 6px 10px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow: auto;
+}
+.script-input-box textarea {
+  position: relative;
+  width: 100%;
+  display: block;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  resize: vertical;
+  z-index: 1;
+}
+.script-input-box textarea:focus { border-color: var(--focus); }
+.script-input-hl {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-card);
+  border-color: transparent;
+  color: var(--text);
+  pointer-events: none;
+  overflow: hidden;
+}
+.sh-str { color: var(--note-focus); }
+.sh-num { color: var(--diff-add-ink); }
+.sh-kw { font-weight: 700; }
+.sh-op { color: var(--text-faint); }
+.sh-var { color: var(--text); }
+.sh-entity { color: var(--text-dim); font-style: italic; }
+.sh-field { color: var(--text-dim); }
+.sh-unknown { color: var(--danger); }
+.sh-bad { color: var(--danger); font-weight: 700; }
+.sh-err { text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+.sh-warn { text-decoration: underline wavy var(--note-focus); text-underline-offset: 3px; }
+.script-menu {
+  position: absolute;
+  left: 6px;
+  top: calc(100% + 2px);
+  z-index: 80;
+  min-width: 180px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+}
+.script-menu button {
+  justify-content: space-between;
+  gap: 12px;
+  border-color: transparent;
+  background: transparent;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.script-menu button.active { background: var(--accent-soft); border-color: var(--border); }
+.script-menu-detail { color: var(--text-faint); font-size: 10px; }
+.script-diags { display: flex; flex-direction: column; gap: 2px; }
+.script-diag-err, .script-diag-warn {
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.script-diag-err { color: var(--danger); background: var(--danger-bg); }
+.script-diag-warn { color: var(--note-fg); background: var(--note-bg); }
+
 /* ---------- R5-B 深色主题 ---------- */
 /* prefers-color-scheme 是默认信号;[data-theme=dark] 是用户显式锁定的深色;
    [data-theme=light] 让用户在系统深色下反锁浅色。变量表在两个通道下保持一致。 */

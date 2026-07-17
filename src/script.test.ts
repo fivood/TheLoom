@@ -45,7 +45,9 @@ describe('脚本指令', () => {
     const warnings = applyInstructions('score /= 0; score += unknown; bad statement', vars);
 
     expect(vars.score).toBe(8);
-    expect(warnings).toEqual(['未知的值:score += unknown', '无法解析:bad statement']);
+    expect(warnings).toHaveLength(2);
+    expect(warnings.join(';')).toContain('未定义的变量「unknown」');
+    expect(warnings.join(';')).toContain('赋值运算符');
   });
 
   it('按变量和实体字段规则转换标量', () => {

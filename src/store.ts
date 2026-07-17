@@ -5,6 +5,8 @@ import type {
 } from './types';
 import { DOC_SNAPSHOT_LIMIT } from './types';
 import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
+import { mapProjectScripts } from './script';
+import { renameEntityField, renameIdentifier, renameSeenTarget } from './script/rename';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
 import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
@@ -221,6 +223,10 @@ interface LoomState {
   addVariable: (v: Variable) => void;
   updateVariable: (id: string, patch: Partial<Variable>) => void;
   removeVariable: (id: string) => void;
+  /** R6 重命名联动:全项目脚本里改写标识符 / 实体字段 / seen 目标 */
+  renameScriptIdentifier: (oldName: string, newName: string) => void;
+  renameScriptEntityField: (entityTech: string, oldField: string, newField: string) => void;
+  renameScriptSeenTarget: (oldName: string, newName: string) => void;
 
   addAsset: (a: import('./types').Asset) => void;
   updateAsset: (id: string, patch: Partial<import('./types').Asset>) => void;
@@ -555,6 +561,18 @@ export const useLoom = create<LoomState>((set, get) => {
     removeVariable: (id) => commit((p) => {
       p.variables = p.variables.filter((x) => x.id !== id);
     }),
+    renameScriptIdentifier: (oldName, newName) => {
+      if (!oldName || !newName || oldName === newName) return;
+      commit((p) => { mapProjectScripts(p, (s) => renameIdentifier(s, oldName, newName)); });
+    },
+    renameScriptEntityField: (entityTech, oldField, newField) => {
+      if (!entityTech || !oldField || !newField || oldField === newField) return;
+      commit((p) => { mapProjectScripts(p, (s) => renameEntityField(s, entityTech, oldField, newField)); });
+    },
+    renameScriptSeenTarget: (oldName, newName) => {
+      if (!oldName || !newName || oldName === newName) return;
+      commit((p) => { mapProjectScripts(p, (s) => renameSeenTarget(s, oldName, newName)); });
+    },
 
     addAsset: (a) => commit((p) => { p.assets.push(a); }),
     updateAsset: (id, patch) => commit((p) => {

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { uid, useLoom } from '../../store';
 import { confirmDialog } from '../../dialog';
 import type { VariableType } from '../../types';
@@ -10,7 +11,9 @@ const TYPE_LABEL: Record<VariableType, string> = {
 
 export default function Variables() {
   const variables = useLoom((s) => s.project.variables);
-  const { addVariable, updateVariable, removeVariable } = useLoom();
+  const { addVariable, updateVariable, removeVariable, renameScriptIdentifier } = useLoom();
+  /** 名称输入聚焦时的原名,blur 时做脚本重命名联动 */
+  const focusName = useRef<string | undefined>(undefined);
 
   return (
     <div className="pane-col">
@@ -40,6 +43,13 @@ export default function Variables() {
                     value={v.name}
                     style={{ fontFamily: 'Consolas, monospace' }}
                     onChange={(e) => updateVariable(v.id, { name: e.target.value })}
+                    onFocus={() => { focusName.current = v.name; }}
+                    onBlur={() => {
+                      if (focusName.current && v.name && focusName.current !== v.name) {
+                        renameScriptIdentifier(focusName.current, v.name);
+                      }
+                      focusName.current = undefined;
+                    }}
                   />
                 </td>
                 <td>

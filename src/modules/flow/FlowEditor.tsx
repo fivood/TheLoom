@@ -15,50 +15,6 @@ import { FLOW_NODE_LABEL } from '../../types';
 import ColorPicker from '../../components/ColorPicker';
 import NavigatorTree from '../../components/NavigatorTree';
 import { useLoom as useLoomStore } from '../../store';
-
-/** 条件/指令脚本的变量校验与快捷插入 */
-function ScriptHints({ text, onInsert }: { text: string; onInsert: (name: string) => void }) {
-  const variables = useLoomStore((s) => s.project.variables);
-  const entities = useLoomStore((s) => s.project.entities);
-  const known = new Set(variables.map((v) => v.name));
-  // 设了技术名的实体作为对象注入脚本,其技术名是已知标识符
-  for (const e of entities) if (e.technicalName) known.add(e.technicalName);
-  const RESERVED = new Set(['true', 'false', 'seen', 'unseen']);
-  // 先剥离引号字符串(seen("tech_name") 的参数不是变量),再负向后看跳过 obj.prop 的 prop 部分
-  const tokens = text.replace(/'[^']*'|"[^"]*"/g, ' ').match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
-  const used = [...new Set(tokens)].filter((x) => !RESERVED.has(x));
-  const unknown = used.filter((x) => !known.has(x));
-  const namedEntities = entities.filter((e) => e.technicalName);
-  return (
-    <div className="script-hints">
-      {unknown.length > 0 && (
-        <div className="script-warn">未定义标识符:{unknown.join('、')}(seen / unseen 是保留函数;有技术名的实体作为对象可直接用)</div>
-      )}
-      {variables.length > 0 && (
-        <div className="card-tags">
-          {variables.map((v) => (
-            <span key={v.id} className="tag clickable" title={`${v.type} · ${v.description}`} onClick={() => onInsert(v.name)}>
-              {v.name}
-            </span>
-          ))}
-        </div>
-      )}
-      {namedEntities.length > 0 && (
-        <div className="card-tags">
-          {namedEntities.map((e) => (
-            <span key={e.id} className="tag clickable" title={`${e.name} 的字段,如 ${e.technicalName}.某字段`} onClick={() => onInsert(e.technicalName!)}>
-              {e.technicalName}
-              <span style={{ opacity: 0.6, fontSize: 10 }}>·{e.name}</span>
-            </span>
-          ))}
-        </div>
-      )}
-      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>
-        可用:<code>seen("技术名")</code> 走过 · <code>unseen("技术名")</code> 未走过 · <code>实体技术名.字段名</code> 访问属性
-      </div>
-    </div>
-  );
-}
 import { nodeTypes, TYPE_COLORS } from './nodes';
 import { getThemeMode, subscribeThemeMode } from '../../theme';
 import Player from './Player';
@@ -68,6 +24,7 @@ import Icon from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
 import FieldListEditor from '../../components/FieldListEditor';
+import ScriptInput from '../../components/ScriptInput';
 import { RichTextInput } from '../../components/RichText';
 
 type LoomNode = Node<FlowNodeData>;
@@ -413,6 +370,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                   onChange={(v) => patchSelectedNode({ text: v })}
                   placeholder={selectedNode.type === 'dialogue' ? '台词内容(可用 **粗** *斜* ~~删~~)' : undefined}
                 />
+              ) : selectedNode.type === 'condition' || selectedNode.type === 'instruction' ? (
+                <ScriptInput
+                  mode={selectedNode.type}
+                  value={selectedNode.data.text}
+                  onChange={(v) => patchSelectedNode({ text: v })}
+                  rows={3}
+                />
               ) : (
                 <textarea rows={5} value={selectedNode.data.text} onChange={(e) => patchSelectedNode({ text: e.target.value })} />
               )}
@@ -421,10 +385,11 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               <>
                 <div className="field">
                   <label>技能表达式(可引用变量,如 logic + 2)</label>
-                  <input
+                  <ScriptInput
+                    mode="number"
                     value={selectedNode.data.checkExpr ?? ''}
-                    onChange={(e) => patchSelectedNode({ checkExpr: e.target.value })}
-                    style={{ fontFamily: 'Consolas, monospace' }}
+                    onChange={(v) => patchSelectedNode({ checkExpr: v })}
+                    rows={1}
                   />
                 </div>
                 <div className="kv-row">
@@ -447,21 +412,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                     </select>
                   </div>
                 </div>
-                <ScriptHints
-                  text={selectedNode.data.checkExpr ?? ''}
-                  onInsert={(name) => patchSelectedNode({
-                    checkExpr: selectedNode.data.checkExpr ? `${selectedNode.data.checkExpr.trimEnd()} ${name}` : name,
-                  })}
-                />
               </>
-            )}
-            {(selectedNode.type === 'condition' || selectedNode.type === 'instruction') && (
-              <ScriptHints
-                text={selectedNode.data.text}
-                onInsert={(name) => patchSelectedNode({
-                  text: selectedNode.data.text ? `${selectedNode.data.text.trimEnd()} ${name}` : name,
-                })}
-              />
             )}
             {selectedNode.type === 'fragment' && (
               <button className="primary" onClick={() => enterSub(selectedNode.id)}>
@@ -479,6 +430,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               value={selectedNode.data.technicalName}
               onChange={(v) => patchSelectedNode({ technicalName: v })}
               displayName={selectedNode.data.title || selectedNode.type || '节点'}
+              onRenamed={(oldV, newV) => useLoomStore.getState().renameScriptSeenTarget(oldV, newV)}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
               <label style={{ margin: 0, flex: 1, fontSize: 12, color: 'var(--text-faint)' }}>自定义字段</label>
@@ -512,28 +464,24 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             </div>
             <div className="field">
               <label>出现条件 ◇(空 = 始终出现)</label>
-              <input
+              <ScriptInput
+                mode="condition"
                 value={selEdgeData.condition}
-                onChange={(e) => patchSelectedEdge({ condition: e.target.value })}
+                onChange={(v) => patchSelectedEdge({ condition: v })}
+                rows={1}
                 placeholder="例如:has_address == true"
-                style={{ fontFamily: 'Consolas, monospace' }}
               />
             </div>
             <div className="field">
               <label>选中效果 ⚡(指令,如 favor += 1)</label>
-              <input
+              <ScriptInput
+                mode="instruction"
                 value={selEdgeData.effect}
-                onChange={(e) => patchSelectedEdge({ effect: e.target.value })}
+                onChange={(v) => patchSelectedEdge({ effect: v })}
+                rows={1}
                 placeholder="例如:took_book = true"
-                style={{ fontFamily: 'Consolas, monospace' }}
               />
             </div>
-            <ScriptHints
-              text={`${selEdgeData.condition} ${selEdgeData.effect}`}
-              onInsert={(name) => patchSelectedEdge({
-                condition: selEdgeData.condition ? `${selEdgeData.condition.trimEnd()} ${name}` : name,
-              })}
-            />
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <input
                 type="checkbox"

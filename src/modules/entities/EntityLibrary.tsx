@@ -356,11 +356,15 @@ export default function EntityLibrary() {
               value={selected.technicalName}
               onChange={(v) => updateEntity(selected.id, { technicalName: v })}
               displayName={selected.name}
+              onRenamed={(oldV, newV) => useLoom.getState().renameScriptIdentifier(oldV, newV)}
             />
             <FieldListEditor
               fields={selected.fields}
               specs={entityTemplates?.[selected.kind]}
               onChange={(fields) => updateEntity(selected.id, { fields })}
+              onFieldRenamed={selected.technicalName
+                ? (o, n) => useLoom.getState().renameScriptEntityField(selected.technicalName!, o, n)
+                : undefined}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
               <AiFillFieldsButton entity={selected} />
