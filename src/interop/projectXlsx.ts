@@ -130,9 +130,9 @@ function timelineEventsSheet(p: Project): Sheet {
 }
 
 function assetsSheet(p: Project): Sheet {
-  const rows: (string | number | boolean)[][] = [['ID', '名称', '类型', 'MIME', '大小(字节)', '技术名', '标签', '来源', '备注']];
+  const rows: (string | number | boolean)[][] = [['ID', '名称', '类型', 'MIME', '大小(字节)', '技术名', '标签', '来源', '授权', '备注']];
   for (const a of p.assets) rows.push([
-    a.id, a.name, a.kind, a.mime, a.size, a.technicalName ?? '', a.tags.join(' '), a.source ?? '', a.notes ?? '',
+    a.id, a.name, a.kind, a.mime, a.size, a.technicalName ?? '', a.tags.join(' '), a.source ?? '', a.license ?? '', a.notes ?? '',
   ]);
   return { name: SHEET.assets, rows };
 }
@@ -579,6 +579,7 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
     const cTech = findCol(h, '技术名', 'technicalName');
     const cTags = findCol(h, '标签', 'tags');
     const cSource = findCol(h, '来源', 'source');
+    const cLicense = findCol(h, '授权', 'license');
     const cNotes = findCol(h, '备注', 'notes');
     if (cName < 0 || cId < 0) warnings.push('[资源] 缺少「ID」或「名称」,只允许更新元数据');
     else {
@@ -592,6 +593,7 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
           technicalName: cTech >= 0 && r[cTech] ? r[cTech] : existing.technicalName,
           tags: cTags >= 0 ? (r[cTags] ?? '').split(/[\s,,;;]+/).filter(Boolean) : existing.tags,
           source: cSource >= 0 ? (r[cSource] ?? '') : existing.source,
+          license: cLicense >= 0 ? (r[cLicense] || undefined) : existing.license,
           notes: cNotes >= 0 ? (r[cNotes] ?? '') : existing.notes,
         };
         Object.assign(existing, patch);

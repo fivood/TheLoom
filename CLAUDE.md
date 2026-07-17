@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.21.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.21.0):
+- 已发布版本:`v0.22.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.22.0):
+  - **v0.22.0 R8 资源原文件闭环** ✅ — 原文件按 SHA-256 内容寻址存储(桌面 `assets/asset-{hash16}.{ext}` / 网页 IndexedDB);播放与下载;视频首帧缩略图;哈希去重;替换保引用;缺失徽标 + 重新定位;删除不吞字节 + 显式孤儿清理;授权字段;绑定文件夹时 IndexedDB 原文件自动落盘
   - **v0.21.0 R7 演出与路径测试** ✅ — 种子化 RNG(mulberry32,同种子掷骰可复现);演出存档/读档(全部运行态 + RNG 快进,本机);节点断点(自动前进暂停,本机);变量监视高亮 + 实体属性;`simulateFlow` 批量路径遍历(确定性枚举 + 合流剪枝,报告覆盖率/不可达/死循环/卡死,可点击跳节点)
   - **v0.20.0 R6 脚本语言重构** ✅ — 自有 lexer/parser/AST/类型检查/解释器(`src/script/`),不再动态执行字符串;错误精确到字符区间;指令支持实体属性读写;ScriptInput 高亮+诊断+补全;变量/实体技术名/字段名/节点技术名重命名联动
   - **v0.19.0 R5-B 深色主题切换** ✅ — 浅色 / 深色 / 跟随系统三态(`theloom-theme-v1` 本机持久化,不入项目);语义色令牌全收敛 + 深色变量表;React Flow colorMode 响应式;内容色不改写、渲染层按亮度反色;防白闪 head 脚本;Tauri 标题栏同步;深色下侧栏加深为 #161413 + logo 反白
@@ -52,7 +53,7 @@
 | ~~R5-B~~ | ~~v0.19.0~~ | ~~深色主题切换~~ | ~~三态切换 / 本机持久化 / 语义色令牌 / 全模块适配~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R6~~ | ~~v0.20.0~~ | ~~脚本语言重构~~ | ~~解析器 / AST / 类型检查 / 属性读写 / 高亮 / 补全 / 重命名联动~~ | ✅ 已完成(详见「最近变更」) | L |
 | ~~R7~~ | ~~v0.21.0~~ | ~~演出与路径测试~~ | ~~存档 / 种子 / 断点 / 监视 / 路径遍历~~ | ✅ 已完成(详见「最近变更」) | M |
-| R8 | v0.22.0 | **资源原文件闭环** | 图片 / 音频 / 视频 / 文件落盘 / 播放 / 缩略图 / 哈希去重 / 替换 / 缺失重定位 / 授权字段 | 桌面项目迁移后所有媒体仍可用;资源替换不破坏引用 | M |
+| ~~R8~~ | ~~v0.22.0~~ | ~~资源原文件闭环~~ | ~~落盘 / 播放 / 缩略图 / 哈希去重 / 替换 / 缺失重定位 / 授权字段~~ | ✅ 已完成(详见「最近变更」) | M |
 | R9 | v0.23.0 | **通用游戏引擎导出** | 带版本的 JSON Schema;导出规则;引用索引;增量导出;类型生成;独立流程运行库 | 示例游戏可在无 React 环境读取项目并运行对白流程 | L |
 | R10 | v0.24.0 | **高级体检与查询** | 脚本类型错误;无效引用;孤立节点 / 循环 / 时间冲突 / 角色一致性;保存查询 | 所有问题可点击直达;支持按对象类型 / 属性 / 状态组合查询 | M |
 | **R10-A** | **v0.25.0** | **🆕 AI 智能助手(深度)** | 消费 R6 AST → AI 生成 / 改写脚本即时校验;消费 R10 体检结果 → AI 修复方案一键 apply;自然语言 → 保存查询;演出路径分析建议;人物一致性诊断;完整互动剧本生成配置 | AI 建议全部通过类型 / 结构检查后才允许 apply;互动项目生成的变量、条件、指令与分支通过脚本和路径检查,不产生"跑不通"的输出 | L |
@@ -91,7 +92,7 @@
 
 ### 后续增强(独立小批,不阻塞主线)
 
-- 矢量地点编辑;音视频 / 大图原文件写入桌面项目文件夹(R8 前可能先出个人体验版)
+- 矢量地点编辑;演出 / 流程节点内直接播放挂接的音视频资源(R8 已有原文件与播放能力,差 Player 接入)
 - Localization UI 文案层(与 R12 项目内容本地化解耦,可先做)
 
 暂不扩展多人同时协作;当前已有的接力式云协作维持现状,优先完成单人小说 / 游戏剧本工作流。
@@ -117,6 +118,24 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R8 · v0.22.0)
+
+资源原文件闭环:
+
+- `types.ts` `Asset` 增 `hash?`(SHA-256 hex,原文件存储键)/ `ext?`(小写扩展名)/ `license?`(授权字段);`fileRef?` 降为兼容保留,文件名一律由 `hash + ext` 推导;`normalizeProject` 剔除非法 hash / ext / license
+- 新增 `src/assetFiles.ts` 原文件存储层,按 `folder` 参数二选一:
+  - 桌面文件夹模式 → 项目文件夹 `assets/asset-{hash前16}.{ext}`,随文件夹迁移仍可用
+  - 网页 / 未绑定 → IndexedDB `theloom-assets`(按完整 hash 全局键,跨槽位共享去重)
+  - API:`hashBlob` / `assetExt` / `assetFileName` / `storeAssetFile` / `loadAssetBlob` / `getAssetUrl`(对象 URL 缓存)/ `listStoredFiles` / `isAssetStored` / `deleteStoredFiles` / `computeOrphans`(纯函数)/ `collectReferencedTexts` / `exportBlobsToFolder`
+- Rust 新增 4 个命令:`list_asset_files`(名称 + 字节数,不读内容)/ `read_asset_file` / `write_asset_file`(同名 = 同内容,已存在直接跳过)/ `delete_asset_files`;名称白名单仅 `asset-` 前缀 + 字母数字 `._-`,杜绝穿越
+- `read_asset_dir` 收窄为只读 `entity-*` 头像:资源原文件不整读进内存,也不进 `knownManaged` 差量删除集合(顺带修复外部放入 `assets/` 的图片被保存流程误删的旧 bug)
+- `Assets.tsx`:导入哈希去重(重复文件跳过并提示);视频导入截首帧缩略图(`util.ts` `fileToVideoThumb`);任意文件类型可导入;inspector 原图预览 / 音视频播放 / 下载原文件;「替换文件」保 asset id 引用不断;「重新定位」哈希一致才关联、不一致询问转替换,旧资源(无 hash)可补挂原文件;卡片「缺失」徽标;「清理未引用原文件」是唯一删字节入口(扫描全部 theloom-* localStorage + 当前项目,子串匹配哈希,宁可漏删)
+- **删除 / 替换资源永不自动删字节**:保证撤销安全(删除 → Ctrl+Z 资源连原文件完整回来);孤儿由清理工具显式确认后回收
+- `App.tsx` 绑定新文件夹时 `exportBlobsToFolder` 把 IndexedDB 原文件落盘;xlsx 资源表增「授权」列往返
+- 测试:`assetFiles.test.ts` 6 项(哈希稳定 / 扩展名推导 / 文件名与非法输入 / 两模式存在性 / 孤儿计算与引用命中)+ util normalize 1 项 + Rust `asset_file_commands_roundtrip_and_guard`;合计 vitest 148 项 + cargo 2 项通过
+- 已实测(浏览器,IndexedDB 模式):导入图 / 音频(真实 WAV)/ 文本 → IDB 三条 blob 键=哈希;重复导入被跳过并弹提示;音频 blob URL 实际播放成功;替换文件后同 id 换哈希;删 IDB 字节 → 缺失徽标 + 重新定位同内容文件恢复播放;注入无引用 blob → 清理工具列 2 个孤儿(含替换遗留)删除、在用 3 个保留;删资源 → 撤销 → 原文件状态「已保留」;控制台零错误
+- 注意:桌面模式文件名只含 hash 前 16 位,`computeOrphans` 用该片段做子串匹配;`storeAssetFile` 同 hash 幂等;演出 / 流程内媒体播放尚未接入(后续批次)
 
 ## 最近变更(R7 · v0.21.0)
 
@@ -376,7 +395,7 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 - **文件夹式 Navigator 树**(`Folder`,已覆盖流程 / 实体 / 资源 / 文档 / 资料,支持多级目录与移动)
 
 **明确暂缓**
-- 音视频/大图原文件的 Rust 文件夹存储(网页模式缩略图已可用;`assets/` 目录读写框架已就位,只差把二进制原文件 push 到 files 列表)
+- ~~音视频/大图原文件的 Rust 文件夹存储~~ ✅ R8 已完成(内容寻址落盘 + IndexedDB 双后端)
 
 **主要缺口(按建议优先级)**
 1. ~~技术名 + 文件夹式 Navigator 树~~ ✅(技术名全对象通用;Navigator 树已覆盖全部适用模块)

@@ -23,18 +23,21 @@ struct ProjectFiles {
     assets: Vec<MdFile>,
 }
 
+/// 只吃 entity-*(实体头像)小图。资源原文件(asset-*)体积可能很大,
+/// 不随项目加载整读进内存,由 list_asset_files / read_asset_file 按需访问;
+/// 外部放进 assets/ 的其他文件也因此不进 knownManaged 差量删除集合。
 fn read_asset_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
     let mut out = Vec::new();
     if dir.is_dir() {
         for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
             let is_img = path
                 .extension()
                 .map(|e| IMG_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x)))
                 .unwrap_or(false);
-            if path.is_file() && is_img {
-                let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_file() && is_img && name.starts_with("entity-") {
                 let bytes = fs::read(&path).map_err(|e| format!("{name}: {e}"))?;
                 out.push(MdFile {
                     name,
@@ -44,6 +47,87 @@ fn read_asset_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
         }
     }
     Ok(out)
+}
+
+/* ---------- 资源原文件(R8):assets/asset-*.*,按内容哈希命名,增量单文件读写 ---------- */
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AssetFileInfo {
+    name: String,
+    size: u64,
+}
+
+/// 原文件名白名单:asset- 前缀 + 字母数字 . _ -,杜绝路径穿越
+fn valid_asset_name(name: &str) -> bool {
+    name.starts_with("asset-")
+        && name.len() <= 120
+        && !name.contains("..")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
+}
+
+fn asset_path(dir: &str, name: &str) -> Result<PathBuf, String> {
+    if !valid_asset_name(name) {
+        return Err(format!("非法资源文件名:{name}"));
+    }
+    Ok(PathBuf::from(dir).join("assets").join(name))
+}
+
+/// 列出 assets/ 下所有资源原文件(名称 + 字节数),不读内容
+#[tauri::command]
+fn list_asset_files(dir: String) -> Result<Vec<AssetFileInfo>, String> {
+    let base = PathBuf::from(&dir).join("assets");
+    let mut out = Vec::new();
+    if base.is_dir() {
+        for entry in fs::read_dir(&base).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_file() && valid_asset_name(&name) {
+                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                out.push(AssetFileInfo { name, size });
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// 读取单个资源原文件,返回 base64
+#[tauri::command]
+fn read_asset_file(dir: String, name: String) -> Result<String, String> {
+    let path = asset_path(&dir, &name)?;
+    let bytes = fs::read(&path).map_err(|e| format!("{name}: {e}"))?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+/// 写入单个资源原文件(base64)。文件按内容哈希命名,同名即同内容,已存在时直接跳过
+#[tauri::command]
+fn write_asset_file(dir: String, name: String, content: String) -> Result<(), String> {
+    let path = asset_path(&dir, &name)?;
+    if path.is_file() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&content)
+        .map_err(|e| format!("{name}: {e}"))?;
+    replace_file(&path, &bytes).map_err(|e| format!("{name}: {e}"))
+}
+
+/// 删除一组资源原文件(仅 asset-* 名称;供「清理未引用原文件」显式调用)
+#[tauri::command]
+fn delete_asset_files(dir: String, names: Vec<String>) -> Result<(), String> {
+    for name in &names {
+        let path = asset_path(&dir, name)?;
+        if path.is_file() {
+            fs::remove_file(&path).map_err(|e| format!("{name}: {e}"))?;
+        }
+    }
+    Ok(())
 }
 
 fn read_md_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
@@ -326,6 +410,48 @@ mod tests {
 
         std::fs::remove_dir_all(&dir).ok();
     }
+
+    #[test]
+    fn asset_file_commands_roundtrip_and_guard() {
+        let dir = std::env::temp_dir().join(format!("theloom-asset-test-{}", std::process::id()));
+        let dir_s = dir.to_string_lossy().to_string();
+        fs::create_dir_all(dir.join("assets")).unwrap();
+
+        let b64 = base64::engine::general_purpose::STANDARD.encode([1u8, 2, 3, 4, 5]);
+        write_asset_file(dir_s.clone(), "asset-abcd1234.png".into(), b64.clone()).unwrap();
+        // 同名(同内容哈希)再写直接跳过,不报错
+        write_asset_file(dir_s.clone(), "asset-abcd1234.png".into(), "ignored".into()).unwrap();
+        assert_eq!(
+            read_asset_file(dir_s.clone(), "asset-abcd1234.png".into()).unwrap(),
+            b64
+        );
+
+        // 头像与外部文件不进原文件清单;asset-* 才算
+        fs::write(dir.join("assets/entity-e1.png"), [9u8]).unwrap();
+        fs::write(dir.join("assets/外部随手放的.png"), [9u8]).unwrap();
+        let listed = list_asset_files(dir_s.clone()).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].name, "asset-abcd1234.png");
+        assert_eq!(listed[0].size, 5);
+
+        // load_project_dir 的 assets 只吃 entity-* 头像,原文件不整读进内存
+        let loaded = load_project_dir(dir_s.clone()).unwrap();
+        assert_eq!(loaded.assets.len(), 1);
+        assert_eq!(loaded.assets[0].name, "entity-e1.png");
+
+        // 名称白名单:路径穿越 / 非 asset- 前缀一律拒绝
+        assert!(read_asset_file(dir_s.clone(), "../project.json".into()).is_err());
+        assert!(write_asset_file(dir_s.clone(), "entity-e1.png".into(), b64.clone()).is_err());
+        assert!(delete_asset_files(dir_s.clone(), vec!["asset-x/../../y.png".into()]).is_err());
+
+        delete_asset_files(dir_s.clone(), vec!["asset-abcd1234.png".into()]).unwrap();
+        assert!(list_asset_files(dir_s.clone()).unwrap().is_empty());
+        // 头像与外部文件安然无恙
+        assert!(dir.join("assets/entity-e1.png").is_file());
+        assert!(dir.join("assets/外部随手放的.png").is_file());
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -334,7 +460,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .invoke_handler(tauri::generate_handler![load_project_dir, save_project_dir])
+        .invoke_handler(tauri::generate_handler![
+            load_project_dir,
+            save_project_dir,
+            list_asset_files,
+            read_asset_file,
+            write_asset_file,
+            delete_asset_files
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -65,6 +65,31 @@ describe('normalizeProject', () => {
     expect(project.entities[1].order).toBeUndefined();
     expect(project.entities[2]?.order).toBeUndefined();
   });
+
+  it('R8 资源原文件字段:非法 hash / ext / license 剔除,合法保留', () => {
+    const project = sampleProject();
+    const hash = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+    project.assets = [
+      {
+        id: 'a1', name: '合法', kind: 'image', mime: 'image/png', size: 1,
+        tags: [], source: '', notes: '', createdAt: 1,
+        hash, ext: 'png', license: 'CC-BY 4.0',
+      },
+      {
+        id: 'a2', name: '非法', kind: 'audio', mime: 'audio/mpeg', size: 1,
+        tags: [], source: '', notes: '', createdAt: 1,
+        hash: '不是哈希', ext: '../x' as string, license: 42 as unknown as string,
+      },
+    ];
+    normalizeProject(project);
+
+    expect(project.assets[0].hash).toBe(hash);
+    expect(project.assets[0].ext).toBe('png');
+    expect(project.assets[0].license).toBe('CC-BY 4.0');
+    expect(project.assets[1].hash).toBeUndefined();
+    expect(project.assets[1].ext).toBeUndefined();
+    expect(project.assets[1].license).toBeUndefined();
+  });
 });
 
 describe('R2 长篇正文工作台', () => {

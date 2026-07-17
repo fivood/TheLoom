@@ -316,12 +316,18 @@ export interface Asset {
   /** 预览 dataURL:图片为 256px JPEG,音频/视频/文件留空。
    *  网页模式唯一可用形态;文件夹模式加载时从 assets/ 读入后也填入 */
   thumbnail?: string;
-  /** 文件夹模式下 assets/ 内的文件名(如 asset-abc.png);网页模式为空——数据完全内嵌 */
+  /** 旧字段(R8 前):文件夹模式下 assets/ 内的文件名;R8 起文件名由 hash + ext 推导,此字段仅兼容保留 */
   fileRef?: string;
+  /** 原文件 SHA-256(hex,64 位):原文件存储的键(桌面 assets/ 文件名 / 网页 IndexedDB 键),同内容去重 */
+  hash?: string;
+  /** 原文件扩展名(小写,不含点),与 hash 一起推导落盘文件名 */
+  ext?: string;
   /** 原始字节数,用于配额提示 */
   size: number;
   tags: string[];
   source: string;
+  /** 授权 / 许可信息(如 CC-BY 4.0、已购买商用授权、自绘) */
+  license?: string;
   notes: string;
   /** 技术名:项目内唯一,用于脚本与导出,如 portrait_semelvie */
   technicalName?: string;
