@@ -3,6 +3,7 @@ import { useLoom } from '../store';
 import { auditProject, projectStats } from '../audit';
 import { useNav } from '../search';
 import { ISSUE_SCOPE_LABEL, ISSUE_SEVERITY_LABEL, type IssueScope, type IssueSeverity } from '../issues';
+import { useAiPanelBus } from '../ai/panelBus';
 
 export default function AuditPanel({ onClose }: { onClose: () => void }) {
   const project = useLoom((s) => s.project);
@@ -94,6 +95,15 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
                 <span className="audit-severity">{ISSUE_SEVERITY_LABEL[it.severity]}</span>
                 <span className="palette-kind">{it.kind}</span>
                 <span className="ref-title">{it.message}</span>
+                <button
+                  className="ghost audit-ai-fix"
+                  title="让 AI 助手生成修复提案(应用前经本地验证)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useAiPanelBus.getState().open('fix', it.id);
+                    onClose();
+                  }}
+                >AI 修复</button>
               </div>
             ))}
           </div>

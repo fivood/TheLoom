@@ -13,6 +13,13 @@ import {
   loadLlmConfig,
   PROVIDER_LABEL,
 } from '../ai/llm';
+import { generateFixProposal } from '../ai/fixAssistant';
+import { useAiPanelBus } from '../ai/panelBus';
+import {
+  dryRunAiProposal,
+  type AiProposal,
+  type AiProposalDryRun,
+} from '../ai/proposal';
 import { interpretProjectQuery, type AiQueryInterpretation } from '../ai/queryAssistant';
 import {
   loadAiSessions,
@@ -29,7 +36,16 @@ import { uid, useLoom } from '../store';
 import Icon from './Icon';
 
 type ContextMode = 'current' | 'references' | 'query' | 'issue';
-type AssistantTask = 'ask' | 'query';
+type AssistantTask = 'ask' | 'query' | 'fix';
+
+interface FixState {
+  proposal: AiProposal;
+  dryRun: AiProposalDryRun;
+  selected: string[];
+  confirmWarnings: boolean;
+  ignoredEvidenceKeys: string[];
+  appliedNote?: string;
+}
 
 interface Props {
   currentTab: NavTab;
@@ -90,6 +106,11 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
   const [queryName, setQueryName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fix, setFix] = useState<FixState | null>(null);
+  const [fixBusy, setFixBusy] = useState(false);
+  const applyAiProposal = useLoom((state) => state.applyAiProposal);
+  const panelRequest = useAiPanelBus((state) => state.request);
+  const consumePanelRequest = useAiPanelBus((state) => state.consume);
   const abortRef = useRef<AbortController | null>(null);
   const sessionSlotRef = useRef(currentSlotId);
 
@@ -112,6 +133,15 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
   useEffect(() => {
     if (sessionSlotRef.current === currentSlotId) saveAiSessions(currentSlotId, sessions);
   }, [currentSlotId, sessions]);
+
+  useEffect(() => {
+    if (!panelRequest) return;
+    setTask(panelRequest.task);
+    if (panelRequest.task === 'fix' || panelRequest.issueId) setMode('issue');
+    if (panelRequest.issueId) setIssueId(panelRequest.issueId);
+    setFix(null);
+    consumePanelRequest();
+  }, [panelRequest, consumePanelRequest]);
 
   useEffect(() => {
     if (mode !== 'issue') return;
@@ -177,7 +207,116 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
     setSessionId(next[0].id);
   };
 
+  const appendSessionMessages = (messages: AiSessionMessage[]) => {
+    if (!activeSession) return;
+    setSessions((current) => updateSession(current, activeSession.id, (session) => {
+      session.messages.push(...messages);
+      if (session.messages.length === messages.length && messages[0]) {
+        session.title = messages[0].text.slice(0, 24);
+      }
+    }));
+  };
+
+  const generateFix = async () => {
+    if (!bundle || !selectedIssue || fixBusy || busy) return;
+    setFixBusy(true);
+    setError(null);
+    setFix(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const cfg = await hydrateDesktopLlmConfig(loadLlmConfig());
+      if (!llmHasCredential(cfg)) throw new Error('还没有配置 API Key');
+      const client = createLlmClient(cfg);
+      const instruction = question.trim() || undefined;
+      const result = await generateFixProposal(client, project, bundle, [selectedIssue], instruction, controller.signal);
+      const dryRun = await dryRunAiProposal(project, result.proposal, {
+        expectedContextSourceKeys: result.proposal.contextSourceKeys,
+      });
+      setFix({
+        proposal: result.proposal,
+        dryRun,
+        selected: result.proposal.operations.map((operation) => operation.id),
+        confirmWarnings: false,
+        ignoredEvidenceKeys: result.ignoredEvidenceKeys,
+      });
+      appendSessionMessages([
+        {
+          id: messageId(),
+          role: 'user',
+          text: instruction ? `修复「${selectedIssue.kind}」:${instruction}` : `修复「${selectedIssue.kind}」`,
+          createdAt: Date.now(),
+          contextSourceKeys: bundle.items.map((item) => item.sourceRef.key),
+        },
+        {
+          id: messageId(),
+          role: 'assistant',
+          text: `${result.proposal.summary}\n\n提案含 ${result.proposal.operations.length} 项操作,本地验证:${dryRun.status === 'pass' ? '通过' : dryRun.status === 'warning' ? '有警告' : '被拦截'}。`,
+          createdAt: Date.now(),
+          usage: result.usage,
+        },
+      ]);
+      setQuestion('');
+    } catch (cause) {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setFixBusy(false);
+    }
+  };
+
+  const reselectFix = async (ids: string[]) => {
+    if (!fix || fix.appliedNote) return;
+    const proposal = fix.proposal;
+    setFix((current) => current && { ...current, selected: ids });
+    const dryRun = await dryRunAiProposal(project, proposal, {
+      selectedOperationIds: ids,
+      expectedContextSourceKeys: proposal.contextSourceKeys,
+    });
+    setFix((current) => current && current.proposal.id === proposal.id
+      ? { ...current, selected: ids, dryRun }
+      : current);
+  };
+
+  const applyFix = async () => {
+    if (!fix || fix.appliedNote || fixBusy) return;
+    setFixBusy(true);
+    setError(null);
+    try {
+      const result = await applyAiProposal(fix.proposal, {
+        selectedOperationIds: fix.selected,
+        expectedContextSourceKeys: fix.proposal.contextSourceKeys,
+        confirmWarnings: fix.confirmWarnings,
+      });
+      if (result.applied) {
+        setFix((current) => current && {
+          ...current,
+          dryRun: result.dryRun,
+          appliedNote: `已应用 ${result.dryRun.metrics.appliedOperations} 项修改,可 Ctrl+Z 一步撤销`,
+        });
+        appendSessionMessages([{
+          id: messageId(),
+          role: 'assistant',
+          text: `修复已应用(${result.dryRun.metrics.appliedOperations} 项操作,改动 ${result.dryRun.metrics.changedChars} 字符)。`,
+          createdAt: Date.now(),
+        }]);
+      } else {
+        setFix((current) => current && { ...current, dryRun: result.dryRun });
+        setError(result.reason === 'project-changed'
+          ? '项目在验证后发生了变化,请重新生成提案'
+          : result.reason === 'warning-confirmation-required'
+            ? '存在警告,请先勾选「已了解全部警告」'
+            : '提案被本地验证拦截,无法应用');
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setFixBusy(false);
+    }
+  };
+
   const send = async () => {
+    if (task === 'fix') { void generateFix(); return; }
     const text = question.trim();
     if (!text || !activeSession || busy || (task === 'ask' && !bundle)) return;
     setBusy(true);
@@ -268,7 +407,7 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
       <div className="ai-assistant-head">
         <Icon name="bulb" size={16} />
         <strong>AI 助手</strong>
-        <span className="ai-readonly-badge">只读</span>
+        <span className="ai-readonly-badge">{task === 'fix' ? '提案制' : '只读'}</span>
         <span className="spacer" />
         <button className="ghost icon-btn" title="AI 设置" onClick={onOpenSettings}><Icon name="braces" size={14} /></button>
         <button className="ghost icon-btn" title="关闭 AI 助手" onClick={onClose}>×</button>
@@ -289,16 +428,19 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
       <div className="ai-task-tabs">
         <button className={task === 'ask' ? 'active' : 'ghost'} onClick={() => setTask('ask')}>项目问答</button>
         <button className={task === 'query' ? 'active' : 'ghost'} onClick={() => setTask('query')}>自然语言查询</button>
+        <button className={task === 'fix' ? 'active' : 'ghost'} onClick={() => { setTask('fix'); setMode('issue'); }}>修复提案</button>
       </div>
 
-      {task === 'ask' ? <div className="ai-context-card">
-        <div className="ai-section-title">发送范围</div>
-        <select aria-label="AI 上下文范围" value={mode} onChange={(event) => setMode(event.target.value as ContextMode)}>
-          <option value="current">当前对象</option>
-          <option value="references">当前对象 + 一跳引用</option>
-          <option value="query">已保存的组合查询</option>
-          <option value="issue">体检问题</option>
-        </select>
+      {task !== 'query' ? <div className="ai-context-card">
+        <div className="ai-section-title">{task === 'fix' ? '要修复的问题' : '发送范围'}</div>
+        {task === 'ask' && (
+          <select aria-label="AI 上下文范围" value={mode} onChange={(event) => setMode(event.target.value as ContextMode)}>
+            <option value="current">当前对象</option>
+            <option value="references">当前对象 + 一跳引用</option>
+            <option value="query">已保存的组合查询</option>
+            <option value="issue">体检问题</option>
+          </select>
+        )}
         {mode === 'query' && (
           <select aria-label="保存的组合查询" value={queryId} onChange={(event) => setQueryId(event.target.value)}>
             <option value="">选择查询…</option>
@@ -384,6 +526,95 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
         </div>
       )}
 
+      {task === 'fix' && fix && (
+        <div className={`ai-fix-card ai-fix-${fix.dryRun.status}`}>
+          <div className="ai-section-title">
+            修复提案 · {fix.dryRun.status === 'pass' ? '✓ 验证通过' : fix.dryRun.status === 'warning' ? '⚠ 有警告' : '✕ 被拦截'}
+          </div>
+          <div className="ai-fix-summary">{fix.proposal.summary}</div>
+          {fix.proposal.confirmations.length > 0 && (
+            <ul className="ai-fix-confirmations">
+              {fix.proposal.confirmations.map((item, index) => <li key={index}>待确认:{item}</li>)}
+            </ul>
+          )}
+          {fix.ignoredEvidenceKeys.length > 0 && (
+            <div className="hint">已忽略 {fix.ignoredEvidenceKeys.length} 个未知依据来源</div>
+          )}
+          <div className="ai-fix-ops">
+            {fix.proposal.operations.map((operation) => {
+              const opChange = fix.dryRun.changes.find((item) => item.operationId === operation.id);
+              const opIssues = fix.dryRun.issues.filter((item) => item.operationId === operation.id);
+              const checked = fix.selected.includes(operation.id);
+              return (
+                <div key={operation.id} className={`ai-fix-op ${checked ? '' : 'ai-fix-op-off'}`}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!!fix.appliedNote || fixBusy}
+                      onChange={() => void reselectFix(checked
+                        ? fix.selected.filter((id) => id !== operation.id)
+                        : [...fix.selected, operation.id])}
+                    />
+                    <span className="ai-fix-op-target">{opChange?.target ?? operation.kind}</span>
+                    <span className="ai-fix-op-confidence">信心 {Math.round(operation.confidence * 100)}%</span>
+                  </label>
+                  <div className="ai-fix-op-reason">{operation.reason}</div>
+                  {opChange && (
+                    <div className="ai-fix-diff">
+                      <pre className="ai-fix-before">{opChange.before || '(空)'}</pre>
+                      <pre className="ai-fix-after">{opChange.after || '(空)'}</pre>
+                    </div>
+                  )}
+                  {opIssues.map((item, index) => (
+                    <div key={index} className={item.severity === 'blocked' ? 'ai-fix-issue-blocked' : 'ai-fix-issue-warning'}>
+                      {item.severity === 'blocked' ? '✕' : '⚠'} {item.message}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+          {fix.dryRun.issues.filter((item) => !item.operationId).map((item, index) => (
+            <div key={index} className={item.severity === 'blocked' ? 'ai-fix-issue-blocked' : 'ai-fix-issue-warning'}>
+              {item.severity === 'blocked' ? '✕' : '⚠'} {item.message}
+            </div>
+          ))}
+          <div className="ai-fix-metrics">
+            选中 {fix.selected.length}/{fix.proposal.operations.length} 项 · 改动 {fix.dryRun.metrics.changedChars.toLocaleString()} 字符
+            {fix.dryRun.metrics.addedObjects > 0 && ` · 新增 ${fix.dryRun.metrics.addedObjects} 个对象`}
+          </div>
+          {fix.appliedNote ? (
+            <div className="ai-fix-applied">✓ {fix.appliedNote}</div>
+          ) : (
+            <>
+              {fix.dryRun.status === 'warning' && (
+                <label className="ai-fix-confirm-warnings">
+                  <input
+                    type="checkbox"
+                    checked={fix.confirmWarnings}
+                    onChange={(event) => setFix((current) => current && { ...current, confirmWarnings: event.target.checked })}
+                  />
+                  已了解全部警告,仍要应用
+                </label>
+              )}
+              <div className="ai-fix-actions">
+                <button
+                  className="primary"
+                  disabled={fixBusy
+                    || fix.dryRun.status === 'blocked'
+                    || (fix.dryRun.status === 'warning' && !fix.confirmWarnings)}
+                  onClick={() => void applyFix()}
+                >
+                  {fixBusy ? '处理中…' : '应用选中修改'}
+                </button>
+                <button className="ghost" disabled={fixBusy} onClick={() => setFix(null)}>放弃提案</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="ai-conversation">
         {activeSession?.messages.length ? activeSession.messages.map((message) => (
           <div key={message.id} className={`ai-message ${message.role}`}>
@@ -409,10 +640,12 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
           </div>
         )) : (
           <div className="ai-empty">
-            <strong>{task === 'ask' ? '从当前叙事对象开始提问' : '用自然语言描述要找的内容'}</strong>
+            <strong>{task === 'ask' ? '从当前叙事对象开始提问' : task === 'query' ? '用自然语言描述要找的内容' : '选择一个体检问题,生成修复提案'}</strong>
             <span>{task === 'ask'
               ? '助手只会收到上方列出的内容，并用可点击来源回答。'
-              : '模型只生成固定查询条件，真实结果由本地索引计算。'}</span>
+              : task === 'query'
+                ? '模型只生成固定查询条件，真实结果由本地索引计算。'
+                : '提案先在项目副本上通过脚本、引用、体检和路径验证,预览差异后才能应用;应用可一步撤销。'}</span>
           </div>
         )}
       </div>
@@ -435,24 +668,32 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
               void send();
             }
           }}
-          placeholder={task === 'ask' ? '询问当前对象、检查矛盾或梳理线索…' : '例如：找出仍在草稿状态且未被引用的文档'}
+          placeholder={task === 'ask'
+            ? '询问当前对象、检查矛盾或梳理线索…'
+            : task === 'query'
+              ? '例如：找出仍在草稿状态且未被引用的文档'
+              : '可选:补充修复要求(如「优先复用已有变量」)…'}
           rows={3}
         />
         <div>
           <span className="hint">
             {task === 'query'
               ? `${PROVIDER_LABEL[loadLlmConfig().provider]} · 结果本地执行`
+              : task === 'fix'
+                ? `${PROVIDER_LABEL[loadLlmConfig().provider]} · 应用前本地验证`
               : bundle ? `${PROVIDER_LABEL[loadLlmConfig().provider]} · 发送前可见` : '等待上下文'}
           </span>
-          {busy ? (
+          {busy || fixBusy ? (
             <button onClick={() => abortRef.current?.abort()}>停止</button>
           ) : (
             <button
               className="primary"
-              disabled={!question.trim() || (task === 'ask' && (!bundle || contextBusy))}
+              disabled={task === 'fix'
+                ? (!bundle || contextBusy || !selectedIssue)
+                : (!question.trim() || (task === 'ask' && (!bundle || contextBusy)))}
               onClick={() => void send()}
             >
-              {task === 'ask' ? '发送' : '生成查询'}
+              {task === 'ask' ? '发送' : task === 'query' ? '生成查询' : '生成修复提案'}
             </button>
           )}
         </div>

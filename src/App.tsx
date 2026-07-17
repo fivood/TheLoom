@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { exportProject, useLoom } from './store';
+import { useAiPanelBus } from './ai/panelBus';
 import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
@@ -75,6 +76,10 @@ export default function App() {
   const [palettes, setPalettes] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
   const [aiAssistant, setAiAssistant] = useState(false);
+  const aiPanelRequest = useAiPanelBus((s) => s.request);
+  useEffect(() => {
+    if (aiPanelRequest) setAiAssistant(true);
+  }, [aiPanelRequest]);
   const [findReplace, setFindReplace] = useState(false);
   const [engineExport, setEngineExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);

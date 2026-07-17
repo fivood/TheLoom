@@ -53,13 +53,13 @@ R10-A 详细设计见 `docs/R10A_AI_ASSISTANT.md`:模型只拥有白名单只读
 ### R10-A 执行顺序
 
 1. **R10-A1 · 安全内核**:Provider 能力、JSON Schema 结构化输出、取消 / usage / 错误分类;显式上下文与字符预算;结构化提案、dry-run 和过期保护
-2. **R10-A2 · 只读助手与自然语言查询**:统一面板、本机会话、带对象引用问答、自然语言 → `ProjectQuery` → 本地执行 → 可选保存
-3. **R10-A3 · 脚本与问题修复**:`ProjectIssue` → 白名单修复提案;AST / 类型 / 引用 / audit / path 全部通过后才允许应用
+2. **R10-A2 · 只读助手与自然语言查询**:✅ 统一面板、本机会话、带对象引用问答、自然语言 → `ProjectQuery` → 本地执行 → 可选保存
+3. **R10-A3 · 脚本与问题修复**:✅ `ProjectIssue` → 白名单修复提案(`generateFixProposal`:模型只产出 summary + 操作,信封 / 指纹本地构建);体检行「AI 修复」一键进入助手「修复提案」任务;差异预览 + 逐项勾选重验 + 警告需显式确认 + 单次 commit 一步撤销;dry-run 的 audit 差异已覆盖脚本类型检查与全项目路径测试,新增脚本错误 / 卡死 / 死循环 / 不可达一律 blocked 不显示应用按钮
 4. **R10-A4 · 叙事分析**:路径覆盖、人物声音、POV / 地点 / 时间 / 弧线、伏笔、节奏;事实、推断、创意建议分开显示
 5. **R10-A5 · 完整互动项目生成**:审阅配置与计划 → 分模块候选 → ImportPreview → 脚本 / 引用 / 路径验收
 6. **R10-A6 · 收尾**:大项目性能与成本基线、隐私、取消 / 离线恢复、浏览器 / Tauri、主题 / 键盘与发布回归
 
-当前开发:R10-A1 Provider 结构化输出入口已完成首批实现(OpenAI JSON Schema / Anthropic 强制 tool / Ollama format / 兼容降级 / 本地 Schema 校验 / 取消与错误分类)。
+当前开发:R10-A1 至 R10-A3 已完成;下一批 R10-A4 叙事分析。R10-A3 实现要点:`src/ai/fixAssistant.ts`(提案生成)、`src/ai/panelBus.ts`(体检 → 助手的任务通道)、`AiAssistantPanel` 修复任务 UI、`AI_FIX_OPERATION_SCHEMAS` 从提案 schema 拆出复用;路径安全依赖 auditProject 内置的全项目 simulateFlow(不要另加重复的路径校验层)。
 
 ### 路线图 · 通往 v1.0(按顺序开发,一批一 minor)
 

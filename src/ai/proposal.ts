@@ -203,6 +203,52 @@ function operationSchema(
   };
 }
 
+const SAVE_QUERY_OP_SCHEMA = operationSchema('save_query', ['queryId', 'name', 'query'], {
+  queryId: ID,
+  name: { type: 'string', minLength: 1, maxLength: 120 },
+  query: QUERY_SCHEMA,
+});
+
+/** 修复提案可用的修改操作(不含 save_query) */
+export const AI_FIX_OPERATION_SCHEMAS: JsonSchema[] = [
+  operationSchema('update_entity_field', ['entityId', 'fieldId', 'value'], {
+    entityId: ID, fieldId: ID, value: BODY_TEXT,
+  }),
+  operationSchema('update_document_block_text', ['documentId', 'blockId', 'text'], {
+    documentId: ID, blockId: ID, text: BODY_TEXT,
+  }),
+  operationSchema('update_flow_node_text', ['flowId', 'path', 'nodeId', 'text'], {
+    flowId: ID, path: STRING_LIST, nodeId: ID, text: BODY_TEXT,
+  }),
+  operationSchema('replace_flow_edge_script', ['flowId', 'path', 'edgeId', 'field', 'value'], {
+    flowId: ID,
+    path: STRING_LIST,
+    edgeId: ID,
+    field: { type: 'string', enum: ['condition', 'effect'] },
+    value: BODY_TEXT,
+  }),
+  operationSchema('replace_flow_node_script', ['flowId', 'path', 'nodeId', 'field', 'value'], {
+    flowId: ID,
+    path: STRING_LIST,
+    nodeId: ID,
+    field: { type: 'string', enum: ['condition', 'instruction', 'checkExpr'] },
+    value: BODY_TEXT,
+  }),
+  operationSchema('replace_document_block_script', ['documentId', 'blockId', 'field', 'value'], {
+    documentId: ID,
+    blockId: ID,
+    field: { type: 'string', enum: ['condition', 'instruction'] },
+    value: BODY_TEXT,
+  }),
+  operationSchema('add_variable', ['variableId', 'name', 'variableType', 'value', 'description'], {
+    variableId: ID,
+    name: { type: 'string', minLength: 1, maxLength: 64 },
+    variableType: { type: 'string', enum: ['boolean', 'number', 'string'] },
+    value: { type: 'string', maxLength: 10_000 },
+    description: { type: 'string', maxLength: 1_000 },
+  }),
+];
+
 export const AI_PROPOSAL_SCHEMA: JsonSchema = {
   type: 'object',
   additionalProperties: false,
@@ -223,49 +269,7 @@ export const AI_PROPOSAL_SCHEMA: JsonSchema = {
       minItems: 1,
       maxItems: 40,
       items: {
-        anyOf: [
-          operationSchema('save_query', ['queryId', 'name', 'query'], {
-            queryId: ID,
-            name: { type: 'string', minLength: 1, maxLength: 120 },
-            query: QUERY_SCHEMA,
-          }),
-          operationSchema('update_entity_field', ['entityId', 'fieldId', 'value'], {
-            entityId: ID, fieldId: ID, value: BODY_TEXT,
-          }),
-          operationSchema('update_document_block_text', ['documentId', 'blockId', 'text'], {
-            documentId: ID, blockId: ID, text: BODY_TEXT,
-          }),
-          operationSchema('update_flow_node_text', ['flowId', 'path', 'nodeId', 'text'], {
-            flowId: ID, path: STRING_LIST, nodeId: ID, text: BODY_TEXT,
-          }),
-          operationSchema('replace_flow_edge_script', ['flowId', 'path', 'edgeId', 'field', 'value'], {
-            flowId: ID,
-            path: STRING_LIST,
-            edgeId: ID,
-            field: { type: 'string', enum: ['condition', 'effect'] },
-            value: BODY_TEXT,
-          }),
-          operationSchema('replace_flow_node_script', ['flowId', 'path', 'nodeId', 'field', 'value'], {
-            flowId: ID,
-            path: STRING_LIST,
-            nodeId: ID,
-            field: { type: 'string', enum: ['condition', 'instruction', 'checkExpr'] },
-            value: BODY_TEXT,
-          }),
-          operationSchema('replace_document_block_script', ['documentId', 'blockId', 'field', 'value'], {
-            documentId: ID,
-            blockId: ID,
-            field: { type: 'string', enum: ['condition', 'instruction'] },
-            value: BODY_TEXT,
-          }),
-          operationSchema('add_variable', ['variableId', 'name', 'variableType', 'value', 'description'], {
-            variableId: ID,
-            name: { type: 'string', minLength: 1, maxLength: 64 },
-            variableType: { type: 'string', enum: ['boolean', 'number', 'string'] },
-            value: { type: 'string', maxLength: 10_000 },
-            description: { type: 'string', maxLength: 1_000 },
-          }),
-        ],
+        anyOf: [SAVE_QUERY_OP_SCHEMA, ...AI_FIX_OPERATION_SCHEMAS],
       },
     },
     confirmations: { type: 'array', maxItems: 50, items: SHORT_TEXT },
@@ -551,6 +555,8 @@ export async function dryRunAiProposal(
     if (result.added) addedObjects++;
   }
 
+  // 体检(auditProject)已含脚本类型检查与全项目路径测试:
+  // 新增脚本错误、卡死、死循环、不可达都会在这里以 audit.new-error 拦截
   if (!issues.some((issue) => issue.severity === 'blocked')) {
     syncNarrativeUnits(preview, project);
     normalizeProject(preview);
