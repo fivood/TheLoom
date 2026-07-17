@@ -23,6 +23,7 @@ export default function RecoveryPanel({ onClose }: { onClose: () => void }) {
   const quarantine = useLoom((state) => state.quarantinedProject);
   const notice = useLoom((state) => state.recoveryNotice);
   const storageUsage = useLoom((state) => state.storageUsage);
+  const folder = useLoom((state) => state.folder);
   const saveStatus = useLoom((state) => state.saveStatus);
   const saveError = useLoom((state) => state.saveError);
   const syncError = useLoom((state) => state.syncError);
@@ -79,7 +80,9 @@ export default function RecoveryPanel({ onClose }: { onClose: () => void }) {
                 <div className="recovery-storage-track"><div style={{ width: `${usagePercent}%` }} /></div>
                 <div className="recovery-card-meta">
                   {storageUsage.bytes >= LOCAL_STORAGE_WARNING_BYTES
-                    ? '本地数据已超过 4 MB 提醒线。建议下载完整备份，并删除不用的项目快照或大尺寸资源。'
+                    ? (folder
+                      ? '本地数据已超过 4 MB 提醒线。当前项目以绑定文件夹为权威存储,不受影响;浏览器空间主要被项目镜像与其他项目占用,可删除不用的项目或下载备份后清理。'
+                      : '本地数据已超过 4 MB 提醒线。建议下载完整备份，并删除不用的项目快照或大尺寸资源。')
                     : '按常见的 5 MB localStorage 容量估算；不同浏览器的实际上限可能不同。'}
                 </div>
               </>

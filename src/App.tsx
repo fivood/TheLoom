@@ -248,7 +248,7 @@ export default function App() {
             <span className="saved-hint" style={{ color: 'var(--danger)' }} title={syncError}>⚠ 同步失败</span>
           ) : saveStatus === 'saving' ? (
             <span className="saved-hint">正在保存…</span>
-          ) : storageUsage.available && storageUsage.bytes >= LOCAL_STORAGE_WARNING_BYTES ? (
+          ) : !folder && storageUsage.available && storageUsage.bytes >= LOCAL_STORAGE_WARNING_BYTES ? (
             <button
               className="ghost saved-hint"
               style={{ color: 'var(--danger)' }}

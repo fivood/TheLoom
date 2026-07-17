@@ -41,6 +41,9 @@ export default function DialogHost() {
         if (current.kind === 'prompt') close(null);
         else if (current.kind === 'confirm') close(false);
         else close(true);
+      } else if (e.key === 'Enter' && current.kind !== 'prompt') {
+        e.preventDefault();
+        close(true);
       }
     };
     window.addEventListener('keydown', onKey);

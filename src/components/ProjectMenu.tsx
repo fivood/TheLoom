@@ -7,7 +7,7 @@ import ImportProjectDialog from './ImportProjectDialog';
 
 /**
  * 顶栏项目切换菜单:项目名可直接改,点开抽屉列出全部槽位并新建/导入/删除。
- * 桌面版绑定了项目文件夹时,槽位管理隐藏——文件夹即项目。
+ * 桌面版绑定文件夹时仍可切换项目,但会先安全解除绑定。
  */
 export default function ProjectMenu() {
   const project = useLoom((s) => s.project);
@@ -16,6 +16,7 @@ export default function ProjectMenu() {
   const folder = useLoom((s) => s.folder);
   const storageUsage = useLoom((s) => s.storageUsage);
   const update = useLoom((s) => s.update);
+  const unbindFolder = useLoom((s) => s.unbindFolder);
   const switchSlot = useLoom((s) => s.switchSlot);
   const newSlot = useLoom((s) => s.newSlot);
   const deleteSlot = useLoom((s) => s.deleteSlot);
@@ -51,6 +52,7 @@ export default function ProjectMenu() {
 
   const confirmImport = async () => {
     if (!inspection) return;
+    if (!await ensureUnbound()) return;
     if (!newSlot('blank')) {
       await alertDialog('无法创建新项目，请先在“恢复与备份”中检查本地空间。当前项目没有被修改。');
       return;
@@ -62,6 +64,19 @@ export default function ProjectMenu() {
   const inFolder = !!folder;
   const others = slots.filter((s) => s.id !== currentSlotId).sort((a, b) => b.updatedAt - a.updatedAt);
 
+  /** 绑定文件夹时,切换 / 新建 / 导入前先确认解绑(避免把别的项目写进已绑定文件夹) */
+  const ensureUnbound = async (): Promise<boolean> => {
+    if (!folder) return true;
+    const ok = await confirmDialog({
+      message: `当前项目绑定在文件夹:\n${folder}\n\n继续操作会解除绑定,当前项目改回浏览器本地存储;文件夹里的内容保持不变,之后可随时重新绑定。`,
+      confirmText: '解除绑定并继续',
+    });
+    if (!ok) return false;
+    if (unbindFolder()) return true;
+    await alertDialog('浏览器本地空间不足或不可用,未能解除绑定。当前项目仍安全地绑定在原文件夹。');
+    return false;
+  };
+
   return (
     <div className="project-menu" ref={rootRef}>
       <input
@@ -71,23 +86,52 @@ export default function ProjectMenu() {
         placeholder="项目名称"
         title={inFolder ? `绑定于文件夹:${folder}` : '当前项目'}
       />
-      {!inFolder && (
-        <button
-          className="ghost icon-btn project-menu-toggle"
-          title="切换项目 / 新建 / 导入"
-          onClick={() => setOpen((v) => !v)}
-        >
-          ▾
-        </button>
-      )}
+      <button
+        className="ghost icon-btn project-menu-toggle"
+        title="切换项目 / 新建 / 导入"
+        onClick={() => setOpen((v) => !v)}
+      >
+        ▾
+      </button>
 
-      {open && !inFolder && (
+      {open && (
         <div className="project-dropdown">
+          {inFolder && (
+            <>
+              <div className="project-dropdown-head">项目文件夹</div>
+              <div className="project-folder-info" title={folder!}>{folder}</div>
+              <div
+                className="project-slot"
+                onClick={async () => {
+                  if (await confirmDialog({
+                    message: `解除与文件夹的绑定?\n\n${folder}\n\n当前项目将改回浏览器本地存储;文件夹里的内容保持不变,之后可通过「工具 → 项目文件夹」重新绑定。`,
+                    confirmText: '解除绑定',
+                  })) {
+                    if (unbindFolder()) {
+                      setOpen(false);
+                    } else {
+                      await alertDialog('浏览器本地空间不足或不可用,未能解除绑定。当前项目仍安全地绑定在原文件夹。');
+                    }
+                  }
+                }}
+              >
+                <Icon name="folder" /> <span className="project-slot-name">解除文件夹绑定</span>
+              </div>
+              <div className="project-dropdown-sep" />
+            </>
+          )}
           {others.length > 0 && (
             <>
               <div className="project-dropdown-head">切换到</div>
               {others.map((s) => (
-                <div key={s.id} className="project-slot" onClick={() => { switchSlot(s.id); setOpen(false); }}>
+                <div
+                  key={s.id}
+                  className="project-slot"
+                  onClick={async () => {
+                    if (await ensureUnbound()) switchSlot(s.id);
+                    setOpen(false);
+                  }}
+                >
                   <span className="project-slot-name">{s.name || '未命名项目'}</span>
                   <span className="project-slot-date">{new Date(s.updatedAt).toLocaleDateString()}</span>
                   <button
@@ -103,22 +147,26 @@ export default function ProjectMenu() {
               <div className="project-dropdown-sep" />
             </>
           )}
-          <div className="project-dropdown-head">当前项目</div>
-          <div
-            className="project-slot danger-hover"
-            onClick={async () => {
-              if (slots.length <= 1) { await alertDialog('至少要保留一个项目'); return; }
-              if (await confirmDialog({ message: `删除当前项目「${project.name || '未命名项目'}」?数据不可恢复。`, danger: true, confirmText: '删除' })) deleteSlot(currentSlotId);
-              setOpen(false);
-            }}
-          >
-            <span className="project-slot-name">删除当前项目</span>
-          </div>
-          <div className="project-dropdown-sep" />
-          <div className="project-slot" onClick={() => { newSlot('blank'); setOpen(false); }}>
+          {!inFolder && (
+            <>
+              <div className="project-dropdown-head">当前项目</div>
+              <div
+                className="project-slot danger-hover"
+                onClick={async () => {
+                  if (slots.length <= 1) { await alertDialog('至少要保留一个项目'); return; }
+                  if (await confirmDialog({ message: `删除当前项目「${project.name || '未命名项目'}」?数据不可恢复。`, danger: true, confirmText: '删除' })) deleteSlot(currentSlotId);
+                  setOpen(false);
+                }}
+              >
+                <span className="project-slot-name">删除当前项目</span>
+              </div>
+              <div className="project-dropdown-sep" />
+            </>
+          )}
+          <div className="project-slot" onClick={async () => { if (await ensureUnbound()) newSlot('blank'); setOpen(false); }}>
             <Icon name="plus" /> <span className="project-slot-name">新建空白项目</span>
           </div>
-          <div className="project-slot" onClick={() => { newSlot('sample'); setOpen(false); }}>
+          <div className="project-slot" onClick={async () => { if (await ensureUnbound()) newSlot('sample'); setOpen(false); }}>
             <Icon name="book" /> <span className="project-slot-name">新建 · 载入示例</span>
           </div>
           <div className="project-slot" onClick={() => { if (!checkingImport) fileRef.current?.click(); }}>

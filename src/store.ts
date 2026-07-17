@@ -7,7 +7,7 @@ import { DOC_SNAPSHOT_LIMIT } from './types';
 import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
 import { mapProjectScripts } from './script';
 import { renameEntityField, renameIdentifier, renameSeenTarget } from './script/rename';
-import { getSavedFolder, isTauri, saveToFolder } from './storage';
+import { getSavedFolder, isTauri, saveToFolder, setSavedFolder } from './storage';
 import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
 import {
@@ -181,6 +181,9 @@ interface LoomState {
   quarantinedProject: RecoveryBackup | null;
   recoveryNotice: string | null;
   setFolder: (dir: string | null) => void;
+  /** 解除文件夹绑定,项目改回浏览器本地存储(文件夹内容保持不变) */
+  /** 本地镜像完整写入后才解除绑定;失败时保留原绑定 */
+  unbindFolder: () => boolean;
   restoreRecoveryBackup: () => Promise<void>;
   dismissRecoveryNotice: () => void;
   discardQuarantinedProject: () => void;
@@ -304,8 +307,13 @@ export const useLoom = create<LoomState>((set, get) => {
           storageUsage: getStorageUsage(localStorage),
         });
       } catch (e) {
-        console.error('保存失败', e);
-        set({ saveStatus: 'error', saveError: e instanceof Error ? e.message : String(e) });
+        if (get().folder && isTauri) {
+          // 文件夹模式:localStorage 只是镜像,写不下不算保存失败(文件夹为权威存储)
+          set({ savedAt: Date.now(), saveStatus: 'saved', saveError: null, storageUsage: getStorageUsage(localStorage) });
+        } else {
+          console.error('保存失败', e);
+          set({ saveStatus: 'error', saveError: e instanceof Error ? e.message : String(e) });
+        }
       }
       const folder = get().folder;
       if (folder && isTauri) {
@@ -388,6 +396,30 @@ export const useLoom = create<LoomState>((set, get) => {
     quarantinedProject: boot.quarantinedProject,
     recoveryNotice: boot.recoveryNotice,
     setFolder: (dir) => set({ folder: dir, syncError: null }),
+    unbindFolder: () => {
+      const cur = get();
+      if (!cur.folder) return true;
+      try {
+        saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
+        const slots = cur.slots.map((s) =>
+          s.id === cur.currentSlotId ? { ...s, name: cur.project.name || '未命名项目', updatedAt: cur.project.updatedAt } : s,
+        );
+        writeSlots(slots);
+        setSavedFolder(null);
+        set({
+          folder: null, syncError: null, slots,
+          savedAt: Date.now(), saveStatus: 'saved', saveError: null,
+          storageUsage: getStorageUsage(localStorage),
+        });
+        return true;
+      } catch (e) {
+        set({
+          saveStatus: 'error',
+          saveError: `无法解除文件夹绑定:浏览器本地存储写入失败。项目仍绑定在原文件夹。${e instanceof Error ? e.message : String(e)}`,
+        });
+        return false;
+      }
+    },
     dismissRecoveryNotice: () => set({ recoveryNotice: null }),
     setRecoveryNotice: (message) => set({ recoveryNotice: message }),
     discardQuarantinedProject: () => {
