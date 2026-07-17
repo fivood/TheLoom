@@ -13,6 +13,7 @@ import SyncPanel from './components/SyncPanel';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
+import { initPaneWidths } from './components/PaneHandle';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
 import ProjectImportWizard from './components/ProjectImportWizard';
 import ProjectMenu from './components/ProjectMenu';
@@ -85,6 +86,9 @@ export default function App() {
   useEffect(() => {
     if (navTarget) setTab(navTarget.tab);
   }, [navSeq]);
+
+  // 恢复本机保存的分栏宽度(启动时一次)
+  useEffect(() => { initPaneWidths(); }, []);
   const project = useLoom((s) => s.project);
   const folder = useLoom((s) => s.folder);
   const syncError = useLoom((s) => s.syncError);

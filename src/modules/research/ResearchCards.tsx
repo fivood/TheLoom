@@ -4,6 +4,7 @@ import { useNav } from '../../search';
 import { confirmDialog, promptText } from '../../dialog';
 import Icon from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
+import Inspector from '../../components/Inspector';
 import type { ResearchCard } from '../../types';
 import { PALETTE } from '../../types';
 import { activePaletteColors } from '../../util';
@@ -113,8 +114,8 @@ export default function ResearchCards() {
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
-          <button className="ghost icon-btn" onClick={addCategory} title="新建分类">＋</button>
-          {catFilter !== 'all' && <button className="ghost icon-btn" onClick={() => removeCategory(catFilter)} title="删除当前分类">×</button>}
+          <button className="ghost" onClick={addCategory} title="新建资料分类" style={{ fontSize: 12 }}>＋ 分类</button>
+          {catFilter !== 'all' && <button className="ghost" onClick={() => removeCategory(catFilter)} title={`删除分类「${catFilter}」`} style={{ fontSize: 12 }}>× 删除分类</button>}
           {allTags.length > 0 && (
             <select value={tagFilter ?? ''} onChange={(event) => setTagFilter(event.target.value || null)} style={{ width: 120 }}>
               <option value="">全部标签</option>
@@ -148,7 +149,7 @@ export default function ResearchCards() {
         </div>
       </div>
 
-      <aside className="inspector">
+      <Inspector>
         {selected ? (
           <>
             <h3>卡片内容</h3>
@@ -212,7 +213,7 @@ export default function ResearchCards() {
         ) : (
           <div className="empty-hint">点击卡片查看和编辑<br /><br />左侧可按分类和标签筛选</div>
         )}
-      </aside>
+      </Inspector>
     </>
   );
 }

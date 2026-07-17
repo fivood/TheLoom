@@ -9,6 +9,7 @@ import { useNav } from '../../search';
 import { confirmDialog, promptText } from '../../dialog';
 import { countSubNodes, resolveSub, walkFlowNodes } from '../../util';
 import { flowToDocument } from '../document/convert';
+import Inspector from '../../components/Inspector';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import ColorPicker from '../../components/ColorPicker';
@@ -371,7 +372,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         <NodeTemplateModal initialType={editingTpl} onClose={() => setEditingTpl(null)} />
       )}
 
-      <aside className="inspector">
+      <Inspector>
         {selectedNode ? (
           <>
             <h3>节点属性 · {FLOW_NODE_LABEL[(selectedNode.type ?? 'fragment') as FlowNodeType]}</h3>
@@ -556,7 +557,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             剧情片段可以双击进入,<br />在内部继续搭建子流程,<br />层层嵌套、没有深度限制
           </div>
         )}
-      </aside>
+      </Inspector>
     </>
   );
 }

@@ -1,50 +1,10 @@
 import { memo, useMemo } from 'react';
 import { useLoom } from '../../store';
-import { RichText } from '../../components/RichText';
-import type { DocBlock, Document, Entity } from '../../types';
+import type { Document, Entity } from '../../types';
 import { DOC_STATUS_LABEL } from '../../types';
 import { documentWordCount, folderPath } from '../../util';
 import BlocksEditor from './BlocksEditor';
-
-function StaticBlock({ b, entities }: { b: DocBlock; entities: Entity[] }) {
-  switch (b.type) {
-    case 'heading':
-      return <h3 className="ms-heading">{b.text || '(未命名场景)'}</h3>;
-    case 'subheading':
-      return b.level === 2 ? <h4 className="ms-sub2">{b.text}</h4> : <h5 className="ms-sub3">{b.text}</h5>;
-    case 'dialogue': {
-      const name = b.speakerId ? entities.find((e) => e.id === b.speakerId)?.name : null;
-      return (
-        <p className="ms-dialogue">
-          {name && <b className="ms-speaker">{name}:</b>}
-          <RichText text={b.text} />
-        </p>
-      );
-    }
-    case 'action':
-      return <p className="ms-action"><RichText text={b.text} /></p>;
-    case 'quote':
-      return <blockquote className="ms-quote">{b.text}</blockquote>;
-    case 'list':
-      return b.ordered
-        ? <ol className="ms-list">{(b.items ?? []).map((it, i) => <li key={i}>{it}</li>)}</ol>
-        : <ul className="ms-list">{(b.items ?? []).map((it, i) => <li key={i}>{it}</li>)}</ul>;
-    case 'choice':
-      return (
-        <div className="ms-meta-block">
-          ▸ {b.text || '选项'}{(b.choices ?? []).filter((c) => c.label).map((c) => ` / ${c.label}`).join('')}
-        </div>
-      );
-    case 'condition':
-      return <div className="ms-meta-block">◇ {b.condition}</div>;
-    case 'instruction':
-      return <div className="ms-meta-block">⚡ {b.instruction}</div>;
-    case 'note':
-      return <div className="ms-note">✎ {b.text}</div>;
-    default:
-      return null;
-  }
-}
+import StaticBlock from './StaticBlock';
 
 /**
  * 非活动场景的轻量静态渲染:纯只读 DOM,点击整块激活编辑。

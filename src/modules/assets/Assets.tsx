@@ -6,6 +6,7 @@ import Icon from '../../components/Icon';
 import type { Asset, AssetKind } from '../../types';
 import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
 import { classifyAsset, fileToImageThumb, formatSize } from '../../util';
+import Inspector from '../../components/Inspector';
 import TechNameField from '../../components/TechNameField';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
@@ -170,7 +171,7 @@ export default function Assets() {
       </div>
 
       {selected && (
-        <aside className="inspector">
+        <Inspector>
           <div className="side-head" style={{ padding: '0 0 4px', borderBottom: '1px solid var(--border)' }}>
             <h3 style={{ margin: 0 }}>资源属性</h3>
             <span className="spacer" style={{ flex: 1 }} />
@@ -249,7 +250,7 @@ export default function Assets() {
               </div>
             ))}
           </div>
-        </aside>
+        </Inspector>
       )}
     </>
   );

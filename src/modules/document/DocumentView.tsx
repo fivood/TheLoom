@@ -13,6 +13,7 @@ import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 import BlocksEditor, { emptyBlock } from './BlocksEditor';
 import Manuscript from './Manuscript';
 import RevisionDiff from './RevisionDiff';
+import Inspector from '../../components/Inspector';
 
 export default function DocumentView() {
   const documents = useLoom((s) => s.project.documents);
@@ -257,8 +258,8 @@ export default function DocumentView() {
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
-          <button className="ghost icon-btn" onClick={addCategory} title="新建分类">＋</button>
-          {catFilter !== 'all' && <button className="ghost icon-btn" onClick={() => removeCategory(catFilter)} title="删除当前分类">×</button>}
+          <button className="ghost" onClick={addCategory} title="新建文档分类" style={{ fontSize: 12 }}>＋ 分类</button>
+          {catFilter !== 'all' && <button className="ghost" onClick={() => removeCategory(catFilter)} title={`删除分类「${catFilter}」`} style={{ fontSize: 12 }}>× 删除分类</button>}
           {(revisionsInUse.length > 0 || revFilter !== 'all') && (
             <select
               value={String(revFilter)}
@@ -333,7 +334,7 @@ export default function DocumentView() {
       </div>
 
       {selected && (
-        <aside className="inspector">
+        <Inspector>
           <div className="side-head" style={{ padding: '0 0 4px', borderBottom: '1px solid var(--border)' }}>
             <h3 style={{ margin: 0 }}>文档属性</h3>
             <span className="spacer" style={{ flex: 1 }} />
@@ -599,7 +600,7 @@ export default function DocumentView() {
               <li><b>注释</b> → 不导出,不进入流程</li>
             </ul>
           </div>
-        </aside>
+        </Inspector>
       )}
 
       {diffOpen && selected && (

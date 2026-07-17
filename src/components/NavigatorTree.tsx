@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uid, useLoom } from '../store';
 import { confirmDialog, promptText } from '../dialog';
 import type { Folder, FolderModule } from '../types';
+import PaneHandle from './PaneHandle';
 
 interface NavigatorItem {
   id: string;
@@ -421,16 +422,23 @@ export default function NavigatorTree<T extends NavigatorItem>({
       <div className="side-head">
         <span>{title}</span>
         <div className="navigator-head-actions">
-          <button className="ghost icon-btn" onClick={() => createFolder(null)} title="新建文件夹">▤＋</button>
-          {onCreate && <button className="ghost icon-btn" onClick={onCreate} title={createLabel}>＋</button>}
+          <button className="ghost navigator-head-btn" onClick={() => createFolder(null)} title="新建文件夹(用于分组归档)">
+            <span className="btn-glyph">▤</span> 文件夹
+          </button>
+          {onCreate && (
+            <button className="ghost navigator-head-btn primary-ghost" onClick={onCreate} title={createLabel}>
+              <span className="btn-glyph">＋</span> {createLabel}
+            </button>
+          )}
         </div>
       </div>
       <div className="items">
         {renderTree(null, 0, new Set())}
         {items.length === 0 && folders.length === 0 && (
-          <div className="empty-hint navigator-empty">{emptyLabel}<br />点击「＋」新建，或「▤＋」建立文件夹</div>
+          <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部「＋ {createLabel}」新建,或「▤ 文件夹」建立分组</div>
         )}
       </div>
+      <PaneHandle varName="--pane-nav" side="right" />
       {showBatch && (
         <div className="navigator-batch">
           <span className="navigator-batch-count">已选 {batchIds.length} 项</span>

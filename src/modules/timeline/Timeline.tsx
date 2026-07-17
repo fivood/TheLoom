@@ -3,6 +3,7 @@ import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { confirmDialog, promptText } from '../../dialog';
 import AttachmentEditor from '../../components/AttachmentEditor';
+import Inspector from '../../components/Inspector';
 import type { TimelineEvent } from '../../types';
 import { PALETTE } from '../../types';
 import { activePaletteColors } from '../../util';
@@ -205,7 +206,7 @@ export default function Timeline() {
         </div>
       </div>
 
-      <aside className="inspector">
+      <Inspector>
         {selected ? (
           <>
             <h3>事件属性</h3>
@@ -267,7 +268,7 @@ export default function Timeline() {
             时间线记录「故事实际发生的顺序」,<br />大纲记录「讲述的顺序」——<br />倒叙、插叙时两者对照特别有用
           </div>
         )}
-      </aside>
+      </Inspector>
     </>
   );
 }

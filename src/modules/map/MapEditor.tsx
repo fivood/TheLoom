@@ -6,6 +6,7 @@ import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import type { MapDoc, MapMarker, MapRegion } from '../../types';
 import Icon from '../../components/Icon';
 import ColorPicker from '../../components/ColorPicker';
+import Inspector from '../../components/Inspector';
 
 type Mode = 'view' | 'marker' | 'region';
 type Selection =
@@ -408,7 +409,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
         </div>
       </div>
 
-      <aside className="inspector">
+      <Inspector>
         {selMarker ? (
           <MarkerInspector marker={selMarker} onChange={(p) => patchMarker(selMarker.id, p)} onDelete={() => removeMarker(selMarker.id)} />
         ) : selRegion ? (
@@ -421,7 +422,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
             选中已有标记/区域后可编辑与删除。
           </div>
         )}
-      </aside>
+      </Inspector>
     </>
   );
 }

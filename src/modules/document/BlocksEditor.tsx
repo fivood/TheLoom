@@ -5,6 +5,7 @@ import { RichTextInput } from '../../components/RichText';
 import type { DocBlock, DocBlockType, Document } from '../../types';
 import { DOC_BLOCK_LABEL } from '../../types';
 import { walkFlowNodes } from '../../util';
+import StaticBlock from './StaticBlock';
 
 const BLOCK_TYPES = Object.keys(DOC_BLOCK_LABEL) as DocBlockType[];
 
@@ -102,9 +103,36 @@ export default function BlocksEditor({ doc, focusBlockId, annotationCounts, onAc
 
   return (
     <>
-      <div className="doc-blocks">
-        {doc.blocks.map((b) => (
-          <div key={b.id} className={`doc-block ${b.type} ${activeBlockId === b.id ? 'active' : ''}`} onClick={() => setActiveBlockId(b.id)}>
+      <div className="doc-blocks doc-blocks-flow">
+        {doc.blocks.map((b) => {
+          if (activeBlockId !== b.id) {
+            const badges = (
+              <span className="doc-block-badges">
+                <span className="doc-block-kind-inline" title={DOC_BLOCK_LABEL[b.type]}>{DOC_BLOCK_LABEL[b.type]}</span>
+                {b.unitId && flowUnitIds.has(b.unitId) && (
+                  <span className="doc-block-linked" title="已与流程节点共享叙事单元:任一处修改会双向同步">⇄</span>
+                )}
+                {(annotationCounts?.get(b.id) ?? 0) > 0 && (
+                  <span className="doc-block-anno" title={`${annotationCounts!.get(b.id)} 条未解决批注`}>💬{annotationCounts!.get(b.id)}</span>
+                )}
+              </span>
+            );
+            return (
+              <div
+                key={b.id}
+                className={`doc-flow-block doc-flow-${b.type}`}
+                onClick={() => setActiveBlockId(b.id)}
+                title="点击进入编辑"
+              >
+                {badges}
+                <div className="doc-flow-body">
+                  <StaticBlock b={b} entities={entities} />
+                </div>
+              </div>
+            );
+          }
+          return (
+          <div key={b.id} className={`doc-block ${b.type} active`} onClick={() => setActiveBlockId(b.id)}>
             <div className="doc-block-side">
               <span className="doc-block-kind" title={DOC_BLOCK_LABEL[b.type]}>{DOC_BLOCK_LABEL[b.type]}</span>
               {b.unitId && flowUnitIds.has(b.unitId) && (
@@ -272,7 +300,8 @@ export default function BlocksEditor({ doc, focusBlockId, annotationCounts, onAc
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="doc-insert-bar">

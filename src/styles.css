@@ -204,11 +204,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* ---------- 通用布局块 ---------- */
 
 .side-list {
-  width: 220px;
+  width: var(--pane-nav, 260px);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
 }
 .side-list .side-head {
   padding: 12px 14px 8px;
@@ -238,16 +239,69 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .side-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
 .inspector {
-  width: 300px;
+  width: var(--pane-inspector, 320px);
   border-left: 1px solid var(--border);
-  overflow-y: auto;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  position: relative;
+}
+.inspector-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--bg-panel);
 }
+
+/* ---------- 分栏拖拽柄 ---------- */
+
+.pane-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 30;
+}
+.pane-handle-right { right: 0; }
+.pane-handle-left { left: 0; }
+.pane-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  transition: background 0.12s;
+}
+.pane-handle-right::after { right: 0; }
+.pane-handle-left::after { left: 0; }
+.pane-handle:hover::after,
+.pane-resizing .pane-handle::after { background: var(--text-faint); }
+.pane-resizing { cursor: col-resize; user-select: none; }
+.pane-resizing * { cursor: col-resize !important; }
+
+/* ---------- Navigator 头部按钮(文字化) ---------- */
+
+.navigator-head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1;
+}
+.navigator-head-btn .btn-glyph { font-size: 11px; color: var(--text-faint); }
+.navigator-head-btn.primary-ghost {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+.navigator-head-btn.primary-ghost .btn-glyph { color: var(--text-dim); }
 .inspector h3 {
   margin: 0 0 4px; font-size: 11px; color: var(--text-faint); font-weight: 700;
   letter-spacing: 1.5px; text-transform: uppercase;
@@ -1137,6 +1191,59 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   flex-direction: column;
   gap: 8px;
 }
+
+/* 单文档正文全篇流:非激活块紧凑段落,点击就地激活为完整编辑卡 */
+.doc-blocks-flow {
+  padding: 24px 32px 120px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  gap: 4px;
+}
+.doc-flow-block {
+  position: relative;
+  padding: 6px 8px 6px 60px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: text;
+  min-height: 28px;
+  transition: background 0.1s;
+}
+.doc-flow-block:hover { background: var(--bg-hover); border-color: var(--border); }
+.doc-flow-block .doc-block-badges {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-faint);
+  line-height: 1;
+}
+.doc-block-kind-inline {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+.doc-flow-block:hover .doc-block-kind-inline { background: var(--bg-panel); }
+.doc-flow-body p,
+.doc-flow-body h3,
+.doc-flow-body h4,
+.doc-flow-body h5,
+.doc-flow-body blockquote,
+.doc-flow-body ul,
+.doc-flow-body ol,
+.doc-flow-body div {
+  margin: 0;
+}
+.doc-flow-body .ms-heading { font-size: 17px; }
+.doc-flow-body .ms-action,
+.doc-flow-body .ms-dialogue { font-size: 15px; line-height: 1.85; }
+.doc-flow-block.doc-flow-heading { margin-top: 10px; }
+.doc-flow-empty { color: var(--text-faint); font-style: italic; }
 .doc-block {
   display: flex;
   gap: 8px;

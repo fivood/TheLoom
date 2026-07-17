@@ -12,6 +12,7 @@ import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
 import FieldListEditor from '../../components/FieldListEditor';
 import { AiFillFieldsButton } from '../../components/AiPanel';
+import Inspector from '../../components/Inspector';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 import EntityEditor from './EntityEditor';
@@ -286,7 +287,7 @@ export default function EntityLibrary() {
         </div>
       </div>
 
-      <aside className="inspector">
+      <Inspector>
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -396,7 +397,7 @@ export default function EntityLibrary() {
         ) : (
           <div className="empty-hint">点击左侧卡片<br />查看和编辑实体</div>
         )}
-      </aside>
+      </Inspector>
 
       {editingTemplate && (
         <TemplateModal
