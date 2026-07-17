@@ -42,6 +42,7 @@ const MapEditor = lazy(() => import('./modules/map/MapEditor'));
 const ResearchCards = lazy(() => import('./modules/research/ResearchCards'));
 const Variables = lazy(() => import('./modules/variables/Variables'));
 const Planning = lazy(() => import('./modules/planning/Planning'));
+const AiAssistantPanel = lazy(() => import('./components/AiAssistantPanel'));
 
 type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
 type TabGroup = 'build' | 'library' | 'plan' | 'logic';
@@ -73,6 +74,7 @@ export default function App() {
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
+  const [aiAssistant, setAiAssistant] = useState(false);
   const [findReplace, setFindReplace] = useState(false);
   const [engineExport, setEngineExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
@@ -237,6 +239,13 @@ export default function App() {
         <header className="topbar">
           <ProjectMenu />
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
+          <button
+            className={`ghost ${aiAssistant ? 'active' : ''}`}
+            title="打开只读 AI 助手"
+            onClick={() => setAiAssistant((open) => !open)}
+          >
+            <Icon name="bulb" size={14} /> 助手
+          </button>
           <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}><Icon name="undo" /></button>
           <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}><Icon name="redo" /></button>
           <span className="spacer" />
@@ -489,6 +498,15 @@ export default function App() {
       )}
       {recovering && <RecoveryPanel onClose={() => setRecovering(false)} />}
       {updateDialog && <UpdateDialog state={updateDialog} onClose={() => setUpdateDialog(null)} />}
+      {aiAssistant && (
+        <Suspense fallback={null}>
+          <AiAssistantPanel
+            currentTab={tab}
+            onClose={() => setAiAssistant(false)}
+            onOpenSettings={() => setAiSettings(true)}
+          />
+        </Suspense>
+      )}
       <DialogHost />
     </div>
   );
