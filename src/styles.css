@@ -2436,3 +2436,56 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .theme-menu button:hover { background: var(--bg-hover); }
 .theme-menu button.active { background: var(--focus); color: var(--focus-fg); }
 .theme-wrap { position: relative; display: inline-flex; }
+
+/* ---------- R7 演出与路径测试 ---------- */
+
+.player-seed {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  margin-left: 10px;
+  cursor: help;
+}
+.var-row.var-changed {
+  background: var(--accent-soft);
+  border-radius: 4px;
+  animation: var-flash 0.9s ease-out;
+}
+@keyframes var-flash {
+  0% { background: var(--note-bg); }
+  100% { background: var(--accent-soft); }
+}
+.player-entity-props { margin-bottom: 6px; }
+
+.pathtest-summary {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.pathtest-coverage {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pathtest-issue-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.pathtest-issue-row:hover { border-color: var(--focus); }
+.pathtest-issue-kind {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.pathtest-issue-row.bad .pathtest-issue-kind { background: var(--danger-bg); color: var(--danger); }

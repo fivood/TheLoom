@@ -10,6 +10,10 @@ import {
   applyInstructions, buildEntityProps, coerceVar, evalCondition, evalNumber,
   type EvalCtx, type VarValue,
 } from '../../script';
+import { mulberry32, randomSeed, resumeRng, rollD6 } from '../../rng';
+import {
+  clearPlaySave, loadBreakpoints, loadPlaySave, storePlaySave, type PlaySave,
+} from '../../playSaves';
 
 interface Beat {
   id: string;
@@ -44,6 +48,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   onClose: () => void;
 }) {
   const project = useLoom((s) => s.project);
+  const slotId = useLoom((s) => s.currentSlotId);
   const entities = project.entities;
 
   const [vars, setVars] = useState<Record<string, VarValue>>(() => {
@@ -55,6 +60,15 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const [curPath, setCurPath] = useState<string[]>(path);
   const [choices, setChoices] = useState<Choice[]>([]);
   const [ended, setEnded] = useState(false);
+  /** 上一步发生变化的变量名(监视高亮) */
+  const [changedVars, setChangedVars] = useState<Set<string>>(new Set());
+  /** 实体属性运行态的渲染快照(指令写入后刷新) */
+  const [propsView, setPropsView] = useState<Record<string, Record<string, VarValue>>>({});
+  /** 固定随机种子:同种子重开 → 检定掷骰序列完全一致 */
+  const [seed, setSeed] = useState<number>(() => randomSeed());
+  const [saveInfo, setSaveInfo] = useState<PlaySave | null>(() => loadPlaySave(slotId, flow.id));
+  const rngRef = useRef<() => number>(mulberry32(seed));
+  const rollsRef = useRef(0);
   const logRef = useRef<HTMLDivElement>(null);
   /** 一次性选项的已选记录 */
   const takenEdges = useRef(new Set<string>());
@@ -62,6 +76,8 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const checkResults = useRef(new Map<string, boolean>());
   /** 已访问节点 id 集合(用于 seen/unseen 求值) */
   const seenRef = useRef<Set<string>>(new Set());
+  /** 节点断点(本机,演出自动前进在断点前暂停) */
+  const breakpoints = useMemo(() => loadBreakpoints(slotId, flow.id), [slotId, flow.id]);
 
   /** 技术名 → 节点 id 映射,递归遍历流程所有层级 */
   const techToId = useMemo(() => {
@@ -84,6 +100,19 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const container = (p: string[]): SubFlow => resolveSub(flow, p) ?? { nodes: [], edges: [] };
 
   const pushBeat = (b: Omit<Beat, 'id'>) => setLog((l) => [...l, { ...b, id: String(++beatSeq) }]);
+
+  /** 提交变量:记录与上一状态的差异用于监视高亮,并刷新实体属性快照 */
+  const varsRef = useRef(vars);
+  const commitVars = (next: Record<string, VarValue>) => {
+    const changed = new Set<string>();
+    for (const k of new Set([...Object.keys(varsRef.current), ...Object.keys(next)])) {
+      if (varsRef.current[k] !== next[k]) changed.add(k);
+    }
+    varsRef.current = next;
+    setChangedVars(changed);
+    setVars(next);
+    setPropsView(structuredClone(entityPropsRef.current));
+  };
 
   /** 节点的出边 → 选项列表;没有出边时向父级回溯;出口节点走父层片段的命名引脚 */
   const outgoingChoices = (p: string[], node: FlowNode, vv: Record<string, VarValue>): { choices: Choice[]; path: string[] } => {
@@ -182,7 +211,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             const starts = startNodes(sub);
             if (starts.length === 1) { id = starts[0].id; continue; }
             setCurPath(curP);
-            setVars(nextVars);
+            commitVars(nextVars);
             setChoices(starts.map((s) => ({ label: s.data.title || FLOW_NODE_LABEL[s.type], nodeId: s.id })));
             return;
           }
@@ -221,8 +250,9 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             note = `红色检定只有一次机会 → 沿用先前结果:${checkResults.current.get(node.id) ? '成功' : '失败'}`;
           } else {
             const skill = evalNumber(node.data.checkExpr, nextVars, evalCtx);
-            const d1 = 1 + Math.floor(Math.random() * 6);
-            const d2 = 1 + Math.floor(Math.random() * 6);
+            const d1 = rollD6(rngRef.current);
+            const d2 = rollD6(rngRef.current);
+            rollsRef.current += 2;
             const passed = d1 + d2 + skill >= dc;
             checkResults.current.set(node.id, passed);
             note = `2d6 = ${d1}+${d2},技能 ${skill},合计 ${d1 + d2 + skill} vs 难度 ${dc} → ${passed ? '成功' : '失败'}`;
@@ -242,26 +272,33 @@ export default function Player({ flow, path, startNodeId, onClose }: {
 
       if (cs.length === 0) {
         setCurPath(curP);
-        setVars(nextVars);
+        commitVars(nextVars);
         setChoices([]);
         setEnded(true);
         return;
       }
       if (cs.length === 1 && ['hub', 'instruction', 'condition', 'exit', 'check'].includes(node.type)) {
-        // 直通型节点自动前进,沿途执行边效果并记录一次性选项
         const c0 = cs[0];
+        // 断点:自动前进的目标带断点时暂停,交还手动控制
+        if (c0.nodeId && breakpoints.has(c0.nodeId)) {
+          setCurPath(curP);
+          commitVars(nextVars);
+          setChoices([{ ...c0, label: `⛔ ${c0.label}(断点)` }]);
+          return;
+        }
+        // 直通型节点自动前进,沿途执行边效果并记录一次性选项
         if (c0.edgeId && c0.once) takenEdges.current.add(c0.edgeId);
         if (c0.effect) applyInstructions(c0.effect, nextVars, evalCtx);
         id = c0.nodeId;
         continue;
       }
       setCurPath(curP);
-      setVars(nextVars);
+      commitVars(nextVars);
       setChoices(cs);
       return;
     }
 
-    setVars(nextVars);
+    commitVars(nextVars);
     setChoices([]);
     setEnded(true);
   };
@@ -277,15 +314,22 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     visit(curPath, c.nodeId, vv);
   };
 
-  const begin = () => {
+  const begin = (useSeed?: number) => {
+    const nextSeed = useSeed ?? randomSeed();
+    setSeed(nextSeed);
+    rngRef.current = mulberry32(nextSeed);
+    rollsRef.current = 0;
     setLog([]);
     setEnded(false);
+    setChangedVars(new Set());
     takenEdges.current.clear();
     checkResults.current.clear();
     seenRef.current = new Set();
     entityPropsRef.current = buildEntityProps(entities);
+    setPropsView(structuredClone(entityPropsRef.current));
     const initVars: Record<string, VarValue> = {};
     for (const x of project.variables) initVars[x.name] = coerceVar(x.type, x.value);
+    varsRef.current = initVars;
     setVars(initVars);
     const c = container(path);
     if (startNodeId && c.nodes.some((n) => n.id === startNodeId)) {
@@ -299,7 +343,56 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     setChoices(starts.map((s) => ({ label: s.data.title || FLOW_NODE_LABEL[s.type], nodeId: s.id })));
   };
 
-  useEffect(begin, []);
+  useEffect(() => { begin(seed); }, []);
+
+  /** 存档:完整运行态 + 种子与已消耗随机数,可跨会话恢复并保证掷骰一致 */
+  const saveGame = () => {
+    const save: PlaySave = {
+      at: Date.now(),
+      seed,
+      rolls: rollsRef.current,
+      vars: varsRef.current,
+      seen: [...seenRef.current],
+      taken: [...takenEdges.current],
+      checks: [...checkResults.current.entries()],
+      entityProps: structuredClone(entityPropsRef.current),
+      curPath,
+      choices: choices.map(({ label, nodeId, edgeId, effect, once }) => ({ label, nodeId, edgeId, effect, once })),
+      ended,
+      log: log.map((b) => ({ id: b.id, kind: b.kind, title: b.title, text: b.text, speakerId: b.speaker?.id, note: b.note })),
+    };
+    const err = storePlaySave(slotId, flow.id, save);
+    if (!err) setSaveInfo(save);
+  };
+
+  /** 读档:还原全部运行态,RNG 按种子快进到存档时的消耗位置 */
+  const loadGame = () => {
+    const save = loadPlaySave(slotId, flow.id);
+    if (!save) return;
+    setSeed(save.seed);
+    rngRef.current = resumeRng(save.seed, save.rolls);
+    rollsRef.current = save.rolls;
+    takenEdges.current = new Set(save.taken);
+    checkResults.current = new Map(save.checks);
+    seenRef.current = new Set(save.seen);
+    entityPropsRef.current = structuredClone(save.entityProps);
+    setPropsView(structuredClone(save.entityProps));
+    varsRef.current = { ...save.vars };
+    setVars({ ...save.vars });
+    setChangedVars(new Set());
+    setCurPath([...save.curPath]);
+    setChoices(save.choices.map((c) => ({ ...c })));
+    setEnded(save.ended);
+    setLog(save.log.map((b) => ({
+      id: b.id, kind: b.kind, title: b.title, text: b.text, note: b.note,
+      speaker: b.speakerId ? entities.find((e) => e.id === b.speakerId) : undefined,
+    })));
+  };
+
+  const dropSave = () => {
+    clearPlaySave(slotId, flow.id);
+    setSaveInfo(null);
+  };
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
@@ -311,8 +404,19 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     <div className="player-overlay">
       <div className="player-head">
         <span className="player-title"><Icon name="play" size={14} /> 演出 · {flow.name}</span>
+        <span className="player-seed" title="随机种子:同种子重开时,检定掷骰序列完全一致(测试可复现)">种子 {seed}</span>
         <span className="spacer" />
-        <button onClick={begin}>⟲ 重新开始</button>
+        <button onClick={saveGame} title="保存当前演出进度(变量 / 走过的节点 / 掷骰进度),存在本机">存档</button>
+        {saveInfo && (
+          <>
+            <button onClick={loadGame} title={`恢复到 ${new Date(saveInfo.at).toLocaleString()} 的存档(种子 ${saveInfo.seed})`}>
+              读档
+            </button>
+            <button className="ghost icon-btn" onClick={dropSave} title="删除本流程的演出存档">🗑</button>
+          </>
+        )}
+        <button onClick={() => begin(seed)} title="用当前种子重新开始:检定结果可复现">⟲ 同种子重开</button>
+        <button onClick={() => begin()} title="换一个随机种子重新开始">⟲ 重新开始</button>
         <button onClick={onClose}>✕ 退出演出</button>
       </div>
       <div className="player-body">
@@ -359,16 +463,35 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           )}
         </div>
         <aside className="player-vars">
-          <h3>变量状态</h3>
+          <h3>变量监视</h3>
           {varList.length === 0 && <div className="empty-hint" style={{ padding: 10 }}>没有变量</div>}
           {varList.map(([k, v]) => (
-            <div key={k} className="var-row">
+            <div key={k} className={`var-row${changedVars.has(k) ? ' var-changed' : ''}`}>
               <span className="var-name">{k}</span>
               <span className={`var-val ${typeof v === 'boolean' ? (v ? 'on' : 'off') : ''}`}>{String(v)}</span>
             </div>
           ))}
+          {Object.keys(propsView).length > 0 && (
+            <>
+              <h3 style={{ marginTop: 10 }}>实体属性</h3>
+              {Object.entries(propsView).map(([tech, fields]) => (
+                <div key={tech} className="player-entity-props">
+                  <div className="var-name" style={{ fontWeight: 700 }}>{tech}</div>
+                  {Object.entries(fields).map(([fk, fv]) => (
+                    <div key={fk} className="var-row" style={{ paddingLeft: 10 }}>
+                      <span className="var-name">{fk}</span>
+                      <span className="var-val">{String(fv)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
+          {breakpoints.size > 0 && (
+            <div className="player-tip">⛔ 本流程有 {breakpoints.size} 个断点:自动前进会在断点处暂停。</div>
+          )}
           <div className="player-tip">
-            条件分支按变量自动走向;<br />指令节点实时修改变量。<br />重新开始会还原默认值。
+            高亮 = 上一步发生变化;<br />条件分支按变量自动走向;<br />同种子重开可复现检定结果。
           </div>
         </aside>
       </div>

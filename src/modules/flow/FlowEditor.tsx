@@ -10,6 +10,8 @@ import { confirmDialog, promptText } from '../../dialog';
 import { countSubNodes, resolveSub, walkFlowNodes } from '../../util';
 import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
+import PathTestPanel from '../../components/PathTestPanel';
+import { loadBreakpoints, toggleBreakpoint } from '../../playSaves';
 import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import ColorPicker from '../../components/ColorPicker';
@@ -74,7 +76,11 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     return set;
   }, [documents]);
   const [playing, setPlaying] = useState(false);
+  const [pathTesting, setPathTesting] = useState(false);
   const [editingTpl, setEditingTpl] = useState<FlowNodeType | null>(null);
+  const slotId = useLoom((s) => s.currentSlotId);
+  const [bp, setBp] = useState<Set<string>>(() => loadBreakpoints(slotId, flow.id));
+  useEffect(() => { setBp(loadBreakpoints(slotId, flow.id)); }, [slotId, flow.id]);
   const sub = resolveSub(flow, path) ?? { nodes: [], edges: [] };
   const [nodes, setNodes] = useState<LoomNode[]>(() =>
     sub.nodes.map((n) => ({
@@ -269,6 +275,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               useNav.getState().go({ tab: 'documents', docId: doc.id });
             }}
           ><Icon name="doc" size={14} /> 查看为剧本</button>
+          <button
+            title="批量遍历所有分支:节点覆盖率、不可达分支、死循环、无出口卡死;结果可复现"
+            onClick={() => { writeBack(); setPathTesting(true); }}
+          ><Icon name="check" size={14} /> 路径测试</button>
           <span className="hint">双击剧情片段进入子流程 · Delete 删除选中</span>
         </div>
         {crumbs.length > 1 && (
@@ -329,6 +339,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
 
       {editingTpl && (
         <NodeTemplateModal initialType={editingTpl} onClose={() => setEditingTpl(null)} />
+      )}
+
+      {pathTesting && (
+        <PathTestPanel
+          flow={useLoom.getState().project.flows.find((f) => f.id === flow.id) ?? flow}
+          onClose={() => setPathTesting(false)}
+        />
       )}
 
       <Inspector>
@@ -425,6 +442,17 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 value={selectedNode.data.color}
                 onChange={(c) => patchSelectedNode({ color: c })}
               />
+            </div>
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  style={{ width: 'auto' }}
+                  checked={bp.has(selectedNode.id)}
+                  onChange={() => setBp(new Set(toggleBreakpoint(slotId, flow.id, selectedNode.id)))}
+                />
+                ⛔ 断点(演出自动前进在此暂停;只存本机)
+              </label>
             </div>
             <TechNameField
               value={selectedNode.data.technicalName}
