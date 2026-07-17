@@ -20,8 +20,8 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.23.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前工作区:`v0.23.1` 文件夹模式稳定性已提交(尚未推送 / 打标签 / 发布);`R10-1` 至 `R10-4` 已完成开发与验证,R10 验收完成
+- 已发布版本:`v0.24.0`(package.json / package-lock.json / tauri.conf.json / Cargo.toml / Cargo.lock 同步)
+- 当前基线:`v0.24.0`;包含 v0.23.1 文件夹模式稳定性修复与完整 R10
 - 已交付的能力(截至 v0.23.0):
   - **v0.23.0 R9 通用游戏引擎导出** ✅ — 带版本 JSON Schema 的引擎包(zip:数据 + Schema + .d.ts 类型 + README);导出规则(选流程 / 剥布局注释 / 仅引用实体资源);技术名与节点定位等四类索引;内容哈希清单 + 增量包;独立运行库 theloom-runtime(零依赖 ES Module,语义与 Player 一致);examples/engine-demo 无 React 演出示例
   - **v0.22.0 R8 资源原文件闭环** ✅ — 原文件按 SHA-256 内容寻址存储(桌面 `assets/asset-{hash16}.{ext}` / 网页 IndexedDB);播放与下载;视频首帧缩略图;哈希去重;替换保引用;缺失徽标 + 重新定位;删除不吞字节 + 显式孤儿清理;授权字段;绑定文件夹时 IndexedDB 原文件自动落盘
