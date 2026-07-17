@@ -56,10 +56,10 @@ R10-A 详细设计见 `docs/R10A_AI_ASSISTANT.md`:模型只拥有白名单只读
 2. **R10-A2 · 只读助手与自然语言查询**:✅ 统一面板、本机会话、带对象引用问答、自然语言 → `ProjectQuery` → 本地执行 → 可选保存
 3. **R10-A3 · 脚本与问题修复**:✅ `ProjectIssue` → 白名单修复提案(`generateFixProposal`:模型只产出 summary + 操作,信封 / 指纹本地构建);体检行「AI 修复」一键进入助手「修复提案」任务;差异预览 + 逐项勾选重验 + 警告需显式确认 + 单次 commit 一步撤销;dry-run 的 audit 差异已覆盖脚本类型检查与全项目路径测试,新增脚本错误 / 卡死 / 死循环 / 不可达一律 blocked 不显示应用按钮
 4. **R10-A4 · 叙事分析**:✅ 五类分析(路径覆盖 / 人物声音 / 设定一致性 / 伏笔台账 / 节奏与登场);统计先由本地算好(`src/ai/analysis.ts` 复用 simulateFlow / auditProject / planning 层),模型只负责解读;结论分事实 / 推断 / 创意建议三栏,事实必须引用来源(analysis_data 块或项目上下文,可点击跳转),模型标事实但无有效依据时本地降级为推断并打「未给依据」标
-5. **R10-A5 · 完整互动项目生成**:审阅配置与计划 → 分模块候选 → ImportPreview → 脚本 / 引用 / 路径验收
+5. **R10-A5 · 完整互动项目生成**:✅ 项目导入向导新增「互动游戏剧本」类型(分支密度 / 目标结局数 / 检定开关 / 失败回路配置);计划阶段产出变量与结局清单供审阅;生成阶段在 R5-A 内容结构上叠加流程(hub 选择 / 条件 / 指令 / 检定 / fallback,BFS 分层自动布局,id 重映射 + 技术名消歧);`verifyInteractiveImport` 在克隆项目上 audit 前后对比(issueKey 与 A3 dry-run 同口径,覆盖脚本 error / 悬挂引用 / 卡死 / 死循环 / 不可达)+ 每个结局 simulateFlow 可达断言;blocked 不显示导入按钮,只能调整后重新生成
 6. **R10-A6 · 收尾**:大项目性能与成本基线、隐私、取消 / 离线恢复、浏览器 / Tauri、主题 / 键盘与发布回归
 
-当前开发:R10-A1 至 R10-A4 已完成;下一批 R10-A5 完整互动项目生成。R10-A3 实现要点:`src/ai/fixAssistant.ts`(提案生成)、`src/ai/panelBus.ts`(体检 → 助手的任务通道)、`AiAssistantPanel` 修复任务 UI、`AI_FIX_OPERATION_SCHEMAS` 从提案 schema 拆出复用;路径安全依赖 auditProject 内置的全项目 simulateFlow(不要另加重复的路径校验层)。
+当前开发:R10-A1 至 R10-A5 已完成;下一批 R10-A6 收尾(性能 / 隐私 / 回归),完成后发布 v0.25.0。R10-A5 实现要点:`src/ai/interactiveImport.ts`(计划 / 生成扩展、normalize 宽容修复 condition/check 缺失引脚、`buildInteractiveImportPreview` 复用 R5-A 预检并叠加流程 / 变量 / 结局、验收闭环);向导 `interactive` 分流;新项目槽位默认流程与生成流程可能重名,按 technicalName 定位。R10-A3 实现要点:`src/ai/fixAssistant.ts`(提案生成)、`src/ai/panelBus.ts`(体检 → 助手的任务通道)、`AiAssistantPanel` 修复任务 UI、`AI_FIX_OPERATION_SCHEMAS` 从提案 schema 拆出复用;路径安全依赖 auditProject 内置的全项目 simulateFlow(不要另加重复的路径校验层)。
 
 ### 路线图 · 通往 v1.0(按顺序开发,一批一 minor)
 

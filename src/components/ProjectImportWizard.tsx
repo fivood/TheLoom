@@ -11,6 +11,12 @@ import {
   type ImportConfig, type ImportPlan, type MaterialKind, type MaterialTrust,
   type ProjectImportPreview, type ProjectKind, type SourceMaterial,
 } from '../ai/projectImport';
+import {
+  applyInteractiveImport, BRANCH_DENSITY_LABEL, buildInteractiveGeneratePrompt,
+  buildInteractiveImportPreview, buildInteractivePlanPrompt, defaultInteractiveOptions,
+  FAIL_MODE_LABEL, normalizeInteractiveGenerated, normalizeInteractivePlan, verifyInteractiveImport,
+  type InteractiveExtrasPlan, type InteractiveImportPreview, type InteractiveOptions, type InteractiveVerification,
+} from '../ai/interactiveImport';
 
 type Step = 'materials' | 'config' | 'plan' | 'preview';
 const STEP_LABEL: Record<Step, string> = {
@@ -29,12 +35,17 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
   const [step, setStep] = useState<Step>('materials');
   const [materials, setMaterials] = useState<SourceMaterial[]>([blankMaterial()]);
   const [config, setConfig] = useState<ImportConfig>({ projectKind: 'novel' });
+  const [iOptions, setIOptions] = useState<InteractiveOptions>(defaultInteractiveOptions);
   const [plan, setPlan] = useState<ImportPlan | null>(null);
+  const [extras, setExtras] = useState<InteractiveExtrasPlan | null>(null);
   const [preview, setPreview] = useState<ProjectImportPreview | null>(null);
+  const [iPreview, setIPreview] = useState<InteractiveImportPreview | null>(null);
+  const [verification, setVerification] = useState<InteractiveVerification | null>(null);
   const [pipelineWarnings, setPipelineWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const interactive = config.projectKind === 'interactive';
 
   const validMaterials = useMemo(() => materials.filter((m) => m.text.trim()), [materials]);
   const totalChars = useMemo(() => validMaterials.reduce((s, m) => s + m.text.length, 0), [validMaterials]);
@@ -73,10 +84,20 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
     setError(null);
     try {
       const { text, truncated } = materialsToText(validMaterials);
-      const output = await callLlm('plan', buildPlanPrompt(config), text, 8000);
-      const { plan: parsed, warnings } = normalizePlan(parseModelJson(output));
-      setPlan(parsed);
-      setPipelineWarnings([...(truncated ? ['材料超过 20 万字,超出部分未参与分析'] : []), ...warnings]);
+      const truncWarn = truncated ? ['材料超过 20 万字,超出部分未参与分析'] : [];
+      if (interactive) {
+        const output = await callLlm('plan', buildInteractivePlanPrompt(iOptions), text, 8000);
+        const { plan: parsed, extras: ext, warnings } = normalizeInteractivePlan(parseModelJson(output));
+        setPlan(parsed);
+        setExtras(ext);
+        setPipelineWarnings([...truncWarn, ...warnings]);
+      } else {
+        const output = await callLlm('plan', buildPlanPrompt(config), text, 8000);
+        const { plan: parsed, warnings } = normalizePlan(parseModelJson(output));
+        setPlan(parsed);
+        setExtras(null);
+        setPipelineWarnings([...truncWarn, ...warnings]);
+      }
       setStep('plan');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -87,14 +108,27 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
 
   const runGenerate = async () => {
     if (!plan) return;
-    setBusy('正在按计划生成完整候选数据…(这一步最慢,请耐心等待)');
+    setBusy(interactive
+      ? '正在生成互动候选数据并执行脚本 / 引用 / 路径验收…(这一步最慢)'
+      : '正在按计划生成完整候选数据…(这一步最慢,请耐心等待)');
     setError(null);
     try {
       const { text } = materialsToText(validMaterials);
-      const output = await callLlm('generate', buildGeneratePrompt(plan, config), text, 32000);
-      const { data, warnings } = normalizeGenerated(parseModelJson(output));
-      const built = buildProjectImportPreview(project, plan, data, validMaterials, [...pipelineWarnings, ...warnings]);
-      setPreview(built);
+      if (interactive && extras) {
+        const output = await callLlm('generate', buildInteractiveGeneratePrompt(plan, extras, iOptions), text, 32000);
+        const { data, warnings } = normalizeInteractiveGenerated(parseModelJson(output));
+        const built = buildInteractiveImportPreview(project, plan, extras, data, validMaterials, [...pipelineWarnings, ...warnings]);
+        setIPreview(built);
+        setVerification(verifyInteractiveImport(project, built));
+        setPreview(built.base);
+      } else {
+        const output = await callLlm('generate', buildGeneratePrompt(plan, config), text, 32000);
+        const { data, warnings } = normalizeGenerated(parseModelJson(output));
+        const built = buildProjectImportPreview(project, plan, data, validMaterials, [...pipelineWarnings, ...warnings]);
+        setPreview(built);
+        setIPreview(null);
+        setVerification(null);
+      }
       setStep('preview');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -104,6 +138,14 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
   };
 
   const apply = () => {
+    if (interactive && iPreview) {
+      if (verification?.status === 'blocked') return;
+      update((p) => applyInteractiveImport(p, iPreview));
+      const firstFlow = iPreview.newFlows[0];
+      onClose();
+      if (firstFlow) go({ tab: 'flow', flowId: firstFlow.id });
+      return;
+    }
     if (!preview) return;
     update((p) => applyProjectImport(p, preview));
     const firstDoc = preview.newDocs[0];
@@ -180,9 +222,58 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
                   </label>
                 ))}
               </div>
+              {interactive && (
+                <div className="field" style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                  <label>互动配置</label>
+                  <div className="kv-row">
+                    <div className="field" style={{ flex: 1 }}>
+                      <label>分支密度</label>
+                      <select value={iOptions.branchDensity} onChange={(e) => setIOptions({ ...iOptions, branchDensity: e.target.value as InteractiveOptions['branchDensity'] })}>
+                        {(Object.keys(BRANCH_DENSITY_LABEL) as InteractiveOptions['branchDensity'][]).map((k) => (
+                          <option key={k} value={k}>{BRANCH_DENSITY_LABEL[k]}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label>目标结局数</label>
+                      <input
+                        type="number" min={1} max={6}
+                        value={iOptions.endings}
+                        onChange={(e) => setIOptions({ ...iOptions, endings: Math.max(1, Math.min(6, Math.floor(Number(e.target.value) || 1))) })}
+                      />
+                    </div>
+                  </div>
+                  <div className="kv-row">
+                    <div className="field" style={{ flex: 1 }}>
+                      <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                        <input type="checkbox" style={{ width: 'auto' }} checked={iOptions.useChecks} onChange={(e) => setIOptions({ ...iOptions, useChecks: e.target.checked })} />
+                        使用 2d6 检定节点
+                      </label>
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label>失败回路</label>
+                      <select value={iOptions.failMode} onChange={(e) => setIOptions({ ...iOptions, failMode: e.target.value as InteractiveOptions['failMode'] })}>
+                        {(Object.keys(FAIL_MODE_LABEL) as InteractiveOptions['failMode'][]).map((k) => (
+                          <option key={k} value={k}>{FAIL_MODE_LABEL[k]}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="player-tip">
-                将生成:卷章目录、场景文档(初稿骨架 + 元数据)、实体与关系、角色弧线、伏笔台账、大纲、时间线、
-                资料原文备份、待定设定卡、风暴板便签;<b>不生成</b>流程 / 变量 / 条件等游戏机制。<br />
+                {interactive ? (
+                  <>
+                    将生成:卷章文档、实体、时间线等内容结构,<b>外加</b>流程节点 / 选择 / 变量 / 条件指令与结局。<br />
+                    生成结果必须通过脚本类型检查、高级体检与路径测试(不可达 / 死循环 / 卡死),
+                    且每个结局至少有一条可达路径,否则不允许导入。
+                  </>
+                ) : (
+                  <>
+                    将生成:卷章目录、场景文档(初稿骨架 + 元数据)、实体与关系、角色弧线、伏笔台账、大纲、时间线、
+                    资料原文备份、待定设定卡、风暴板便签;<b>不生成</b>流程 / 变量 / 条件等游戏机制。
+                  </>
+                )}<br />
                 建议在<b>空白项目槽位</b>中使用;导入不会删除或覆盖任何现有内容,且整体可一步撤销。
               </div>
               <div className="sync-actions">
@@ -221,6 +312,29 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
                   {plan.entities.length > 30 && <span className="hint" style={{ fontSize: 11 }}>…等 {plan.entities.length} 个</span>}
                 </div>
               </div>
+              {interactive && extras && (
+                <>
+                  <div className="field">
+                    <label>变量({extras.variables.length})· 驱动分支与结局</label>
+                    <table className="var-table">
+                      <thead><tr><th>变量</th><th>类型</th><th>初始值</th><th>用途</th></tr></thead>
+                      <tbody>
+                        {extras.variables.map((v) => (
+                          <tr key={v.name}><td><code>{v.name}</code></td><td>{v.type}</td><td>{v.value}</td><td className="hint">{v.description}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="field">
+                    <label>结局({extras.endings.length})· 每个结局都会验收可达性</label>
+                    <ul className="doc-legend">
+                      {extras.endings.map((e) => (
+                        <li key={e.technicalName}><b>{e.title}</b> <code style={{ fontSize: 10 }}>{e.technicalName}</code>{e.summary && ` —— ${e.summary}`}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
               {plan.pending.length > 0 && (
                 <div className="field">
                   <label>待定问题({plan.pending.length})· 不会被擅自定稿,导入后见「待定设定」资料卡</label>
@@ -278,13 +392,55 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
                   <ul className="doc-legend">{preview.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
                 </div>
               )}
+              {interactive && verification && (
+                <div
+                  className="field"
+                  style={{
+                    border: `1px solid ${verification.status === 'blocked' ? 'var(--danger)' : 'var(--border)'}`,
+                    borderRadius: 8, padding: 10,
+                  }}
+                >
+                  <label style={{ color: verification.status === 'blocked' ? 'var(--danger)' : undefined }}>
+                    互动验收 · {verification.status === 'pass' ? '✓ 全部通过' : verification.status === 'warning' ? '△ 有警告(可导入)' : '✗ 未通过(不能导入)'}
+                  </label>
+                  <table className="var-table">
+                    <tbody>
+                      <tr><td>新增脚本 / 体检错误</td><td style={{ color: verification.summary.newAuditErrors ? 'var(--danger)' : undefined }}>{verification.summary.newAuditErrors}</td></tr>
+                      <tr><td>新增警告</td><td>{verification.summary.newAuditWarnings}</td></tr>
+                      <tr>
+                        <td>结局可达</td>
+                        <td style={{ color: verification.summary.unreachableEndings.length ? 'var(--danger)' : 'var(--diff-add-strong)' }}>
+                          {verification.summary.endingsChecked - verification.summary.unreachableEndings.length} / {verification.summary.endingsChecked}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {verification.issues.length > 0 && (
+                    <ul className="doc-legend" style={{ marginTop: 6 }}>
+                      {verification.issues.slice(0, 25).map((i, idx) => (
+                        <li key={idx} style={i.severity === 'error' ? { color: 'var(--danger)' } : undefined}>{i.message}</li>
+                      ))}
+                      {verification.issues.length > 25 && <li>…以及另外 {verification.issues.length - 25} 条</li>}
+                    </ul>
+                  )}
+                  {verification.status === 'blocked' && (
+                    <div className="hint" style={{ fontSize: 12, marginTop: 6 }}>
+                      生成结果没有通过验收(路径卡死 / 死循环 / 脚本错误 / 结局不可达都会阻断)。
+                      可以「返回计划」调整后重新生成,验收通过才会出现导入按钮。
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="player-tip" style={{ marginTop: 4 }}>
                 只新增、不删除、不覆盖;同名实体仅补空白。建议先在「工具 → 版本历史」存一个快照。
               </div>
               <div className="sync-actions">
                 <button onClick={() => setStep('plan')}>← 返回计划</button>
+                {interactive && <button onClick={runGenerate}>↻ 重新生成</button>}
                 <button onClick={onClose}>取消</button>
-                <button className="primary" onClick={apply}>事务式导入</button>
+                {(!interactive || verification?.status !== 'blocked') && (
+                  <button className="primary" onClick={apply}>事务式导入</button>
+                )}
               </div>
             </>
           )}

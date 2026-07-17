@@ -39,10 +39,11 @@ export interface SourceMaterial {
   text: string;
 }
 
-export type ProjectKind = 'novel' | 'shorts';
+export type ProjectKind = 'novel' | 'shorts' | 'interactive';
 export const PROJECT_KIND_LABEL: Record<ProjectKind, string> = {
   novel: '长篇小说(卷 / 章 / 场景)',
   shorts: '短篇集(每章一篇)',
+  interactive: '互动游戏剧本(流程 / 变量 / 结局)',
 };
 
 export interface ImportConfig {
@@ -56,7 +57,7 @@ export function suggestProjectKind(materials: SourceMaterial[]): { kind: Project
   if (manuscriptChars / total > 0.5 && manuscriptChars > 30000) {
     return { kind: 'novel', reason: '正文材料占比高且篇幅较长,建议按长篇小说组织卷章' };
   }
-  return { kind: 'novel', reason: '默认建议长篇小说;若材料是多篇独立故事可改选短篇集' };
+  return { kind: 'novel', reason: '默认建议长篇小说;若材料是多篇独立故事可改选短篇集,想做成可玩分支则选互动游戏剧本' };
 }
 
 const MATERIAL_TOTAL_LIMIT = 200000;
