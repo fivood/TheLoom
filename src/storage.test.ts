@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { sampleProject } from './sample';
 import type { Document, Entity, ResearchCard } from './types';
 import {
   cardToMd, documentToMd, entityToMd, mdToCard, mdToDocument, mdToEntity,
-  resolveEntityRefs,
+  projectToFolderJson, resolveEntityRefs,
 } from './storage';
 
 describe('文件夹 Markdown 往返', () => {
@@ -143,6 +144,34 @@ category: 正文
     };
     const restoredE = mdToEntity(`${entity.name}.md`, entityToMd(entity), 0);
     expect(restoredE.order).toBeUndefined();
+  });
+
+  it('文件夹 project.json 保留保存查询,正文对象继续由 Markdown 承载', () => {
+    const project = sampleProject();
+    project.savedQueries = [{
+      id: 'query-1',
+      name: '未引用资源',
+      query: {
+        objectType: 'asset',
+        text: '',
+        folderId: 'ungrouped',
+        attributeName: '',
+        attributeValue: '',
+        tags: ['概念图'],
+        status: 'any',
+        references: 'unreferenced',
+      },
+      createdAt: 1,
+      updatedAt: 2,
+    }];
+
+    const restored = JSON.parse(projectToFolderJson(project));
+
+    expect(restored.savedQueries).toEqual(project.savedQueries);
+    expect(restored.entities).toEqual([]);
+    expect(restored.researchCards).toEqual([]);
+    expect(restored.documents).toEqual([]);
+    expect(restored.flows).toHaveLength(project.flows.length);
   });
 });
 

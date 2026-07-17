@@ -592,6 +592,30 @@ export interface ColorPalette {
   colors: string[];
 }
 
+/* ---------- 保存查询 ---------- */
+
+export type QueryObjectType = 'all' | 'flow' | 'entity' | 'asset' | 'document' | 'research' | 'timeline';
+export type QueryReferenceFilter = 'any' | 'referenced' | 'unreferenced';
+
+export interface ProjectQuery {
+  objectType: QueryObjectType;
+  text: string;
+  folderId: 'any' | 'ungrouped' | string;
+  attributeName: string;
+  attributeValue: string;
+  tags: string[];
+  status: 'any' | DocStatus;
+  references: QueryReferenceFilter;
+}
+
+export interface SavedProjectQuery {
+  id: ID;
+  name: string;
+  query: ProjectQuery;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /* ---------- 项目 ---------- */
 
 export interface Project {
@@ -645,6 +669,8 @@ export interface Project {
   palettes?: ColorPalette[];
   /** 当前激活的配色表 id(空 = 使用默认灰阶 PALETTE) */
   activePaletteId?: ID;
+  /** 项目内命名保存的组合查询 */
+  savedQueries?: SavedProjectQuery[];
   updatedAt: number;
 }
 

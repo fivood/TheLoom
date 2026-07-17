@@ -144,4 +144,29 @@ describe('组合查询', () => {
     const results = queryProject(p, { ...DEFAULT_PROJECT_QUERY, references: 'referenced' });
     expect(results.map((result) => result.id)).toEqual(expect.arrayContaining(['document', 'flow']));
   });
+
+  it('大型项目组合查询保持线性可用基线', () => {
+    const project = fixture();
+    const seed = project.entities[0];
+    project.entities = Array.from({ length: 5000 }, (_, index) => ({
+      ...structuredClone(seed),
+      id: `entity-${index}`,
+      name: index % 10 === 0 ? `目标角色 ${index}` : `背景角色 ${index}`,
+      technicalName: `character_${index}`,
+      fields: [{ id: `field-${index}`, label: '阵营', value: index % 2 === 0 ? '白厅' : '基金会' }],
+    }));
+
+    const startedAt = performance.now();
+    const results = queryProject(project, {
+      ...DEFAULT_PROJECT_QUERY,
+      objectType: 'entity',
+      text: '目标角色',
+      attributeName: '阵营',
+      attributeValue: '白厅',
+    });
+    const elapsed = performance.now() - startedAt;
+
+    expect(results).toHaveLength(500);
+    expect(elapsed).toBeLessThan(1500);
+  });
 });

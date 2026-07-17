@@ -30,6 +30,7 @@ export function normalizeProject(p: Project): Project {
   p.folders ??= [];
   p.nodeTemplates ??= {};
   p.palettes ??= [];
+  if (!Array.isArray(p.savedQueries)) p.savedQueries = [];
   const folderById = new Map(p.folders.map((folder) => [folder.id, folder]));
   for (const folder of p.folders) {
     const parent = folder.parentId ? folderById.get(folder.parentId) : null;
@@ -61,6 +62,48 @@ export function normalizeProject(p: Project): Project {
   cleanAssignments(p.assets, 'asset');
   cleanAssignments(p.documents, 'document');
   cleanAssignments(p.researchCards, 'research');
+  const queryObjectTypes = new Set(['all', 'flow', 'entity', 'asset', 'document', 'research', 'timeline']);
+  const queryReferenceFilters = new Set(['any', 'referenced', 'unreferenced']);
+  const queryFolderModule: Record<string, FolderModule | undefined> = {
+    flow: 'flow',
+    entity: 'entity',
+    asset: 'asset',
+    document: 'document',
+    research: 'research',
+  };
+  const savedIds = new Set<string>();
+  p.savedQueries = p.savedQueries.filter((saved) => {
+    if (!saved || typeof saved.id !== 'string' || savedIds.has(saved.id)
+      || typeof saved.name !== 'string' || !saved.name.trim() || !saved.query || typeof saved.query !== 'object') return false;
+    savedIds.add(saved.id);
+    saved.name = saved.name.trim();
+    const raw = saved.query as unknown as Record<string, unknown>;
+    const objectType = typeof raw.objectType === 'string' && queryObjectTypes.has(raw.objectType)
+      ? raw.objectType as import('./types').QueryObjectType : 'all';
+    let folderId = typeof raw.folderId === 'string' ? raw.folderId : 'any';
+    if (folderId !== 'any' && folderId !== 'ungrouped') {
+      const folder = folderById.get(folderId);
+      const module = queryFolderModule[objectType];
+      if (!folder || (module && folder.module !== module)) folderId = 'any';
+    }
+    saved.query = {
+      objectType,
+      text: typeof raw.text === 'string' ? raw.text : '',
+      folderId,
+      attributeName: typeof raw.attributeName === 'string' ? raw.attributeName : '',
+      attributeValue: typeof raw.attributeValue === 'string' ? raw.attributeValue : '',
+      tags: Array.isArray(raw.tags)
+        ? [...new Set(raw.tags.filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim()).filter(Boolean))]
+        : [],
+      status: typeof raw.status === 'string' && (raw.status === 'any' || raw.status in DOC_STATUS_LABEL)
+        ? raw.status as import('./types').ProjectQuery['status'] : 'any',
+      references: typeof raw.references === 'string' && queryReferenceFilters.has(raw.references)
+        ? raw.references as import('./types').QueryReferenceFilter : 'any',
+    };
+    if (typeof saved.createdAt !== 'number' || !Number.isFinite(saved.createdAt)) saved.createdAt = Date.now();
+    if (typeof saved.updatedAt !== 'number' || !Number.isFinite(saved.updatedAt)) saved.updatedAt = saved.createdAt;
+    return true;
+  });
   // 规范化 order:非有限数字直接剔除,让旧项目保持默认排序
   const cleanOrder = (items: { order?: unknown }[]) => {
     for (const item of items) {

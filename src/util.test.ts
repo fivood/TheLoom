@@ -13,7 +13,7 @@ describe('normalizeProject', () => {
       'flows', 'entities', 'brainstormNotes', 'brainstormEdges', 'outlineColumns', 'outlineRows',
       'timelineTracks', 'timelinePoints', 'timelineEvents', 'maps', 'researchCards',
       'researchCategories', 'variables', 'entityTemplates', 'assets', 'documents',
-      'documentCategories', 'attachments', 'folders', 'nodeTemplates', 'palettes',
+      'documentCategories', 'attachments', 'folders', 'nodeTemplates', 'palettes', 'savedQueries',
     ];
     for (const key of keys) delete legacy[key];
 
@@ -23,6 +23,47 @@ describe('normalizeProject', () => {
     expect(project.timelineTracks).toEqual([]);
     expect(project.attachments).toEqual({});
     expect(project.nodeTemplates).toEqual({});
+    expect(project.savedQueries).toEqual([]);
+  });
+
+  it('迁移并清理保存查询,保留有效的文件夹条件', () => {
+    const project = sampleProject();
+    project.folders = [
+      { id: 'docs', name: '正文', module: 'document' },
+      { id: 'entities', name: '人物', module: 'entity' },
+    ];
+    project.savedQueries = [
+      {
+        id: 'valid', name: '  待修订  ', createdAt: 1, updatedAt: 2,
+        query: {
+          objectType: 'document', text: '雨', folderId: 'docs', attributeName: '', attributeValue: '',
+          tags: [' 主线 ', '主线', ''], status: 'revising', references: 'referenced',
+        },
+      },
+      {
+        id: 'wrong-folder', name: '错位文件夹', createdAt: 1, updatedAt: 2,
+        query: {
+          objectType: 'document', text: '', folderId: 'entities', attributeName: '', attributeValue: '',
+          tags: [], status: 'any', references: 'any',
+        },
+      },
+      {
+        id: 'broken', name: '', createdAt: 1, updatedAt: 2,
+        query: {
+          objectType: 'all', text: '', folderId: 'any', attributeName: '', attributeValue: '',
+          tags: [], status: 'any', references: 'any',
+        },
+      },
+    ];
+
+    normalizeProject(project);
+
+    expect(project.savedQueries).toHaveLength(2);
+    expect(project.savedQueries?.[0]).toMatchObject({
+      name: '待修订',
+      query: { folderId: 'docs', tags: ['主线'], status: 'revising', references: 'referenced' },
+    });
+    expect(project.savedQueries?.[1].query.folderId).toBe('any');
   });
 
   it('清理跨模块和不存在的文件夹归属', () => {

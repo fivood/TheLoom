@@ -411,6 +411,11 @@ export interface LoadedFolderProject {
   recoveredFromBackup: boolean;
 }
 
+export function projectToFolderJson(project: Project): string {
+  const slim = { ...project, entities: [], researchCards: [], documents: [] };
+  return JSON.stringify(slim, null, 2);
+}
+
 export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> {
   const files = await invoke<ProjectFiles>('load_project_dir', { dir });
   recordKnown(dir, files);
@@ -466,10 +471,8 @@ export async function saveToFolder(dir: string, project: Project): Promise<void>
   const idToName = new Map(project.entities.map((e) => [e.id, e.name]));
 
   // project.json 里不重复存 md 化的内容,只留引用顺序无关的结构化数据
-  const slim = { ...project, entities: [], researchCards: [], documents: [] };
-
   const files: { relPath: string; content: string; base64?: boolean }[] = [
-    { relPath: 'project.json', content: JSON.stringify(slim, null, 2) },
+    { relPath: 'project.json', content: projectToFolderJson(project) },
   ];
   const keepMd: string[] = [];
 

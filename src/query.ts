@@ -1,20 +1,10 @@
-import type { DocStatus, FolderModule, Project, SubFlow } from './types';
+import type {
+  DocStatus, FolderModule, Project, ProjectQuery, QueryObjectType, QueryReferenceFilter, SubFlow,
+} from './types';
 import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL } from './types';
 import type { NavTarget } from './search';
 
-export type QueryObjectType = 'all' | 'flow' | 'entity' | 'asset' | 'document' | 'research' | 'timeline';
-export type QueryReferenceFilter = 'any' | 'referenced' | 'unreferenced';
-
-export interface ProjectQuery {
-  objectType: QueryObjectType;
-  text: string;
-  folderId: 'any' | 'ungrouped' | string;
-  attributeName: string;
-  attributeValue: string;
-  tags: string[];
-  status: 'any' | DocStatus;
-  references: QueryReferenceFilter;
-}
+export type { ProjectQuery, QueryObjectType, QueryReferenceFilter } from './types';
 
 export interface QueryHit {
   id: string;

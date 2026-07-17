@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useLoom } from '../store';
+import { uid, useLoom } from '../store';
 import { useNav } from '../search';
 import { DOC_STATUS_LABEL, DOC_STATUS_ORDER } from '../types';
+import { alertDialog, confirmDialog, promptText } from '../dialog';
 import {
   DEFAULT_PROJECT_QUERY,
   QUERY_FOLDER_MODULE,
@@ -14,9 +15,16 @@ import Icon from './Icon';
 
 export default function QueryPanel({ onClose }: { onClose: () => void }) {
   const project = useLoom((state) => state.project);
+  const addSavedQuery = useLoom((state) => state.addSavedQuery);
+  const updateSavedQuery = useLoom((state) => state.updateSavedQuery);
+  const removeSavedQuery = useLoom((state) => state.removeSavedQuery);
   const go = useNav((state) => state.go);
   const [query, setQuery] = useState<ProjectQuery>(DEFAULT_PROJECT_QUERY);
+  const [activeSavedId, setActiveSavedId] = useState<string | null>(null);
   const results = useMemo(() => queryProject(project, query), [project, query]);
+  const savedQueries = project.savedQueries ?? [];
+  const activeSaved = savedQueries.find((saved) => saved.id === activeSavedId);
+  const activeChanged = activeSaved ? JSON.stringify(activeSaved.query) !== JSON.stringify(query) : false;
   const folderModule = QUERY_FOLDER_MODULE[query.objectType];
   const folders = project.folders.filter((folder) => !folderModule || folder.module === folderModule);
   const patch = <K extends keyof ProjectQuery>(key: K, value: ProjectQuery[K]) =>
@@ -27,6 +35,64 @@ export default function QueryPanel({ onClose }: { onClose: () => void }) {
     go(nav);
   };
 
+  const applySaved = (id: string) => {
+    const saved = savedQueries.find((item) => item.id === id);
+    if (!saved) return;
+    setActiveSavedId(id);
+    setQuery(structuredClone(saved.query));
+  };
+
+  const saveNew = async () => {
+    const value = await promptText({
+      title: '保存查询',
+      message: '为当前查询条件命名',
+      placeholder: '如:待修订的主线章节',
+      confirmText: '保存',
+    });
+    const name = value?.trim();
+    if (!name) return;
+    if (savedQueries.some((saved) => saved.name === name)) {
+      await alertDialog(`已有名为「${name}」的查询`);
+      return;
+    }
+    const now = Date.now();
+    const id = uid();
+    addSavedQuery({ id, name, query: structuredClone(query), createdAt: now, updatedAt: now });
+    setActiveSavedId(id);
+  };
+
+  const updateActive = () => {
+    if (!activeSaved) return;
+    updateSavedQuery(activeSaved.id, { query: structuredClone(query) });
+  };
+
+  const renameActive = async () => {
+    if (!activeSaved) return;
+    const value = await promptText({
+      title: '重命名查询',
+      message: '查询名称',
+      defaultValue: activeSaved.name,
+      confirmText: '重命名',
+    });
+    const name = value?.trim();
+    if (!name || name === activeSaved.name) return;
+    if (savedQueries.some((saved) => saved.id !== activeSaved.id && saved.name === name)) {
+      await alertDialog(`已有名为「${name}」的查询`);
+      return;
+    }
+    updateSavedQuery(activeSaved.id, { name });
+  };
+
+  const deleteActive = async () => {
+    if (!activeSaved || !await confirmDialog({
+      message: `删除保存的查询「${activeSaved.name}」?\n\n只会删除查询条件,不会删除项目内容。`,
+      confirmText: '删除',
+      danger: true,
+    })) return;
+    removeSavedQuery(activeSaved.id);
+    setActiveSavedId(null);
+  };
+
   return (
     <div className="palette-backdrop" onClick={onClose}>
       <div className="palette query-panel" onClick={(event) => event.stopPropagation()}>
@@ -35,6 +101,29 @@ export default function QueryPanel({ onClose }: { onClose: () => void }) {
           <span>组合查询</span>
           <span className="spacer" />
           <button className="ghost icon-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="query-saved">
+          <div className="query-saved-list">
+            {savedQueries.map((saved) => (
+              <button
+                key={saved.id}
+                className={activeSavedId === saved.id ? 'active' : ''}
+                onClick={() => applySaved(saved.id)}
+                title={`套用「${saved.name}」`}
+              >
+                {saved.name}{activeSavedId === saved.id && activeChanged ? ' *' : ''}
+              </button>
+            ))}
+            {savedQueries.length === 0 && <span>还没有保存的查询</span>}
+          </div>
+          <div className="query-saved-actions">
+            <button className="ghost" onClick={saveNew}>保存当前</button>
+            {activeSaved && <>
+              <button className="ghost" disabled={!activeChanged} onClick={updateActive}>更新条件</button>
+              <button className="ghost" onClick={renameActive}>重命名</button>
+              <button className="ghost danger" onClick={deleteActive}>删除</button>
+            </>}
+          </div>
         </div>
         <div className="query-controls">
           <label>
@@ -94,7 +183,15 @@ export default function QueryPanel({ onClose }: { onClose: () => void }) {
               <option value="unreferenced">未被引用</option>
             </select>
           </label>
-          <button className="ghost query-reset" onClick={() => setQuery(DEFAULT_PROJECT_QUERY)}>重置条件</button>
+          <button
+            className="ghost query-reset"
+            onClick={() => {
+              setQuery(DEFAULT_PROJECT_QUERY);
+              setActiveSavedId(null);
+            }}
+          >
+            重置条件
+          </button>
         </div>
         <div className="query-summary">找到 {results.length} 个对象{results.length > 200 ? '，显示前 200 个' : ''}</div>
         <div className="query-results">

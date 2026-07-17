@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
   Annotation, ArcStage, BrainEdge, BrainNote, ColorPalette, Document, Entity, EntityRelation,
-  Flow, Folder, Foreshadow, OutlineColumn, OutlineRow, Project, ResearchCard, Variable,
+  Flow, Folder, Foreshadow, OutlineColumn, OutlineRow, Project, ResearchCard, SavedProjectQuery, Variable,
 } from './types';
 import { DOC_SNAPSHOT_LIMIT } from './types';
 import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
@@ -242,6 +242,10 @@ interface LoomState {
   addFolder: (f: Folder) => void;
   updateFolder: (id: string, patch: Partial<Folder>) => void;
   removeFolder: (id: string) => void;
+
+  addSavedQuery: (query: SavedProjectQuery) => void;
+  updateSavedQuery: (id: string, patch: Partial<Omit<SavedProjectQuery, 'id' | 'createdAt'>>) => void;
+  removeSavedQuery: (id: string) => void;
 
   addAnnotation: (a: Annotation) => void;
   updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
@@ -696,6 +700,9 @@ export const useLoom = create<LoomState>((set, get) => {
         }
       }
       p.folders = p.folders.filter((f) => !toDelete.has(f.id));
+      for (const saved of p.savedQueries ?? []) {
+        if (toDelete.has(saved.query.folderId)) saved.query.folderId = 'any';
+      }
       // 解除受影响文件夹下所有对象的归属(此处覆盖所有用 folderId 的对象类型)
       const clear = (fid: string) => {
         for (const fl of p.flows) if (fl.folderId === fid) fl.folderId = undefined;
@@ -705,6 +712,18 @@ export const useLoom = create<LoomState>((set, get) => {
         for (const card of p.researchCards) if (card.folderId === fid) card.folderId = undefined;
       };
       for (const fid of toDelete) clear(fid);
+    }),
+
+    addSavedQuery: (query) => commit((p) => {
+      p.savedQueries ??= [];
+      p.savedQueries.push(query);
+    }),
+    updateSavedQuery: (id, patch) => commit((p) => {
+      const saved = (p.savedQueries ?? []).find((query) => query.id === id);
+      if (saved) Object.assign(saved, patch, { updatedAt: Date.now() });
+    }),
+    removeSavedQuery: (id) => commit((p) => {
+      p.savedQueries = (p.savedQueries ?? []).filter((query) => query.id !== id);
     }),
 
     addRelation: (r) => commit((p) => { p.relations ??= []; p.relations.push(r); }),
