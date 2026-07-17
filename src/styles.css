@@ -116,11 +116,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 .app { display: flex; height: 100%; padding: 10px; gap: 10px; }
 
-/* 侧栏是固定深色栏,不随主题变化 */
 .sidebar {
   width: var(--sidebar-w);
-  background: #161413;
-  border: 1px solid #161413;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
@@ -133,11 +132,17 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   margin-bottom: 10px;
   width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
-.sidebar .logo img { filter: invert(1); }
+/* 深色主题:侧栏加深一档并反白 logo */
+:root[data-theme-mode=dark] .sidebar { background: #161413; border-color: #161413; }
+:root[data-theme-mode=dark] .sidebar .logo {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme-mode=dark] .sidebar .logo img { filter: invert(1); }
 .nav-btn {
   width: 50px;
   height: 50px;
@@ -149,22 +154,22 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: #a09e97;
+  color: var(--text-dim);
   font-size: 10px;
   padding: 0;
 }
-.nav-btn:hover { background: rgba(255, 255, 255, 0.08); color: #f5f4ef; }
-.nav-btn.active { background: #f5f4ef; color: #161413; }
+.nav-btn:hover { background: var(--bg-hover); color: var(--text); }
+.nav-btn.active { background: var(--focus); color: var(--focus-fg); }
 
 .nav-sep {
   width: 30px;
   margin: 6px auto 4px;
   padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid var(--border);
   text-align: center;
   font-size: 9px;
   letter-spacing: 1px;
-  color: #706e68;
+  color: var(--text-faint);
   text-transform: uppercase;
   user-select: none;
 }

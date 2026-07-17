@@ -22,7 +22,7 @@
 
 - 已发布版本:`v0.19.0`(package.json / tauri.conf.json / Cargo.toml 同步)
 - 已交付的能力(截至 v0.19.0):
-  - **v0.19.0 R5-B 深色主题切换** ✅ — 浅色 / 深色 / 跟随系统三态(`theloom-theme-v1` 本机持久化,不入项目);语义色令牌全收敛 + 深色变量表;React Flow colorMode 响应式;内容色不改写、渲染层按亮度反色;防白闪 head 脚本;Tauri 标题栏同步;侧栏固定深色 #161413 + logo 反白
+  - **v0.19.0 R5-B 深色主题切换** ✅ — 浅色 / 深色 / 跟随系统三态(`theloom-theme-v1` 本机持久化,不入项目);语义色令牌全收敛 + 深色变量表;React Flow colorMode 响应式;内容色不改写、渲染层按亮度反色;防白闪 head 脚本;Tauri 标题栏同步;深色下侧栏加深为 #161413 + logo 反白
   - **v0.18.0 R5-A 完整项目导入(小说版)** ✅ — 多材料(类型+可信度标注)→ 项目生成计划(用户审阅)→ 分模块候选数据 → 完整差异预检 → 单次事务导入;覆盖卷章树/场景文档/实体/关系/弧线/伏笔/大纲/时间线/资料备份/待定设定/风暴板/地图占位;不生成游戏机制
   - **v0.17.0 R5 正文修订系统** ✅ — 批注(块级锚定 + 解决状态)、场景快照(每篇 20 个上限 + 恢复可撤销)、版本差异(行级 LCS 对比)、修订轮次(元数据 + 列表筛选)、全局查找替换(跨文档、勾选精确替换、单步撤销)
   - **v0.16.0 R4 小说规划增强** ✅ — 规划模块六视图:关系图(React Flow 浮动边)、角色弧线、伏笔台账(状态推导)、登场统计矩阵、场景卡片墙(章内拖拽排序)、节奏图(字数 + 张力);`Document.tension` 场景元数据
@@ -123,7 +123,7 @@
 - 新增 `src/theme.ts`:`ThemePref`(light/dark/system)存 `theloom-theme-v1` localStorage,**不入 Project、不参与云同步**;`applyPref` 在 `<html>` 上打 `data-theme`(system 时清除,让 `@media (prefers-color-scheme: dark)` 兜底)+ `data-theme-mode`(实际生效模式,始终有值);`initTheme` 恢复偏好并监听系统主题变化;`getThemeMode` / `subscribeThemeMode`(applyPref 派发 `theloom-theme` 事件,供 `useSyncExternalStore` 消费);`readableInk(hex)` 按亮度返回深/浅文字色(非 hex 返回 undefined);Tauri 环境动态 import `getCurrentWindow().setTheme` 同步标题栏
 - `index.html`:`<head>` 内联脚本在 CSS/JS 加载前同步应用主题并写 html 背景,消除深色白闪;`meta[name=theme-color]` 跟随
 - `src/main.tsx`:样式加载后、React 挂载前 `initTheme()`
-- `styles.css`:硬编码颜色全部收敛为语义令牌(`--chip-border` / `--checker-a/b` / `--flow-canvas` / `--node-*` 十种节点头 / `--pace-*` 节奏图灰阶 / `--overlay` / `--danger-bg` / `--note-*` 等);深色变量表两份(`@media` + `:root[data-theme=dark]` 显式锁定,`[data-theme=light]` 可在系统深色下反锁浅色);半透明浅底(演出遮罩 / 地图标签 / 分区)改 `color-mix`;**侧栏固定深色 `#161413` 不随主题**(nav 按钮 / 分隔线配套固定浅色系),logo `filter: invert(1)` 反白
+- `styles.css`:硬编码颜色全部收敛为语义令牌(`--chip-border` / `--checker-a/b` / `--flow-canvas` / `--node-*` 十种节点头 / `--pace-*` 节奏图灰阶 / `--overlay` / `--danger-bg` / `--note-*` 等);深色变量表两份(`@media` + `:root[data-theme=dark]` 显式锁定,`[data-theme=light]` 可在系统深色下反锁浅色);半透明浅底(演出遮罩 / 地图标签 / 分区)改 `color-mix`;**深色主题下侧栏加深为 `#161413`**(`[data-theme-mode=dark]` 覆盖,浅色不变),logo `filter: invert(1)` 反白
 - 深色下节点头灰阶整体反转(浅底配 `--focus-fg` 深字);`.check-kind.red` 固定反白;用户自定义节点色 / 便签色是内容数据不改写,由 `readableInk` 内联反色文字
 - 三处 React Flow(FlowEditor / Brainstorm / RelationGraph)`colorMode` 改响应式(`useSyncExternalStore(subscribeThemeMode, getThemeMode)`);`--xy-background-color` 走 `--flow-canvas` 令牌
 - 登场统计格子 `color-mix(var(--text) N%, transparent)` + 深格文字 `var(--bg)`,两套主题同一段代码
