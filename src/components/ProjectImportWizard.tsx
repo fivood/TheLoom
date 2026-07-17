@@ -255,7 +255,7 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
                       return (
                         <tr key={label} style={zero ? { color: 'var(--text-faint)' } : undefined}>
                           <td>{label}</td>
-                          <td>{v.add > 0 ? <b style={{ color: '#3a8f4a' }}>+{v.add}</b> : v.add}</td>
+                          <td>{v.add > 0 ? <b style={{ color: 'var(--diff-add-strong)' }}>+{v.add}</b> : v.add}</td>
                           <td>{v.update > 0 ? <b>{v.update}</b> : v.update}</td>
                           <td>{v.skip > 0 ? <span style={{ color: 'var(--text-faint)' }}>{v.skip}</span> : v.skip}</td>
                         </tr>

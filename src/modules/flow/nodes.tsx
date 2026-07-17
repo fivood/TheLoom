@@ -5,24 +5,26 @@ import { useLoom } from '../../store';
 import { countSubNodes } from '../../util';
 import Icon, { KIND_ICON } from '../../components/Icon';
 import { RichText } from '../../components/RichText';
+import { readableInk } from '../../theme';
 
 export const TYPE_COLORS: Record<FlowNodeType, string> = {
-  dialogue: '#1b1b19',
-  fragment: '#565550',
-  hub: '#8e8d86',
-  condition: '#3a3936',
-  instruction: '#72716b',
-  jump: '#4a4946',
-  exit: '#aaa9a1',
-  check: '#2f2e2b',
-  note: '#c6c5bd',
-  zone: '#e0dfd8',
+  dialogue: 'var(--node-dialogue)',
+  fragment: 'var(--node-fragment)',
+  hub: 'var(--node-hub)',
+  condition: 'var(--node-condition)',
+  instruction: 'var(--node-instruction)',
+  jump: 'var(--node-jump)',
+  exit: 'var(--node-exit)',
+  check: 'var(--node-check)',
+  note: 'var(--node-note)',
+  zone: 'var(--node-zone)',
 };
 
 type LoomNode = Node<FlowNodeData>;
 
 function headStyle(type: FlowNodeType, custom?: string) {
-  return { background: custom || TYPE_COLORS[type] };
+  if (custom) return { background: custom, color: readableInk(custom) };
+  return { background: TYPE_COLORS[type] };
 }
 
 function BaseNode({ id, type, data, selected, children }: NodeProps<LoomNode> & { children?: React.ReactNode }) {

@@ -14,6 +14,7 @@ import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
 import { initPaneWidths } from './components/PaneHandle';
+import ThemeToggle from './components/ThemeToggle';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
 import ProjectImportWizard from './components/ProjectImportWizard';
 import ProjectMenu from './components/ProjectMenu';
@@ -251,6 +252,7 @@ export default function App() {
               {folder ? `已同步 · ${folder.split(/[\\/]/).pop()}` : '已自动保存到本地'}
             </span>
           )}
+          <ThemeToggle />
           <button
             className="ghost saved-hint"
             style={{ padding: '2px 6px' }}

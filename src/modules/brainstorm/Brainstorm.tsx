@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   applyNodeChanges, applyEdgeChanges, addEdge, useReactFlow, MarkerType,
@@ -6,6 +6,7 @@ import {
   type Node, type Edge, type NodeChange, type EdgeChange, type Connection, type NodeProps,
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
+import { getThemeMode, readableInk, subscribeThemeMode } from '../../theme';
 
 interface StickyData {
   text: string;
@@ -30,7 +31,7 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
   useEffect(autoSize, [data.text]);
 
   return (
-    <div className={`sticky-note ${selected ? 'selected' : ''}`} style={{ background: data.color }}>
+    <div className={`sticky-note ${selected ? 'selected' : ''}`} style={{ background: data.color, color: readableInk(data.color) }}>
       <Handle type="target" position={Position.Left} />
       <textarea
         ref={ref}
@@ -52,6 +53,7 @@ function Canvas() {
   const storedEdges = useLoom((s) => s.project.brainstormEdges);
   const setBrainstorm = useLoom((s) => s.setBrainstorm);
   const { screenToFlowPosition } = useReactFlow();
+  const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
 
   const [nodes, setNodes] = useState<StickyNode[]>(() =>
     notes.map((n) => ({ id: n.id, type: 'sticky', position: n.position, data: { text: n.text, color: n.color } })),
@@ -123,7 +125,7 @@ function Canvas() {
       <div style={{ flex: 1 }}>
         <ReactFlow
           className="rf-light"
-          colorMode="light"
+          colorMode={themeMode}
           nodes={nodes}
           edges={edges}
           nodeTypes={stickyTypes}

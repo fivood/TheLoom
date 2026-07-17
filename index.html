@@ -4,7 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="theme-color" content="#eceae6" />
     <title>叙事织机 TheLoom</title>
+    <script>
+      // 主题在 <head> 里同步应用,避免加载 JS/CSS 之前的白闪
+      (function () {
+        try {
+          var pref = localStorage.getItem('theloom-theme-v1');
+          if (pref !== 'light' && pref !== 'dark' && pref !== 'system') pref = 'system';
+          if (pref === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+          else if (pref === 'light') document.documentElement.setAttribute('data-theme', 'light');
+          var mode = pref === 'system'
+            ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : pref;
+          document.documentElement.setAttribute('data-theme-mode', mode);
+          document.documentElement.style.background = mode === 'dark' ? '#17171a' : '#eceae6';
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', mode === 'dark' ? '#1b1b19' : '#eceae6');
+        } catch (e) { /* 忽略 */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

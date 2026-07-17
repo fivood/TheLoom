@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   applyNodeChanges, MarkerType, Handle, Position,
@@ -11,6 +11,7 @@ import { promptText, confirmDialog } from '../../dialog';
 import { useNav } from '../../search';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
+import { getThemeMode, subscribeThemeMode } from '../../theme';
 
 interface RelNodeData {
   name: string;
@@ -145,8 +146,10 @@ function Canvas() {
       label: r.label || '(未命名)',
       selected: r.id === selectedRelId,
       markerEnd: r.bidirectional ? undefined : { type: MarkerType.ArrowClosed, color: r.color || '#72716b' },
-      style: { stroke: r.color || '#72716b', strokeWidth: r.id === selectedRelId ? 2.5 : 1.5 },
+      style: { stroke: r.color || 'var(--edge)', strokeWidth: r.id === selectedRelId ? 2.5 : 1.5 },
     })), [relations, visibleIds, selectedRelId]);
+
+  const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
 
   const onNodesChange = useCallback((changes: NodeChange<RelNode>[]) => {
     setNodes((ns) => applyNodeChanges(changes, ns));
@@ -185,7 +188,7 @@ function Canvas() {
         </div>
         <ReactFlow
           className="rf-light"
-          colorMode="light"
+          colorMode={themeMode}
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}

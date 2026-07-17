@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   applyNodeChanges, applyEdgeChanges, addEdge, useReactFlow, MarkerType,
@@ -60,6 +60,7 @@ function ScriptHints({ text, onInsert }: { text: string; onInsert: (name: string
   );
 }
 import { nodeTypes, TYPE_COLORS } from './nodes';
+import { getThemeMode, subscribeThemeMode } from '../../theme';
 import Player from './Player';
 import NodeTemplateModal from './NodeTemplateModal';
 import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
@@ -137,6 +138,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     };
   }));
   const { screenToFlowPosition } = useReactFlow();
+  const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // 本地画布状态防抖回写 store;卸载(切流程 / 进出子流程)时立即冲刷
@@ -330,7 +332,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         <div ref={wrapRef} style={{ flex: 1 }}>
           <ReactFlow
             className="rf-light"
-            colorMode="light"
+            colorMode={themeMode}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}

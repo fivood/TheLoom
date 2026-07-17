@@ -5,14 +5,14 @@ import { pacingPoints } from '../../planning';
 import type { DocStatus } from '../../types';
 import { DOC_STATUS_LABEL, DOC_STATUS_ORDER } from '../../types';
 
-/** 状态 → 灰阶(浅 → 深 = 大纲 → 完成,单色顺序标度) */
+/** 状态 → 灰阶(弱 → 强 = 大纲 → 完成,单色顺序标度;深浅色各一套令牌) */
 const STATUS_BAR: Record<DocStatus, string> = {
-  outline: '#e0dfd8',
-  draft: '#b5b3ab',
-  revising: '#807e77',
-  done: '#1b1b19',
+  outline: 'var(--pace-outline)',
+  draft: 'var(--pace-draft)',
+  revising: 'var(--pace-revising)',
+  done: 'var(--pace-done)',
 };
-const UNSET_BAR = '#cfcdc6';
+const UNSET_BAR = 'var(--pace-unset)';
 
 const MARGIN_L = 48;
 const MARGIN_R = 16;
@@ -129,7 +129,7 @@ export default function PacingChart() {
               <g key={p.doc.id} onClick={() => setSelectedId(active ? null : p.doc.id)} style={{ cursor: 'pointer' }}>
                 {/* 命中区比柱子宽,方便点击 */}
                 <rect x={xs[i] - 3} y={TOP} width={BAR_W + 6} height={PLOT_H + GAP_TRACKS + TENSION_H} fill="transparent" />
-                <path d={barPath(xs[i], y, BAR_W, h)} fill={fill} stroke={active ? '#1b1b19' : 'none'} strokeWidth={active ? 2 : 0} strokeDasharray={!p.status && !active ? '3 2' : undefined} />
+                <path d={barPath(xs[i], y, BAR_W, h)} fill={fill} stroke={active ? 'var(--focus)' : 'none'} strokeWidth={active ? 2 : 0} strokeDasharray={!p.status && !active ? '3 2' : undefined} />
                 <title>{`${p.chapterLabel} · ${p.doc.name}\n${p.words} 字${p.status ? ` · ${DOC_STATUS_LABEL[p.status]}` : ''}${typeof p.tension === 'number' ? ` · 张力 ${p.tension}` : ''}`}</title>
               </g>
             );

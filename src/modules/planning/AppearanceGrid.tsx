@@ -63,8 +63,8 @@ export default function AppearanceGrid() {
                       <button
                         className={`appear-cell ${active ? 'active' : ''}`}
                         style={cell.scenes > 0 ? {
-                          background: `rgba(27, 27, 25, ${0.06 + depth * 0.5})`,
-                          color: depth > 0.55 ? '#f5f4ef' : undefined,
+                          background: `color-mix(in srgb, var(--text) ${Math.round((0.06 + depth * 0.5) * 100)}%, transparent)`,
+                          color: depth > 0.55 ? 'var(--bg)' : undefined,
                         } : undefined}
                         title={tipParts.join('\n')}
                         onClick={() => setPicked(active ? null : { row: ri, col: ci })}
