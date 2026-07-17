@@ -2,14 +2,18 @@ import { useMemo, useState } from 'react';
 import { useLoom } from '../store';
 import { auditProject, projectStats } from '../audit';
 import { useNav } from '../search';
-import { ISSUE_SEVERITY_LABEL, type IssueSeverity } from '../issues';
+import { ISSUE_SCOPE_LABEL, ISSUE_SEVERITY_LABEL, type IssueScope, type IssueSeverity } from '../issues';
 
 export default function AuditPanel({ onClose }: { onClose: () => void }) {
   const project = useLoom((s) => s.project);
   const stats = useMemo(() => projectStats(project), [project]);
   const issues = useMemo(() => auditProject(project), [project]);
   const [severity, setSeverity] = useState<IssueSeverity | 'all'>('all');
-  const visibleIssues = severity === 'all' ? issues : issues.filter((issue) => issue.severity === severity);
+  const [scope, setScope] = useState<IssueScope | 'all'>('all');
+  const scopes = useMemo(() => [...new Set(issues.map((issue) => issue.scope))], [issues]);
+  const visibleIssues = issues.filter((issue) =>
+    (severity === 'all' || issue.severity === severity)
+    && (scope === 'all' || issue.scope === scope));
   const severityCounts = useMemo(() => ({
     error: issues.filter((issue) => issue.severity === 'error').length,
     warning: issues.filter((issue) => issue.severity === 'warning').length,
@@ -71,9 +75,15 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
                     </button>
                   )
                 ))}
+                {scopes.length > 1 && (
+                  <select value={scope} onChange={(event) => setScope(event.target.value as IssueScope | 'all')} aria-label="问题范围">
+                    <option value="all">全部范围</option>
+                    {scopes.map((value) => <option key={value} value={value}>{ISSUE_SCOPE_LABEL[value]}</option>)}
+                  </select>
+                )}
               </div>
             )}
-            {issues.length === 0 && <div className="audit-ok">没有发现问题:无孤儿节点、无分支缺口、无未定义变量、无空对白、无悬挂附件、无重复技术名、无必填缺失、无损坏资产。</div>}
+            {issues.length === 0 && <div className="audit-ok">没有发现引用、结构、时间、角色、脚本或内容完整性问题。</div>}
             {visibleIssues.map((it) => (
               <div
                 key={it.id}

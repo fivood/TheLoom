@@ -3,7 +3,17 @@ import type { SimReport } from './simulate';
 
 export type IssueSeverity = 'error' | 'warning' | 'info';
 export type IssueSource = 'audit' | 'script' | 'path';
-export type IssueScope = 'project' | 'flow' | 'document' | 'entity' | 'asset';
+export type IssueScope =
+  | 'project'
+  | 'flow'
+  | 'document'
+  | 'entity'
+  | 'asset'
+  | 'timeline'
+  | 'map'
+  | 'planning'
+  | 'brainstorm'
+  | 'outline';
 
 export interface ProjectIssue {
   id: string;
@@ -75,4 +85,17 @@ export const ISSUE_SEVERITY_LABEL: Record<IssueSeverity, string> = {
   error: '错误',
   warning: '警告',
   info: '提示',
+};
+
+export const ISSUE_SCOPE_LABEL: Record<IssueScope, string> = {
+  project: '项目',
+  flow: '流程',
+  document: '文档',
+  entity: '实体',
+  asset: '资源',
+  timeline: '时间线',
+  map: '地图',
+  planning: '规划',
+  brainstorm: '风暴',
+  outline: '大纲',
 };

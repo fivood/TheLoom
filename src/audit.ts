@@ -6,6 +6,7 @@ import { buildScriptScope } from './script';
 import { checkCondition, checkInstructions, checkNumberExpr } from './script/check';
 import type { Diagnostic } from './script/ast';
 import { createIssue, type IssueScope, type IssueSeverity, type ProjectIssue, type ProjectIssueInput } from './issues';
+import { advancedAuditProject } from './advancedAudit';
 
 /** 中文按字计,拉丁与数字按词计 */
 export function countWords(text: string | undefined): number {
@@ -242,5 +243,5 @@ export function auditProject(p: Project): ProjectIssue[] {
     issues.push({ kind: '重复技术名', message: `${dup.name} → ${where}` });
   }
 
-  return issues.map(normalizeIssue);
+  return [...issues.map(normalizeIssue), ...advancedAuditProject(p)];
 }

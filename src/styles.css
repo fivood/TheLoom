@@ -2530,6 +2530,13 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   border-radius: 999px;
   font-size: 11px;
 }
+.audit-filters select {
+  margin-left: auto;
+  width: auto;
+  min-width: 92px;
+  padding: 3px 24px 3px 8px;
+  font-size: 11px;
+}
 .audit-filters button.active {
   background: var(--text);
   color: var(--bg);
