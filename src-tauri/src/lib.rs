@@ -1,8 +1,201 @@
 use base64::Engine;
+use keyring_core::Entry;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+use std::time::Duration;
 
 const IMG_EXTS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
+const LLM_KEYRING_SERVICE: &str = "com.fivood.theloom.llm";
+static LLM_KEYRING_INIT: OnceLock<Result<(), String>> = OnceLock::new();
+const LLM_PROVIDERS: [&str; 10] = [
+    "openai",
+    "anthropic",
+    "deepseek",
+    "kimi",
+    "qwen",
+    "glm",
+    "minimax",
+    "ollama",
+    "custom-openai",
+    "custom-anthropic",
+];
+
+fn llm_credential(provider: &str) -> Result<Entry, String> {
+    if !LLM_PROVIDERS.contains(&provider) {
+        return Err("未知 AI 服务商".into());
+    }
+    LLM_KEYRING_INIT
+        .get_or_init(|| {
+            let store = windows_native_keyring_store::Store::new()
+                .map_err(|e| format!("Windows 凭据管理器不可用:{e}"))?;
+            keyring_core::set_default_store(store);
+            Ok(())
+        })
+        .clone()?;
+    Entry::new(LLM_KEYRING_SERVICE, provider).map_err(|e| format!("系统凭据库不可用:{e}"))
+}
+
+#[tauri::command]
+fn set_llm_secret(provider: String, secret: String) -> Result<(), String> {
+    if secret.is_empty() || secret.len() > 16384 {
+        return Err("API Key 长度无效".into());
+    }
+    llm_credential(&provider)?
+        .set_password(&secret)
+        .map_err(|e| format!("保存系统凭据失败:{e}"))
+}
+
+#[tauri::command]
+fn has_llm_secret(provider: String) -> Result<bool, String> {
+    match llm_credential(&provider)?.get_password() {
+        Ok(secret) => Ok(!secret.is_empty()),
+        Err(keyring_core::Error::NoEntry) => Ok(false),
+        Err(e) => Err(format!("读取系统凭据失败:{e}")),
+    }
+}
+
+#[tauri::command]
+fn delete_llm_secret(provider: String) -> Result<(), String> {
+    match llm_credential(&provider)?.delete_credential() {
+        Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
+        Err(e) => Err(format!("删除系统凭据失败:{e}")),
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LlmHttpRequest {
+    provider: String,
+    protocol: String,
+    auth_mode: String,
+    url: String,
+    body: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LlmHttpResponse {
+    status: u16,
+    body: String,
+    request_id: Option<String>,
+}
+
+fn validate_llm_url(raw: &str) -> Result<reqwest::Url, String> {
+    let url = reqwest::Url::parse(raw).map_err(|_| "AI API 地址无效".to_string())?;
+    if !url.username().is_empty() || url.password().is_some() || url.fragment().is_some() {
+        return Err("AI API 地址不能包含账号、密码或片段".into());
+    }
+    match url.scheme() {
+        "https" => Ok(url),
+        "http" => {
+            let host = url.host_str().unwrap_or_default();
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                Ok(url)
+            } else {
+                Err("远程 AI API 必须使用 HTTPS".into())
+            }
+        }
+        _ => Err("AI API 仅支持 HTTPS；本机服务可使用 HTTP".into()),
+    }
+}
+
+fn validate_llm_target(provider: &str, raw: &str) -> Result<reqwest::Url, String> {
+    let url = validate_llm_url(raw)?;
+    let host = url.host_str().unwrap_or_default();
+    let allowed = match provider {
+        "openai" => host == "api.openai.com",
+        "anthropic" => host == "api.anthropic.com",
+        "deepseek" => host == "api.deepseek.com",
+        "kimi" => host == "api.moonshot.cn",
+        "qwen" => host == "dashscope.aliyuncs.com" || host.ends_with(".maas.aliyuncs.com"),
+        "glm" => host == "open.bigmodel.cn",
+        "minimax" => host == "api.minimaxi.com",
+        "ollama" => host == "localhost" || host == "127.0.0.1" || host == "::1",
+        "custom-openai" | "custom-anthropic" => true,
+        _ => false,
+    };
+    if allowed {
+        Ok(url)
+    } else {
+        Err("该服务商的 API Key 只能发送到其官方域名；其他地址请使用自定义兼容服务".into())
+    }
+}
+
+#[tauri::command]
+async fn llm_http_request(request: LlmHttpRequest) -> Result<LlmHttpResponse, String> {
+    if !LLM_PROVIDERS.contains(&request.provider.as_str()) {
+        return Err("未知 AI 服务商".into());
+    }
+    if request.protocol != "openai"
+        && request.protocol != "anthropic"
+        && request.protocol != "ollama"
+    {
+        return Err("未知 AI 协议".into());
+    }
+    if request.auth_mode != "bearer"
+        && request.auth_mode != "x-api-key"
+        && request.auth_mode != "none"
+    {
+        return Err("未知认证方式".into());
+    }
+    if request.body.len() > 4 * 1024 * 1024 {
+        return Err("AI 请求内容超过 4 MB".into());
+    }
+    let url = validate_llm_target(&request.provider, &request.url)?;
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(20))
+        .timeout(Duration::from_secs(180))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| format!("初始化安全请求失败:{e}"))?;
+    let mut builder = client
+        .post(url)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(request.body);
+    if request.protocol == "anthropic" {
+        builder = builder.header("anthropic-version", "2023-06-01");
+    }
+    if request.auth_mode != "none" {
+        let secret = llm_credential(&request.provider)?
+            .get_password()
+            .map_err(|e| match e {
+                keyring_core::Error::NoEntry => "尚未在系统凭据库保存 API Key".into(),
+                other => format!("读取系统凭据失败:{other}"),
+            })?;
+        builder = if request.auth_mode == "x-api-key" {
+            builder.header("x-api-key", secret)
+        } else {
+            builder.bearer_auth(secret)
+        };
+    }
+    let response = builder
+        .send()
+        .await
+        .map_err(|e| format!("AI 网络请求失败:{e}"))?;
+    let status = response.status().as_u16();
+    if response.content_length().unwrap_or(0) > 8 * 1024 * 1024 {
+        return Err("AI 响应超过 8 MB".into());
+    }
+    let request_id = response
+        .headers()
+        .get("x-request-id")
+        .or_else(|| response.headers().get("request-id"))
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("读取 AI 响应失败:{e}"))?;
+    if bytes.len() > 8 * 1024 * 1024 {
+        return Err("AI 响应超过 8 MB".into());
+    }
+    Ok(LlmHttpResponse {
+        status,
+        body: String::from_utf8_lossy(&bytes).into_owned(),
+        request_id,
+    })
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -452,6 +645,28 @@ mod tests {
 
         std::fs::remove_dir_all(&dir).ok();
     }
+
+    #[test]
+    fn llm_proxy_url_guard() {
+        assert!(validate_llm_url("https://api.openai.com/v1/chat/completions").is_ok());
+        assert!(validate_llm_url("http://127.0.0.1:11434/api/chat").is_ok());
+        assert!(validate_llm_url("http://localhost:11434/api/chat").is_ok());
+        assert!(validate_llm_url("http://api.example.com/chat").is_err());
+        assert!(validate_llm_url("file:///tmp/key").is_err());
+        assert!(validate_llm_url("https://user:pass@example.com/chat").is_err());
+        assert!(validate_llm_url("https://example.com/chat#secret").is_err());
+        assert!(
+            validate_llm_target("openai", "https://api.openai.com/v1/chat/completions").is_ok()
+        );
+        assert!(validate_llm_target("openai", "https://evil.example/v1/chat/completions").is_err());
+        assert!(validate_llm_target(
+            "qwen",
+            "https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+        )
+        .is_ok());
+        assert!(validate_llm_target("custom-openai", "https://gateway.example/v1").is_ok());
+        assert!(validate_llm_target("ollama", "https://remote.example/api/chat").is_err());
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -466,7 +681,11 @@ pub fn run() {
             list_asset_files,
             read_asset_file,
             write_asset_file,
-            delete_asset_files
+            delete_asset_files,
+            set_llm_secret,
+            has_llm_secret,
+            delete_llm_secret,
+            llm_http_request
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

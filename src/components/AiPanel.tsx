@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLoom } from '../store';
 import { useNav } from '../search';
 import { alertDialog, confirmDialog } from '../dialog';
 import Icon from './Icon';
 import type { Entity } from '../types';
 import {
-  chatComplete, llmNeedsApiKey, loadLlmConfig, parseModelJson, PROVIDER_DEFAULTS, PROVIDER_LABEL, PROVIDER_META,
-  saveLlmConfig, testLlmConnection, type LlmConfig, type LlmProvider,
+  chatComplete, deleteLlmCredential, hydrateDesktopLlmConfig, llmHasCredential, llmNeedsApiKey, loadLlmConfig,
+  parseModelJson, PROVIDER_DEFAULTS, PROVIDER_LABEL, PROVIDER_META, saveLlmConfig, testLlmConnection,
+  type LlmConfig, type LlmProvider,
 } from '../ai/llm';
 import {
   applyAiImportPreview, buildAiImportPreview, buildFieldFillPrompt, DEFAULT_EXTRACT_PROMPT,
@@ -20,17 +21,28 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  useEffect(() => {
+    void hydrateDesktopLlmConfig(loadLlmConfig()).then(setCfg).catch((error) => {
+      setTestResult(`✗ ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }, []);
+
   const switchProvider = (provider: LlmProvider) => {
-    setCfg({ ...PROVIDER_DEFAULTS[provider], apiKey: '' });
+    const next = { ...PROVIDER_DEFAULTS[provider], apiKey: '' };
+    setCfg(next);
+    void hydrateDesktopLlmConfig(next).then((hydrated) => {
+      setCfg((current) => current.provider === provider ? { ...current, credentialStored: hydrated.credentialStored } : current);
+    }).catch(() => {});
     setTestResult(null);
   };
 
   const test = async () => {
     setTesting(true);
     setTestResult(null);
-    saveLlmConfig(cfg);
     try {
-      const ms = await testLlmConnection(cfg);
+      const saved = await saveLlmConfig(cfg);
+      setCfg(saved);
+      const ms = await testLlmConnection(saved);
       setTestResult(`✓ 连接成功(${ms}ms)`);
     } catch (e) {
       setTestResult(`✗ ${e instanceof Error ? e.message : String(e)}`);
@@ -63,7 +75,13 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
           {(cfg.provider === 'custom-openai' || cfg.provider === 'custom-anthropic') && (
             <div className="field">
               <label>认证方式</label>
-              <select value={cfg.authMode} onChange={(e) => setCfg({ ...cfg, authMode: e.target.value as LlmConfig['authMode'] })}>
+              <select
+                value={cfg.authMode}
+                onChange={(e) => {
+                  const authMode = e.target.value as LlmConfig['authMode'];
+                  setCfg({ ...cfg, authMode, apiKey: authMode === 'none' ? '' : cfg.apiKey });
+                }}
+              >
                 <option value="bearer">Bearer API Key</option>
                 <option value="x-api-key">x-api-key</option>
                 <option value="none">无需认证</option>
@@ -72,7 +90,17 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
           )}
           <div className="field">
             <label>API 地址</label>
-            <input value={cfg.baseUrl} onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })} placeholder={PROVIDER_DEFAULTS[cfg.provider].baseUrl} />
+            <input
+              value={cfg.baseUrl}
+              onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })}
+              placeholder={PROVIDER_DEFAULTS[cfg.provider].baseUrl}
+              readOnly={cfg.provider !== 'qwen' && cfg.provider !== 'ollama' && cfg.provider !== 'custom-openai' && cfg.provider !== 'custom-anthropic'}
+            />
+            {cfg.provider !== 'qwen' && cfg.provider !== 'ollama' && cfg.provider !== 'custom-openai' && cfg.provider !== 'custom-anthropic' && (
+              <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
+                内置服务商固定使用官方域名；代理或第三方网关请选“自定义兼容”
+              </div>
+            )}
           </div>
           {llmNeedsApiKey(cfg) && (
             <div className="field">
@@ -93,11 +121,22 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
                 type="password"
                 value={cfg.apiKey}
                 onChange={(e) => setCfg({ ...cfg, apiKey: e.target.value })}
-                placeholder="sk-…"
+                placeholder={cfg.credentialStored ? '已安全保存；输入新 Key 可替换' : 'sk-…'}
                 autoComplete="off"
               />
               <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
-                当前只保存在本浏览器 / 本机，不写入项目文件或云协作；桌面安全凭据存储将在后续批次接入
+                {cfg.credentialStored
+                  ? '已保存在系统安全凭据库，前端和项目文件均不包含明文'
+                  : '桌面版保存到系统安全凭据库；网页版只保存在当前浏览器，不随项目或云协作同步'}
+                {cfg.credentialStored && (
+                  <button
+                    className="ghost"
+                    style={{ marginLeft: 8, fontSize: 11 }}
+                    onClick={() => void deleteLlmCredential(cfg).then(setCfg).catch((error) => setTestResult(`✗ ${error instanceof Error ? error.message : String(error)}`))}
+                  >
+                    删除凭据
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -112,7 +151,7 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
           )}
           <div className="sync-actions">
             <button disabled={testing} onClick={test}>{testing ? '测试中…' : '测试连接'}</button>
-            <button className="primary" onClick={() => { saveLlmConfig(cfg); onClose(); }}>保存</button>
+            <button className="primary" onClick={() => void saveLlmConfig(cfg).then(() => onClose()).catch((error) => setTestResult(`✗ ${error instanceof Error ? error.message : String(error)}`))}>保存</button>
           </div>
         </div>
       </div>
@@ -150,7 +189,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
 
   const run = async () => {
     const cfg = loadLlmConfig();
-    if (llmNeedsApiKey(cfg) && !cfg.apiKey) {
+    if (!llmHasCredential(cfg)) {
       setError('还没有配置 API Key。请先在「工具 → AI 设置」里完成配置。');
       return;
     }
@@ -325,7 +364,7 @@ export function AiFillFieldsButton({ entity }: { entity: Entity }) {
 
   const run = async () => {
     const cfg = loadLlmConfig();
-    if (llmNeedsApiKey(cfg) && !cfg.apiKey) {
+    if (!llmHasCredential(cfg)) {
       await alertDialog('还没有配置 API Key。请先在「工具 → AI 设置」里完成配置。');
       return;
     }

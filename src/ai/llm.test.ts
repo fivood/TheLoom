@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  chatComplete, structuredComplete, type LlmConfig,
+  chatComplete, llmHasCredential, saveLlmConfig, structuredComplete, type LlmConfig,
 } from './llm';
 import type { JsonSchema } from './schema';
 
@@ -15,6 +15,7 @@ const config = (provider: LlmConfig['provider']): LlmConfig => ({
   provider,
   protocol: provider === 'anthropic' ? 'anthropic' : provider === 'ollama' ? 'ollama' : 'openai',
   authMode: provider === 'anthropic' ? 'x-api-key' : provider === 'ollama' ? 'none' : 'bearer',
+  credentialStored: false,
   baseUrl: provider === 'ollama' ? 'http://localhost:11434' : `https://${provider}.example`,
   apiKey: 'secret',
   model: 'test-model',
@@ -172,5 +173,25 @@ describe('AI Provider 结构化输出', () => {
       'anthropic-version': '2023-06-01',
     });
     expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('x-api-key');
+  });
+
+  it('系统凭据状态可满足桌面端认证检查', () => {
+    expect(llmHasCredential({ ...config('openai'), apiKey: '', credentialStored: true })).toBe(true);
+    expect(llmHasCredential({ ...config('openai'), apiKey: '', credentialStored: false })).toBe(false);
+    expect(llmHasCredential(config('ollama'))).toBe(true);
+  });
+
+  it('免认证配置不会在网页版残留 API Key', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    });
+
+    const saved = await saveLlmConfig({ ...config('custom-openai'), authMode: 'none' });
+
+    expect(saved.apiKey).toBe('');
+    expect(JSON.parse(values.get('theloom-llm-v2') ?? '{}').apiKey).toBe('');
   });
 });

@@ -1,6 +1,6 @@
 /**
  * LLM 服务层:本地优先,多服务商兼容后端,零第三方依赖(原生 fetch)。
- * API Key 只存 localStorage(本浏览器 / 本机),不写入项目数据,不随云协作同步。
+ * API Key 网页版存当前浏览器,Windows 桌面版存系统凭据管理器,不写入项目数据或云协作。
  */
 
 import { validateJsonSchema, type JsonSchema, type SchemaIssue } from './schema';
@@ -26,6 +26,7 @@ export interface LlmConfig {
   authMode: LlmAuthMode;
   baseUrl: string;
   apiKey: string;
+  credentialStored: boolean;
   model: string;
 }
 
@@ -43,16 +44,16 @@ export const PROVIDER_LABEL: Record<LlmProvider, string> = {
 };
 
 export const PROVIDER_DEFAULTS: Record<LlmProvider, Omit<LlmConfig, 'apiKey'>> = {
-  openai: { provider: 'openai', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-  anthropic: { provider: 'anthropic', protocol: 'anthropic', authMode: 'x-api-key', baseUrl: 'https://api.anthropic.com', model: 'claude-opus-4-8' },
-  deepseek: { provider: 'deepseek', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
-  kimi: { provider: 'kimi', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
-  qwen: { provider: 'qwen', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
-  glm: { provider: 'glm', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.2' },
-  minimax: { provider: 'minimax', protocol: 'openai', authMode: 'bearer', baseUrl: 'https://api.minimaxi.com/v1', model: 'MiniMax-M2.7' },
-  ollama: { provider: 'ollama', protocol: 'ollama', authMode: 'none', baseUrl: 'http://localhost:11434', model: 'qwen3:8b' },
-  'custom-openai': { provider: 'custom-openai', protocol: 'openai', authMode: 'bearer', baseUrl: '', model: '' },
-  'custom-anthropic': { provider: 'custom-anthropic', protocol: 'anthropic', authMode: 'x-api-key', baseUrl: '', model: '' },
+  openai: { provider: 'openai', protocol: 'openai', authMode: 'bearer', credentialStored: false, baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  anthropic: { provider: 'anthropic', protocol: 'anthropic', authMode: 'x-api-key', credentialStored: false, baseUrl: 'https://api.anthropic.com', model: 'claude-opus-4-8' },
+  deepseek: { provider: 'deepseek', protocol: 'openai', authMode: 'bearer', credentialStored: false, baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
+  kimi: { provider: 'kimi', protocol: 'openai', authMode: 'bearer', credentialStored: false, baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
+  qwen: { provider: 'qwen', protocol: 'openai', authMode: 'bearer', credentialStored: false, baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  glm: { provider: 'glm', protocol: 'openai', authMode: 'bearer', credentialStored: false, baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.2' },
+  minimax: { provider: 'minimax', protocol: 'openai', authMode: 'bearer', credentialStored: false, baseUrl: 'https://api.minimaxi.com/v1', model: 'MiniMax-M2.7' },
+  ollama: { provider: 'ollama', protocol: 'ollama', authMode: 'none', credentialStored: false, baseUrl: 'http://localhost:11434', model: 'qwen3:8b' },
+  'custom-openai': { provider: 'custom-openai', protocol: 'openai', authMode: 'bearer', credentialStored: false, baseUrl: '', model: '' },
+  'custom-anthropic': { provider: 'custom-anthropic', protocol: 'anthropic', authMode: 'x-api-key', credentialStored: false, baseUrl: '', model: '' },
 };
 
 export const PROVIDER_META: Record<LlmProvider, { consoleUrl?: string; hint: string }> = {
@@ -71,6 +72,11 @@ export const PROVIDER_META: Record<LlmProvider, { consoleUrl?: string; hint: str
 const CONFIG_KEY = 'theloom-llm-v2';
 const LEGACY_CONFIG_KEY = 'theloom-llm-v1';
 const PROVIDERS = new Set<LlmProvider>(Object.keys(PROVIDER_DEFAULTS) as LlmProvider[]);
+const isDesktop = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+function storedConfig(cfg: LlmConfig, keepApiKey: boolean) {
+  return JSON.stringify({ ...cfg, apiKey: keepApiKey ? cfg.apiKey : '' });
+}
 
 export function loadLlmConfig(): LlmConfig {
   try {
@@ -90,19 +96,75 @@ export function loadLlmConfig(): LlmConfig {
           ? parsed.authMode
           : defaults.authMode,
         baseUrl: typeof parsed.baseUrl === 'string' && parsed.baseUrl ? parsed.baseUrl : defaults.baseUrl,
-        apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
+        apiKey: !isDesktop && typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
+        credentialStored: typeof parsed.credentialStored === 'boolean'
+          ? parsed.credentialStored
+          : isDesktop && typeof parsed.apiKey === 'string' && Boolean(parsed.apiKey),
         model: typeof parsed.model === 'string' && parsed.model ? parsed.model : defaults.model,
       };
     }
-  } catch { /* 忽略损坏配置 */ }
+  } catch {}
   return { ...PROVIDER_DEFAULTS.openai, apiKey: '' };
 }
 
-export function saveLlmConfig(cfg: LlmConfig) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+async function invokeDesktop<T>(command: string, args: Record<string, unknown>): Promise<T> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(command, args);
+}
+
+export async function hydrateDesktopLlmConfig(cfg: LlmConfig): Promise<LlmConfig> {
+  if (!isDesktop || cfg.authMode === 'none') return cfg;
+  const raw = localStorage.getItem(CONFIG_KEY) ?? localStorage.getItem(LEGACY_CONFIG_KEY);
+  let legacySecret = '';
+  try {
+    const parsed = raw ? JSON.parse(raw) as Partial<LlmConfig> : {};
+    legacySecret = typeof parsed.apiKey === 'string' ? parsed.apiKey : '';
+  } catch { /* 忽略损坏配置 */ }
+  if (legacySecret) {
+    await invokeDesktop('set_llm_secret', { provider: cfg.provider, secret: legacySecret });
+    const next = { ...cfg, apiKey: '', credentialStored: true };
+    localStorage.setItem(CONFIG_KEY, storedConfig(next, false));
+    localStorage.removeItem(LEGACY_CONFIG_KEY);
+    return next;
+  }
+  if (cfg.credentialStored) return cfg;
+  const credentialStored = await invokeDesktop<boolean>('has_llm_secret', { provider: cfg.provider });
+  return { ...cfg, apiKey: '', credentialStored };
+}
+
+export async function saveLlmConfig(cfg: LlmConfig): Promise<LlmConfig> {
+  if (!isDesktop) {
+    const next = cfg.authMode === 'none' ? { ...cfg, apiKey: '', credentialStored: false } : cfg;
+    localStorage.setItem(CONFIG_KEY, storedConfig(next, true));
+    return next;
+  }
+  let credentialStored = cfg.credentialStored;
+  if (cfg.authMode === 'none') {
+    if (credentialStored) {
+      await invokeDesktop('delete_llm_secret', { provider: cfg.provider });
+    }
+    credentialStored = false;
+  } else if (cfg.apiKey) {
+    await invokeDesktop('set_llm_secret', { provider: cfg.provider, secret: cfg.apiKey });
+    credentialStored = true;
+  }
+  const next = { ...cfg, apiKey: '', credentialStored };
+  localStorage.setItem(CONFIG_KEY, storedConfig(next, false));
+  localStorage.removeItem(LEGACY_CONFIG_KEY);
+  return next;
+}
+
+export async function deleteLlmCredential(cfg: LlmConfig): Promise<LlmConfig> {
+  if (isDesktop) {
+    await invokeDesktop('delete_llm_secret', { provider: cfg.provider });
+  }
+  const next = { ...cfg, apiKey: '', credentialStored: false };
+  localStorage.setItem(CONFIG_KEY, storedConfig(next, !isDesktop));
+  return next;
 }
 
 export const llmNeedsApiKey = (cfg: LlmConfig) => cfg.authMode !== 'none';
+export const llmHasCredential = (cfg: LlmConfig) => !llmNeedsApiKey(cfg) || Boolean(cfg.apiKey) || cfg.credentialStored;
 
 const trimSlash = (s: string) => s.replace(/\/+$/, '');
 
@@ -163,15 +225,46 @@ function classifyStatus(status: number): { kind: LlmErrorKind; retryable: boolea
   return { kind: 'request', retryable: false };
 }
 
-async function requestJson(provider: string, url: string, init: RequestInit): Promise<{ data: unknown; response: Response }> {
+interface DesktopHttpResponse {
+  status: number;
+  body: string;
+  requestId?: string;
+}
+
+async function desktopRequest(cfg: LlmConfig, url: string, init: RequestInit): Promise<Response> {
+  await hydrateDesktopLlmConfig(cfg);
+  const pending = invokeDesktop<DesktopHttpResponse>('llm_http_request', {
+    request: {
+      provider: cfg.provider,
+      protocol: cfg.protocol,
+      authMode: cfg.authMode,
+      url,
+      body: typeof init.body === 'string' ? init.body : '',
+    },
+  });
+  if (!init.signal) {
+    const result = await pending;
+    return new Response(result.body, { status: result.status, headers: result.requestId ? { 'x-request-id': result.requestId } : {} });
+  }
+  if (init.signal.aborted) throw new DOMException('aborted', 'AbortError');
+  const result = await Promise.race([
+    pending,
+    new Promise<never>((_, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true })),
+  ]);
+  return new Response(result.body, { status: result.status, headers: result.requestId ? { 'x-request-id': result.requestId } : {} });
+}
+
+async function requestJson(cfg: LlmConfig, provider: string, url: string, init: RequestInit): Promise<{ data: unknown; response: Response }> {
   let response: Response;
   try {
-    response = await fetch(url, init);
+    response = isDesktop ? await desktopRequest(cfg, url, init) : await fetch(url, init);
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new LlmRequestError('请求已取消', 'cancelled', false);
     }
-    throw new LlmRequestError(`${provider} 网络请求失败:${error instanceof Error ? error.message : String(error)}`, 'network', true);
+    const detail = error instanceof Error ? error.message : String(error);
+    const auth = detail.includes('API Key') || detail.includes('凭据');
+    throw new LlmRequestError(`${provider} ${auth ? '认证失败' : '网络请求失败'}:${detail}`, auth ? 'auth' : 'network', !auth);
   }
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 400);
@@ -189,7 +282,7 @@ async function requestJson(provider: string, url: string, init: RequestInit): Pr
 export async function chatComplete(cfg: LlmConfig, req: ChatRequest): Promise<string> {
   const maxTokens = req.maxTokens ?? 16000;
   if (cfg.protocol === 'anthropic') {
-    const { data: raw } = await requestJson('Anthropic', `${trimSlash(cfg.baseUrl)}/v1/messages`, {
+    const { data: raw } = await requestJson(cfg, 'Anthropic', `${trimSlash(cfg.baseUrl)}/v1/messages`, {
       method: 'POST',
       signal: req.signal,
       headers: {
@@ -212,7 +305,7 @@ export async function chatComplete(cfg: LlmConfig, req: ChatRequest): Promise<st
     return text;
   }
   if (cfg.protocol === 'ollama') {
-    const { data: raw } = await requestJson('Ollama', `${trimSlash(cfg.baseUrl)}/api/chat`, {
+    const { data: raw } = await requestJson(cfg, 'Ollama', `${trimSlash(cfg.baseUrl)}/api/chat`, {
       method: 'POST',
       signal: req.signal,
       headers: { 'content-type': 'application/json' },
@@ -235,7 +328,7 @@ export async function chatComplete(cfg: LlmConfig, req: ChatRequest): Promise<st
     return text;
   }
   // OpenAI 兼容(OpenAI / DeepSeek / Moonshot / SiliconFlow / 任意自建网关)
-  const { data: raw } = await requestJson('API', `${trimSlash(cfg.baseUrl)}/chat/completions`, {
+  const { data: raw } = await requestJson(cfg, 'API', `${trimSlash(cfg.baseUrl)}/chat/completions`, {
     method: 'POST',
     signal: req.signal,
     headers: {
@@ -292,7 +385,7 @@ function ensureStructured<T>(value: unknown, schema: JsonSchema): T {
 async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Promise<StructuredResponse<T>> {
   const maxTokens = req.maxTokens ?? 16000;
   if (cfg.protocol === 'anthropic') {
-    const { data: unknownData, response } = await requestJson('Anthropic', `${trimSlash(cfg.baseUrl)}/v1/messages`, {
+    const { data: unknownData, response } = await requestJson(cfg, 'Anthropic', `${trimSlash(cfg.baseUrl)}/v1/messages`, {
       method: 'POST',
       signal: req.signal,
       headers: {
@@ -328,7 +421,7 @@ async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Prom
     };
   }
   if (cfg.protocol === 'ollama') {
-    const { data: unknownData, response } = await requestJson('Ollama', `${trimSlash(cfg.baseUrl)}/api/chat`, {
+    const { data: unknownData, response } = await requestJson(cfg, 'Ollama', `${trimSlash(cfg.baseUrl)}/api/chat`, {
       method: 'POST',
       signal: req.signal,
       headers: { 'content-type': 'application/json' },
@@ -358,7 +451,7 @@ async function nativeStructured<T>(cfg: LlmConfig, req: StructuredRequest): Prom
       requestId: response.headers.get('x-request-id') ?? undefined,
     };
   }
-  const { data: unknownData, response } = await requestJson('API', `${trimSlash(cfg.baseUrl)}/chat/completions`, {
+  const { data: unknownData, response } = await requestJson(cfg, 'API', `${trimSlash(cfg.baseUrl)}/chat/completions`, {
     method: 'POST',
     signal: req.signal,
     headers: {
