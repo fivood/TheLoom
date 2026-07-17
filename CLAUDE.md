@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.22.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.22.0):
+- 已发布版本:`v0.23.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.23.0):
+  - **v0.23.0 R9 通用游戏引擎导出** ✅ — 带版本 JSON Schema 的引擎包(zip:数据 + Schema + .d.ts 类型 + README);导出规则(选流程 / 剥布局注释 / 仅引用实体资源);技术名与节点定位等四类索引;内容哈希清单 + 增量包;独立运行库 theloom-runtime(零依赖 ES Module,语义与 Player 一致);examples/engine-demo 无 React 演出示例
   - **v0.22.0 R8 资源原文件闭环** ✅ — 原文件按 SHA-256 内容寻址存储(桌面 `assets/asset-{hash16}.{ext}` / 网页 IndexedDB);播放与下载;视频首帧缩略图;哈希去重;替换保引用;缺失徽标 + 重新定位;删除不吞字节 + 显式孤儿清理;授权字段;绑定文件夹时 IndexedDB 原文件自动落盘
   - **v0.21.0 R7 演出与路径测试** ✅ — 种子化 RNG(mulberry32,同种子掷骰可复现);演出存档/读档(全部运行态 + RNG 快进,本机);节点断点(自动前进暂停,本机);变量监视高亮 + 实体属性;`simulateFlow` 批量路径遍历(确定性枚举 + 合流剪枝,报告覆盖率/不可达/死循环/卡死,可点击跳节点)
   - **v0.20.0 R6 脚本语言重构** ✅ — 自有 lexer/parser/AST/类型检查/解释器(`src/script/`),不再动态执行字符串;错误精确到字符区间;指令支持实体属性读写;ScriptInput 高亮+诊断+补全;变量/实体技术名/字段名/节点技术名重命名联动
@@ -54,7 +55,7 @@
 | ~~R6~~ | ~~v0.20.0~~ | ~~脚本语言重构~~ | ~~解析器 / AST / 类型检查 / 属性读写 / 高亮 / 补全 / 重命名联动~~ | ✅ 已完成(详见「最近变更」) | L |
 | ~~R7~~ | ~~v0.21.0~~ | ~~演出与路径测试~~ | ~~存档 / 种子 / 断点 / 监视 / 路径遍历~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R8~~ | ~~v0.22.0~~ | ~~资源原文件闭环~~ | ~~落盘 / 播放 / 缩略图 / 哈希去重 / 替换 / 缺失重定位 / 授权字段~~ | ✅ 已完成(详见「最近变更」) | M |
-| R9 | v0.23.0 | **通用游戏引擎导出** | 带版本的 JSON Schema;导出规则;引用索引;增量导出;类型生成;独立流程运行库 | 示例游戏可在无 React 环境读取项目并运行对白流程 | L |
+| ~~R9~~ | ~~v0.23.0~~ | ~~通用游戏引擎导出~~ | ~~JSON Schema / 导出规则 / 引用索引 / 增量导出 / 类型生成 / 独立运行库~~ | ✅ 已完成(详见「最近变更」) | L |
 | R10 | v0.24.0 | **高级体检与查询** | 脚本类型错误;无效引用;孤立节点 / 循环 / 时间冲突 / 角色一致性;保存查询 | 所有问题可点击直达;支持按对象类型 / 属性 / 状态组合查询 | M |
 | **R10-A** | **v0.25.0** | **🆕 AI 智能助手(深度)** | 消费 R6 AST → AI 生成 / 改写脚本即时校验;消费 R10 体检结果 → AI 修复方案一键 apply;自然语言 → 保存查询;演出路径分析建议;人物一致性诊断;完整互动剧本生成配置 | AI 建议全部通过类型 / 结构检查后才允许 apply;互动项目生成的变量、条件、指令与分支通过脚本和路径检查,不产生"跑不通"的输出 | L |
 | R11 | v0.26.0 | **完整模板与数据库** | 模块化模板;模板分配 / 继承 / 迁移;扩展到资源 / 文档 / 地图;收藏夹;批量编辑 | 模板新增字段后实例安全迁移;所有主要对象可套用模板 | L |
@@ -118,6 +119,23 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R9 · v0.23.0)
+
+通用游戏引擎导出:
+
+- 新增 `src/engine/`(纯逻辑):
+  - `package.ts`:`buildEnginePackage(project, rules)` → `EnginePackage`(schema `theloom-package` + `schemaVersion 1.0.0`);规则 = 选流程 / `includeLayout` / `includeAnnotations`(默认剥除,连带剥指向注释的边)/ 实体 `referenced`(说话人 + entity/entities 字段传递闭包)/ 资源 `referenced`(仅被挂接);附件 owner 限定在导出范围;资源带 `hash/ext/license/fileName`(接 R8,字节不入包);四类索引(technicalNames / nodes 定位 / speakers / assetOwners);`contentHash`(FNV-1a 双 32 位)per 对象清单;`diffManifests` + `buildEngineDelta`(变更带全量对象、删除只带键)
+  - `typegen.ts`:`generateTypes(pkg)` → 自包含 .d.ts,变量名 / 流程 / 实体 / 资源 / 节点技术名全部字面量联合,变量表接口带描述注释
+  - `schema.ts`:draft-07 JSON Schema(节点 / 边 / 子流程递归 $defs)+ zip 内 README 文本
+- 新增 `src/runtime/`(纯逻辑,零框架依赖):`FlowRuntime` 类复刻 Player 全部行进语义(直通自动前进 / 无出边逐层回溯 / exit 命名引脚 / fragment 默认引脚 / fallback 遮蔽 / once / 条件边过滤 / 2d6 检定红白 / 实体属性读写);输入是结构最小类型(应用内 Flow 与引擎包 JSON 都满足);`seed` 种子演出可复现;`snapshot()/restore()` 存读档(resumeRng 快进,续掷不漂移);`onBeat` 回调
+- **Player / simulate / runtime 三处行进语义必须同步**(各文件头有互指注释)
+- `script.ts` `buildEntityProps` 参数放宽为结构类型 `EntityPropsSource`(运行库与引擎包实体共用)
+- 新增 `vite.runtime.config.ts` + `npm run build:runtime` → `runtime-dist/theloom-runtime.js`(ES Module,~30KB 未压缩,gitignore);`examples/engine-demo/demo.mjs` 纯 Node 读包自动演出(内置示例包,也可传导出的 theloom-package.json + 流程技术名 + 种子)
+- 新增 `components/EngineExportModal.tsx`(工具菜单「引擎包 .zip(游戏引擎)」):流程勾选 + 四项规则 + 实时统计;导出 zip(theloom-package.json / schema.json / types.d.ts / README.md,走 interop/zip);manifest 存 `theloom-engine-manifest-{slotId}`,界面显示与上次导出的 +新增/~变更/−删除;「导出增量 .json」无变化时提示拦截
+- 测试:`engine/engine.test.ts` 8 项(默认规则剥离 / 规则组合 / JSON 往返自洽 / 哈希稳定 / diff+delta / 类型生成 / never 分支 / Schema 对齐)+ `runtime/runtime.test.ts` 8 项(线性 / 选项与 once / 条件与 fallback / 子流程 exit / 实体属性 / 同种子复现 / snapshot-restore / onBeat),运行库测试全部经 JSON 序列化往返消费(即无 React 环境证明);合计 164 项通过
+- 已实测:`node examples/engine-demo/demo.mjs` 全程演出(说话人 / 选项 / 指令改实体属性 / 种子检定)输出正确;浏览器中导出模态规则切换实时改统计、导出 zip 后 manifest 落 localStorage、差异行出现、增量按钮解锁、无变化拦截提示;控制台零错误
+- 注意:引擎包 schemaVersion 独立于应用版本,破坏性改动才升 major;新增节点字段时同步 `cloneNode`、typegen 静态块与 JSON Schema
 
 ## 最近变更(R8 · v0.22.0)
 
@@ -459,6 +477,7 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 npm install
 npm run dev          # http://localhost:5173
 npm run build        # tsc -b + vite build
+npm run build:runtime  # 独立流程运行库 → runtime-dist/theloom-runtime.js
 cd src-tauri && cargo test --lib   # Rust 单元测试
 npm run tauri dev    # 桌面版调试
 npm run tauri build  # 桌面版打包

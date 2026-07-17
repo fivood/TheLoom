@@ -24,6 +24,7 @@ import RecoveryPanel from './components/RecoveryPanel';
 import DialogHost from './components/Dialog';
 import ImportPreview from './components/ImportPreview';
 import FindReplace from './components/FindReplace';
+import EngineExportModal from './components/EngineExportModal';
 import Icon, { type IconName } from './components/Icon';
 import { projectToXlsx } from './interop/projectXlsx';
 import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
@@ -71,6 +72,7 @@ export default function App() {
   const [palettes, setPalettes] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
   const [findReplace, setFindReplace] = useState(false);
+  const [engineExport, setEngineExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
   const [projectImport, setProjectImport] = useState(false);
   const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx'; file: File } | null>(null);
@@ -346,6 +348,12 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); exportProject(project); }}>
                     JSON 完整备份
                   </button>
+                  <button
+                    title="带版本 JSON Schema 的引擎包(zip):数据 + 索引 + 类型定义;配合独立运行库在任何 JS 环境演出"
+                    onClick={() => { setToolsOpen(false); setEngineExport(true); }}
+                  >
+                    <Icon name="braces" size={14} /> 引擎包 .zip(游戏引擎)
+                  </button>
                   <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-实体表.csv`, entitiesToCsv(project)); }}>
                     实体表 CSV
                   </button>
@@ -469,6 +477,7 @@ export default function App() {
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
       {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
       {findReplace && <FindReplace onClose={() => setFindReplace(false)} />}
+      {engineExport && <EngineExportModal onClose={() => setEngineExport(false)} />}
       {importFile && (
         <ImportPreview mode={importFile.mode} file={importFile.file} onClose={() => setImportFile(null)} />
       )}

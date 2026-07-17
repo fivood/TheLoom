@@ -89,8 +89,15 @@ export function applyInstructions(text: string, vars: Record<string, VarValue>, 
   return warnings;
 }
 
+/** buildEntityProps 的最小结构要求:应用内 Entity 与引擎包实体都满足(R9 独立运行库共用) */
+export interface EntityPropsSource {
+  id: string;
+  technicalName?: string;
+  fields: { label: string; value: string; type?: string }[];
+}
+
 /** 实体属性表:技术名 → { 字段名 → 标量值 / 被引用实体技术名 }(演出运行态的初始值) */
-export function buildEntityProps(entities: Entity[]): Record<string, Record<string, VarValue>> {
+export function buildEntityProps(entities: EntityPropsSource[]): Record<string, Record<string, VarValue>> {
   const out: Record<string, Record<string, VarValue>> = {};
   const byId = new Map(entities.map((e) => [e.id, e]));
   for (const e of entities) {

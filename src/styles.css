@@ -1196,6 +1196,19 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .asset-file-state { font-size: 12px; color: var(--text-dim); }
 .asset-file-state.warn { color: var(--danger); font-weight: 600; }
+
+/* ---------- 引擎包导出(R9) ---------- */
+.engine-flow-list {
+  max-height: 180px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.engine-flow-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; padding: 2px 0; cursor: pointer;
+}
+.engine-flow-row input[type='checkbox'] { width: auto; margin: 0; }
+.engine-flow-row .hint { font-size: 11px; }
 .asset-thumb-empty { display: flex; align-items: center; justify-content: center; height: 100%; }
 .asset-meta { padding: 8px 10px; }
 .asset-name {
