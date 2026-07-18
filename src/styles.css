@@ -841,8 +841,27 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
+  /* 每行统一最小高度,避免 hover 造成的微小尺寸差异触发换行抖动 */
+  row-gap: 8px;
+}
+.toolbar > button, .toolbar > select, .toolbar > input, .toolbar > .doc-mode-switch {
+  min-height: 30px;
+  box-sizing: border-box;
 }
 .toolbar .hint { color: var(--text-faint); font-size: 12px; margin-left: auto; }
+
+/* 「＋ 新 XX」这种"添加对象"按钮:CTA 但不与 .primary(表示当前激活)混淆 */
+.btn-create {
+  background: var(--accent-soft);
+  border: 1px dashed var(--border-light);
+  color: var(--text);
+  font-weight: 500;
+}
+.btn-create:hover {
+  background: var(--bg-hover);
+  border-color: var(--focus);
+  border-style: solid;
+}
 
 /* ---------- 流程节点 ---------- */
 

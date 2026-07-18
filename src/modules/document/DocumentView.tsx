@@ -293,7 +293,7 @@ export default function DocumentView() {
 
       <div className="pane-col">
         <div className="toolbar">
-          <button className="primary" onClick={createDoc}>＋ 新场景</button>
+          <button className="btn-create" onClick={createDoc}>＋ 新场景</button>
           <div className="doc-mode-switch">
             <button className={mode === 'writing' ? 'primary' : 'ghost'} onClick={() => setMode('writing')}>写作</button>
             <button className={mode === 'structure' ? 'primary' : 'ghost'} onClick={() => setMode('structure')}>结构</button>
