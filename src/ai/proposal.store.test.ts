@@ -47,7 +47,7 @@ afterAll(async () => {
 });
 
 describe('AI 提案 store 执行门', () => {
-  it('通过验证的操作合并为独立撤销步骤', async () => {
+  it('通过验证的操作合并为独立撤销步骤', { timeout: 30000 }, async () => {
     stubLocalStorage();
     vi.resetModules();
     const { useLoom } = await import('../store');

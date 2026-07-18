@@ -20,7 +20,8 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.24.0`(package.json / package-lock.json / tauri.conf.json / Cargo.toml / Cargo.lock 同步)
+- 已发布版本:`v0.25.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.25.0`;R10-A(AI 智能助手)六批全部完成;下一批 R11 完整模板与数据库
 - 当前基线:`v0.24.0`;包含 v0.23.1 文件夹模式稳定性修复与完整 R10
 - 已交付的能力(截至 v0.23.0):
   - **v0.23.0 R9 通用游戏引擎导出** ✅ — 带版本 JSON Schema 的引擎包(zip:数据 + Schema + .d.ts 类型 + README);导出规则(选流程 / 剥布局注释 / 仅引用实体资源);技术名与节点定位等四类索引;内容哈希清单 + 增量包;独立运行库 theloom-runtime(零依赖 ES Module,语义与 Player 一致);examples/engine-demo 无 React 演出示例
@@ -59,7 +60,7 @@ R10-A 详细设计见 `docs/R10A_AI_ASSISTANT.md`:模型只拥有白名单只读
 5. **R10-A5 · 完整互动项目生成**:✅ 项目导入向导新增「互动游戏剧本」类型(分支密度 / 目标结局数 / 检定开关 / 失败回路配置);计划阶段产出变量与结局清单供审阅;生成阶段在 R5-A 内容结构上叠加流程(hub 选择 / 条件 / 指令 / 检定 / fallback,BFS 分层自动布局,id 重映射 + 技术名消歧);`verifyInteractiveImport` 在克隆项目上 audit 前后对比(issueKey 与 A3 dry-run 同口径,覆盖脚本 error / 悬挂引用 / 卡死 / 死循环 / 不可达)+ 每个结局 simulateFlow 可达断言;blocked 不显示导入按钮,只能调整后重新生成
 6. **R10-A6 · 收尾**:大项目性能与成本基线、隐私、取消 / 离线恢复、浏览器 / Tauri、主题 / 键盘与发布回归
 
-当前开发:R10-A1 至 R10-A5 已完成;下一批 R10-A6 收尾(性能 / 隐私 / 回归),完成后发布 v0.25.0。R10-A5 实现要点:`src/ai/interactiveImport.ts`(计划 / 生成扩展、normalize 宽容修复 condition/check 缺失引脚、`buildInteractiveImportPreview` 复用 R5-A 预检并叠加流程 / 变量 / 结局、验收闭环);向导 `interactive` 分流;新项目槽位默认流程与生成流程可能重名,按 technicalName 定位。R10-A3 实现要点:`src/ai/fixAssistant.ts`(提案生成)、`src/ai/panelBus.ts`(体检 → 助手的任务通道)、`AiAssistantPanel` 修复任务 UI、`AI_FIX_OPERATION_SCHEMAS` 从提案 schema 拆出复用;路径安全依赖 auditProject 内置的全项目 simulateFlow(不要另加重复的路径校验层)。
+当前开发:R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完整项目导入向导补取消按钮(AbortSignal 传入 chatComplete,`已取消 / cancelled / aborted` 归类为 cancel 提示);README 补 AI 隐私说明(凭据、发送范围、绝不擅自修改、可切换服务商、可取消);30 万字级 auditProject ~1.3s、verifyInteractiveImport ~3.3s,深色主题下 AI 助手、导入向导与所有面板正确渲染。R10-A5 实现要点:`src/ai/interactiveImport.ts`(计划 / 生成扩展、normalize 宽容修复 condition/check 缺失引脚、`buildInteractiveImportPreview` 复用 R5-A 预检并叠加流程 / 变量 / 结局、验收闭环);向导 `interactive` 分流;新项目槽位默认流程与生成流程可能重名,按 technicalName 定位。R10-A3 实现要点:`src/ai/fixAssistant.ts`(提案生成)、`src/ai/panelBus.ts`(体检 → 助手的任务通道)、`AiAssistantPanel` 修复任务 UI、`AI_FIX_OPERATION_SCHEMAS` 从提案 schema 拆出复用;路径安全依赖 auditProject 内置的全项目 simulateFlow(不要另加重复的路径校验层)。
 
 ### 路线图 · 通往 v1.0(按顺序开发,一批一 minor)
 

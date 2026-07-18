@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../store';
 import { useNav } from '../search';
 import Icon from './Icon';
@@ -45,7 +45,10 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const interactive = config.projectKind === 'interactive';
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const validMaterials = useMemo(() => materials.filter((m) => m.text.trim()), [materials]);
   const totalChars = useMemo(() => validMaterials.reduce((s, m) => s + m.text.length, 0), [validMaterials]);
@@ -63,13 +66,13 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
     setMaterials((ms) => [...ms.filter((m) => m.text.trim() || m.name.trim()), ...added]);
   };
 
-  const callLlm = async (purpose: 'plan' | 'generate', system: string, user: string, maxTokens: number): Promise<string> => {
+  const callLlm = async (purpose: 'plan' | 'generate', system: string, user: string, maxTokens: number, signal: AbortSignal): Promise<string> => {
     const cfg = loadLlmConfig();
     if (!llmHasCredential(cfg)) {
       throw new Error('还没有配置 API Key。请先在「工具 → AI 设置」里完成配置。');
     }
     try {
-      const output = await chatComplete(cfg, { system, user, maxTokens });
+      const output = await chatComplete(cfg, { system, user, maxTokens, signal });
       update((p) => pushAiLog(p, { provider: cfg.provider, model: cfg.model, purpose, inChars: user.length, outChars: output.length, ok: true }));
       return output;
     } catch (e) {
@@ -79,20 +82,27 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
     }
   };
 
+  const cancel = () => abortRef.current?.abort();
+
+  const isAbort = (e: unknown) => (e instanceof DOMException && e.name === 'AbortError')
+    || (e instanceof Error && (e.message.includes('已取消') || e.message.includes('cancelled') || e.message.includes('aborted')));
+
   const runPlan = async () => {
-    setBusy('正在生成项目计划…(长材料可能需要一两分钟)');
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setBusy('正在生成项目计划…(长材料可能需要一两分钟;可随时停止)');
     setError(null);
     try {
       const { text, truncated } = materialsToText(validMaterials);
       const truncWarn = truncated ? ['材料超过 20 万字,超出部分未参与分析'] : [];
       if (interactive) {
-        const output = await callLlm('plan', buildInteractivePlanPrompt(iOptions), text, 8000);
+        const output = await callLlm('plan', buildInteractivePlanPrompt(iOptions), text, 8000, controller.signal);
         const { plan: parsed, extras: ext, warnings } = normalizeInteractivePlan(parseModelJson(output));
         setPlan(parsed);
         setExtras(ext);
         setPipelineWarnings([...truncWarn, ...warnings]);
       } else {
-        const output = await callLlm('plan', buildPlanPrompt(config), text, 8000);
+        const output = await callLlm('plan', buildPlanPrompt(config), text, 8000, controller.signal);
         const { plan: parsed, warnings } = normalizePlan(parseModelJson(output));
         setPlan(parsed);
         setExtras(null);
@@ -100,29 +110,33 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
       }
       setStep('plan');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (isAbort(e)) setError('已停止:未收到模型响应,可修改材料或提示词后重试');
+      else setError(e instanceof Error ? e.message : String(e));
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setBusy(null);
     }
   };
 
   const runGenerate = async () => {
     if (!plan) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setBusy(interactive
-      ? '正在生成互动候选数据并执行脚本 / 引用 / 路径验收…(这一步最慢)'
-      : '正在按计划生成完整候选数据…(这一步最慢,请耐心等待)');
+      ? '正在生成互动候选数据并执行脚本 / 引用 / 路径验收…(这一步最慢;可随时停止)'
+      : '正在按计划生成完整候选数据…(这一步最慢;可随时停止)');
     setError(null);
     try {
       const { text } = materialsToText(validMaterials);
       if (interactive && extras) {
-        const output = await callLlm('generate', buildInteractiveGeneratePrompt(plan, extras, iOptions), text, 32000);
+        const output = await callLlm('generate', buildInteractiveGeneratePrompt(plan, extras, iOptions), text, 32000, controller.signal);
         const { data, warnings } = normalizeInteractiveGenerated(parseModelJson(output));
         const built = buildInteractiveImportPreview(project, plan, extras, data, validMaterials, [...pipelineWarnings, ...warnings]);
         setIPreview(built);
         setVerification(verifyInteractiveImport(project, built));
         setPreview(built.base);
       } else {
-        const output = await callLlm('generate', buildGeneratePrompt(plan, config), text, 32000);
+        const output = await callLlm('generate', buildGeneratePrompt(plan, config), text, 32000, controller.signal);
         const { data, warnings } = normalizeGenerated(parseModelJson(output));
         const built = buildProjectImportPreview(project, plan, data, validMaterials, [...pipelineWarnings, ...warnings]);
         setPreview(built);
@@ -131,8 +145,10 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
       }
       setStep('preview');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (isAbort(e)) setError('已停止:未收到模型响应,可返回上一步重试');
+      else setError(e instanceof Error ? e.message : String(e));
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setBusy(null);
     }
   };
@@ -163,7 +179,12 @@ export default function ProjectImportWizard({ onClose }: { onClose: () => void }
           <button className="ghost icon-btn" onClick={onClose}>×</button>
         </div>
         <div className="sync-body" style={{ overflowY: 'auto' }}>
-          {busy && <div className="empty-hint" style={{ padding: 20 }}>{busy}</div>}
+          {busy && (
+            <div className="empty-hint" style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div>{busy}</div>
+              <button onClick={cancel}>停止</button>
+            </div>
+          )}
           {error && (
             <div className="field">
               <label style={{ color: 'var(--danger)' }}>出错了</label>

@@ -173,6 +173,8 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<AiImportPreview | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const readFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -193,12 +195,16 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
       setError('还没有配置 API Key。请先在「工具 → AI 设置」里完成配置。');
       return;
     }
+    const controller = new AbortController();
+    abortRef.current = controller;
     setBusy(true);
     setError(null);
     setPreview(null);
     const source = text.slice(0, 200000);
+    const isAbort = (e: unknown) => (e instanceof DOMException && e.name === 'AbortError')
+      || (e instanceof Error && (e.message.includes('已取消') || e.message.includes('cancelled') || e.message.includes('aborted')));
     try {
-      const output = await chatComplete(cfg, { system: prompt, user: source });
+      const output = await chatComplete(cfg, { system: prompt, user: source, signal: controller.signal });
       const { data, warnings } = normalizeExtracted(parseModelJson(output));
       const built = buildAiImportPreview(project, data, warnings);
       setPreview(built);
@@ -208,12 +214,13 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
       }));
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      setError(message);
+      setError(isAbort(e) ? '已停止:未收到模型响应' : message);
       update((p) => pushAiLog(p, {
         provider: cfg.provider, model: cfg.model, purpose: 'extract',
         inChars: source.length, outChars: 0, ok: false, error: message.slice(0, 200),
       }));
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setBusy(false);
     }
   };
