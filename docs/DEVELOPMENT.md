@@ -67,12 +67,13 @@ npx wrangler pages dev dist --d1=SYNC_DB --port 8788
 ├── project.json.bak   自动恢复副本(由应用管理)
 ├── entities/          实体卡,每个实体一个 Markdown 文件(YAML frontmatter)
 ├── research/          资料卡,每张卡一个 Markdown 文件
-├── documents/         文档,每篇一个 Markdown 文件(结构化块 + 剧本预览)
+├── documents/         场景正文,按 Navigator 卷 / 章建立真实子目录
+│   └── 第一卷/第一章/场景.md  可读正文 + 隐藏 loom:block 稳定结构标记
 └── assets/            实体头像等二进制资源
 ```
 
 - `entities/`、`research/`、`documents/` 下新建的 `.md` 文件在下次加载时自动导入,文件名即名称,frontmatter 中 `kind: character` 可指定实体类型
-- 实体、资料卡和文档的 Navigator 归属保存在 frontmatter 的 `folderId`;文件夹树本身保存在 `project.json` 的 `folders`
+- 实体、资料卡和文档的 Navigator 归属与收藏状态保存在 frontmatter 的 `folderId` / `favorite`;文件夹树本身保存在 `project.json` 的 `folders`
 - 在应用内删除实体、资料卡或文档会同步删除对应文件
 - `project.json` 为结构化数据,不建议手工编辑
 - 文件写入先落到临时文件再替换;`project.json.bak` 最多每 10 分钟更新一次,主文件损坏时桌面端自动回退并在顶栏提示

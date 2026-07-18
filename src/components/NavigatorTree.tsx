@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uid, useLoom } from '../store';
 import { confirmDialog, promptText } from '../dialog';
 import type { Folder, FolderModule } from '../types';
+import { setObjectFavorites } from '../batch';
+import BatchEditDialog from './BatchEditDialog';
 import PaneHandle from './PaneHandle';
 
 interface NavigatorItem {
   id: string;
+  favorite?: boolean;
   folderId?: string;
   order?: number;
 }
@@ -93,6 +96,8 @@ export default function NavigatorTree<T extends NavigatorItem>({
   const { addFolder, updateFolder, removeFolder, update } = useLoom();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(folders.map((folder) => folder.id)));
   const [multiSelect, setMultiSelect] = useState<Set<string>>(new Set());
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [batchEditIds, setBatchEditIds] = useState<string[] | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const dragRef = useRef<{ kind: 'item' | 'folder'; id: string } | null>(null);
   const rowRects = useRef(new Map<string, { top: number; height: number }>());
@@ -100,6 +105,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
   const foldersByParent = useMemo(() => {
     const result = new Map<string | null, Folder[]>();
+    if (favoritesOnly) return result;
     for (const folder of folders) {
       const parentId = folder.parentId ?? null;
       const list = result.get(parentId) ?? [];
@@ -108,19 +114,22 @@ export default function NavigatorTree<T extends NavigatorItem>({
     }
     for (const list of result.values()) byOrder(list);
     return result;
-  }, [folders]);
+  }, [folders, favoritesOnly]);
   const itemsByFolder = useMemo(() => {
     const result = new Map<string | null, T[]>();
     for (const item of items) {
-      const folderId = item.folderId && folderById.has(item.folderId) ? item.folderId : null;
+      if (favoritesOnly && !item.favorite) continue;
+      const folderId = favoritesOnly ? null : item.folderId && folderById.has(item.folderId) ? item.folderId : null;
       const list = result.get(folderId) ?? [];
       list.push(item);
       result.set(folderId, list);
     }
     for (const list of result.values()) byOrder(list);
     return result;
-  }, [items, folderById]);
+  }, [items, folderById, favoritesOnly]);
   const folderRows = useMemo(() => flattenFolders(folders), [folders]);
+  const favoriteCount = items.filter((item) => item.favorite).length;
+  const visibleItems = favoritesOnly ? items.filter((item) => item.favorite) : items;
 
   useEffect(() => {
     const selected = items.find((item) => item.id === selectedId);
@@ -304,6 +313,10 @@ export default function NavigatorTree<T extends NavigatorItem>({
     else ids.forEach((id) => onMove(id, fid));
   };
 
+  const toggleFavorite = (item: T) => {
+    update((project) => setObjectFavorites(project, module, [item.id], !item.favorite));
+  };
+
   const renderTree = (parentId: string | null, depth: number, trail: Set<string>): ReactNode => {
     const pad = 8 + depth * 14;
     const siblingFolders = foldersByParent.get(parentId) ?? [];
@@ -365,6 +378,14 @@ export default function NavigatorTree<T extends NavigatorItem>({
               <span className="navigator-label">{getLabel(item)}</span>
               {getDetail?.(item) && <span className="navigator-detail">{getDetail(item)}</span>}
               {renderItemMeta?.(item)}
+              <button
+                className={`ghost navigator-favorite${item.favorite ? ' active' : ''}`}
+                title={item.favorite ? '取消收藏' : '加入收藏'}
+                aria-label={`${item.favorite ? '取消收藏' : '收藏'}${getLabel(item)}`}
+                onClick={(event) => { event.stopPropagation(); toggleFavorite(item); }}
+              >
+                {item.favorite ? '★' : '☆'}
+              </button>
               {renderItemActions?.(item)}
               <select
                 className="move-to-folder"
@@ -400,7 +421,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
       return;
     }
     if (event.shiftKey && selectedId) {
-      const visible = items.map((it) => it.id);
+      const visible = visibleItems.map((it) => it.id);
       const i = visible.indexOf(id);
       const j = visible.indexOf(selectedId);
       if (i >= 0 && j >= 0) {
@@ -418,10 +439,21 @@ export default function NavigatorTree<T extends NavigatorItem>({
   const showBatch = batchIds.length > 1;
 
   return (
+    <>
     <div className="side-list navigator-side">
       <div className="side-head">
         <span>{title}</span>
         <div className="navigator-head-actions">
+          <button
+            className={`ghost navigator-head-btn navigator-favorites-btn${favoritesOnly ? ' active' : ''}`}
+            onClick={() => {
+              setFavoritesOnly((value) => !value);
+              setMultiSelect(new Set());
+            }}
+            title={favoritesOnly ? '返回全部内容' : '只看收藏'}
+          >
+            <span className="btn-glyph">★</span> 收藏 {favoriteCount}
+          </button>
           <button className="ghost navigator-head-btn" onClick={() => createFolder(null)} title="新建文件夹(用于分组归档)">
             <span className="btn-glyph">▤</span> 文件夹
           </button>
@@ -434,8 +466,11 @@ export default function NavigatorTree<T extends NavigatorItem>({
       </div>
       <div className="items">
         {renderTree(null, 0, new Set())}
-        {items.length === 0 && folders.length === 0 && (
+        {!favoritesOnly && items.length === 0 && folders.length === 0 && (
           <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部「＋ {createLabel}」新建,或「▤ 文件夹」建立分组</div>
+        )}
+        {favoritesOnly && favoriteCount === 0 && (
+          <div className="empty-hint navigator-empty">还没有收藏<br />点击条目右侧的 ☆ 即可加入收藏夹</div>
         )}
       </div>
       <PaneHandle varName="--pane-nav" side="right" />
@@ -458,9 +493,17 @@ export default function NavigatorTree<T extends NavigatorItem>({
               <option key={folder.id} value={folder.id}>{`${'　'.repeat(fd)}${folder.name}`}</option>
             ))}
           </select>
+          <button className="ghost navigator-batch-edit" onClick={() => setBatchEditIds(batchIds)}>批量编辑…</button>
           <button className="ghost icon-btn" title="取消多选" onClick={() => setMultiSelect(new Set())}>×</button>
         </div>
       )}
     </div>
+    {batchEditIds && (
+      <BatchEditDialog module={module} ids={batchEditIds} onClose={() => {
+        setBatchEditIds(null);
+        setMultiSelect(new Set());
+      }} />
+    )}
+    </>
   );
 }

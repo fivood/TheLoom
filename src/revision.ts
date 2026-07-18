@@ -4,6 +4,7 @@ import type { DocBlock, Entity, Project } from './types';
 
 export function blockLines(b: DocBlock, entityName: (id?: string) => string): string[] {
   switch (b.type) {
+    case 'paragraph': return b.text.split('\n');
     case 'heading': return [`【场景】${b.text}`];
     case 'subheading': return [`${b.level === 2 ? '##' : '###'} ${b.text}`];
     case 'action': return b.text.split('\n');

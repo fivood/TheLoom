@@ -343,7 +343,40 @@ fn read_md_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
     Ok(out)
 }
 
-/// 读取项目文件夹:project.json + entities/*.md + research/*.md + documents/*.md
+fn read_md_dir_recursive(dir: &Path) -> Result<Vec<MdFile>, String> {
+    let mut out = Vec::new();
+    fn visit(base: &Path, current: &Path, out: &mut Vec<MdFile>) -> Result<(), String> {
+        for entry in fs::read_dir(current).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit(base, &path, out)?;
+                continue;
+            }
+            let is_md = path
+                .extension()
+                .map(|e| e.eq_ignore_ascii_case("md"))
+                .unwrap_or(false);
+            if !is_md {
+                continue;
+            }
+            let name = path
+                .strip_prefix(base)
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            let content = fs::read_to_string(&path).map_err(|e| format!("{name}: {e}"))?;
+            out.push(MdFile { name, content });
+        }
+        Ok(())
+    }
+    if dir.is_dir() {
+        visit(dir, dir, &mut out)?;
+    }
+    Ok(out)
+}
+
+/// 读取项目文件夹:project.json + entities/*.md + research/*.md + documents/**/*.md
 #[tauri::command]
 fn load_project_dir(dir: String) -> Result<ProjectFiles, String> {
     let base = PathBuf::from(&dir);
@@ -367,7 +400,7 @@ fn load_project_dir(dir: String) -> Result<ProjectFiles, String> {
         recovered_from_backup,
         entities: read_md_dir(&base.join("entities"))?,
         research: read_md_dir(&base.join("research"))?,
-        documents: read_md_dir(&base.join("documents"))?,
+        documents: read_md_dir_recursive(&base.join("documents"))?,
         assets: read_asset_dir(&base.join("assets"))?,
     })
 }
@@ -518,7 +551,7 @@ mod tests {
                     base64: false,
                 },
                 WriteSpec {
-                    rel_path: "documents/草稿.md".into(),
+                    rel_path: "documents/第一卷/第一章/草稿.md".into(),
                     content: "---\nid: d1\n---\n正文".into(),
                     base64: false,
                 },
@@ -542,7 +575,7 @@ mod tests {
         assert_eq!(loaded.entities[0].name, "林晚.md");
         assert_eq!(loaded.research.len(), 1);
         assert_eq!(loaded.documents.len(), 1);
-        assert_eq!(loaded.documents[0].name, "草稿.md");
+        assert_eq!(loaded.documents[0].name, "第一卷/第一章/草稿.md");
         assert_eq!(loaded.assets.len(), 1);
         assert_eq!(loaded.assets[0].content, png_b64); // 二进制往返一致
 
@@ -559,7 +592,7 @@ mod tests {
             }],
             vec![
                 "entities/林晚.md".into(),
-                "documents/草稿.md".into(),
+                "documents/第一卷/第一章/草稿.md".into(),
                 "assets/entity-e1.png".into(),
             ],
         )

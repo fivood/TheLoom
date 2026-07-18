@@ -4,6 +4,10 @@ import type { DocBlock, Entity } from '../../types';
 /** 只读的文章式块渲染:文档正文全篇视图与连续稿共用 */
 export default function StaticBlock({ b, entities }: { b: DocBlock; entities: Entity[] }) {
   switch (b.type) {
+    case 'paragraph':
+      return b.text
+        ? <p className="ms-paragraph"><RichText text={b.text} /></p>
+        : <p className="ms-paragraph doc-flow-empty">(空正文 · 点击编辑)</p>;
     case 'heading':
       return <h3 className="ms-heading">{b.text || '(未命名场景)'}</h3>;
     case 'subheading':

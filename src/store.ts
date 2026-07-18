@@ -732,6 +732,7 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeDocument: (id) => commit((p) => {
       p.documents = p.documents.filter((x) => x.id !== id);
+      for (const flow of p.flows) if (flow.documentId === id) flow.documentId = undefined;
       for (const a of p.arcs ?? []) if (a.docId === id) a.docId = undefined;
       for (const f of p.foreshadows ?? []) {
         f.plants = f.plants.filter((ref) => ref.docId !== id);

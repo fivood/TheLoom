@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import type { ReactNode } from 'react';
+import type { KeyboardEventHandler, ReactNode } from 'react';
 
 /** 行内 Markdown 渲染:**bold** / *italic* / ~~strike~~。
  * React 默认转义字符串,无 XSS 风险。可嵌套(如 **粗 *粗斜* 粗**)。 */
@@ -43,11 +43,14 @@ function parseInline(text: string, keyPrefix = ''): ReactNode[] {
 }
 
 /** 带格式工具栏的 textarea:点 B/I/S 在选区两侧包夹标记 */
-export function RichTextInput({ value, onChange, rows = 5, placeholder }: {
+export function RichTextInput({ value, onChange, rows = 5, placeholder, inputId, onKeyDown, onFocus }: {
   value: string;
   onChange: (v: string) => void;
   rows?: number;
   placeholder?: string;
+  inputId?: string;
+  onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>;
+  onFocus?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const wrap = (marker: string) => {
@@ -71,7 +74,16 @@ export function RichTextInput({ value, onChange, rows = 5, placeholder }: {
         <button type="button" onClick={() => wrap('~~')} title="删除线 ~~"><s>S</s></button>
         <span className="hint" style={{ fontSize: 11 }}>行内标记 **粗** *斜* ~~删~~</span>
       </div>
-      <textarea ref={ref} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+      <textarea
+        ref={ref}
+        data-doc-input={inputId}
+        rows={rows}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        placeholder={placeholder}
+      />
     </div>
   );
 }

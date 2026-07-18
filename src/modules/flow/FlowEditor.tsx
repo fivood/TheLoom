@@ -266,14 +266,26 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               const f = p.flows.find((x) => x.id === flow.id) ?? flow;
               const unitIds = new Set<string>();
               walkFlowNodes(f.nodes, (n) => { if (typeof n.data.unitId === 'string') unitIds.add(n.data.unitId); });
-              const existing = p.documents.find((d) => d.blocks.some((b) => b.unitId && unitIds.has(b.unitId)));
+              const existing = p.documents.find((d) =>
+                d.id === f.documentId || d.linkedFlowId === f.id || d.blocks.some((b) => b.unitId && unitIds.has(b.unitId)));
               if (existing) {
+                if (existing.linkedFlowId !== f.id || f.documentId !== existing.id) {
+                  useLoom.getState().update((p2) => {
+                    const linkedDoc = p2.documents.find((d) => d.id === existing.id);
+                    const linkedFlow = p2.flows.find((x) => x.id === f.id);
+                    if (linkedDoc) linkedDoc.linkedFlowId = f.id;
+                    if (linkedFlow) linkedFlow.documentId = existing.id;
+                  });
+                }
                 useNav.getState().go({ tab: 'documents', docId: existing.id });
                 return;
               }
               const doc = flowToDocument(f, p.units ?? []);
+              doc.linkedFlowId = f.id;
               useLoom.getState().update((p2) => {
                 p2.documents.push(doc);
+                const linkedFlow = p2.flows.find((x) => x.id === f.id);
+                if (linkedFlow) linkedFlow.documentId = doc.id;
                 if (doc.category && !p2.documentCategories.includes(doc.category)) p2.documentCategories.push(doc.category);
               });
               useNav.getState().go({ tab: 'documents', docId: doc.id });
@@ -622,7 +634,10 @@ export default function FlowEditor() {
   };
   const removeFlow = async (id: string) => {
     if (!await confirmDialog({ message: '删除该流程及其全部节点?', danger: true, confirmText: '删除' })) return;
-    update((p) => { p.flows = p.flows.filter((x) => x.id !== id); });
+    update((p) => {
+      p.flows = p.flows.filter((x) => x.id !== id);
+      for (const d of p.documents) if (d.linkedFlowId === id) d.linkedFlowId = undefined;
+    });
     if (activeId === id) { setActiveId(null); setPath([]); }
   };
 

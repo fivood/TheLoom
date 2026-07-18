@@ -119,6 +119,21 @@ describe('文档转流程共享单元', () => {
     expect(flow.nodes[1].data.unitId).toBe(doc.blocks[1].unitId);
     expect(flow.nodes[3].data.unitId).toBe(doc.blocks[3].unitId);
   });
+
+  it('普通正文默认不进流程,显式节拍正文才生成节点并记录文档关联', () => {
+    const doc: Document = {
+      id: 'doc-prose', name: '长篇场景', category: '正文', notes: '', createdAt: 1, updatedAt: 1,
+      blocks: [
+        { id: 'p1', type: 'paragraph', text: '普通正文', flowRole: 'none' },
+        { id: 'p2', type: 'paragraph', text: '转折节拍', flowRole: 'beat', unitId: 'unit-p2' },
+        { id: 'd1', type: 'dialogue', text: '继续走。', unitId: 'unit-d1' },
+      ],
+    };
+    const flow = documentToFlow(doc);
+    expect(flow.documentId).toBe(doc.id);
+    expect(flow.nodes).toHaveLength(2);
+    expect(flow.nodes.map((node) => node.data.unitId)).toEqual(['unit-p2', 'unit-d1']);
+  });
 });
 
 describe('叙事单元双向同步(commit 语义)', () => {

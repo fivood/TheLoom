@@ -187,6 +187,8 @@ function speakerName(b: DocBlock, entities: Entity[]): string {
 
 function blockToLines(b: DocBlock, entities: Entity[]): string[] {
   switch (b.type) {
+    case 'paragraph':
+      return [b.text || '', ''];
     case 'heading':
       return [`## ${b.text || '(未命名场景)'}`, ''];
     case 'subheading': {

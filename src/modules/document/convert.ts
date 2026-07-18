@@ -53,13 +53,16 @@ export function documentToFlow(doc: Document): Flow {
   };
 
   for (const b of doc.blocks) {
-    // 写作组织块(subheading / quote / list / note)不进入流程
-    if (DOC_WRITING_TYPES.has(b.type)) continue;
+    if (b.flowRole === 'none') continue;
+    if (DOC_WRITING_TYPES.has(b.type) && !(b.type === 'paragraph' && (b.flowRole === 'beat' || b.flowRole === 'node'))) continue;
 
     let node: FlowNode | null = null;
     let branchHandles: HandleSpec[] = [{ id: null }];
 
     switch (b.type) {
+      case 'paragraph':
+        node = makeNode('dialogue', { text: b.text, title: '', unitId: b.unitId }, x, y);
+        break;
       case 'heading':
         node = makeNode('fragment', { title: b.text, unitId: b.unitId }, x, y);
         break;
@@ -101,7 +104,7 @@ export function documentToFlow(doc: Document): Flow {
     x += SPACING_X;
   }
 
-  return { id: uid(), name: doc.name || '新流程', nodes, edges };
+  return { id: uid(), name: doc.name || '新流程', documentId: doc.id, nodes, edges };
 }
 
 interface FlowContainer {
@@ -188,6 +191,7 @@ export function flowToDocument(flow: Flow, units: NarrativeUnit[]): Document {
   return {
     id: uid(),
     name: `${flow.name || '流程'} · 剧本视图`,
+    linkedFlowId: flow.id,
     category: '剧本草稿',
     blocks: blocks.length ? blocks : [{ id: uid(), type: 'note', text: '(此流程没有可展示的叙事节点)' }],
     notes: `由流程「${flow.name}」生成的剧本视图;正文与流程节点共享叙事单元,双向同步。`,

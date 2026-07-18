@@ -73,6 +73,7 @@ export interface ObjectTemplate {
 
 export interface Entity {
   id: ID;
+  favorite?: boolean;
   /** 所属实体文件夹 id;空 = 未分组 */
   folderId?: ID;
   /** Navigator 树内手动排序序号;空 = 按默认(创建时间)排序 */
@@ -181,6 +182,9 @@ export interface FlowEdge {
 export interface Flow {
   id: ID;
   name: string;
+  favorite?: boolean;
+  /** 关联的场景文档 id;用于文档—流程双视图定位与结构更新 */
+  documentId?: ID;
   /** 技术名:项目内唯一,用于跳转与导出,如 act1_rain */
   technicalName?: string;
   /** 所属文件夹 id(null / undefined = 未分组);Navigator 树用 */
@@ -293,6 +297,7 @@ export interface MapDoc {
 
 export interface ResearchCard {
   id: ID;
+  favorite?: boolean;
   /** 所属资料文件夹 id;空 = 未分组 */
   folderId?: ID;
   /** Navigator 树内手动排序序号;空 = 按默认(置顶 + 创建时间)排序 */
@@ -339,6 +344,7 @@ export const ASSET_KIND_ICON: Record<AssetKind, 'image' | 'music' | 'film' | 'ar
 
 export interface Asset {
   id: ID;
+  favorite?: boolean;
   /** 所属资源文件夹 id;空 = 未分组 */
   folderId?: ID;
   /** Navigator 树内手动排序序号;空 = 按默认(创建时间倒序)排序 */
@@ -408,6 +414,7 @@ export interface NarrativeUnit {
  * 写作块(subheading / list / quote)只用于长篇写作组织,转流程时跳过。
  */
 export type DocBlockType =
+  | 'paragraph'    // 普通正文(默认不进入流程)
   | 'heading'      // 场景标题 → fragment
   | 'subheading'   // 子标题(不进入流程,写作层级组织)
   | 'action'       // 动作/旁白 → dialogue(无说话人)
@@ -420,7 +427,8 @@ export type DocBlockType =
   | 'note';        // 注释 → 不进入流程
 
 export const DOC_BLOCK_LABEL: Record<DocBlockType, string> = {
-  heading: '场景',
+  paragraph: '正文',
+  heading: '场景锚点',
   subheading: '子标题',
   action: '动作',
   dialogue: '对白',
@@ -433,7 +441,9 @@ export const DOC_BLOCK_LABEL: Record<DocBlockType, string> = {
 };
 
 /** 不进入流程的写作组织块(排除在 documentToFlow 之外) */
-export const DOC_WRITING_TYPES: ReadonlySet<DocBlockType> = new Set(['subheading', 'quote', 'list', 'note']);
+export const DOC_WRITING_TYPES: ReadonlySet<DocBlockType> = new Set(['paragraph', 'subheading', 'quote', 'list', 'note']);
+
+export type DocFlowRole = 'none' | 'beat' | 'node';
 
 export interface DocChoice {
   id: ID;
@@ -460,6 +470,8 @@ export interface DocBlock {
   condition?: string;
   /** 仅 instruction:指令 */
   instruction?: string;
+  /** 流程映射策略;普通正文缺省为 none,剧本块缺省为 node */
+  flowRole?: DocFlowRole;
 }
 
 /** 场景写作状态(R2 长篇正文工作台) */
@@ -476,11 +488,14 @@ export const DOC_STATUS_ORDER: DocStatus[] = ['outline', 'draft', 'revising', 'd
 
 export interface Document {
   id: ID;
+  favorite?: boolean;
   /** 所属文档文件夹 id;空 = 未分组 */
   folderId?: ID;
   /** Navigator 树内手动排序序号;空 = 按默认(更新时间倒序)排序 */
   order?: number;
   name: string;
+  /** 首次生成流程后记录关联对象,后续打开或显式更新结构 */
+  linkedFlowId?: ID;
   /** 技术名:项目内唯一,用于导出,如 act1_draft */
   technicalName?: string;
   /** R11:模板分配与自定义字段 */

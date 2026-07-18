@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sampleProject } from './sample';
 import type { Document, Entity, ResearchCard } from './types';
 import {
-  cardToMd, documentToMd, entityToMd, mdToCard, mdToDocument, mdToEntity,
+  assignDocumentFilenames, cardToMd, documentToMd, entityToMd, mdToCard, mdToDocument, mdToEntity,
   projectToFolderJson, resolveEntityRefs,
 } from './storage';
 
@@ -13,7 +13,7 @@ describe('文件夹 Markdown 往返', () => {
       summary: '', fields: [], notes: '', createdAt: 2,
     };
     const source: Entity = {
-      id: 'entity-source', folderId: 'folder-entity', kind: 'character', name: '塞梅尔维斯', technicalName: 'semelvie',
+      id: 'entity-source', favorite: true, folderId: 'folder-entity', kind: 'character', name: '塞梅尔维斯', technicalName: 'semelvie',
       color: '#111111', emoji: 'S', summary: '简介', notes: '备注', createdAt: 1,
       fields: [
         { id: 'field-1', label: '同伴', value: target.id, type: 'entity', filterKind: 'character' },
@@ -29,6 +29,7 @@ describe('文件夹 Markdown 往返', () => {
       name: source.name,
       kind: source.kind,
       technicalName: source.technicalName,
+      favorite: true,
       folderId: source.folderId,
       summary: source.summary,
       notes: source.notes,
@@ -42,7 +43,7 @@ describe('文件夹 Markdown 往返', () => {
 
   it('保留资料卡内容和元数据', () => {
     const card: ResearchCard = {
-      id: 'card-1', folderId: 'folder-research', title: '史料', content: '正文', category: '考据', tags: ['伦敦'],
+      id: 'card-1', favorite: true, folderId: 'folder-research', title: '史料', content: '正文', category: '考据', tags: ['伦敦'],
       color: '#333333', source: '档案馆', pinned: true, createdAt: 3,
     };
     const restored = mdToCard(`${card.title}.md`, cardToMd(card), 0);
@@ -51,7 +52,7 @@ describe('文件夹 Markdown 往返', () => {
 
   it('保留文档块和选项的稳定 ID', () => {
     const document: Document = {
-      id: 'doc-1', folderId: 'folder-document', name: '第一幕', technicalName: 'act_one', category: '正文', notes: '草稿',
+      id: 'doc-1', favorite: true, folderId: 'folder-document', name: '第一幕', technicalName: 'act_one', category: '正文', notes: '草稿',
       createdAt: 4, updatedAt: 5,
       blocks: [
         { id: 'block-heading', type: 'heading', text: '雨夜' },
@@ -67,6 +68,7 @@ describe('文件夹 Markdown 往返', () => {
       id: document.id,
       name: document.name,
       technicalName: document.technicalName,
+      favorite: true,
       folderId: document.folderId,
       category: document.category,
       notes: document.notes,
@@ -135,6 +137,58 @@ category: 正文
     };
     const restored = mdToDocument(`${doc.name}.md`, documentToMd(doc, []), 0);
     expect(restored.blocks).toEqual(doc.blocks);
+  });
+
+  it('正文 Markdown 是权威内容,Obsidian 修改可读正文后保留块身份与流程角色', () => {
+    const doc: Document = {
+      id: 'doc-authoring',
+      name: '雨夜',
+      linkedFlowId: 'flow-rain',
+      category: '正文',
+      notes: '',
+      createdAt: 1,
+      updatedAt: 2,
+      blocks: [
+        { id: 'b-paragraph', type: 'paragraph', text: '她推开门。', flowRole: 'none' },
+        { id: 'b-beat', type: 'paragraph', text: '灯突然熄灭。', flowRole: 'beat', unitId: 'unit-beat' },
+      ],
+    };
+    const markdown = documentToMd(doc, []);
+    expect(markdown).toContain('<!-- loom:block');
+    expect(markdown).not.toContain('```yaml loom-blocks');
+
+    const restored = mdToDocument('第一卷/第一章/雨夜.md', markdown.replace('她推开门。', '她悄悄推开门。'), 0);
+    expect(restored.name).toBe('雨夜');
+    expect(restored.linkedFlowId).toBe('flow-rain');
+    expect(restored.blocks[0]).toMatchObject({
+      id: 'b-paragraph', type: 'paragraph', text: '她悄悄推开门。', flowRole: 'none',
+    });
+    expect(restored.blocks[1]).toMatchObject({
+      id: 'b-beat', type: 'paragraph', text: '灯突然熄灭。', flowRole: 'beat', unitId: 'unit-beat',
+    });
+  });
+
+  it('没有织机标记的普通 Markdown 按自然段导入为正文块', () => {
+    const restored = mdToDocument('外部场景.md', '# 外部场景\n\n第一段。\n\n第二段。', 0);
+    expect(restored.blocks.map((block) => block.type)).toEqual(['paragraph', 'paragraph']);
+    expect(restored.blocks.map((block) => block.text)).toEqual(['第一段。', '第二段。']);
+    expect(restored.blocks.every((block) => block.flowRole === 'none')).toBe(true);
+  });
+
+  it('文档文件路径按卷 / 章 Navigator 映射为真实子目录', () => {
+    const project = sampleProject();
+    project.folders.push(
+      { id: 'volume', module: 'document', name: '第一卷', parentId: null },
+      { id: 'chapter', module: 'document', name: '第一章', parentId: 'volume' },
+    );
+    project.documents = [{
+      id: 'scene', folderId: 'chapter', name: '雨夜', category: '正文', notes: '',
+      blocks: [{ id: 'p', type: 'paragraph', text: '正文', flowRole: 'none' }],
+      createdAt: 1, updatedAt: 2,
+    }];
+
+    expect([...assignDocumentFilenames(project.documents, project.folders).keys()])
+      .toEqual(['第一卷/第一章/雨夜.md']);
   });
 
   it('order 缺失时往返保持 undefined', () => {

@@ -60,6 +60,9 @@ export function documentToParagraphs(doc: Document, entities: Entity[]): FdxPara
   const speaker = (id?: string) => (id ? entities.find((e) => e.id === id)?.name : undefined);
   for (const b of doc.blocks) {
     switch (b.type) {
+      case 'paragraph':
+        if (b.text) out.push({ type: 'Action', text: b.text });
+        break;
       case 'heading':
         out.push({ type: 'Scene Heading', text: b.text || '(未命名场景)' });
         break;

@@ -20,6 +20,7 @@ export default function DocumentView() {
   const documents = useLoom((s) => s.project.documents);
   const categories = useLoom((s) => s.project.documentCategories);
   const entities = useLoom((s) => s.project.entities);
+  const flows = useLoom((s) => s.project.flows);
   const folders = useLoom((s) => s.project.folders);
   const annotations = useLoom((s) => s.project.annotations);
   const docSnapshots = useLoom((s) => s.project.docSnapshots);
@@ -38,7 +39,8 @@ export default function DocumentView() {
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [annoDraft, setAnnoDraft] = useState('');
   const [diffOpen, setDiffOpen] = useState<{ leftId?: string } | null>(null);
-  const [mode, setMode] = useState<'single' | 'manuscript'>('single');
+  const [mode, setMode] = useState<'writing' | 'structure' | 'manuscript'>('writing');
+  const [focusMode, setFocusMode] = useState(false);
 
   const navSeq = useNav((s) => s.seq);
   useEffect(() => {
@@ -88,6 +90,9 @@ export default function DocumentView() {
   );
 
   const selected = documents.find((d) => d.id === selectedId) ?? null;
+  const linkedFlow = selected
+    ? flows.find((f) => f.id === selected.linkedFlowId || f.documentId === selected.id)
+    : undefined;
 
   // R5:当前文档的批注与快照
   const docAnnotations = useMemo(
@@ -141,9 +146,9 @@ export default function DocumentView() {
     const d: Document = {
       id: uid(),
       folderId: selected?.folderId,
-      name: '新文档',
+      name: '新场景',
       category: catFilter === 'all' ? (categories[0] ?? '未分类') : catFilter,
-      blocks: [emptyBlock('heading')],
+      blocks: [emptyBlock('paragraph')],
       notes: '',
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -153,11 +158,25 @@ export default function DocumentView() {
     setFocusBlockId(d.blocks[0].id);
   };
 
-  const addCategory = async () => {
+  const addCategory = async (): Promise<string | null> => {
     const name = await promptText({ message: '新分类名称(例如:剧本草稿 / 设计文档 / 处理)', placeholder: '分类名称' });
-    if (!name) return;
-    update((p) => { if (!p.documentCategories.includes(name)) p.documentCategories.push(name); });
-    setCatFilter(name);
+    const clean = name?.trim();
+    if (!clean) return null;
+    update((p) => { if (!p.documentCategories.includes(clean)) p.documentCategories.push(clean); });
+    setCatFilter(clean);
+    return clean;
+  };
+
+  const renameCategory = async (name: string) => {
+    const next = await promptText({ message: `重命名分类「${name}」`, defaultValue: name, confirmText: '重命名' });
+    const clean = next?.trim();
+    if (!clean || clean === name) return;
+    update((p) => {
+      if (!p.documentCategories.includes(clean)) p.documentCategories.push(clean);
+      p.documentCategories = p.documentCategories.filter((c) => c !== name);
+      for (const d of p.documents) if (d.category === name) d.category = clean;
+    });
+    setCatFilter(clean);
   };
 
   const removeCategory = async (name: string) => {
@@ -181,14 +200,41 @@ export default function DocumentView() {
 
   const convertToFlow = async () => {
     if (!selected) return;
-    const flowable = selected.blocks.filter((b) => !DOC_WRITING_TYPES.has(b.type));
+    const flowable = selected.blocks.filter((b) =>
+      b.flowRole !== 'none'
+      && (!DOC_WRITING_TYPES.has(b.type) || (b.type === 'paragraph' && (b.flowRole === 'beat' || b.flowRole === 'node'))));
     if (flowable.length === 0) {
-      await alertDialog('文档里没有可转换为流程节点的剧本块。写作块(子标题 / 引用 / 列表 / 注释)不进入流程。');
+      await alertDialog('当前场景没有参与流程的结构块。普通正文默认不进入流程；可在「结构」视图把正文标为节拍，或添加动作、对白与逻辑块。');
       return;
     }
     const flow = documentToFlow(selected);
-    update((p) => p.flows.push(flow));
+    update((p) => {
+      p.flows.push(flow);
+      const d = p.documents.find((x) => x.id === selected.id);
+      if (d) d.linkedFlowId = flow.id;
+    });
     go({ tab: 'flow', flowId: flow.id });
+  };
+
+  const refreshLinkedFlow = async () => {
+    if (!selected || !linkedFlow) return;
+    const next = documentToFlow(selected);
+    if (!await confirmDialog({
+      message: `用当前场景结构更新关联流程「${linkedFlow.name}」？\n\n`
+        + `节点 ${linkedFlow.nodes.length} → ${next.nodes.length}，连线 ${linkedFlow.edges.length} → ${next.edges.length}。\n`
+        + '流程里的手工布局与未在文档中表达的连线会被替换；正文内容仍由叙事单元共享。',
+      confirmText: '更新并打开',
+    })) return;
+    update((p) => {
+      const flow = p.flows.find((f) => f.id === linkedFlow.id);
+      const doc = p.documents.find((d) => d.id === selected.id);
+      if (!flow || !doc) return;
+      flow.nodes = next.nodes;
+      flow.edges = next.edges;
+      flow.documentId = doc.id;
+      doc.linkedFlowId = flow.id;
+    });
+    go({ tab: 'flow', flowId: linkedFlow.id });
   };
 
   const stats = useMemo(() => {
@@ -213,7 +259,7 @@ export default function DocumentView() {
 
   return (
     <>
-      <NavigatorTree
+      {!focusMode && <NavigatorTree
         module="document"
         title="文档"
         items={filtered}
@@ -241,26 +287,36 @@ export default function DocumentView() {
           for (const d of p.documents) if (map.has(d.id)) d.order = map.get(d.id);
         })}
         onCreate={createDoc}
-        createLabel="新建文档"
-        emptyLabel="还没有文档"
-      />
+        createLabel="新建场景"
+        emptyLabel="还没有场景"
+      />}
 
       <div className="pane-col">
         <div className="toolbar">
-          <button className="primary" onClick={createDoc}>＋ 新文档</button>
+          <button className="primary" onClick={createDoc}>＋ 新场景</button>
+          <div className="doc-mode-switch">
+            <button className={mode === 'writing' ? 'primary' : 'ghost'} onClick={() => setMode('writing')}>写作</button>
+            <button className={mode === 'structure' ? 'primary' : 'ghost'} onClick={() => setMode('structure')}>结构</button>
+            <button className={mode === 'manuscript' ? 'primary' : 'ghost'} onClick={() => setMode('manuscript')}>
+              <Icon name="book" size={13} /> 连续稿
+            </button>
+          </div>
           <button
-            className={mode === 'manuscript' ? 'primary' : undefined}
-            title="连续稿:按卷 / 章 / 场景树顺序连成一篇稿子,点击任意场景就地编辑"
-            onClick={() => setMode((m) => (m === 'manuscript' ? 'single' : 'manuscript'))}
-          >
-            <Icon name="book" size={13} /> 连续稿
-          </button>
+            className={focusMode ? 'primary' : 'ghost'}
+            title="隐藏导航与属性栏，专注正文"
+            onClick={() => setFocusMode((value) => !value)}
+          >{focusMode ? '退出专注' : '专注'}</button>
           <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
-          <button className="ghost" onClick={addCategory} title="新建文档分类" style={{ fontSize: 12 }}>＋ 分类</button>
-          {catFilter !== 'all' && <button className="ghost" onClick={() => removeCategory(catFilter)} title={`删除分类「${catFilter}」`} style={{ fontSize: 12 }}>× 删除分类</button>}
+          <button className="ghost" onClick={() => addCategory()} title="新建场景分类" style={{ fontSize: 12 }}>＋ 分类</button>
+          {catFilter !== 'all' && (
+            <>
+              <button className="ghost" onClick={() => renameCategory(catFilter)} style={{ fontSize: 12 }}>重命名</button>
+              <button className="ghost" onClick={() => removeCategory(catFilter)} title={`删除分类「${catFilter}」`} style={{ fontSize: 12 }}>× 删除</button>
+            </>
+          )}
           {(revisionsInUse.length > 0 || revFilter !== 'all') && (
             <select
               value={String(revFilter)}
@@ -283,7 +339,11 @@ export default function DocumentView() {
             style={{ width: 260 }}
           />
           <span className="hint">
-            {mode === 'manuscript' ? '左侧文件夹是卷 / 章,拖拽即可重排场景' : '在结构化剧本块里起草,再「转为流程」生成节点图'}
+            {mode === 'manuscript'
+              ? '按卷 / 章顺序通读全文'
+              : mode === 'structure'
+                ? '整理块类型、流程参与方式与顺序'
+                : 'Enter 新段，Shift+Enter 换行，输入 / 切换块类型'}
           </span>
         </div>
 
@@ -300,26 +360,40 @@ export default function DocumentView() {
                 className="doc-title-input"
                 value={selected.name}
                 onChange={(e) => patchDoc((d) => { d.name = e.target.value; })}
-                placeholder="文档标题"
+                placeholder="场景名称"
               />
               <select
                 value={selected.category}
-                onChange={(e) => patchDoc((d) => { d.category = e.target.value; })}
+                onChange={async (e) => {
+                  if (e.target.value === '__new__') {
+                    const category = await addCategory();
+                    if (category) patchDoc((d) => { d.category = category; });
+                  } else {
+                    patchDoc((d) => { d.category = e.target.value; });
+                  }
+                }}
                 style={{ width: 130 }}
               >
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                 {!categories.includes('未分类') && <option value="未分类">未分类</option>}
+                <option value="__new__">＋ 新建分类…</option>
               </select>
-              <button
-                className="primary"
-                title="把文档里的块转换为一条新的流程(场景→片段、对白→对白节点、条件→条件节点…)"
-                onClick={convertToFlow}
-              >
-                <Icon name="flow" size={13} /> 转为流程
-              </button>
+              {linkedFlow ? (
+                <>
+                  <button className="primary" onClick={() => go({ tab: 'flow', flowId: linkedFlow.id })}>
+                    <Icon name="flow" size={13} /> 打开关联流程
+                  </button>
+                  <button className="ghost" onClick={refreshLinkedFlow}>更新结构</button>
+                </>
+              ) : (
+                <button className="primary" onClick={convertToFlow}>
+                  <Icon name="flow" size={13} /> 生成流程
+                </button>
+              )}
             </div>
             <BlocksEditor
               doc={selected}
+              variant={mode === 'structure' ? 'structure' : 'writing'}
               focusBlockId={focusBlockId}
               annotationCounts={annotationCounts}
               onActiveChange={setActiveBlockId}
@@ -328,16 +402,16 @@ export default function DocumentView() {
         ) : (
           <div className="empty-hint" style={{ margin: 'auto' }}>
             {filtered.length === 0
-              ? <>还没有文档。<br />左侧「＋ 新文档」开始起草剧本或设计稿。</>
-              : <>点击左侧文档查看和编辑</>}
+              ? <>还没有场景。<br />左侧「＋ 新场景」开始写作。</>
+              : <>点击左侧场景查看和编辑</>}
           </div>
         )}
       </div>
 
-      {selected && (
+      {selected && !focusMode && (
         <Inspector>
           <div className="side-head" style={{ padding: '0 0 4px', borderBottom: '1px solid var(--border)' }}>
-            <h3 style={{ margin: 0 }}>文档属性</h3>
+            <h3 style={{ margin: 0 }}>场景属性</h3>
             <span className="spacer" style={{ flex: 1 }} />
             <button
               className="ghost icon-btn"
@@ -589,17 +663,18 @@ export default function DocumentView() {
           </div>
 
           <div className="field">
-            <label>剧本块(参与转流程)</label>
+            <label>结构块(参与流程)</label>
             <ul className="doc-legend">
-              <li><b>场景</b> → 片段节点(章节锚)</li>
+              <li><b>场景锚点</b> → 片段节点(兼容多场景剧本)</li>
               <li><b>动作</b> → 对白节点(无说话人)</li>
               <li><b>对白</b> → 对白节点(带说话人)</li>
               <li><b>选项</b> → 汇聚点(分支提示)</li>
               <li><b>条件</b> → 条件节点(真/假引脚)</li>
               <li><b>指令</b> → 指令节点(变量赋值)</li>
             </ul>
-            <label style={{ marginTop: 8 }}>写作块(仅长篇组织)</label>
+            <label style={{ marginTop: 8 }}>写作块</label>
             <ul className="doc-legend">
+              <li><b>正文</b> → 默认不进入流程，可在结构视图标为节拍</li>
               <li><b>子标题</b> → H2 / H3,只影响排版和 Markdown</li>
               <li><b>引用</b> → Markdown 的 <code>&gt;</code> 块</li>
               <li><b>列表</b> → 有序 / 无序列表</li>

@@ -124,6 +124,16 @@ export function normalizeProject(p: Project): Project {
   cleanOrder(p.assets);
   cleanOrder(p.documents);
   cleanOrder(p.researchCards);
+  const cleanFavorites = (items: { favorite?: unknown }[]) => {
+    for (const item of items) {
+      if (item.favorite !== true) delete item.favorite;
+    }
+  };
+  cleanFavorites(p.flows);
+  cleanFavorites(p.entities);
+  cleanFavorites(p.assets);
+  cleanFavorites(p.documents);
+  cleanFavorites(p.researchCards);
   // 资源原文件字段(R8):非字符串 / 明显非法的值剔除
   for (const a of p.assets) {
     if (a.hash !== undefined && (typeof a.hash !== 'string' || !/^[0-9a-f]{64}$/.test(a.hash))) delete a.hash;
@@ -131,6 +141,8 @@ export function normalizeProject(p: Project): Project {
     if (a.license !== undefined && typeof a.license !== 'string') delete a.license;
   }
   // 场景元数据:剔除非法值,保持旧项目 / 手改文件安全
+  const flowIds = new Set(p.flows.map((f) => f.id));
+  const documentIds = new Set(p.documents.map((d) => d.id));
   for (const d of p.documents) {
     if (d.status !== undefined && !(d.status in DOC_STATUS_LABEL)) delete d.status;
     if (d.wordTarget !== undefined && (typeof d.wordTarget !== 'number' || !Number.isFinite(d.wordTarget) || d.wordTarget < 0)) delete d.wordTarget;
@@ -138,6 +150,24 @@ export function normalizeProject(p: Project): Project {
     else if (d.tension !== undefined) d.tension = Math.round(d.tension);
     if (d.revision !== undefined && (typeof d.revision !== 'number' || !Number.isFinite(d.revision) || d.revision < 1)) delete d.revision;
     else if (d.revision !== undefined) d.revision = Math.round(d.revision);
+    if (d.linkedFlowId && !flowIds.has(d.linkedFlowId)) delete d.linkedFlowId;
+    for (const b of d.blocks) {
+      if (b.flowRole !== undefined && b.flowRole !== 'none' && b.flowRole !== 'beat' && b.flowRole !== 'node') {
+        delete b.flowRole;
+      }
+    }
+  }
+  for (const f of p.flows) {
+    if (f.documentId && !documentIds.has(f.documentId)) delete f.documentId;
+    if (f.documentId) {
+      const d = p.documents.find((x) => x.id === f.documentId);
+      if (d && (!d.linkedFlowId || !flowIds.has(d.linkedFlowId))) d.linkedFlowId = f.id;
+    }
+  }
+  for (const d of p.documents) {
+    if (!d.linkedFlowId) continue;
+    const f = p.flows.find((x) => x.id === d.linkedFlowId);
+    if (f && !f.documentId) f.documentId = d.id;
   }
   // 小说规划(R4):清理指向已删除实体 / 文档的关系、弧线、伏笔引用
   p.relations ??= [];
@@ -254,6 +284,7 @@ interface UnitContent {
 
 function contentOfBlock(b: DocBlock): UnitContent | null {
   switch (b.type) {
+    case 'paragraph': return b.flowRole === 'beat' || b.flowRole === 'node' ? { kind: 'line', text: b.text } : null;
     case 'heading': return { kind: 'scene', title: b.text };
     case 'action': return { kind: 'line', text: b.text };
     case 'dialogue': return { kind: 'line', text: b.text, manageSpeaker: true, speakerId: b.speakerId };
@@ -310,6 +341,7 @@ function createUnit(id: string, c: UnitContent): NarrativeUnit {
 
 function writeBlockFromUnit(b: DocBlock, u: NarrativeUnit) {
   switch (b.type) {
+    case 'paragraph': b.text = u.text; break;
     case 'heading': b.text = u.title; break;
     case 'action': b.text = u.text; break;
     case 'dialogue': b.text = u.text; b.speakerId = u.speakerId; break;

@@ -5,6 +5,7 @@
  *   project.json      流程 / 大纲 / 时间线 / 风暴 / 变量等结构化数据
  *   entities/*.md     实体卡:YAML frontmatter + 正文(简介、备注)
  *   research/*.md     资料卡:YAML frontmatter + 正文
+ *   documents/<卷>/<章>/*.md 场景正文:Navigator 目录 + 隐藏稳定块标记
  *
  * 把这个文件夹放进 OneDrive / Google Drive 同步目录即可云同步;
  * 在 Obsidian 中直接打开该文件夹,实体卡和资料卡就是普通笔记,
@@ -12,10 +13,9 @@
  * 会在下次加载时自动导入为实体 / 资料卡。
  */
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import type { DocBlock, DocBlockType, DocStatus, Document, Entity, EntityField, EntityFieldType, EntityKind, Project, ResearchCard } from './types';
-import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL, PALETTE } from './types';
+import type { DocBlock, DocBlockType, DocStatus, Document, Entity, EntityField, EntityFieldType, EntityKind, Folder, Project, ResearchCard } from './types';
+import { DOC_BLOCK_LABEL, DOC_STATUS_LABEL, ENTITY_KIND_LABEL, PALETTE } from './types';
 import { normalizeProject, uid } from './util';
-import { documentToMarkdown } from './export';
 import { parseProjectData } from './recovery';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -72,6 +72,7 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
   };
   if (e.technicalName) meta.technicalName = e.technicalName;
   if (e.templateId) meta.templateId = e.templateId;
+  if (e.favorite) meta.favorite = true;
   if (e.folderId) meta.folderId = e.folderId;
   if (typeof e.order === 'number' && Number.isFinite(e.order)) meta.order = e.order;
   if (avatarPath) meta.avatar = avatarPath;
@@ -106,7 +107,7 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
   return withFrontmatter(meta, body);
 }
 
-const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'technicalName', 'templateId', 'folderId', 'order', 'tags', 'aliases', 'cssclasses', '_field_types', '_conflict_fields']);
+const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'technicalName', 'templateId', 'favorite', 'folderId', 'order', 'tags', 'aliases', 'cssclasses', '_field_types', '_conflict_fields']);
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
 /** [[Name]] → Name;非链接返回 null */
@@ -162,6 +163,7 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
   const avatarFile = typeof meta.avatar === 'string' ? meta.avatar.replace(/^assets\//, '') : null;
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
+    favorite: meta.favorite === true || undefined,
     folderId: typeof meta.folderId === 'string' && meta.folderId ? meta.folderId : undefined,
     order: typeof meta.order === 'number' && Number.isFinite(meta.order) ? meta.order : undefined,
     kind,
@@ -206,6 +208,7 @@ export function cardToMd(c: ResearchCard): string {
     createdAt: c.createdAt,
   };
   if (c.source) meta.source = c.source;
+  if (c.favorite) meta.favorite = true;
   if (c.folderId) meta.folderId = c.folderId;
   if (typeof c.order === 'number' && Number.isFinite(c.order)) meta.order = c.order;
   return withFrontmatter(meta, c.content);
@@ -215,6 +218,7 @@ export function mdToCard(filename: string, md: string, index: number): ResearchC
   const { meta, body } = splitFrontmatter(md);
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
+    favorite: meta.favorite === true || undefined,
     folderId: typeof meta.folderId === 'string' && meta.folderId ? meta.folderId : undefined,
     order: typeof meta.order === 'number' && Number.isFinite(meta.order) ? meta.order : undefined,
     title: filename.replace(/\.md$/i, ''),
@@ -230,6 +234,157 @@ export function mdToCard(filename: string, md: string, index: number): ResearchC
 
 /* ---------- 文档序列化 ---------- */
 
+interface StoredBlockMarker {
+  id?: string;
+  type?: DocBlockType;
+  unitId?: string;
+  speakerId?: string;
+  flowRole?: DocBlock['flowRole'];
+  ordered?: boolean;
+  level?: 2 | 3;
+  choiceIds?: string[];
+}
+
+function blockMarker(b: DocBlock): string {
+  const marker: StoredBlockMarker = { id: b.id, type: b.type };
+  if (b.unitId) marker.unitId = b.unitId;
+  if (b.speakerId) marker.speakerId = b.speakerId;
+  if (b.flowRole) marker.flowRole = b.flowRole;
+  if (typeof b.ordered === 'boolean') marker.ordered = b.ordered;
+  if (b.level === 2 || b.level === 3) marker.level = b.level;
+  if (b.choices) marker.choiceIds = b.choices.map((choice) => choice.id);
+  return `<!-- loom:block ${JSON.stringify(marker)} -->`;
+}
+
+function blockStorageMarkdown(b: DocBlock, entities: Entity[]): string {
+  switch (b.type) {
+    case 'paragraph':
+    case 'action':
+      return b.text;
+    case 'heading':
+      return `## ${b.text}`;
+    case 'subheading':
+      return `${b.level === 2 ? '##' : '###'} ${b.text}`;
+    case 'dialogue': {
+      const speaker = b.speakerId ? entities.find((entity) => entity.id === b.speakerId)?.name : undefined;
+      return speaker ? `**${speaker}**:${b.text}` : b.text;
+    }
+    case 'quote':
+      return b.text.split('\n').map((line) => `> ${line}`.trimEnd()).join('\n');
+    case 'list':
+      return (b.items ?? []).map((item, index) => b.ordered ? `${index + 1}. ${item}` : `- ${item}`).join('\n');
+    case 'choice':
+      return [
+        `*◇ ${b.text}*`,
+        ...(b.choices ?? []).map((choice) => `- ▸ ${choice.label}`),
+      ].join('\n');
+    case 'condition':
+      return `*◇ 条件 \`${b.condition ?? ''}\`*`;
+    case 'instruction':
+      return `*⚙ 指令 \`${b.instruction ?? ''}\`*`;
+    case 'note':
+      return ['> [!note] 织机注释', ...b.text.split('\n').map((line) => `> ${line}`.trimEnd())].join('\n');
+  }
+}
+
+function markedBlocks(body: string): DocBlock[] {
+  const markerPattern = /<!--\s*loom:block\s+(\{[^\n]*\})\s*-->/g;
+  const matches = [...body.matchAll(markerPattern)];
+  if (matches.length === 0) return [];
+  const validTypes = new Set(Object.keys(DOC_BLOCK_LABEL));
+  const blocks: DocBlock[] = [];
+  for (let index = 0; index < matches.length; index++) {
+    let marker: StoredBlockMarker;
+    try {
+      marker = JSON.parse(matches[index][1]) as StoredBlockMarker;
+    } catch {
+      continue;
+    }
+    if (!marker.type || !validTypes.has(marker.type)) continue;
+    const start = (matches[index].index ?? 0) + matches[index][0].length;
+    const end = index + 1 < matches.length ? matches[index + 1].index ?? body.length : body.length;
+    const raw = body.slice(start, end).replace(/^\s*\r?\n/, '').trimEnd();
+    const block: DocBlock = {
+      id: marker.id || uid(),
+      type: marker.type,
+      text: '',
+    };
+    if (marker.unitId) block.unitId = marker.unitId;
+    if (marker.speakerId) block.speakerId = marker.speakerId;
+    if (marker.flowRole === 'none' || marker.flowRole === 'beat' || marker.flowRole === 'node') block.flowRole = marker.flowRole;
+    if (typeof marker.ordered === 'boolean') block.ordered = marker.ordered;
+    if (marker.level === 2 || marker.level === 3) block.level = marker.level;
+    switch (block.type) {
+      case 'heading':
+        block.text = raw.replace(/^##\s*/, '').trim();
+        break;
+      case 'subheading':
+        block.text = raw.replace(/^#{2,3}\s*/, '').trim();
+        break;
+      case 'dialogue':
+        block.text = raw.replace(/^\*\*[^*\n]+\*\*:\s?/, '');
+        break;
+      case 'quote':
+        block.text = raw.split(/\r?\n/).map((line) => line.replace(/^>\s?/, '')).join('\n');
+        break;
+      case 'list': {
+        const lines = raw.split(/\r?\n/).filter((line) => line.trim());
+        block.items = lines.map((line) => line.replace(/^(?:-\s*|\d+\.\s*)/, ''));
+        block.ordered = marker.ordered ?? lines.some((line) => /^\d+\.\s*/.test(line));
+        break;
+      }
+      case 'choice': {
+        const lines = raw.split(/\r?\n/);
+        block.text = (lines.shift() ?? '').replace(/^\*◇\s*/, '').replace(/\*$/, '').trim();
+        block.choices = lines
+          .filter((line) => /^-\s*▸/.test(line))
+          .map((line, choiceIndex) => ({
+            id: marker.choiceIds?.[choiceIndex] || uid(),
+            label: line.replace(/^-\s*▸\s*/, ''),
+          }));
+        break;
+      }
+      case 'condition':
+        block.condition = raw.match(/`([^`]*)`/)?.[1] ?? raw;
+        break;
+      case 'instruction':
+        block.instruction = raw.match(/`([^`]*)`/)?.[1] ?? raw;
+        break;
+      case 'note':
+        block.text = raw.split(/\r?\n/)
+          .filter((line) => !/^>\s*\[!note\]/.test(line))
+          .map((line) => line.replace(/^>\s?/, ''))
+          .join('\n');
+        break;
+      default:
+        block.text = raw;
+    }
+    blocks.push(block);
+  }
+  return blocks;
+}
+
+function plainMarkdownBlocks(body: string): DocBlock[] {
+  const clean = body.replace(/^#\s+[^\n]+\r?\n?/, '').trim();
+  if (!clean) return [];
+  return clean.split(/\r?\n\s*\r?\n/).map((chunk): DocBlock => {
+    if (/^###\s+/.test(chunk)) return { id: uid(), type: 'subheading', level: 3, text: chunk.replace(/^###\s+/, '') };
+    if (/^##\s+/.test(chunk)) return { id: uid(), type: 'subheading', level: 2, text: chunk.replace(/^##\s+/, '') };
+    if (/^>\s?/.test(chunk)) {
+      return { id: uid(), type: 'quote', text: chunk.split(/\r?\n/).map((line) => line.replace(/^>\s?/, '')).join('\n') };
+    }
+    const lines = chunk.split(/\r?\n/);
+    if (lines.every((line) => /^(?:-\s+|\d+\.\s+)/.test(line))) {
+      const ordered = lines.every((line) => /^\d+\.\s+/.test(line));
+      return {
+        id: uid(), type: 'list', text: '', ordered,
+        items: lines.map((line) => line.replace(/^(?:-\s+|\d+\.\s+)/, '')),
+      };
+    }
+    return { id: uid(), type: 'paragraph', flowRole: 'none', text: chunk };
+  });
+}
+
 export function documentToMd(d: Document, entities: Entity[]): string {
   const meta: Record<string, unknown> = {
     loom: 'document',
@@ -239,7 +394,9 @@ export function documentToMd(d: Document, entities: Entity[]): string {
     updatedAt: d.updatedAt,
   };
   if (d.technicalName) meta.technicalName = d.technicalName;
+  if (d.linkedFlowId) meta.linkedFlowId = d.linkedFlowId;
   if (d.templateId) meta.templateId = d.templateId;
+  if (d.favorite) meta.favorite = true;
   if (d.fields?.length) {
     meta.fields = d.fields.map((f) => {
       const out: Record<string, unknown> = { id: f.id, label: f.label, value: f.value };
@@ -258,40 +415,21 @@ export function documentToMd(d: Document, entities: Entity[]): string {
   if (typeof d.tension === 'number' && Number.isFinite(d.tension)) meta.tension = d.tension;
   if (typeof d.revision === 'number' && Number.isFinite(d.revision)) meta.revision = d.revision;
   if (d.notes.trim()) meta.notes = d.notes;
-  // 结构化块以 yaml fenced block 无损保存;正文再附上人类可读的剧本渲染
-  const blockYaml = stringifyYaml(d.blocks.map((b) => {
-    const out: Record<string, unknown> = { id: b.id, type: b.type };
-    if (b.unitId) out.unitId = b.unitId;
-    if (b.speakerId) out.speakerId = b.speakerId;
-    if (b.text) out.text = b.text;
-    if (b.choices) out.choices = b.choices;
-    if (b.items) out.items = b.items;
-    if (typeof b.ordered === 'boolean') out.ordered = b.ordered;
-    if (typeof b.level === 'number') out.level = b.level;
-    if (b.condition !== undefined) out.condition = b.condition;
-    if (b.instruction !== undefined) out.instruction = b.instruction;
-    return out;
-  })).trimEnd();
   const body = [
-    '```yaml loom-blocks',
-    blockYaml,
-    '```',
+    `# ${d.name}`,
     '',
-    '## 剧本预览',
-    '',
-    documentToMarkdown(d, entities),
-  ].join('\n');
+    ...d.blocks.flatMap((block) => [blockMarker(block), blockStorageMarkdown(block, entities), '']),
+  ].join('\n').trimEnd();
   return withFrontmatter(meta, body);
 }
 
 export function mdToDocument(filename: string, md: string, _index: number): Document {
   const { meta, body } = splitFrontmatter(md);
-  const name = filename.replace(/\.md$/i, '');
+  const name = filename.split(/[\\/]/).pop()!.replace(/\.md$/i, '');
 
-  // 从 ```yaml loom-blocks … ``` 围栏块里恢复结构化块
-  let blocks: DocBlock[] = [];
+  let blocks = markedBlocks(body);
   const fence = md.match(/```yaml\s+loom-blocks\s*\n([\s\S]*?)\n```/);
-  if (fence) {
+  if (blocks.length === 0 && fence) {
     try {
       const arr = parseYaml(fence[1]) as unknown[];
       if (Array.isArray(arr)) {
@@ -314,23 +452,26 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
           if (r.level === 2 || r.level === 3) b.level = r.level;
           if (typeof r.condition === 'string') b.condition = r.condition;
           if (typeof r.instruction === 'string') b.instruction = r.instruction;
+          if (r.flowRole === 'none' || r.flowRole === 'beat' || r.flowRole === 'node') b.flowRole = r.flowRole;
           return b;
         });
       }
     } catch { /* 损坏时回落空 */ }
   }
   if (blocks.length === 0) {
-    // 兼容:无结构化块时把正文当单一动作块
     const previewIdx = body.indexOf('## 剧本预览');
     const text = (previewIdx >= 0 ? body.slice(previewIdx + 7) : body).trim();
-    blocks = text ? [{ id: uid(), type: 'action', text }] : [{ id: uid(), type: 'heading', text: name }];
+    blocks = plainMarkdownBlocks(text);
+    if (blocks.length === 0) blocks = [{ id: uid(), type: 'paragraph', flowRole: 'none', text: '' }];
   }
 
   return {
     id: typeof meta.id === 'string' && meta.id ? meta.id : uid(),
+    favorite: meta.favorite === true || undefined,
     folderId: typeof meta.folderId === 'string' && meta.folderId ? meta.folderId : undefined,
     order: typeof meta.order === 'number' && Number.isFinite(meta.order) ? meta.order : undefined,
     name,
+    linkedFlowId: typeof meta.linkedFlowId === 'string' && meta.linkedFlowId ? meta.linkedFlowId : undefined,
     technicalName: typeof meta.technicalName === 'string' && meta.technicalName ? meta.technicalName : undefined,
     templateId: typeof meta.templateId === 'string' && meta.templateId ? meta.templateId : undefined,
     fields: Array.isArray(meta.fields)
@@ -375,6 +516,43 @@ function assignFilenames<T extends { id: string }>(items: T[], nameOf: (t: T) =>
     if (used.has(base.toLowerCase())) base = `${base} ${item.id.slice(0, 6)}`;
     used.add(base.toLowerCase());
     out.set(`${base}.md`, item);
+  }
+  return out;
+}
+
+export function assignDocumentFilenames(documents: Document[], folders: Folder[]): Map<string, Document> {
+  const docFolders = folders.filter((folder) => folder.module === 'document');
+  const children = new Map<string | null, Folder[]>();
+  for (const folder of docFolders) {
+    const parentId = folder.parentId ?? null;
+    children.set(parentId, [...(children.get(parentId) ?? []), folder]);
+  }
+  const paths = new Map<string, string>();
+  const visit = (parentId: string | null, parentPath: string) => {
+    const siblings = [...(children.get(parentId) ?? [])]
+      .sort((a, b) => (a.order ?? Number.POSITIVE_INFINITY) - (b.order ?? Number.POSITIVE_INFINITY));
+    const used = new Set<string>();
+    for (const folder of siblings) {
+      let segment = sanitizeFilename(folder.name, folder.id);
+      if (used.has(segment.toLowerCase())) segment = `${segment} ${folder.id.slice(0, 6)}`;
+      used.add(segment.toLowerCase());
+      const path = parentPath ? `${parentPath}/${segment}` : segment;
+      paths.set(folder.id, path);
+      visit(folder.id, path);
+    }
+  };
+  visit(null, '');
+
+  const byDirectory = new Map<string, Set<string>>();
+  const out = new Map<string, Document>();
+  for (const document of documents) {
+    const directory = document.folderId ? paths.get(document.folderId) ?? '' : '';
+    const used = byDirectory.get(directory) ?? new Set<string>();
+    let base = sanitizeFilename(document.name, document.id);
+    if (used.has(base.toLowerCase())) base = `${base} ${document.id.slice(0, 6)}`;
+    used.add(base.toLowerCase());
+    byDirectory.set(directory, used);
+    out.set(`${directory ? `${directory}/` : ''}${base}.md`, document);
   }
   return out;
 }
@@ -489,7 +667,7 @@ export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> 
 export async function saveToFolder(dir: string, project: Project): Promise<void> {
   const entityFiles = assignFilenames(project.entities, (e) => e.name);
   const cardFiles = assignFilenames(project.researchCards, (c) => c.title);
-  const docFiles = assignFilenames(project.documents, (d) => d.name);
+  const docFiles = assignDocumentFilenames(project.documents, project.folders);
   const idToName = new Map(project.entities.map((e) => [e.id, e.name]));
 
   // project.json 里不重复存 md 化的内容,只留引用顺序无关的结构化数据
