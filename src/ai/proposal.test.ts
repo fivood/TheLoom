@@ -196,8 +196,11 @@ describe('AI 提案安全内核', () => {
     const project = sampleProject();
     const entity = project.entities.find((item) => item.fields.length > 0)!;
     const field = entity.fields[0];
-    project.entityTemplates ??= {};
-    project.entityTemplates[entity.kind] = [{ label: field.label, readonly: true }];
+    (project.templates ??= []).push({
+      id: 'tpl-readonly', name: '锁字段模板', module: 'entity',
+      fields: [{ label: field.label, readonly: true }], createdAt: 1, updatedAt: 1,
+    });
+    entity.templateId = 'tpl-readonly';
     const raw = await proposal(project, [
       {
         kind: 'update_entity_field',

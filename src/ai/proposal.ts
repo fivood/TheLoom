@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import { DOC_STATUS_LABEL } from '../types';
 import { normalizeProject, resolveSub, syncNarrativeUnits, validateTechnicalName } from '../util';
+import { specsForEntity } from '../templates';
 import { fingerprintValue } from './context';
 import { validateJsonSchema, type JsonSchema, type SchemaIssue } from './schema';
 
@@ -402,9 +403,7 @@ function applyOperation(p: Project, operation: AiProposalOperation): ApplyResult
     const entity = p.entities.find((item) => item.id === operation.entityId);
     const field = entity?.fields.find((item) => item.id === operation.fieldId);
     if (!entity || !field) return { issue: blocked('target.missing', '实体或已有字段不存在', operation.id) };
-    const spec = (p.entityTemplates?.[entity.kind] ?? [])
-      .map((item) => typeof item === 'string' ? { label: item } : item)
-      .find((item) => item.label === field.label);
+    const spec = specsForEntity(p, entity).find((item) => item.label === field.label);
     if (spec?.readonly) return { issue: blocked('permission.readonly-field', `字段「${field.label}」为只读`, operation.id) };
     if (spec?.enumValues?.length && !spec.enumValues.includes(operation.value)) {
       return { issue: blocked('constraint.enum', `字段「${field.label}」的值不在模板枚举内`, operation.id) };

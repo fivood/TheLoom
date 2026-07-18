@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useLoom } from '../../store';
+import { specsForEntity } from '../../templates';
 import { fileToAvatar } from '../../util';
 import { findEntityRefs, useNav } from '../../search';
 import { confirmDialog, alertDialog } from '../../dialog';
@@ -21,7 +22,6 @@ export default function EntityEditor({ entityId, onClose }: { entityId: string; 
   const project = useLoom((s) => s.project);
   const { updateEntity, removeEntity } = useLoom();
   const entity = project.entities.find((e) => e.id === entityId) ?? null;
-  const templates = project.entityTemplates;
   const avatarRef = useRef<HTMLInputElement>(null);
   const refs = useMemo(() => (entity ? findEntityRefs(project, entity) : []), [project, entity]);
 
@@ -124,7 +124,7 @@ export default function EntityEditor({ entityId, onClose }: { entityId: string; 
           <div className="entity-editor-col">
             <FieldListEditor
               fields={entity.fields}
-              specs={templates?.[entity.kind]}
+              specs={specsForEntity(project, entity)}
               onChange={(fields) => patch({ fields })}
               onFieldRenamed={entity.technicalName
                 ? (o, n) => useLoom.getState().renameScriptEntityField(entity.technicalName!, o, n)

@@ -12,25 +12,22 @@ import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
 import FieldListEditor from '../../components/FieldListEditor';
 import { AiFillFieldsButton } from '../../components/AiPanel';
+import { defaultEntityTemplate, resolveTemplateFields, specsForEntity } from '../../templates';
 import Inspector from '../../components/Inspector';
 import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 import EntityEditor from './EntityEditor';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
-/** 归一化模板条目:老字符串等价于文本字段 */
-function normTpl(spec: EntityTemplateSpec): EntityTemplateField {
-  return typeof spec === 'string' ? { label: spec } : spec;
-}
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
-/** 按类型的字段模板编辑器 */
+/** 按类型的字段模板编辑器(编辑该类型的默认命名模板;保存后实例自动补齐新增字段) */
 function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onClose: () => void }) {
-  const update = useLoom((s) => s.update);
+  const setDefaultTemplate = useLoom((s) => s.setDefaultTemplate);
   const [kind, setKind] = useState<EntityKind>(initialKind);
   const readTpl = (k: EntityKind): EntityTemplateField[] =>
-    (useLoom.getState().project.entityTemplates?.[k] ?? []).map(normTpl);
+    resolveTemplateFields(useLoom.getState().project, defaultEntityTemplate(useLoom.getState().project, k)?.id);
   const [rows, setRows] = useState<EntityTemplateField[]>(() => readTpl(initialKind));
 
   const switchKind = (k: EntityKind) => { setKind(k); setRows(readTpl(k)); };
@@ -44,13 +41,7 @@ function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onCl
       if (r.readonly) out.readonly = true;
       return out;
     });
-    update((p) => {
-      p.entityTemplates ??= {};
-      // 无任何额外属性的纯文本字段落回字符串以保持文件精简
-      p.entityTemplates[kind] = clean.map((r) =>
-        (r.type || r.filterKind || r.enumValues?.length || r.required || r.readonly) ? r : r.label
-      );
-    });
+    setDefaultTemplate({ entityKind: kind }, clean);
     onClose();
   };
 
@@ -198,11 +189,14 @@ export default function EntityLibrary() {
 
   const createEntity = () => {
     const kind = kindFilter === 'all' ? 'character' : kindFilter;
-    const tpl = (useLoom.getState().project.entityTemplates?.[kind] ?? []).map(normTpl);
-    const cols = activePaletteColors(useLoom.getState().project);
+    const project = useLoom.getState().project;
+    const defaultTpl = defaultEntityTemplate(project, kind);
+    const tpl = resolveTemplateFields(project, defaultTpl?.id);
+    const cols = activePaletteColors(project);
     const e: Entity = {
       id: uid(), kind, name: `新${ENTITY_KIND_LABEL[kind]}`,
       folderId: selected?.folderId,
+      templateId: defaultTpl?.id,
       color: cols[entities.length % cols.length] ?? PALETTE[0],
       emoji: '', summary: '',
       fields: tpl.map((tf) => ({ id: uid(), label: tf.label, value: '', type: tf.type, filterKind: tf.filterKind })),
@@ -212,7 +206,8 @@ export default function EntityLibrary() {
     setSelectedId(e.id);
   };
 
-  const entityTemplates = useLoom((s) => s.project.entityTemplates);
+  const templates = useLoom((s) => s.project.templates);
+  const projectForSpecs = useLoom((s) => s.project);
 
   return (
     <>
@@ -358,9 +353,21 @@ export default function EntityLibrary() {
               displayName={selected.name}
               onRenamed={(oldV, newV) => useLoom.getState().renameScriptIdentifier(oldV, newV)}
             />
+            <div className="field">
+              <label>模板</label>
+              <select
+                value={selected.templateId ?? ''}
+                onChange={(e) => useLoom.getState().assignEntityTemplate(selected.id, e.target.value || undefined)}
+              >
+                <option value="">(不套用模板)</option>
+                {(templates ?? []).filter((t) => t.module === 'entity').map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}{t.entityKind ? `(${ENTITY_KIND_LABEL[t.entityKind]}默认)` : ''}</option>
+                ))}
+              </select>
+            </div>
             <FieldListEditor
               fields={selected.fields}
-              specs={entityTemplates?.[selected.kind]}
+              specs={specsForEntity(projectForSpecs, selected)}
               onChange={(fields) => updateEntity(selected.id, { fields })}
               onFieldRenamed={selected.technicalName
                 ? (o, n) => useLoom.getState().renameScriptEntityField(selected.technicalName!, o, n)

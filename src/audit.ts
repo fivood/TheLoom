@@ -3,6 +3,7 @@ import { ANNOTATION_TYPES } from './types';
 import { findDuplicateTechnicalNames } from './util';
 import type { NavTarget } from './search';
 import { buildScriptScope } from './script';
+import { specsForEntity } from './templates';
 import { checkCondition, checkInstructions, checkNumberExpr } from './script/check';
 import type { Diagnostic } from './script/ast';
 import { createIssue, type IssueScope, type IssueSeverity, type ProjectIssue, type ProjectIssueInput } from './issues';
@@ -215,7 +216,7 @@ export function auditProject(p: Project): ProjectIssue[] {
 
   // 必填模板字段:实体上缺失或为空
   for (const e of p.entities) {
-    const specs = (p.entityTemplates?.[e.kind] ?? []).map((s) => (typeof s === 'string' ? { label: s } : s));
+    const specs = specsForEntity(p, e);
     for (const spec of specs) {
       if (!spec.required) continue;
       const field = e.fields.find((f) => f.label === spec.label);

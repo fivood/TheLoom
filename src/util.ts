@@ -3,7 +3,8 @@ import type {
   FlowEdge, FlowNode, NarrativeUnit, NarrativeUnitKind, Project, SubFlow,
 } from './types';
 import type { AssetKind } from './types';
-import { DOC_STATUS_LABEL, PALETTE } from './types';
+import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL, FLOW_NODE_LABEL, PALETTE } from './types';
+import { cleanTemplateRefs, migrateLegacyTemplates, migrateTemplateInstances } from './templates';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -22,15 +23,20 @@ export function normalizeProject(p: Project): Project {
   p.researchCards ??= [];
   p.researchCategories ??= [];
   p.variables ??= [];
-  p.entityTemplates ??= {};
   p.assets ??= [];
   p.documents ??= [];
   p.documentCategories ??= [];
   p.attachments ??= {};
   p.folders ??= [];
-  p.nodeTemplates ??= {};
   p.palettes ??= [];
   if (!Array.isArray(p.savedQueries)) p.savedQueries = [];
+  // R11 命名模板:旧按类别模板迁移 → 清理非法引用 → 实例补齐模板字段
+  p.templates = (p.templates ?? []).filter((t) => t && typeof t.id === 'string' && typeof t.name === 'string'
+    && (t.module === 'entity' || t.module === 'node') && Array.isArray(t.fields));
+  cleanTemplateRefs(p);
+  migrateLegacyTemplates(p, { entity: ENTITY_KIND_LABEL, node: FLOW_NODE_LABEL });
+  cleanTemplateRefs(p);
+  migrateTemplateInstances(p);
   const folderById = new Map(p.folders.map((folder) => [folder.id, folder]));
   for (const folder of p.folders) {
     const parent = folder.parentId ? folderById.get(folder.parentId) : null;

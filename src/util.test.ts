@@ -12,17 +12,19 @@ describe('normalizeProject', () => {
     const keys = [
       'flows', 'entities', 'brainstormNotes', 'brainstormEdges', 'outlineColumns', 'outlineRows',
       'timelineTracks', 'timelinePoints', 'timelineEvents', 'maps', 'researchCards',
-      'researchCategories', 'variables', 'entityTemplates', 'assets', 'documents',
-      'documentCategories', 'attachments', 'folders', 'nodeTemplates', 'palettes', 'savedQueries',
+      'researchCategories', 'variables', 'assets', 'documents',
+      'documentCategories', 'attachments', 'folders', 'templates', 'palettes', 'savedQueries',
     ];
     for (const key of keys) delete legacy[key];
+    delete legacy.entityTemplates;
+    delete legacy.nodeTemplates;
 
     const project = normalizeProject(legacy as unknown as Project) as unknown as Record<string, unknown>;
 
     for (const key of keys) expect(project[key]).toBeDefined();
     expect(project.timelineTracks).toEqual([]);
     expect(project.attachments).toEqual({});
-    expect(project.nodeTemplates).toEqual({});
+    expect(project.templates).toEqual([]);
     expect(project.savedQueries).toEqual([]);
   });
 

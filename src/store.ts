@@ -4,7 +4,9 @@ import type {
   Flow, Folder, Foreshadow, OutlineColumn, OutlineRow, Project, ResearchCard, SavedProjectQuery, Variable,
 } from './types';
 import { DOC_SNAPSHOT_LIMIT } from './types';
-import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
+import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits, walkFlowNodes } from './util';
+import { ENTITY_KIND_LABEL, FLOW_NODE_LABEL } from './types';
+import { cleanTemplateRefs, migrateTemplateInstances } from './templates';
 import { mapProjectScripts } from './script';
 import { renameEntityField, renameIdentifier, renameSeenTarget } from './script/rename';
 import { getSavedFolder, isTauri, saveToFolder, setSavedFolder } from './storage';
@@ -224,6 +226,14 @@ interface LoomState {
   addCard: (c: ResearchCard) => void;
   updateCard: (id: string, patch: Partial<ResearchCard>) => void;
   removeCard: (id: string) => void;
+
+  /** R11 命名模板 CRUD;编辑后同 commit 内做实例安全迁移 */
+  addTemplate: (t: import('./types').ObjectTemplate) => void;
+  updateTemplate: (id: string, patch: Partial<import('./types').ObjectTemplate>) => void;
+  removeTemplate: (id: string) => void;
+  assignEntityTemplate: (entityId: string, templateId: string | undefined) => void;
+  /** 设置某类别的默认模板字段(找不到则创建),并分配给该类别下尚未套模板的对象 */
+  setDefaultTemplate: (target: { entityKind: import('./types').EntityKind } | { nodeType: import('./types').FlowNodeType }, fields: import('./types').EntityTemplateField[]) => void;
 
   addVariable: (v: Variable) => void;
   updateVariable: (id: string, patch: Partial<Variable>) => void;
@@ -608,6 +618,66 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeCard: (id) => commit((p) => {
       p.researchCards = p.researchCards.filter((x) => x.id !== id);
+    }),
+
+    addTemplate: (t) => commit((p) => {
+      (p.templates ??= []).push(t);
+      migrateTemplateInstances(p);
+    }),
+    updateTemplate: (id, patch) => commit((p) => {
+      const t = (p.templates ?? []).find((x) => x.id === id);
+      if (!t) return;
+      Object.assign(t, patch, { updatedAt: Date.now() });
+      cleanTemplateRefs(p);
+      migrateTemplateInstances(p);
+    }),
+    removeTemplate: (id) => commit((p) => {
+      p.templates = (p.templates ?? []).filter((x) => x.id !== id);
+      cleanTemplateRefs(p);
+    }),
+    assignEntityTemplate: (entityId, templateId) => commit((p) => {
+      const e = p.entities.find((x) => x.id === entityId);
+      if (!e) return;
+      e.templateId = templateId;
+      migrateTemplateInstances(p);
+    }),
+    setDefaultTemplate: (target, fields) => commit((p) => {
+      p.templates ??= [];
+      const now = Date.now();
+      if ('entityKind' in target) {
+        let t = p.templates.find((x) => x.module === 'entity' && x.entityKind === target.entityKind);
+        if (!t) {
+          t = {
+            id: uid(), name: `${ENTITY_KIND_LABEL[target.entityKind]}模板`, module: 'entity',
+            entityKind: target.entityKind, fields: [], createdAt: now, updatedAt: now,
+          };
+          p.templates.push(t);
+        }
+        t.fields = fields;
+        t.updatedAt = now;
+        for (const e of p.entities) {
+          if (e.kind === target.entityKind && !e.templateId) e.templateId = t.id;
+        }
+      } else {
+        let t = p.templates.find((x) => x.module === 'node' && x.nodeType === target.nodeType);
+        if (!t) {
+          t = {
+            id: uid(), name: `${FLOW_NODE_LABEL[target.nodeType]}节点模板`, module: 'node',
+            nodeType: target.nodeType, fields: [], createdAt: now, updatedAt: now,
+          };
+          p.templates.push(t);
+        }
+        t.fields = fields;
+        t.updatedAt = now;
+        for (const flow of p.flows) {
+          walkFlowNodes(flow.nodes, (node) => {
+            if (node.type === target.nodeType && typeof node.data.templateId !== 'string') {
+              node.data.templateId = t!.id;
+            }
+          });
+        }
+      }
+      migrateTemplateInstances(p);
     }),
 
     addVariable: (v) => commit((p) => { p.variables.push(v); }),

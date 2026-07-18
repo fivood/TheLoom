@@ -43,6 +43,26 @@ export interface EntityTemplateField {
 /** 兼容旧版:字符串等价于 { label, type: 'text' } */
 export type EntityTemplateSpec = string | EntityTemplateField;
 
+/** R11 命名模板的适用模块 */
+export type TemplateModule = 'entity' | 'node';
+
+/**
+ * R11 命名模板对象:可分配、可继承、编辑后实例安全迁移。
+ * entityKind / nodeType 表示它是该类别的默认模板(新建对象自动套用)。
+ */
+export interface ObjectTemplate {
+  id: ID;
+  name: string;
+  module: TemplateModule;
+  entityKind?: EntityKind;
+  nodeType?: FlowNodeType;
+  /** 父模板:先取父模板字段,再按 label 被本模板覆盖;链上有环时忽略环 */
+  parentId?: ID;
+  fields: EntityTemplateField[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Entity {
   id: ID;
   /** 所属实体文件夹 id;空 = 未分组 */
@@ -53,6 +73,8 @@ export interface Entity {
   name: string;
   color: string;
   emoji: string;
+  /** R11:分配的命名模板 id;空 = 未套用模板 */
+  templateId?: ID;
   /** 头像图片 dataURL(128px);文件夹模式下存为 assets/entity-{id}.png */
   avatar?: string;
   summary: string;
@@ -635,6 +657,9 @@ export interface Project {
   researchCategories: string[];
   variables: Variable[];
   /** 实体字段模板:按类型预设字段名(字符串等价于文本类型),新建实体时自动填入 */
+  /** R11 命名模板库(实体 / 流程节点);旧版 entityTemplates / nodeTemplates 加载时自动迁移进来 */
+  templates?: ObjectTemplate[];
+  /** @deprecated 旧版按实体类型的模板,normalizeProject 迁移到 templates 后清除 */
   entityTemplates?: Partial<Record<EntityKind, EntityTemplateSpec[]>>;
   /** 资源库 */
   assets: Asset[];

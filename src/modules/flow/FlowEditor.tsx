@@ -19,6 +19,7 @@ import NavigatorTree from '../../components/NavigatorTree';
 import { useLoom as useLoomStore } from '../../store';
 import { nodeTypes, TYPE_COLORS } from './nodes';
 import { getThemeMode, subscribeThemeMode } from '../../theme';
+import { defaultNodeTemplate, specsForNode } from '../../templates';
 import Player from './Player';
 import NodeTemplateModal from './NodeTemplateModal';
 import { downloadMarkdown, flowToMarkdown, projectToMarkdown } from '../../export';
@@ -67,7 +68,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
 }) {
   const updateFlow = useLoom((s) => s.updateFlow);
   const entities = useLoom((s) => s.project.entities);
-  const nodeTemplates = useLoom((s) => s.project.nodeTemplates);
+  const projectForSpecs = useLoom((s) => s.project);
   const documents = useLoom((s) => s.project.documents);
   // 被文档块共享的叙事单元 id:节点 inspector 显示双向同步提示
   const docUnitIds = useMemo(() => {
@@ -184,11 +185,14 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     const center = rect
       ? screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
       : { x: 100, y: 100 };
+    const defaultTpl = defaultNodeTemplate(useLoom.getState().project, type);
     const node: LoomNode = {
       id: uid(),
       type,
       position: { x: center.x - 95 + Math.random() * 40, y: center.y - 40 + Math.random() * 40 },
-      data: type === 'zone' ? { title: '', text: '', w: 420, h: 300 } : { title: '', text: '' },
+      data: type === 'zone'
+        ? { title: '', text: '', w: 420, h: 300 }
+        : { title: '', text: '', ...(defaultTpl ? { templateId: defaultTpl.id } : {}) },
       selected: true,
       dragHandle: type === 'zone' ? '.zone-head' : undefined,
     };
@@ -471,7 +475,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             </div>
             <FieldListEditor
               fields={selectedNode.data.fields ?? []}
-              specs={nodeTemplates?.[(selectedNode.type ?? 'fragment') as FlowNodeType]}
+              specs={specsForNode(projectForSpecs, selectedNode.data)}
               onChange={(fields) => patchSelectedNode({ fields })}
             />
             <AttachmentEditor ownerId={selectedNode.id} />

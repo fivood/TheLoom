@@ -1,18 +1,17 @@
 import { useState } from 'react';
 import { useLoom } from '../../store';
 import { uid } from '../../util';
-import type { EntityTemplateField, EntityTemplateSpec, FlowNodeType } from '../../types';
+import type { EntityTemplateField, FlowNodeType } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import type { EntityFieldType } from '../../types';
+import { defaultNodeTemplate, resolveTemplateFields } from '../../templates';
 
-const normTpl = (s: EntityTemplateSpec): EntityTemplateField => (typeof s === 'string' ? { label: s } : s);
-
-/** 按节点类型编辑模板字段 + 约束(与实体模板同构) */
+/** 按节点类型编辑模板字段 + 约束(编辑该类型的默认命名模板;保存后实例自动补齐新增字段) */
 export default function NodeTemplateModal({ initialType, onClose }: { initialType: FlowNodeType; onClose: () => void }) {
-  const update = useLoom((s) => s.update);
+  const setDefaultTemplate = useLoom((s) => s.setDefaultTemplate);
   const [type, setType] = useState<FlowNodeType>(initialType);
   const readTpl = (t: FlowNodeType): EntityTemplateField[] =>
-    (useLoom.getState().project.nodeTemplates?.[t] ?? []).map(normTpl);
+    resolveTemplateFields(useLoom.getState().project, defaultNodeTemplate(useLoom.getState().project, t)?.id);
   const [rows, setRows] = useState<EntityTemplateField[]>(() => readTpl(initialType));
 
   const switchType = (t: FlowNodeType) => { setType(t); setRows(readTpl(t)); };
@@ -26,12 +25,7 @@ export default function NodeTemplateModal({ initialType, onClose }: { initialTyp
       if (r.readonly) out.readonly = true;
       return out;
     });
-    update((p) => {
-      p.nodeTemplates ??= {};
-      p.nodeTemplates[type] = clean.map((r) =>
-        (r.type || r.filterKind || r.enumValues?.length || r.required || r.readonly) ? r : r.label
-      );
-    });
+    setDefaultTemplate({ nodeType: type }, clean);
     onClose();
   };
   const patchRow = (i: number, patch: Partial<EntityTemplateField>) =>

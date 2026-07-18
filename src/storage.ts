@@ -71,6 +71,7 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
     createdAt: e.createdAt,
   };
   if (e.technicalName) meta.technicalName = e.technicalName;
+  if (e.templateId) meta.templateId = e.templateId;
   if (e.folderId) meta.folderId = e.folderId;
   if (typeof e.order === 'number' && Number.isFinite(e.order)) meta.order = e.order;
   if (avatarPath) meta.avatar = avatarPath;
@@ -105,7 +106,7 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
   return withFrontmatter(meta, body);
 }
 
-const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'technicalName', 'folderId', 'order', 'tags', 'aliases', 'cssclasses', '_field_types', '_conflict_fields']);
+const ENTITY_META_KEYS = new Set(['loom', 'id', 'kind', 'color', 'emoji', 'avatar', 'createdAt', 'technicalName', 'templateId', 'folderId', 'order', 'tags', 'aliases', 'cssclasses', '_field_types', '_conflict_fields']);
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
 /** [[Name]] → Name;非链接返回 null */
@@ -172,6 +173,7 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
     fields,
     notes,
     technicalName: typeof meta.technicalName === 'string' && meta.technicalName ? meta.technicalName : undefined,
+    templateId: typeof meta.templateId === 'string' && meta.templateId ? meta.templateId : undefined,
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
   };
 }
@@ -434,7 +436,6 @@ export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> 
       researchCards: [], researchCategories: [], variables: [],
       assets: [], documents: [], documentCategories: [], attachments: {},
       folders: [],
-      nodeTemplates: {},
       updatedAt: Date.now(),
     };
   }
