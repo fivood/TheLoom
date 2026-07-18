@@ -441,8 +441,8 @@ export default function App() {
                     <Icon name="upload" size={12} /> Final Draft .fdx(带预检)
                   </button>
                   <button onClick={() => { setToolsOpen(false); importManuscriptRef.current?.click(); }}
-                    title="TXT / Markdown / EPUB 长稿:自动按 # 标题、「第X章」正则或 spine 顺序拆卷 / 章 / 场景">
-                    <Icon name="upload" size={12} /> TXT / Markdown / EPUB 稿件(带预检)
+                    title="TXT / Markdown / EPUB / DOCX 长稿:自动按 # 标题、「第X章」正则、EPUB spine 或 Word 标题样式拆卷 / 章 / 场景">
+                    <Icon name="upload" size={12} /> TXT / Markdown / EPUB / DOCX 稿件(带预检)
                   </button>
                   <input
                     ref={importXlsxRef}
@@ -469,7 +469,7 @@ export default function App() {
                   <input
                     ref={importManuscriptRef}
                     type="file"
-                    accept=".md,.markdown,.txt,.epub,text/plain,text/markdown,application/epub+zip"
+                    accept=".md,.markdown,.txt,.epub,.docx,text/plain,text/markdown,application/epub+zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     style={{ display: 'none' }}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
