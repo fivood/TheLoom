@@ -6,6 +6,7 @@ import {
   applyManuscript, parseManuscript, readManuscriptFile,
   type ParsedManuscript,
 } from '../interop/manuscriptImport';
+import { parseEpub } from '../interop/epubImport';
 import type { Document } from '../types';
 import Icon from './Icon';
 
@@ -50,9 +51,15 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
           setFdxDocName(name);
           setFdx(previewFdxImport(text, project, name));
         } else {
-          const { text, format } = await readManuscriptFile(file);
-          if (abortRef.current) return;
-          setManuscript(parseManuscript(text, { format }));
+          if (/\.epub$/i.test(file.name)) {
+            const buf = await file.arrayBuffer();
+            if (abortRef.current) return;
+            setManuscript(await parseEpub(buf));
+          } else {
+            const { text, format } = await readManuscriptFile(file);
+            if (abortRef.current) return;
+            setManuscript(parseManuscript(text, { format }));
+          }
         }
       } catch (e) {
         if (!abortRef.current) setErr(e instanceof Error ? e.message : String(e));
@@ -96,7 +103,7 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
   const title = mode === 'xlsx'
     ? 'Excel 项目导入 · 预检'
     : mode === 'fdx' ? 'Final Draft 剧本导入 · 预检'
-    : 'TXT / Markdown 稿件导入 · 预检';
+    : 'TXT / Markdown / EPUB 稿件导入 · 预检';
 
   return (
     <div className="palette-backdrop" onClick={onClose}>
