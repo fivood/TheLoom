@@ -86,7 +86,8 @@ export default function App() {
   const [engineExport, setEngineExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
   const [projectImport, setProjectImport] = useState(false);
-  const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx'; file: File } | null>(null);
+  const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx' | 'manuscript'; file: File } | null>(null);
+  const importManuscriptRef = useRef<HTMLInputElement>(null);
   const importXlsxRef = useRef<HTMLInputElement>(null);
   const importFdxRef = useRef<HTMLInputElement>(null);
   const [recovering, setRecovering] = useState(false);
@@ -439,6 +440,10 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); importFdxRef.current?.click(); }}>
                     <Icon name="upload" size={12} /> Final Draft .fdx(带预检)
                   </button>
+                  <button onClick={() => { setToolsOpen(false); importManuscriptRef.current?.click(); }}
+                    title="TXT / Markdown 长稿:自动按 # 标题或「第X章」正则拆卷 / 章 / 场景">
+                    <Icon name="upload" size={12} /> TXT / Markdown 稿件(带预检)
+                  </button>
                   <input
                     ref={importXlsxRef}
                     type="file"
@@ -458,6 +463,17 @@ export default function App() {
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) setImportFile({ mode: 'fdx', file: f });
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                  <input
+                    ref={importManuscriptRef}
+                    type="file"
+                    accept=".md,.markdown,.txt,text/plain,text/markdown"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setImportFile({ mode: 'manuscript', file: f });
                       e.currentTarget.value = '';
                     }}
                   />

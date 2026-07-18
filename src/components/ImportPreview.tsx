@@ -2,10 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useLoom, uid } from '../store';
 import { previewProjectXlsx, type XlsxImportPreview } from '../interop/projectXlsx';
 import { previewFdxImport, type FdxImportPreview } from '../interop/fdx';
+import {
+  applyManuscript, parseManuscript, readManuscriptFile,
+  type ParsedManuscript,
+} from '../interop/manuscriptImport';
 import type { Document } from '../types';
 import Icon from './Icon';
 
-type Mode = 'xlsx' | 'fdx';
+type Mode = 'xlsx' | 'fdx' | 'manuscript';
 
 interface Props {
   mode: Mode;
@@ -27,6 +31,7 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
   const [xlsx, setXlsx] = useState<XlsxImportPreview | null>(null);
   const [fdx, setFdx] = useState<FdxImportPreview | null>(null);
   const [fdxDocName, setFdxDocName] = useState('');
+  const [manuscript, setManuscript] = useState<ParsedManuscript | null>(null);
   const abortRef = useRef(false);
 
   useEffect(() => {
@@ -38,12 +43,16 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
           if (abortRef.current) return;
           const p = await previewProjectXlsx(buf, project);
           if (!abortRef.current) setXlsx(p);
-        } else {
+        } else if (mode === 'fdx') {
           const text = await file.text();
           if (abortRef.current) return;
           const name = file.name.replace(/\.fdx$/i, '') || '导入剧本';
           setFdxDocName(name);
           setFdx(previewFdxImport(text, project, name));
+        } else {
+          const { text, format } = await readManuscriptFile(file);
+          if (abortRef.current) return;
+          setManuscript(parseManuscript(text, { format }));
         }
       } catch (e) {
         if (!abortRef.current) setErr(e instanceof Error ? e.message : String(e));
@@ -78,7 +87,16 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
     onClose();
   };
 
-  const title = mode === 'xlsx' ? 'Excel 项目导入 · 预检' : 'Final Draft 剧本导入 · 预检';
+  const applyManuscriptDoc = () => {
+    if (!manuscript) return;
+    update((p) => { applyManuscript(p, manuscript); });
+    onClose();
+  };
+
+  const title = mode === 'xlsx'
+    ? 'Excel 项目导入 · 预检'
+    : mode === 'fdx' ? 'Final Draft 剧本导入 · 预检'
+    : 'TXT / Markdown 稿件导入 · 预检';
 
   return (
     <div className="palette-backdrop" onClick={onClose}>
@@ -160,6 +178,66 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
                   onClick={applyXlsx}
                   title={xlsx.errors.length > 0 ? '存在错误,请先修复表格' : '把变更应用到当前项目'}
                 >应用到项目</button>
+              </div>
+            </>
+          )}
+
+          {mode === 'manuscript' && manuscript && (
+            <>
+              {manuscript.projectName && (
+                <div className="hint" style={{ fontSize: 12 }}>
+                  frontmatter 检测到:标题 <b>{manuscript.projectName}</b>
+                  {manuscript.author ? <> · 作者 <b>{manuscript.author}</b></> : null}
+                </div>
+              )}
+              <div className="field">
+                <label>解析结果</label>
+                <table className="var-table">
+                  <tbody>
+                    <tr><td>卷 / 分辑</td><td>{manuscript.volumes.length}</td></tr>
+                    <tr><td>章</td><td>{manuscript.volumes.reduce((s, v) => s + v.chapters.length, 0)}</td></tr>
+                    <tr><td>场景</td><td>{manuscript.sceneCount}</td></tr>
+                    <tr><td>正文字符(近似)</td><td>{manuscript.totalChars.toLocaleString()}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="field">
+                <label>目录预览</label>
+                <div style={{ maxHeight: 200, overflowY: 'auto', fontSize: 12, lineHeight: 1.6 }}>
+                  {manuscript.volumes.map((v, vi) => (
+                    <div key={vi}>
+                      <b>{v.title || `卷${vi + 1}`}</b>
+                      {v.chapters.map((c, ci) => (
+                        <div key={ci} style={{ paddingLeft: 12 }}>
+                          {c.title || `第${ci + 1}章`}
+                          <span className="hint"> · {c.scenes.length} 场</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {manuscript.warnings.length > 0 && (
+                <div className="field">
+                  <label>警告({manuscript.warnings.length})</label>
+                  <ul className="doc-legend">
+                    {manuscript.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              <div className="player-tip" style={{ marginTop: 8 }}>
+                导入会在文档模块新建卷 / 章文件夹树,场景写为独立文档(状态=大纲,分类=导入稿件)。<br />
+                只新增,不覆盖任何现有对象;Ctrl+Z 一步撤销。
+              </div>
+
+              <div className="sync-actions">
+                <button onClick={onClose}>取消</button>
+                <button className="primary" onClick={applyManuscriptDoc}>
+                  导入 {manuscript.sceneCount} 场景
+                </button>
               </div>
             </>
           )}
