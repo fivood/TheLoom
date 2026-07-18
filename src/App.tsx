@@ -16,6 +16,7 @@ import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
 import TemplateManager from './components/TemplateManager';
+import ChapterCompileDialog from './components/ChapterCompileDialog';
 import { initPaneWidths } from './components/PaneHandle';
 import ThemeToggle from './components/ThemeToggle';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
@@ -76,6 +77,7 @@ export default function App() {
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
   const [templateManager, setTemplateManager] = useState(false);
+  const [chapterCompile, setChapterCompile] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
   const [aiAssistant, setAiAssistant] = useState(false);
   const aiPanelRequest = useAiPanelBus((s) => s.request);
@@ -432,6 +434,12 @@ export default function App() {
                   }}>
                     Final Draft .fdx
                   </button>
+                  <button
+                    onClick={() => { setToolsOpen(false); setChapterCompile(true); }}
+                    title="按卷/章勾选文档,编译为 Markdown / TXT / Final Draft 成品稿件"
+                  >
+                    <Icon name="script" size={12} /> 章节编译…
+                  </button>
                   <div className="tools-sep" />
                   <div className="tools-label">导入</div>
                   <button onClick={() => { setToolsOpen(false); importXlsxRef.current?.click(); }}>
@@ -531,6 +539,7 @@ export default function App() {
       {history && <VersionHistory onClose={() => setHistory(false)} />}
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
       {templateManager && <TemplateManager onClose={() => setTemplateManager(false)} />}
+      {chapterCompile && <ChapterCompileDialog onClose={() => setChapterCompile(false)} />}
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
       {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
