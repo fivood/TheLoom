@@ -9,7 +9,7 @@ import { ENTITY_KIND_LABEL, FLOW_NODE_LABEL } from './types';
 import { cleanTemplateRefs, migrateTemplateInstances } from './templates';
 import { mapProjectScripts } from './script';
 import { renameEntityField, renameIdentifier, renameSeenTarget } from './script/rename';
-import { getSavedFolder, isTauri, saveToFolder, setSavedFolder } from './storage';
+import { getSavedFolder, isTauri, loadFromFolder, saveToFolder, setSavedFolder } from './storage';
 import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
 import {
@@ -64,6 +64,7 @@ export interface SlotMeta {
   id: string;
   name: string;
   updatedAt: number;
+  folder?: string;
 }
 
 /* ---------- 空白项目(默认) ---------- */
@@ -99,7 +100,15 @@ function blankProject(): Project {
 function readSlots(): SlotMeta[] {
   try {
     const raw = localStorage.getItem(SLOTS_KEY);
-    if (raw) return JSON.parse(raw) as SlotMeta[];
+    if (raw) {
+      const parsed = JSON.parse(raw) as SlotMeta[];
+      return parsed.filter((slot) => slot && typeof slot.id === 'string').map((slot) => ({
+        id: slot.id,
+        name: typeof slot.name === 'string' ? slot.name : '未命名项目',
+        updatedAt: typeof slot.updatedAt === 'number' && Number.isFinite(slot.updatedAt) ? slot.updatedAt : Date.now(),
+        ...(typeof slot.folder === 'string' && slot.folder ? { folder: slot.folder } : {}),
+      }));
+    }
   } catch { /* 忽略 */ }
   return [];
 }
@@ -114,6 +123,7 @@ function initSlots(): {
   recoveryBackup: RecoveryBackup | null;
   quarantinedProject: RecoveryBackup | null;
   recoveryNotice: string | null;
+  folder: string | null;
 } {
   let slots = readSlots();
   let id = localStorage.getItem(CURRENT_KEY);
@@ -153,6 +163,18 @@ function initSlots(): {
     localStorage.setItem(CURRENT_KEY, id);
   }
 
+  let folder: string | null = null;
+  if (isTauri) {
+    const legacyFolder = getSavedFolder();
+    const current = slots.find((slot) => slot.id === id)!;
+    if (legacyFolder && !current.folder) {
+      current.folder = legacyFolder;
+      writeSlots(slots);
+    }
+    if (legacyFolder) setSavedFolder(null);
+    folder = current.folder ?? null;
+  }
+
   const loaded = readProjectWithRecovery(localStorage, id);
   const project = loaded.project ?? blankProject();
   return {
@@ -162,6 +184,7 @@ function initSlots(): {
     recoveryBackup: loaded.backup,
     quarantinedProject: loaded.quarantine,
     recoveryNotice: loaded.notice,
+    folder,
   };
 }
 
@@ -202,9 +225,9 @@ interface LoomState {
   /** 多项目槽位 */
   slots: SlotMeta[];
   currentSlotId: string;
-  switchSlot: (id: string) => void;
-  newSlot: (kind: 'blank' | 'sample') => boolean;
-  deleteSlot: (id: string) => void;
+  switchSlot: (id: string) => Promise<boolean>;
+  newSlot: (kind: 'blank' | 'sample') => Promise<boolean>;
+  deleteSlot: (id: string) => Promise<boolean>;
 
   updateFlow: (flowId: string, fn: (f: Flow) => void) => void;
 
@@ -294,6 +317,7 @@ interface LoomState {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let folderSaveQueue: Promise<void> = Promise.resolve();
 
 const UNDO_LIMIT = 50;
 const UNDO_COALESCE_MS = 800;
@@ -304,6 +328,12 @@ let lastUndoPush = 0;
 const boot = initSlots();
 
 export const useLoom = create<LoomState>((set, get) => {
+  const enqueueFolderSave = (folder: string, project: Project) => {
+    const save = folderSaveQueue.catch(() => undefined).then(() => saveToFolder(folder, project));
+    folderSaveQueue = save;
+    return save;
+  };
+
   const persist = (p: Project) => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -334,40 +364,106 @@ export const useLoom = create<LoomState>((set, get) => {
       }
       const folder = get().folder;
       if (folder && isTauri) {
-        saveToFolder(folder, p)
-          .then(() => set({ syncError: null }))
-          .catch((e) => set({ syncError: String(e) }));
+        enqueueFolderSave(folder, p)
+          .then(() => {
+            if (get().folder === folder) set({ syncError: null });
+          })
+          .catch((e) => {
+            if (get().folder === folder) set({ syncError: String(e) });
+          });
       }
     }, 400);
   };
 
-  /** 换到另一个槽位时:立即冲刷当前槽的保存,清撤销栈 */
-  const flushAndSwitch = (targetId: string) => {
+  /** 换到另一个槽位时:先完整保存当前项目,再载入目标项目自己的存储位置 */
+  const flushAndSwitch = async (targetId: string): Promise<boolean> => {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    // 立即写入当前槽,避免防抖丢失
+    const cur = get();
+    const target = cur.slots.find((slot) => slot.id === targetId);
+    if (!target) return false;
+
     try {
-      const cur = get();
       saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
-    } catch { /* 忽略 */ }
-    localStorage.setItem(CURRENT_KEY, targetId);
+    } catch (error) {
+      if (!cur.folder || !isTauri) {
+        set({
+          saveStatus: 'error',
+          saveError: `切换前无法保存当前项目:${error instanceof Error ? error.message : String(error)}`,
+        });
+        return false;
+      }
+    }
+
+    if (cur.folder && isTauri) {
+      try {
+        await enqueueFolderSave(cur.folder, cur.project);
+      } catch (error) {
+        set({
+          syncError: `切换前无法保存当前项目到文件夹:${error instanceof Error ? error.message : String(error)}`,
+        });
+        return false;
+      }
+    }
+
+    const localLoaded = readProjectWithRecovery(localStorage, targetId);
+    let next = localLoaded.project ?? blankProject();
+    let folderRecoveryNotice: string | null = null;
+    if (target.folder && isTauri) {
+      try {
+        const loaded = await loadFromFolder(target.folder);
+        next = loaded.project;
+        folderRecoveryNotice = loaded.recoveredFromBackup
+          ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
+          : null;
+        try { saveProjectWithRecovery(localStorage, targetId, next); } catch { /* 文件夹仍是权威存储 */ }
+      } catch (error) {
+        set({
+          syncError: `无法打开项目「${target.name || '未命名项目'}」的文件夹:\n${target.folder}\n${error instanceof Error ? error.message : String(error)}`,
+        });
+        return false;
+      }
+    }
+
+    const slots = cur.slots.map((slot) => {
+      if (slot.id === cur.currentSlotId) {
+        return { ...slot, name: cur.project.name || '未命名项目', updatedAt: cur.project.updatedAt };
+      }
+      if (slot.id === targetId) {
+        return { ...slot, name: next.name || '未命名项目', updatedAt: next.updatedAt };
+      }
+      return slot;
+    });
+    try {
+      writeSlots(slots);
+      localStorage.setItem(CURRENT_KEY, targetId);
+    } catch (error) {
+      set({
+        saveStatus: 'error',
+        saveError: `无法记录项目切换:${error instanceof Error ? error.message : String(error)}`,
+      });
+      return false;
+    }
+
     undoStack = []; redoStack = []; lastUndoPush = 0;
-    const loaded = readProjectWithRecovery(localStorage, targetId);
-    const next = loaded.project ?? blankProject();
     set((s) => ({
       project: next,
       currentSlotId: targetId,
+      slots,
+      folder: isTauri ? target.folder ?? null : null,
       snapshots: readSnapshots(targetId),
       savedAt: Date.now(),
       saveStatus: 'saved',
       saveError: null,
-      recoveryBackup: loaded.backup,
-      quarantinedProject: loaded.quarantine,
-      recoveryNotice: loaded.notice,
+      syncError: null,
+      recoveryBackup: target.folder && isTauri ? null : localLoaded.backup,
+      quarantinedProject: target.folder && isTauri ? null : localLoaded.quarantine,
+      recoveryNotice: target.folder && isTauri ? folderRecoveryNotice : localLoaded.notice,
       storageUsage: getStorageUsage(localStorage),
       revision: s.revision + 1,
       canUndo: false,
       canRedo: false,
     }));
+    return true;
   };
 
   const commit = (fn: (p: Project) => void, isolated = false) => {
@@ -407,19 +503,38 @@ export const useLoom = create<LoomState>((set, get) => {
     revision: 0,
     canUndo: false,
     canRedo: false,
-    folder: isTauri ? getSavedFolder() : null,
+    folder: boot.folder,
     syncError: null,
     recoveryBackup: boot.recoveryBackup,
     quarantinedProject: boot.quarantinedProject,
     recoveryNotice: boot.recoveryNotice,
-    setFolder: (dir) => set({ folder: dir, syncError: null }),
+    setFolder: (dir) => {
+      const cur = get();
+      try {
+        const slots = cur.slots.map((slot) => (
+          slot.id === cur.currentSlotId
+            ? { ...slot, ...(dir ? { folder: dir } : { folder: undefined }) }
+            : slot
+        ));
+        writeSlots(slots);
+        setSavedFolder(null);
+        set({ folder: dir, slots, syncError: null });
+      } catch (error) {
+        set({
+          saveStatus: 'error',
+          saveError: `无法记录项目文件夹:${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    },
     unbindFolder: () => {
       const cur = get();
       if (!cur.folder) return true;
       try {
         saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
         const slots = cur.slots.map((s) =>
-          s.id === cur.currentSlotId ? { ...s, name: cur.project.name || '未命名项目', updatedAt: cur.project.updatedAt } : s,
+          s.id === cur.currentSlotId
+            ? { ...s, name: cur.project.name || '未命名项目', updatedAt: cur.project.updatedAt, folder: undefined }
+            : s,
         );
         writeSlots(slots);
         setSavedFolder(null);
@@ -464,13 +579,13 @@ export const useLoom = create<LoomState>((set, get) => {
     currentSlotId: boot.currentId,
     snapshots: readSnapshots(boot.currentId),
 
-    switchSlot: (id) => {
+    switchSlot: async (id) => {
       const cur = get().currentSlotId;
-      if (id === cur) return;
-      if (!get().slots.some((s) => s.id === id)) return;
-      flushAndSwitch(id);
+      if (id === cur) return true;
+      if (!get().slots.some((s) => s.id === id)) return false;
+      return flushAndSwitch(id);
     },
-    newSlot: (kind) => {
+    newSlot: async (kind) => {
       const newId = uid();
       try {
         const proj = kind === 'sample' ? sampleProject() : blankProject();
@@ -479,7 +594,15 @@ export const useLoom = create<LoomState>((set, get) => {
         const nextSlots = [...get().slots, meta];
         writeSlots(nextSlots);
         set({ slots: nextSlots, storageUsage: getStorageUsage(localStorage) });
-        flushAndSwitch(newId);
+        if (!await flushAndSwitch(newId)) {
+          const restoredSlots = get().slots.filter((slot) => slot.id !== newId);
+          try {
+            localStorage.removeItem(projectKey(newId));
+            writeSlots(restoredSlots);
+          } catch { /* 原项目仍保持打开 */ }
+          set({ slots: restoredSlots, storageUsage: getStorageUsage(localStorage) });
+          return false;
+        }
         return true;
       } catch (error) {
         try { localStorage.removeItem(projectKey(newId)); } catch {}
@@ -491,16 +614,25 @@ export const useLoom = create<LoomState>((set, get) => {
         return false;
       }
     },
-    deleteSlot: (id) => {
+    deleteSlot: async (id) => {
       const cur = get();
-      if (cur.slots.length <= 1) return; // 至少留一个
+      if (cur.slots.length <= 1 || !cur.slots.some((slot) => slot.id === id)) return false;
       const nextSlots = cur.slots.filter((s) => s.id !== id);
-      writeSlots(nextSlots);
-      localStorage.removeItem(projectKey(id));
-      localStorage.removeItem(snapshotsKey(id));
-      clearProjectRecovery(localStorage, id);
-      set({ slots: nextSlots, storageUsage: getStorageUsage(localStorage) });
-      if (cur.currentSlotId === id) flushAndSwitch(nextSlots[0].id);
+      if (cur.currentSlotId === id && !await flushAndSwitch(nextSlots[0].id)) return false;
+      try {
+        writeSlots(nextSlots);
+        localStorage.removeItem(projectKey(id));
+        localStorage.removeItem(snapshotsKey(id));
+        clearProjectRecovery(localStorage, id);
+        set({ slots: nextSlots, storageUsage: getStorageUsage(localStorage) });
+        return true;
+      } catch (error) {
+        set({
+          saveStatus: 'error',
+          saveError: `无法删除项目:${error instanceof Error ? error.message : String(error)}`,
+        });
+        return false;
+      }
     },
 
     update: commit,

@@ -3,7 +3,7 @@ import { exportProject, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
 import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export';
 import {
-  folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder, setSavedFolder,
+  folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
 import { exportBlobsToFolder } from './assetFiles';
 import { useNav } from './search';
@@ -105,6 +105,8 @@ export default function App() {
   // 恢复本机保存的分栏宽度(启动时一次)
   useEffect(() => { initPaneWidths(); }, []);
   const project = useLoom((s) => s.project);
+  const slots = useLoom((s) => s.slots);
+  const currentSlotId = useLoom((s) => s.currentSlotId);
   const folder = useLoom((s) => s.folder);
   const syncError = useLoom((s) => s.syncError);
   const saveStatus = useLoom((s) => s.saveStatus);
@@ -112,6 +114,7 @@ export default function App() {
   const recoveryNotice = useLoom((s) => s.recoveryNotice);
   const storageUsage = useLoom((s) => s.storageUsage);
   const setFolder = useLoom((s) => s.setFolder);
+  const switchSlot = useLoom((s) => s.switchSlot);
   const revision = useLoom((s) => s.revision);
   const canUndo = useLoom((s) => s.canUndo);
   const canRedo = useLoom((s) => s.canRedo);
@@ -173,7 +176,6 @@ export default function App() {
       })
       .catch(async () => {
         await alertDialog(`无法读取项目文件夹:\n${folder}\n\n已切换为浏览器本地存储。`);
-        setSavedFolder(null);
         setFolder(null);
       });
     // 仅启动时执行一次
@@ -183,6 +185,21 @@ export default function App() {
     const dir = await pickFolder();
     if (!dir) return;
     try {
+      const normalizePath = (value: string) => value.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLocaleLowerCase();
+      const boundSlot = slots.find((slot) => (
+        slot.id !== currentSlotId && slot.folder && normalizePath(slot.folder) === normalizePath(dir)
+      ));
+      if (boundSlot) {
+        if (!await confirmDialog({
+          message: `这个文件夹已绑定到项目「${boundSlot.name || '未命名项目'}」。\n\n是否直接切换到该项目?`,
+          confirmText: '切换项目',
+        })) return;
+        if (!await switchSlot(boundSlot.id)) {
+          const state = useLoom.getState();
+          await alertDialog(state.syncError || state.saveError || '项目切换失败，当前项目仍保持打开。');
+        }
+        return;
+      }
       if (await folderHasProject(dir)) {
         if (!await confirmDialog({ message: `该文件夹已有项目数据,加载它并替换当前打开的项目?\n\n${dir}` })) return;
         const loaded = await loadFromFolder(dir);
@@ -199,7 +216,6 @@ export default function App() {
           await alertDialog(`已落盘 ${moved.written} 个资源原文件;${moved.missing} 个在浏览器存储中缺失,可稍后在资源模块「重新定位」。`);
         }
       }
-      setSavedFolder(dir);
       setFolder(dir);
     } catch (e) {
       await alertDialog(`操作失败:${e}`);

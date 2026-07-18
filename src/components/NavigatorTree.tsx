@@ -387,19 +387,20 @@ export default function NavigatorTree<T extends NavigatorItem>({
                 {item.favorite ? '★' : '☆'}
               </button>
               {renderItemActions?.(item)}
-              <select
-                className="move-to-folder"
-                value={item.folderId ?? ''}
-                onClick={(event) => event.stopPropagation()}
-                onChange={(event) => onMove(item.id, event.target.value || undefined)}
-                title="移到文件夹"
-                aria-label={`移动${getLabel(item)}`}
-              >
-                <option value="">未分组</option>
-                {folderRows.map(({ folder, depth: folderDepth }) => (
-                  <option key={folder.id} value={folder.id}>{`${'　'.repeat(folderDepth)}${folder.name}`}</option>
-                ))}
-              </select>
+              <span className="move-to-folder-control" title="移到文件夹">
+                <select
+                  className="move-to-folder"
+                  value={item.folderId ?? ''}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => onMove(item.id, event.target.value || undefined)}
+                  aria-label={`移动${getLabel(item)}`}
+                >
+                  <option value="">未分组</option>
+                  {folderRows.map(({ folder, depth: folderDepth }) => (
+                    <option key={folder.id} value={folder.id}>{`${'　'.repeat(folderDepth)}${folder.name}`}</option>
+                  ))}
+                </select>
+              </span>
               {isDrop && dropTarget?.position === 'after' && <span className="drop-line" />}
             </div>
           );

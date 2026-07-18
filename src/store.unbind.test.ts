@@ -20,8 +20,8 @@ describe('unbindFolder(文件夹模式解绑)', () => {
     const { useLoom } = await import('./store');
 
     useLoom.getState().setFolder('C:/some/project-dir');
-    mem.set('theloom-folder', 'C:/some/project-dir');
     expect(useLoom.getState().folder).toBe('C:/some/project-dir');
+    expect(JSON.parse(mem.get('theloom-slots-v1')!)[0].folder).toBe('C:/some/project-dir');
 
     useLoom.getState().unbindFolder();
 
@@ -30,6 +30,7 @@ describe('unbindFolder(文件夹模式解绑)', () => {
     expect(after.saveStatus).toBe('saved');
     expect(after.saveError).toBeNull();
     expect(mem.has('theloom-folder')).toBe(false);
+    expect(JSON.parse(mem.get('theloom-slots-v1')!)[0].folder).toBeUndefined();
 
     const slotKey = [...mem.keys()].find((k) => k.includes(after.currentSlotId) && mem.get(k)!.includes('"flows"'));
     expect(slotKey).toBeTruthy();
@@ -56,7 +57,6 @@ describe('unbindFolder(文件夹模式解绑)', () => {
     const { useLoom } = await import('./store');
 
     useLoom.getState().setFolder('C:/safe/project-dir');
-    mem.set('theloom-folder', 'C:/safe/project-dir');
     const originalSetItem = localStorage.setItem;
     localStorage.setItem = (key: string, value: string) => {
       if (key.includes(useLoom.getState().currentSlotId)) throw new Error('QuotaExceededError');
@@ -66,7 +66,7 @@ describe('unbindFolder(文件夹模式解绑)', () => {
     expect(useLoom.getState().unbindFolder()).toBe(false);
     const after = useLoom.getState();
     expect(after.folder).toBe('C:/safe/project-dir');
-    expect(mem.get('theloom-folder')).toBe('C:/safe/project-dir');
+    expect(JSON.parse(mem.get('theloom-slots-v1')!)[0].folder).toBe('C:/safe/project-dir');
     expect(after.saveStatus).toBe('error');
     expect(after.saveError).toContain('仍绑定在原文件夹');
 
