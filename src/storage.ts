@@ -239,6 +239,15 @@ export function documentToMd(d: Document, entities: Entity[]): string {
     updatedAt: d.updatedAt,
   };
   if (d.technicalName) meta.technicalName = d.technicalName;
+  if (d.templateId) meta.templateId = d.templateId;
+  if (d.fields?.length) {
+    meta.fields = d.fields.map((f) => {
+      const out: Record<string, unknown> = { id: f.id, label: f.label, value: f.value };
+      if (f.type) out.type = f.type;
+      if (f.filterKind) out.filterKind = f.filterKind;
+      return out;
+    });
+  }
   if (d.folderId) meta.folderId = d.folderId;
   if (typeof d.order === 'number' && Number.isFinite(d.order)) meta.order = d.order;
   if (d.status) meta.status = d.status;
@@ -323,6 +332,18 @@ export function mdToDocument(filename: string, md: string, _index: number): Docu
     order: typeof meta.order === 'number' && Number.isFinite(meta.order) ? meta.order : undefined,
     name,
     technicalName: typeof meta.technicalName === 'string' && meta.technicalName ? meta.technicalName : undefined,
+    templateId: typeof meta.templateId === 'string' && meta.templateId ? meta.templateId : undefined,
+    fields: Array.isArray(meta.fields)
+      ? (meta.fields as Record<string, unknown>[])
+        .filter((f) => f && typeof f.label === 'string')
+        .map((f) => ({
+          id: typeof f.id === 'string' && f.id ? f.id : uid(),
+          label: f.label as string,
+          value: typeof f.value === 'string' ? f.value : '',
+          ...(f.type === 'entity' || f.type === 'entities' ? { type: f.type } : {}),
+          ...(typeof f.filterKind === 'string' ? { filterKind: f.filterKind as EntityKind } : {}),
+        }))
+      : undefined,
     category: typeof meta.category === 'string' && meta.category ? meta.category : '未分类',
     blocks,
     notes: typeof meta.notes === 'string' ? meta.notes : '',

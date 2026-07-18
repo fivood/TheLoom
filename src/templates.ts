@@ -49,6 +49,11 @@ export function specsForNode(p: Project, data: FlowNodeData): EntityTemplateFiel
   return resolveTemplateFields(p, typeof data.templateId === 'string' ? data.templateId : undefined);
 }
 
+/** 资源 / 文档 / 地图共用:按对象自身的 templateId 解析 */
+export function specsForObject(p: Project, obj: { templateId?: string }): EntityTemplateField[] {
+  return resolveTemplateFields(p, obj.templateId);
+}
+
 /**
  * 实例安全迁移:被分配模板的对象自动补齐模板新增的字段。
  * 只追加缺失字段,绝不删除或改写实例上已有的值。返回补齐的字段总数。
@@ -73,6 +78,13 @@ export function migrateTemplateInstances(p: Project): number {
       node.data.fields ??= [];
       ensure(node.data.fields, specs);
     });
+  }
+  for (const obj of [...p.assets, ...p.documents, ...p.maps]) {
+    if (!obj.templateId) continue;
+    const specs = resolveTemplateFields(p, obj.templateId);
+    if (specs.length === 0) continue;
+    obj.fields ??= [];
+    ensure(obj.fields, specs);
   }
   return added;
 }
@@ -160,5 +172,8 @@ export function cleanTemplateRefs(p: Project) {
         delete node.data.templateId;
       }
     });
+  }
+  for (const obj of [...p.assets, ...p.documents, ...p.maps]) {
+    if (obj.templateId && !ids.has(obj.templateId)) obj.templateId = undefined;
   }
 }

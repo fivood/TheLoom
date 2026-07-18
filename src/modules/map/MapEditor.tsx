@@ -5,6 +5,7 @@ import { useNav } from '../../search';
 import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import type { MapDoc, MapMarker, MapRegion } from '../../types';
 import Icon from '../../components/Icon';
+import ObjectTemplateSection from '../../components/ObjectTemplateSection';
 import ColorPicker from '../../components/ColorPicker';
 import Inspector from '../../components/Inspector';
 
@@ -415,12 +416,19 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
         ) : selRegion ? (
           <RegionInspector region={selRegion} onChange={(p) => patchRegion(selRegion.id, p)} onDelete={() => removeRegion(selRegion.id)} />
         ) : (
-          <div className="empty-hint">
-            切换工具栏模式并点画布来添加。<br /><br />
-            <b>标记</b>:关联「地点」实体、指定时间线区间<br />
-            <b>区域</b>:多边形圈一块地(常用于阵营领地)<br /><br />
-            选中已有标记/区域后可编辑与删除。
-          </div>
+          <>
+            <ObjectTemplateSection
+              module="map"
+              object={map}
+              onFieldsChange={(fields) => patch((m) => { m.fields = fields; })}
+            />
+            <div className="empty-hint">
+              切换工具栏模式并点画布来添加。<br /><br />
+              <b>标记</b>:关联「地点」实体、指定时间线区间<br />
+              <b>区域</b>:多边形圈一块地(常用于阵营领地)<br /><br />
+              选中已有标记/区域后可编辑与删除。
+            </div>
+          </>
         )}
       </Inspector>
     </>

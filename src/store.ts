@@ -232,6 +232,7 @@ interface LoomState {
   updateTemplate: (id: string, patch: Partial<import('./types').ObjectTemplate>) => void;
   removeTemplate: (id: string) => void;
   assignEntityTemplate: (entityId: string, templateId: string | undefined) => void;
+  assignObjectTemplate: (module: 'asset' | 'document' | 'map', id: string, templateId: string | undefined) => void;
   /** 设置某类别的默认模板字段(找不到则创建),并分配给该类别下尚未套模板的对象 */
   setDefaultTemplate: (target: { entityKind: import('./types').EntityKind } | { nodeType: import('./types').FlowNodeType }, fields: import('./types').EntityTemplateField[]) => void;
 
@@ -639,6 +640,13 @@ export const useLoom = create<LoomState>((set, get) => {
       const e = p.entities.find((x) => x.id === entityId);
       if (!e) return;
       e.templateId = templateId;
+      migrateTemplateInstances(p);
+    }),
+    assignObjectTemplate: (module, id, templateId) => commit((p) => {
+      const list = module === 'asset' ? p.assets : module === 'document' ? p.documents : p.maps;
+      const obj = (list as { id: string; templateId?: string }[]).find((x) => x.id === id);
+      if (!obj) return;
+      obj.templateId = templateId;
       migrateTemplateInstances(p);
     }),
     setDefaultTemplate: (target, fields) => commit((p) => {

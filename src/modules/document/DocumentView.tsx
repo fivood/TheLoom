@@ -3,6 +3,7 @@ import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import Icon from '../../components/Icon';
+import ObjectTemplateSection from '../../components/ObjectTemplateSection';
 import TechNameField from '../../components/TechNameField';
 import type { DocStatus, Document } from '../../types';
 import { DOC_STATUS_LABEL, DOC_STATUS_ORDER, DOC_WRITING_TYPES } from '../../types';
@@ -381,6 +382,11 @@ export default function DocumentView() {
             </div>
           )}
 
+          <ObjectTemplateSection
+            module="document"
+            object={selected}
+            onFieldsChange={(fields) => patchDoc((d) => { d.fields = fields; })}
+          />
           <div className="field">
             <label>场景元数据</label>
             <div className="kv-row">

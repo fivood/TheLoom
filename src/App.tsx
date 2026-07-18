@@ -15,6 +15,7 @@ import SyncPanel from './components/SyncPanel';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
+import TemplateManager from './components/TemplateManager';
 import { initPaneWidths } from './components/PaneHandle';
 import ThemeToggle from './components/ThemeToggle';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
@@ -74,6 +75,7 @@ export default function App() {
   const [querying, setQuerying] = useState(false);
   const [history, setHistory] = useState(false);
   const [palettes, setPalettes] = useState(false);
+  const [templateManager, setTemplateManager] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
   const [aiAssistant, setAiAssistant] = useState(false);
   const aiPanelRequest = useAiPanelBus((s) => s.request);
@@ -339,6 +341,9 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); setPalettes(true); }}>
                     <Icon name="palette" size={14} /> 配色表
                   </button>
+                  <button onClick={() => { setToolsOpen(false); setTemplateManager(true); }}>
+                    <Icon name="braces" size={14} /> 模板管理器
+                  </button>
                   <button onClick={() => { setToolsOpen(false); setSyncing(true); }}>
                     <Icon name="cloud" size={14} /> 协作
                   </button>
@@ -493,6 +498,7 @@ export default function App() {
       {querying && <QueryPanel onClose={() => setQuerying(false)} />}
       {history && <VersionHistory onClose={() => setHistory(false)} />}
       {palettes && <PaletteManager onClose={() => setPalettes(false)} />}
+      {templateManager && <TemplateManager onClose={() => setTemplateManager(false)} />}
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
       {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}

@@ -118,6 +118,46 @@ describe('R11 实例安全迁移(验收)', () => {
   });
 });
 
+describe('R11-2 资源 / 文档 / 地图套用模板', () => {
+  it('三类对象按分配模板补齐字段,清理失效引用', () => {
+    const p = baseProject();
+    p.templates = [
+      tpl({ id: 'ta', name: '素材卡', module: 'asset', fields: [{ label: '用途' }] }),
+      tpl({ id: 'td', name: '场景卡', module: 'document', fields: [{ label: '钩子', required: true }] }),
+      tpl({ id: 'tm', name: '地图卡', module: 'map', fields: [{ label: '气候' }] }),
+    ];
+    p.assets.push({ id: 'a1', name: '图', kind: 'image', mime: 'image/png', size: 1, tags: [], source: '', notes: '', createdAt: 1, templateId: 'ta' } as never);
+    p.documents[0].templateId = 'td';
+    p.maps.push({ id: 'm1', name: '大陆', markers: [], regions: [], templateId: 'tm' } as never);
+
+    migrateTemplateInstances(p);
+    expect(p.assets.find((a) => a.id === 'a1')!.fields!.map((f) => f.label)).toEqual(['用途']);
+    expect(p.documents[0].fields!.map((f) => f.label)).toEqual(['钩子']);
+    expect(p.maps.find((m) => m.id === 'm1')!.fields!.map((f) => f.label)).toEqual(['气候']);
+
+    p.templates = [];
+    cleanTemplateRefs(p);
+    expect(p.assets.find((a) => a.id === 'a1')!.templateId).toBeUndefined();
+    expect(p.documents[0].templateId).toBeUndefined();
+    expect(p.maps.find((m) => m.id === 'm1')!.templateId).toBeUndefined();
+  });
+
+  it('文档 templateId 与 fields 经 md frontmatter 无损往返', async () => {
+    const { documentToMd, mdToDocument } = await import('./storage');
+    const p = baseProject();
+    const doc = structuredClone(p.documents[0]);
+    doc.templateId = 'td';
+    doc.fields = [
+      { id: 'f1', label: '钩子', value: '断电的电梯' },
+      { id: 'f2', label: '嫌疑人', value: 'e9', type: 'entity', filterKind: 'character' },
+    ];
+    const md = documentToMd(doc, p.entities);
+    const back = mdToDocument(`${doc.name}.md`, md, 0);
+    expect(back.templateId).toBe('td');
+    expect(back.fields).toEqual(doc.fields);
+  });
+});
+
 describe('R11 旧模板迁移不影响审计与提案约束', () => {
   it('必填约束经命名模板继续生效(audit 必填缺失)', async () => {
     const p = baseProject();

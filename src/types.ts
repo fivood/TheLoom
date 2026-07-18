@@ -44,7 +44,15 @@ export interface EntityTemplateField {
 export type EntityTemplateSpec = string | EntityTemplateField;
 
 /** R11 命名模板的适用模块 */
-export type TemplateModule = 'entity' | 'node';
+export type TemplateModule = 'entity' | 'node' | 'asset' | 'document' | 'map';
+
+export const TEMPLATE_MODULE_LABEL: Record<TemplateModule, string> = {
+  entity: '实体',
+  node: '流程节点',
+  asset: '资源',
+  document: '文档',
+  map: '地图',
+};
 
 /**
  * R11 命名模板对象:可分配、可继承、编辑后实例安全迁移。
@@ -270,6 +278,9 @@ export interface MapRegion {
 export interface MapDoc {
   id: ID;
   name: string;
+  /** R11:模板分配与自定义字段 */
+  templateId?: ID;
+  fields?: EntityField[];
   /** 底图:dataURL(网页版内嵌)或 asset:map-{id}.png(桌面文件夹模式) */
   image?: string;
   imageWidth?: number;
@@ -334,6 +345,9 @@ export interface Asset {
   order?: number;
   name: string;
   kind: AssetKind;
+  /** R11:模板分配与自定义字段 */
+  templateId?: ID;
+  fields?: EntityField[];
   mime: string;
   /** 预览 dataURL:图片为 256px JPEG,音频/视频/文件留空。
    *  网页模式唯一可用形态;文件夹模式加载时从 assets/ 读入后也填入 */
@@ -469,6 +483,9 @@ export interface Document {
   name: string;
   /** 技术名:项目内唯一,用于导出,如 act1_draft */
   technicalName?: string;
+  /** R11:模板分配与自定义字段 */
+  templateId?: ID;
+  fields?: EntityField[];
   category: string;
   blocks: DocBlock[];
   notes: string;

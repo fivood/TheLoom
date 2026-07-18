@@ -3,6 +3,7 @@ import { uid, useLoom } from '../../store';
 import { findAssetRefs, useNav } from '../../search';
 import { alertDialog, confirmDialog } from '../../dialog';
 import Icon from '../../components/Icon';
+import ObjectTemplateSection from '../../components/ObjectTemplateSection';
 import type { Asset, AssetKind } from '../../types';
 import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
 import { classifyAsset, fileToImageThumb, fileToVideoThumb, formatSize } from '../../util';
@@ -445,6 +446,11 @@ export default function Assets() {
               placeholder="如:CC-BY 4.0 / 已购买商用授权 / 自绘"
             />
           </div>
+          <ObjectTemplateSection
+            module="asset"
+            object={selected}
+            onFieldsChange={(fields) => updateAsset(selected.id, { fields })}
+          />
           <div className="field">
             <label>标签</label>
             <input

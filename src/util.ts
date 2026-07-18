@@ -32,7 +32,7 @@ export function normalizeProject(p: Project): Project {
   if (!Array.isArray(p.savedQueries)) p.savedQueries = [];
   // R11 命名模板:旧按类别模板迁移 → 清理非法引用 → 实例补齐模板字段
   p.templates = (p.templates ?? []).filter((t) => t && typeof t.id === 'string' && typeof t.name === 'string'
-    && (t.module === 'entity' || t.module === 'node') && Array.isArray(t.fields));
+    && ['entity', 'node', 'asset', 'document', 'map'].includes(t.module) && Array.isArray(t.fields));
   cleanTemplateRefs(p);
   migrateLegacyTemplates(p, { entity: ENTITY_KIND_LABEL, node: FLOW_NODE_LABEL });
   cleanTemplateRefs(p);
