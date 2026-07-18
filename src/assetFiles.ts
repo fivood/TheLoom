@@ -209,7 +209,11 @@ export function computeOrphans(stored: StoredAssetFile[], referencedTexts: strin
 
 /** 收集本机所有可能引用资源哈希的文本:一切 theloom-* localStorage 值 + 当前项目 JSON */
 export function collectReferencedTexts(currentProject: Project): string[] {
-  const texts: string[] = [JSON.stringify(currentProject)];
+  return [JSON.stringify(currentProject), ...collectLocalStorageTexts()];
+}
+
+function collectLocalStorageTexts(): string[] {
+  const texts: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key?.startsWith('theloom-')) {
@@ -220,15 +224,37 @@ export function collectReferencedTexts(currentProject: Project): string[] {
   return texts;
 }
 
+export async function clearProjectBrowserBlobs(project: Project): Promise<number> {
+  const referencedTexts = collectLocalStorageTexts();
+  const removable = projectBrowserBlobKeysToClear(project, referencedTexts);
+  if (removable.length === 0) return 0;
+  await idbDelete(removable);
+  for (const hash of removable) invalidateAssetUrl(hash);
+  return removable.length;
+}
+
+export function projectBrowserBlobKeysToClear(project: Project, referencedTexts: string[]): string[] {
+  return [...new Set(project.assets.map((asset) => asset.hash).filter((hash): hash is string => !!hash))]
+    .filter((hash) => !referencedTexts.some((text) => text.includes(hash)));
+}
+
 /** 绑定项目文件夹时:把 IndexedDB 里本项目引用的原文件落盘到 assets/ */
 export async function exportBlobsToFolder(project: Project, dir: string): Promise<{ written: number; missing: number }> {
+  return transferProjectAssetsToFolder(project, null, dir);
+}
+
+export async function transferProjectAssetsToFolder(
+  project: Project,
+  sourceFolder: string | null,
+  dir: string,
+): Promise<{ written: number; missing: number }> {
   let written = 0;
   let missing = 0;
   const seen = new Set<string>();
   for (const a of project.assets) {
     if (!a.hash || seen.has(a.hash)) continue;
     seen.add(a.hash);
-    const blob = await idbGet(a.hash);
+    const blob = await loadAssetBlob(sourceFolder, a);
     if (!blob) {
       missing++;
       continue;

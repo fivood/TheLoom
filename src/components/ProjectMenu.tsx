@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useLoom } from '../store';
 import { inspectProjectImport, type ImportInspection } from '../diagnostics';
 import { confirmDialog, alertDialog } from '../dialog';
+import { exportBlobsToFolder } from '../assetFiles';
+import { offerClearCurrentBrowserCache } from '../folderCache';
+import { folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder } from '../storage';
 import Icon from './Icon';
 import ImportProjectDialog from './ImportProjectDialog';
 
@@ -21,6 +24,7 @@ export default function ProjectMenu() {
   const newSlot = useLoom((s) => s.newSlot);
   const deleteSlot = useLoom((s) => s.deleteSlot);
   const replaceProject = useLoom((s) => s.replaceProject);
+  const setFolder = useLoom((s) => s.setFolder);
 
   const [open, setOpen] = useState(false);
   const [checkingImport, setCheckingImport] = useState(false);
@@ -61,6 +65,7 @@ export default function ProjectMenu() {
   };
 
   const inFolder = !!folder;
+  const currentSlot = slots.find((slot) => slot.id === currentSlotId);
   const others = slots.filter((s) => s.id !== currentSlotId).sort((a, b) => b.updatedAt - a.updatedAt);
 
   const openSlot = async (id: string) => {
@@ -73,12 +78,83 @@ export default function ProjectMenu() {
   };
 
   const createSlot = async (kind: 'blank' | 'sample') => {
-    if (await newSlot(kind)) {
+    let dir: string | null = null;
+    if (isTauri) {
+      setOpen(false);
+      dir = await pickFolder();
+      if (!dir) {
+        if (!await confirmDialog({
+          message: '没有选择本地文件夹。\n\n是否仍创建一个只保存在应用内的项目?',
+          confirmText: '仍然创建',
+          cancelText: '取消新建',
+        })) return;
+      }
+      if (!dir) {
+        if (!await newSlot(kind)) {
+          const state = useLoom.getState();
+          await alertDialog(state.syncError || state.saveError || '无法创建新项目，当前项目没有被修改。');
+        }
+        return;
+      }
+      const normalizePath = (value: string) => value.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLocaleLowerCase();
+      const boundSlot = slots.find((slot) => slot.folder && normalizePath(slot.folder) === normalizePath(dir!));
+      if (boundSlot) {
+        if (boundSlot.id === currentSlotId) {
+          await alertDialog('这个文件夹已经属于当前项目，请为新项目选择另一个文件夹。');
+        } else if (await confirmDialog({
+          message: `这个文件夹已经绑定到项目「${boundSlot.name || '未命名项目'}」。\n\n是否直接切换到该项目?`,
+          confirmText: '切换项目',
+        })) {
+          await openSlot(boundSlot.id);
+        }
+        return;
+      }
+      try {
+        if (await folderHasProject(dir)) {
+          if (!await confirmDialog({
+            message: `所选文件夹里已有 TheLoom 项目。\n\n${dir}\n\n是否把它作为一个项目槽位打开?`,
+            confirmText: '打开已有项目',
+          })) return;
+          const loaded = await loadFromFolder(dir);
+          if (!await newSlot('blank')) throw new Error('无法创建项目槽位');
+          replaceProject(loaded.project);
+          setFolder(dir);
+          useLoom.getState().setRecoveryNotice(loaded.recoveredFromBackup
+            ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
+            : null);
+          await offerClearCurrentBrowserCache(dir);
+          return;
+        }
+      } catch (error) {
+        await alertDialog(`无法检查所选文件夹:${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+    }
+
+    if (!await newSlot(kind)) {
+      const state = useLoom.getState();
+      await alertDialog(state.syncError || state.saveError || '无法创建新项目，当前项目没有被修改。');
+      return;
+    }
+
+    if (!dir) {
       setOpen(false);
       return;
     }
-    const state = useLoom.getState();
-    await alertDialog(state.syncError || state.saveError || '无法创建新项目，当前项目没有被修改。');
+
+    try {
+      const createdProject = useLoom.getState().project;
+      await saveToFolder(dir, createdProject);
+      const moved = await exportBlobsToFolder(createdProject, dir);
+      setFolder(dir);
+      if (useLoom.getState().folder !== dir) throw new Error('无法记录项目文件夹绑定');
+      if (moved.missing > 0) {
+        await alertDialog(`项目已落盘，但有 ${moved.missing} 个资源原文件在浏览器缓存中缺失，可稍后在资源模块重新定位。`);
+      }
+      await offerClearCurrentBrowserCache(dir);
+    } catch (error) {
+      await alertDialog(`新项目已保存在应用内，但无法写入所选文件夹:\n${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   return (
@@ -104,7 +180,22 @@ export default function ProjectMenu() {
             <>
               <div className="project-dropdown-head">项目文件夹</div>
               <div className="project-folder-info" title={folder!}>{folder}</div>
-              <div className="project-folder-note">这个项目会记住自己的绑定，切换项目时无需解除。</div>
+              <div className="project-folder-note">
+                {currentSlot?.folderOnly
+                  ? '仅文件夹存储；浏览器镜像已清理。'
+                  : '这个项目会记住自己的绑定，切换项目时无需解除。'}
+              </div>
+              {!currentSlot?.folderOnly && (
+                <div
+                  className="project-slot"
+                  onClick={async () => {
+                    setOpen(false);
+                    await offerClearCurrentBrowserCache(folder!);
+                  }}
+                >
+                  <Icon name="trash" /> <span className="project-slot-name">清理浏览器缓存</span>
+                </div>
+              )}
               <div
                 className="project-slot"
                 onClick={async () => {
@@ -136,7 +227,11 @@ export default function ProjectMenu() {
                   title={s.folder ? `绑定于 ${s.folder}` : '仅保存在本机应用中'}
                 >
                   <span className="project-slot-name">{s.name || '未命名项目'}</span>
-                  {s.folder && <span className="project-slot-folder"><Icon name="folder" /> 已绑定</span>}
+                  {s.folder && (
+                    <span className="project-slot-folder">
+                      <Icon name="folder" /> {s.folderOnly ? '仅文件夹' : '已绑定'}
+                    </span>
+                  )}
                   <span className="project-slot-date">{new Date(s.updatedAt).toLocaleDateString()}</span>
                   <button
                     className="ghost icon-btn"

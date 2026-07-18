@@ -10,6 +10,7 @@ import { cleanTemplateRefs, migrateTemplateInstances } from './templates';
 import { mapProjectScripts } from './script';
 import { renameEntityField, renameIdentifier, renameSeenTarget } from './script/rename';
 import { getSavedFolder, isTauri, loadFromFolder, saveToFolder, setSavedFolder } from './storage';
+import { clearProjectBrowserBlobs } from './assetFiles';
 import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
 import {
@@ -65,6 +66,13 @@ export interface SlotMeta {
   name: string;
   updatedAt: number;
   folder?: string;
+  folderOnly?: boolean;
+}
+
+export interface BrowserCacheClearResult {
+  cleared: boolean;
+  removedAssets: number;
+  error?: string;
 }
 
 /* ---------- 空白项目(默认) ---------- */
@@ -102,12 +110,15 @@ function readSlots(): SlotMeta[] {
     const raw = localStorage.getItem(SLOTS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as SlotMeta[];
-      return parsed.filter((slot) => slot && typeof slot.id === 'string').map((slot) => ({
-        id: slot.id,
-        name: typeof slot.name === 'string' ? slot.name : '未命名项目',
-        updatedAt: typeof slot.updatedAt === 'number' && Number.isFinite(slot.updatedAt) ? slot.updatedAt : Date.now(),
-        ...(typeof slot.folder === 'string' && slot.folder ? { folder: slot.folder } : {}),
-      }));
+      return parsed.filter((slot) => slot && typeof slot.id === 'string').map((slot) => {
+        const folder = typeof slot.folder === 'string' && slot.folder ? slot.folder : undefined;
+        return {
+          id: slot.id,
+          name: typeof slot.name === 'string' ? slot.name : '未命名项目',
+          updatedAt: typeof slot.updatedAt === 'number' && Number.isFinite(slot.updatedAt) ? slot.updatedAt : Date.now(),
+          ...(folder ? { folder, ...(slot.folderOnly === true ? { folderOnly: true } : {}) } : {}),
+        };
+      });
     }
   } catch { /* 忽略 */ }
   return [];
@@ -207,6 +218,7 @@ interface LoomState {
   quarantinedProject: RecoveryBackup | null;
   recoveryNotice: string | null;
   setFolder: (dir: string | null) => void;
+  clearCurrentBrowserCache: () => Promise<BrowserCacheClearResult>;
   /** 解除文件夹绑定,项目改回浏览器本地存储(文件夹内容保持不变) */
   /** 本地镜像完整写入后才解除绑定;失败时保留原绑定 */
   unbindFolder: () => boolean;
@@ -337,11 +349,14 @@ export const useLoom = create<LoomState>((set, get) => {
   const persist = (p: Project) => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      const id = get().currentSlotId;
+      const current = get();
+      const id = current.currentSlotId;
+      const folderOnly = current.slots.find((slot) => slot.id === id)?.folderOnly === true;
       try {
-        const result = saveProjectWithRecovery(localStorage, id, p);
-        // 同步更新槽位元数据(名称、更新时间)
-        const slots = get().slots.map((s) =>
+        const result = folderOnly
+          ? { backup: null, backupError: null }
+          : saveProjectWithRecovery(localStorage, id, p);
+        const slots = current.slots.map((s) =>
           s.id === id ? { ...s, name: p.name || '未命名项目', updatedAt: p.updatedAt } : s,
         );
         writeSlots(slots);
@@ -362,7 +377,7 @@ export const useLoom = create<LoomState>((set, get) => {
           set({ saveStatus: 'error', saveError: e instanceof Error ? e.message : String(e) });
         }
       }
-      const folder = get().folder;
+      const folder = current.folder;
       if (folder && isTauri) {
         enqueueFolderSave(folder, p)
           .then(() => {
@@ -382,15 +397,18 @@ export const useLoom = create<LoomState>((set, get) => {
     const target = cur.slots.find((slot) => slot.id === targetId);
     if (!target) return false;
 
-    try {
-      saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
-    } catch (error) {
-      if (!cur.folder || !isTauri) {
-        set({
-          saveStatus: 'error',
-          saveError: `切换前无法保存当前项目:${error instanceof Error ? error.message : String(error)}`,
-        });
-        return false;
+    const currentFolderOnly = cur.slots.find((slot) => slot.id === cur.currentSlotId)?.folderOnly === true;
+    if (!currentFolderOnly) {
+      try {
+        saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
+      } catch (error) {
+        if (!cur.folder || !isTauri) {
+          set({
+            saveStatus: 'error',
+            saveError: `切换前无法保存当前项目:${error instanceof Error ? error.message : String(error)}`,
+          });
+          return false;
+        }
       }
     }
 
@@ -415,7 +433,9 @@ export const useLoom = create<LoomState>((set, get) => {
         folderRecoveryNotice = loaded.recoveredFromBackup
           ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
           : null;
-        try { saveProjectWithRecovery(localStorage, targetId, next); } catch { /* 文件夹仍是权威存储 */ }
+        if (!target.folderOnly) {
+          try { saveProjectWithRecovery(localStorage, targetId, next); } catch { /* 文件夹仍是权威存储 */ }
+        }
       } catch (error) {
         set({
           syncError: `无法打开项目「${target.name || '未命名项目'}」的文件夹:\n${target.folder}\n${error instanceof Error ? error.message : String(error)}`,
@@ -513,7 +533,7 @@ export const useLoom = create<LoomState>((set, get) => {
       try {
         const slots = cur.slots.map((slot) => (
           slot.id === cur.currentSlotId
-            ? { ...slot, ...(dir ? { folder: dir } : { folder: undefined }) }
+            ? { ...slot, folder: dir ?? undefined, folderOnly: undefined }
             : slot
         ));
         writeSlots(slots);
@@ -526,6 +546,50 @@ export const useLoom = create<LoomState>((set, get) => {
         });
       }
     },
+    clearCurrentBrowserCache: async () => {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      const cur = get();
+      if (!isTauri || !cur.folder) {
+        return { cleared: false, removedAssets: 0, error: '当前项目没有绑定本地文件夹。' };
+      }
+      try {
+        await enqueueFolderSave(cur.folder, cur.project);
+      } catch (error) {
+        const message = `清理前无法确认文件夹已保存:${error instanceof Error ? error.message : String(error)}`;
+        set({ syncError: message });
+        return { cleared: false, removedAssets: 0, error: message };
+      }
+      try {
+        localStorage.removeItem(projectKey(cur.currentSlotId));
+        clearProjectRecovery(localStorage, cur.currentSlotId);
+        const slots = cur.slots.map((slot) => (
+          slot.id === cur.currentSlotId ? { ...slot, folderOnly: true } : slot
+        ));
+        writeSlots(slots);
+        let removedAssets = 0;
+        let assetError: string | undefined;
+        try {
+          removedAssets = await clearProjectBrowserBlobs(cur.project);
+        } catch (error) {
+          assetError = `项目镜像已清理，但资源缓存清理失败:${error instanceof Error ? error.message : String(error)}`;
+        }
+        set({
+          slots,
+          savedAt: Date.now(),
+          saveStatus: 'saved',
+          saveError: assetError ?? null,
+          syncError: null,
+          recoveryBackup: null,
+          quarantinedProject: null,
+          storageUsage: getStorageUsage(localStorage),
+        });
+        return { cleared: true, removedAssets, ...(assetError ? { error: assetError } : {}) };
+      } catch (error) {
+        const message = `无法清理浏览器空间:${error instanceof Error ? error.message : String(error)}`;
+        set({ saveStatus: 'error', saveError: message });
+        return { cleared: false, removedAssets: 0, error: message };
+      }
+    },
     unbindFolder: () => {
       const cur = get();
       if (!cur.folder) return true;
@@ -533,7 +597,13 @@ export const useLoom = create<LoomState>((set, get) => {
         saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
         const slots = cur.slots.map((s) =>
           s.id === cur.currentSlotId
-            ? { ...s, name: cur.project.name || '未命名项目', updatedAt: cur.project.updatedAt, folder: undefined }
+            ? {
+              ...s,
+              name: cur.project.name || '未命名项目',
+              updatedAt: cur.project.updatedAt,
+              folder: undefined,
+              folderOnly: undefined,
+            }
             : s,
         );
         writeSlots(slots);

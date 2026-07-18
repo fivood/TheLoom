@@ -10,10 +10,12 @@ function stubLocalStorage() {
     key: (index: number) => [...mem.keys()][index] ?? null,
     get length() { return mem.size; },
   });
+  return mem;
 }
 
 afterEach(() => {
   vi.doUnmock('./storage');
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -79,5 +81,43 @@ describe('多项目文件夹绑定', () => {
     expect(await useLoom.getState().switchSlot(targetId)).toBe(false);
     expect(useLoom.getState().currentSlotId).toBe(currentId);
     expect(useLoom.getState().syncError).toContain('folder unavailable');
+  });
+
+  it('清理浏览器镜像后后续编辑只写文件夹，解绑时恢复本地镜像', async () => {
+    const mem = stubLocalStorage();
+    vi.useFakeTimers();
+    vi.resetModules();
+    const saveToFolder = vi.fn(async () => undefined);
+    vi.doMock('./storage', async () => ({
+      ...(await vi.importActual<typeof import('./storage')>('./storage')),
+      isTauri: true,
+      getSavedFolder: () => null,
+      setSavedFolder: vi.fn(),
+      saveToFolder,
+      loadFromFolder: vi.fn(),
+    }));
+    const { useLoom } = await import('./store');
+
+    const slotId = useLoom.getState().currentSlotId;
+    const projectStorageKey = `theloom-project-${slotId}`;
+    useLoom.getState().setFolder('C:/stories/folder-only');
+    expect(mem.has(projectStorageKey)).toBe(true);
+
+    const cleared = await useLoom.getState().clearCurrentBrowserCache();
+    expect(cleared).toEqual({ cleared: true, removedAssets: 0 });
+    expect(mem.has(projectStorageKey)).toBe(false);
+    expect(useLoom.getState().slots[0].folderOnly).toBe(true);
+
+    useLoom.getState().update((project) => { project.name = '只写文件夹'; });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(mem.has(projectStorageKey)).toBe(false);
+    expect(saveToFolder).toHaveBeenLastCalledWith(
+      'C:/stories/folder-only',
+      expect.objectContaining({ name: '只写文件夹' }),
+    );
+
+    expect(useLoom.getState().unbindFolder()).toBe(true);
+    expect(mem.has(projectStorageKey)).toBe(true);
+    expect(useLoom.getState().slots[0].folderOnly).toBeUndefined();
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  assetExt, assetFileName, computeOrphans, hashBlob, isAssetStored, type StoredAssetFile,
+  assetExt, assetFileName, computeOrphans, hashBlob, isAssetStored, projectBrowserBlobKeysToClear,
+  type StoredAssetFile,
 } from './assetFiles';
 
 describe('R8 资源原文件:哈希与命名', () => {
@@ -53,5 +54,16 @@ describe('R8 资源原文件:存在性与孤儿计算', () => {
     const stored: StoredAssetFile[] = [{ key: 'asset-deadbeefdeadbeef.mp3' }];
     expect(computeOrphans(stored, ['{}', `快照:deadbeefdeadbeef1234…`])).toEqual([]);
     expect(computeOrphans(stored, ['{}'])).toHaveLength(1);
+  });
+
+  it('项目落盘后只清理未被其他槽位或快照引用的浏览器资源', () => {
+    const project = {
+      assets: [
+        { hash: 'a'.repeat(64) },
+        { hash: 'b'.repeat(64) },
+        { hash: 'a'.repeat(64) },
+      ],
+    } as import('./types').Project;
+    expect(projectBrowserBlobKeysToClear(project, [`另一个槽位仍引用 ${'b'.repeat(64)}`])).toEqual(['a'.repeat(64)]);
   });
 });

@@ -5,7 +5,8 @@ import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export'
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
-import { exportBlobsToFolder } from './assetFiles';
+import { transferProjectAssetsToFolder } from './assetFiles';
+import { offerClearCurrentBrowserCache } from './folderCache';
 import { useNav } from './search';
 import { confirmDialog, alertDialog } from './dialog';
 import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
@@ -214,12 +215,14 @@ export default function App() {
         if (!await confirmDialog({ message: `将当前项目「${project.name}」写入该文件夹?\n\n${dir}\n\n之后所有改动都会自动保存到这里。` })) return;
         await saveToFolder(dir, project);
         // 把浏览器 IndexedDB 里的资源原文件迁移落盘到 assets/,形成随文件夹走的闭环
-        const moved = await exportBlobsToFolder(project, dir);
+        const moved = await transferProjectAssetsToFolder(project, folder, dir);
         if (moved.missing > 0) {
           await alertDialog(`已落盘 ${moved.written} 个资源原文件;${moved.missing} 个在浏览器存储中缺失,可稍后在资源模块「重新定位」。`);
         }
       }
       setFolder(dir);
+      if (useLoom.getState().folder !== dir) throw new Error('无法记录项目文件夹绑定');
+      await offerClearCurrentBrowserCache(dir);
     } catch (e) {
       await alertDialog(`操作失败:${e}`);
     }
