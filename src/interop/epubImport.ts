@@ -88,7 +88,7 @@ const BLOCK_TAGS = new Set(['p', 'blockquote', 'li']);
 const SKIP_CONTENT_TAGS = new Set(['script', 'style', 'nav', 'head']);
 
 /** 一份 XHTML → 一个 ParsedChapter;内部 h1..h6 切场景,块级标签逐段收集 */
-function xhtmlToChapter(xhtml: string, chapterFallback: string): ParsedChapter {
+export function xhtmlToChapter(xhtml: string, chapterFallback: string): ParsedChapter {
   const scenes: ParsedScene[] = [];
   let currentScene: ParsedScene = { title: '', blocks: [], chars: 0 };
   let chapterTitle = chapterFallback;

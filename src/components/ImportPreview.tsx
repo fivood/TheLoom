@@ -8,6 +8,7 @@ import {
 } from '../interop/manuscriptImport';
 import { parseEpub } from '../interop/epubImport';
 import { parseDocx } from '../interop/docxImport';
+import { parseMobi } from '../interop/mobiImport';
 import type { Document } from '../types';
 import Icon from './Icon';
 
@@ -56,6 +57,10 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
             const buf = await file.arrayBuffer();
             if (abortRef.current) return;
             setManuscript(await parseEpub(buf));
+          } else if (/\.(mobi|azw3?|prc)$/i.test(file.name)) {
+            const buf = await file.arrayBuffer();
+            if (abortRef.current) return;
+            setManuscript(parseMobi(buf));
           } else if (/\.docx$/i.test(file.name)) {
             const buf = await file.arrayBuffer();
             if (abortRef.current) return;
