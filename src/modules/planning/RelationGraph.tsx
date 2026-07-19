@@ -209,7 +209,12 @@ function Canvas() {
           <MiniMap pannable zoomable />
         </ReactFlow>
         {project.entities.length === 0 && (
-          <div className="empty-hint rel-empty">先在「实体」模块创建角色,再回来梳理关系</div>
+          <div className="empty-hint rel-empty">
+            先在「实体」模块创建角色,再回来梳理关系
+            <div style={{ marginTop: 8 }}>
+              <button className="primary" onClick={() => go({ tab: 'entities' })}>去创建角色 →</button>
+            </div>
+          </div>
         )}
       </div>
 

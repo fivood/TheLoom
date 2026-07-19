@@ -174,6 +174,8 @@ export default function EntityLibrary() {
   const project = useLoom((s) => s.project);
   const refs = useMemo(() => (selected ? findEntityRefs(project, selected) : []), [project, selected]);
   const avatarRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [pendingNameFocus, setPendingNameFocus] = useState<string | null>(null);
 
   const uploadAvatar = async (file: File) => {
     if (!selected) return;
@@ -204,7 +206,16 @@ export default function EntityLibrary() {
     };
     addEntity(e);
     setSelectedId(e.id);
+    setPendingNameFocus(e.id);
   };
+
+  // 新建后直接进入命名:聚焦并全选名字,与新建场景的即刻编辑体验一致
+  useEffect(() => {
+    if (!pendingNameFocus || selected?.id !== pendingNameFocus) return;
+    nameInputRef.current?.focus();
+    nameInputRef.current?.select();
+    setPendingNameFocus(null);
+  }, [pendingNameFocus, selected?.id]);
 
   const templates = useLoom((s) => s.project.templates);
   const projectForSpecs = useLoom((s) => s.project);
@@ -278,7 +289,11 @@ export default function EntityLibrary() {
               )}
             </div>
           ))}
-          {filtered.length === 0 && <div className="empty-hint" style={{ gridColumn: '1/-1' }}>没有匹配的实体</div>}
+          {filtered.length === 0 && (
+            <div className="empty-hint" style={{ gridColumn: '1/-1' }}>
+              {entities.length === 0 ? '还没有实体。点击上方「＋ 新建实体」创建角色、地点或设定。' : '没有匹配的实体'}
+            </div>
+          )}
         </div>
       </div>
 
@@ -303,6 +318,7 @@ export default function EntityLibrary() {
                 {selected.avatar ? <img src={selected.avatar} alt="" /> : <Icon name={KIND_ICON[selected.kind]} size={18} />}
               </span>
               <input
+                ref={nameInputRef}
                 style={{ width: 'auto', flex: 1 }}
                 value={selected.name}
                 onChange={(e) => updateEntity(selected.id, { name: e.target.value })}

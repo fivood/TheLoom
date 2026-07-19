@@ -236,7 +236,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
           {(Object.keys(FLOW_NODE_LABEL) as FlowNodeType[])
             .filter((t) => t !== 'exit' || path.length > 0)
             .map((t) => (
-              <button key={t} onClick={() => addNode(t)} title={t === 'exit' ? '出口会成为父层片段节点的命名引脚' : undefined}>
+              <button key={t} onClick={() => addNode(t)} title={t === 'exit' ? '出口会成为父层片段节点的命名引脚' : `点击在画布中央添加「${FLOW_NODE_LABEL[t]}」节点`}>
                 <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
               </button>
             ))}

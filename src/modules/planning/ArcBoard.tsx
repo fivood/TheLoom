@@ -151,7 +151,12 @@ export default function ArcBoard({ focusEntityId, onConsumeFocus }: {
             </div>
           </>
         ) : (
-          <div className="empty-hint" style={{ margin: 'auto' }}>先在「实体」模块创建角色</div>
+          <div className="empty-hint" style={{ margin: 'auto', textAlign: 'center' }}>
+            先在「实体」模块创建角色
+            <div style={{ marginTop: 8 }}>
+              <button className="primary" onClick={() => go({ tab: 'entities' })}>去创建角色 →</button>
+            </div>
+          </div>
         )}
       </div>
     </div>

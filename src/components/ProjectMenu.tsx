@@ -251,7 +251,7 @@ export default function ProjectMenu() {
           )}
           {!inFolder && (
             <>
-              <div className="project-dropdown-head">当前项目</div>
+              <div className="project-dropdown-head">当前项目 · {project.name || '未命名项目'}</div>
               <div
                 className="project-slot danger-hover"
                 onClick={async () => {

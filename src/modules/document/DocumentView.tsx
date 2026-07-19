@@ -343,7 +343,7 @@ export default function DocumentView() {
               ? '按卷 / 章顺序通读全文'
               : mode === 'structure'
                 ? '整理块类型、流程参与方式与顺序'
-                : 'Enter 新段，Shift+Enter 换行，输入 / 切换块类型'}
+                : 'Enter 新段，Shift+Enter 换行，空段首输入 / 切换块类型'}
           </span>
         </div>
 
@@ -550,8 +550,8 @@ export default function DocumentView() {
             </div>
           </div>
 
-          <div className="field">
-            <label>批注({docAnnotations.filter((a) => !a.resolved).length} 未解决)</label>
+          <details className="field inspector-fold" open={docAnnotations.some((a) => !a.resolved)}>
+            <summary>批注({docAnnotations.filter((a) => !a.resolved).length} 未解决)</summary>
             <div className="anno-add">
               <textarea
                 rows={2}
@@ -593,10 +593,10 @@ export default function DocumentView() {
               ))}
               {docAnnotations.length === 0 && <div className="empty-hint" style={{ padding: '6px 0' }}>还没有批注</div>}
             </div>
-          </div>
+          </details>
 
-          <div className="field">
-            <label>场景快照({docSnaps.length})</label>
+          <details className="field inspector-fold">
+            <summary>场景快照({docSnaps.length})</summary>
             <div style={{ display: 'flex', gap: 6 }}>
               <button className="ghost" style={{ flex: 1 }} onClick={saveSnapshot}>存快照</button>
               <button
@@ -639,7 +639,7 @@ export default function DocumentView() {
                 <div className="empty-hint" style={{ padding: '6px 0' }}>改稿前先「存快照」,之后可对比差异或一键恢复</div>
               )}
             </div>
-          </div>
+          </details>
 
           <TechNameField
             value={selected.technicalName}

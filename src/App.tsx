@@ -52,7 +52,7 @@ type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outlin
 type TabGroup = 'build' | 'library' | 'plan' | 'logic';
 
 const GROUP_LABEL: Record<TabGroup, string> = {
-  build: '构建', library: '素材', plan: '规划', logic: '逻辑',
+  build: '构建', library: '素材', plan: '构思', logic: '逻辑',
 };
 
 const TABS: { key: Tab; icon: IconName; label: string; group: TabGroup }[] = [
@@ -69,8 +69,21 @@ const TABS: { key: Tab; icon: IconName; label: string; group: TabGroup }[] = [
   { key: 'variables', icon: 'braces', label: '变量', group: 'logic' },
 ];
 
+const TAB_MEMORY_KEY = 'theloom-last-tab';
+const VALID_TABS: Tab[] = ['flow', 'documents', 'entities', 'assets', 'research', 'planning', 'outline', 'timeline', 'map', 'brainstorm', 'variables'];
+
 export default function App() {
-  const [tab, setTab] = useState<Tab>('flow');
+  // 记住上次停留的模块;首次使用默认落在「文档」(写作是最常见的起点)
+  const [tab, setTab] = useState<Tab>(() => {
+    try {
+      const saved = localStorage.getItem(TAB_MEMORY_KEY) as Tab | null;
+      if (saved && VALID_TABS.includes(saved)) return saved;
+    } catch { /* 忽略 */ }
+    return 'documents';
+  });
+  useEffect(() => {
+    try { localStorage.setItem(TAB_MEMORY_KEY, tab); } catch { /* 忽略 */ }
+  }, [tab]);
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [auditing, setAuditing] = useState(false);
@@ -342,6 +355,7 @@ export default function App() {
                       <div className="tools-sep" />
                     </>
                   )}
+                  <div className="tools-label">检查</div>
                   <button onClick={() => { setToolsOpen(false); setAuditing(true); }}>
                     <Icon name="script" size={14} /> 体检
                   </button>
@@ -354,6 +368,8 @@ export default function App() {
                   >
                     <Icon name="search" size={14} /> 查找替换
                   </button>
+                  <div className="tools-sep" />
+                  <div className="tools-label">项目</div>
                   <button onClick={() => { setToolsOpen(false); setHistory(true); }}>
                     <Icon name="undo" size={14} /> 版本历史
                   </button>
