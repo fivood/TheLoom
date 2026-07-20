@@ -71,6 +71,12 @@ export function sampleProject(): Project {
 
   const trackSem = uid(), trackVal = uid();
   const ptBefore = uid(), pt1609 = uid(), pt1627 = uid(), ptFive = uid(), ptChime = uid();
+  const outlineCols = [
+    { id: uid(), title: '塞的调查线', color: '#1b1b19' },
+    { id: uid(), title: '瓦的求救线', color: '#565550' },
+    { id: uid(), title: '关键道具与线索', color: '#8e8d86' },
+    { id: uid(), title: '基调与情绪', color: '#aaa9a1' },
+  ];
 
   const paletteId = uid();
 
@@ -365,8 +371,86 @@ export function sampleProject(): Project {
       { id: uid(), text: '红检定只用在「叙事上真的不可重来」的地方:闯门厅、共振窗口', color: '#e6e4df', position: { x: 740, y: 200 } },
     ],
     brainstormEdges: [],
-    outlineColumns: [],
-    outlineRows: [],
+    outlineColumns: outlineCols,
+    outlineRows: [
+      {
+        id: uid(), no: '1', time: '16:09-16:32', title: 'ACT 1 · 雨中短信',
+        main: '收到求救 → 推理时间戳 → 决定是否联系档案室',
+        cells: {
+          [outlineCols[0].id]: '发现 signal_blocked;推 delay_noticed;可选联系档案室',
+          [outlineCols[1].id]: '短信 3 条,像素绿屏,落款小鱼',
+          [outlineCols[2].id]: '德制直板手机(唯一通道)',
+          [outlineCols[3].id]: '克制、悬念、雨声',
+        },
+      },
+      {
+        id: uid(), no: '2', time: '17:00 前后', title: 'ACT 2 · 白厅七号',
+        main: '范肖三选一谈判 → 拿软盘(可能附带情报)',
+        cells: {
+          [outlineCols[0].id]: '告知书 / 施压 / 软话;红检定「闯楼」(此路不建议)',
+          [outlineCols[1].id]: '沉默:她还没到这一步',
+          [outlineCols[2].id]: '传送软盘 LSCC-TPT-LDN-ERR',
+          [outlineCols[3].id]: '克制的黑色幽默,英式行规',
+        },
+      },
+      {
+        id: uid(), no: '3', time: '傍晚', title: 'ACT 3 · 查令十字',
+        main: '进地下夹层 → 神秘术失效 → 找到收容室墙缝',
+        cells: {
+          [outlineCols[0].id]: '导航靠水声与振动;focus 检定',
+          [outlineCols[1].id]: '短信断连(墙内符文)',
+          [outlineCols[2].id]: '维多利亚工程遗迹地图',
+          [outlineCols[3].id]: '取消配乐,只留心跳与列车',
+        },
+      },
+      {
+        id: uid(), no: '4', time: '整点', title: 'ACT 4 · 共振窗口',
+        main: '整点钟声 + 双向列车 → 红检定跃入;失败分流 B/C 结局',
+        cells: {
+          [outlineCols[0].id]: '红检定 resonance_leap;技能 = resolve + semelvie.雾化熟练',
+          [outlineCols[1].id]: '共振期恢复片刻通话,「感谢我的仁慈」',
+          [outlineCols[2].id]: 'position_sent 决定救援兜底',
+          [outlineCols[3].id]: '大本钟当节拍器',
+        },
+      },
+      {
+        id: uid(), no: '5', time: '夜里', title: 'ACT 5 · 晚饭谈判',
+        main: 'A 结局:两人一起选餐厅;不写拥抱',
+        cells: {
+          [outlineCols[0].id]: '塞不承认在等这条短信;她还是承认了',
+          [outlineCols[1].id]: '首次直接对话,不用短信',
+          [outlineCols[2].id]: '结账时的小鱼签名',
+          [outlineCols[3].id]: '冷幽默 + 一丝松弛',
+        },
+      },
+    ],
+    relations: [
+      { id: uid(), fromId: semId, toId: valId, label: '搭档 / 相互戏弄', bidirectional: true, color: '#c68e00' },
+      { id: uid(), fromId: semId, toId: foundationId, label: '雇员(常年投诉)', bidirectional: false, color: '#565550' },
+      { id: uid(), fromId: semId, toId: phoneId, label: '不承认在等短信', bidirectional: false, color: '#8e8d86' },
+      { id: uid(), fromId: valId, toId: containId, label: '被困于此', bidirectional: false, color: '#3a3936' },
+      { id: uid(), fromId: fanId, toId: floppyId, label: '把软盘卖给瓦', bidirectional: false, color: '#565550' },
+      { id: uid(), fromId: floppyId, toId: containId, label: '误传目的地', bidirectional: false, color: '#72716b' },
+      { id: uid(), fromId: whitehallId, toId: fanId, label: '经营地点', bidirectional: false, color: '#8e8d86' },
+    ],
+    arcs: [
+      { id: uid(), entityId: semId, title: '休假中(遮阳篷)', note: '试图不看手机', order: 0 },
+      { id: uid(), entityId: semId, title: '收到瓦的短信', note: '「你在哪儿」;16:15 接收,发送 16:09', order: 1 },
+      { id: uid(), entityId: semId, title: '推理时间戳', note: '短信被延迟中转 = 有屏蔽', order: 2 },
+      { id: uid(), entityId: semId, title: '范肖谈判', note: '三选一:告知书 / 施压 / 软话', order: 3 },
+      { id: uid(), entityId: semId, title: '共振跳跃', note: '整点钟声 + 双向列车 = 红检定窗口', order: 4 },
+      { id: uid(), entityId: semId, title: '晚饭谈判', note: '不写拥抱,写谁付账', order: 5 },
+      { id: uid(), entityId: valId, title: '选中软盘', note: '「五英寸、黑色、有徽记 —— 完美」', order: 0 },
+      { id: uid(), entityId: valId, title: '进入收容室', note: '手机 40% 电,空气发霉', order: 1 },
+      { id: uid(), entityId: valId, title: '标价救援', note: '「价钱随你开」', order: 2 },
+      { id: uid(), entityId: valId, title: '共振窗口对齐', note: '「感谢我的仁慈」', order: 3 },
+    ],
+    foreshadows: [
+      { id: uid(), title: '短信时间戳异常', note: '玩家自己看出延迟 → delay_noticed;推理正确才能免付「late_start」代价', plants: [], payoffs: [], createdAt: Date.now() },
+      { id: uid(), title: '范肖的行规软肋', note: '早期得知「差评比传票可怕」;谈判分支的施压路径成本降低', plants: [], payoffs: [], createdAt: Date.now() },
+      { id: uid(), title: '技术档案室的定位召唤', note: '一次早期看似支线的短信选项;共振失败时决定 B / C 结局', plants: [], payoffs: [], createdAt: Date.now() },
+      { id: uid(), title: '「重量尚可」', note: '开场角色对手机的自我合理化 → 结局回收:她终究是等这条短信的', plants: [], payoffs: [], createdAt: Date.now() },
+    ],
     timelineTracks: [
       { id: trackSem, name: '明线 · 塞梅尔维斯', color: '#1b1b19' },
       { id: trackVal, name: '暗线 · 瓦伦缇娜', color: '#565550' },

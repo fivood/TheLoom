@@ -4,6 +4,7 @@ import { useAiPanelBus } from './ai/panelBus';
 import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
 import OverviewPanel from './components/OverviewPanel';
 import StorageManager from './components/StorageManager';
+import HelpPanel from './components/HelpPanel';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
@@ -132,6 +133,7 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
   const [storageMgr, setStorageMgr] = useState(false);
+  const [help, setHelp] = useState(false);
   // R14-3 分屏:副 pane 打开时,值为当前副 pane 的模块 tab;null = 单栏
   const [secondaryTab, setSecondaryTab] = useState<Tab | null>(null);
   const navTarget = useNav((s) => s.target);
@@ -173,6 +175,7 @@ export default function App() {
   // 全局撤销/重做快捷键;焦点在输入框时交给浏览器原生文本撤销
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F1') { e.preventDefault(); setHelp(true); return; }
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
       if (k === 'k' && e.shiftKey) { e.preventDefault(); setOverview(true); return; }
@@ -322,6 +325,7 @@ export default function App() {
           <ProjectMenu />
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
           <button className="ghost" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
+          <button className="ghost" title="使用指南 (F1)" onClick={() => setHelp(true)}>?</button>
           <button
             className={`ghost ${secondaryTab ? 'active' : ''}`}
             title="分屏:主副两个模块并列显示 (Ctrl+\\)"
@@ -598,6 +602,7 @@ export default function App() {
       {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
       {overview && <OverviewPanel onClose={() => setOverview(false)} />}
       {storageMgr && <StorageManager onClose={() => setStorageMgr(false)} />}
+      {help && <HelpPanel onClose={() => setHelp(false)} />}
       {onboarding && (
         <Onboarding
           onContinueBlank={() => { setTab('documents'); }}
