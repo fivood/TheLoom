@@ -3,6 +3,7 @@ import { exportProject, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
 import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
 import OverviewPanel from './components/OverviewPanel';
+import StorageManager from './components/StorageManager';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
@@ -130,6 +131,7 @@ export default function App() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
+  const [storageMgr, setStorageMgr] = useState(false);
   // R14-3 分屏:副 pane 打开时,值为当前副 pane 的模块 tab;null = 单栏
   const [secondaryTab, setSecondaryTab] = useState<Tab | null>(null);
   const navTarget = useNav((s) => s.target);
@@ -420,6 +422,12 @@ export default function App() {
                   <button onClick={() => { setToolsOpen(false); setRecovering(true); }}>
                     <Icon name="archive" size={14} /> 恢复与备份
                   </button>
+                  <button
+                    title="查看本机数据占用,备份或清除项目槽位与资源缓存"
+                    onClick={() => { setToolsOpen(false); setStorageMgr(true); }}
+                  >
+                    <Icon name="trash" size={14} /> 存储管理
+                  </button>
                   <button onClick={() => { setToolsOpen(false); setPalettes(true); }}>
                     <Icon name="palette" size={14} /> 配色表
                   </button>
@@ -589,6 +597,7 @@ export default function App() {
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
       {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
       {overview && <OverviewPanel onClose={() => setOverview(false)} />}
+      {storageMgr && <StorageManager onClose={() => setStorageMgr(false)} />}
       {onboarding && (
         <Onboarding
           onContinueBlank={() => { setTab('documents'); }}
