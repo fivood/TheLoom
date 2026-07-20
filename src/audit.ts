@@ -2,6 +2,8 @@ import type { FlowNode, Project, SubFlow } from './types';
 import { ANNOTATION_TYPES } from './types';
 import { findDuplicateTechnicalNames } from './util';
 import type { NavTarget } from './search';
+import { checkScript, describeSpan, type ScriptMode } from './lang/check';
+import { buildScriptEnv } from './lang/env';
 
 /** 中文按字计,拉丁与数字按词计 */
 export function countWords(text: string | undefined): number {
@@ -80,27 +82,19 @@ export interface Issue {
   nav?: NavTarget;
 }
 
-const RESERVED = new Set(['true', 'false', 'seen', 'unseen']);
-
-/** 收集某文本里出现的"独立标识符"(obj.prop 的 prop 与字符串字面量不算),返回未知的 */
-function findUnknownIdentifiers(text: string, known: Set<string>): string[] {
-  // 先剥离引号字符串(seen("tech_name") 的参数不是变量),再负向后看跳过 obj.prop 的 prop 部分
-  const stripped = text.replace(/'[^']*'|"[^"]*"/g, ' ');
-  const tokens = stripped.match(/(?<![.\w])[A-Za-z_]\w*/g) ?? [];
-  return [...new Set(tokens)].filter((x) => !RESERVED.has(x) && !known.has(x));
-}
-
 export function auditProject(p: Project): Issue[] {
   const issues: Issue[] = [];
-  const known = new Set(p.variables.map((v) => v.name));
-  // 设了技术名的实体作为对象注入脚本,其技术名是已知标识符
-  for (const e of p.entities) if (e.technicalName) known.add(e.technicalName);
+  const env = buildScriptEnv(p);
 
-  const checkVars = (text: string | undefined, where: string, nav?: NavTarget) => {
-    if (!text) return;
-    const used = findUnknownIdentifiers(text, known);
-    if (used.length > 0) {
-      issues.push({ kind: '未定义变量', message: `${where}:${used.join('、')}`, nav });
+  // 脚本静态检查(R6):解析 + 标识符 + 类型,错误精确到表达式位置
+  const checkVars = (text: string | undefined, where: string, nav?: NavTarget, mode: ScriptMode = 'condition') => {
+    if (!text?.trim()) return;
+    for (const issue of checkScript(text, mode, env)) {
+      issues.push({
+        kind: issue.severity === 'error' ? '脚本错误' : '脚本提醒',
+        message: `${where} · ${describeSpan(text, issue.span)}:${issue.message}`,
+        nav,
+      });
     }
   };
 
@@ -130,9 +124,9 @@ export function auditProject(p: Project): Issue[] {
         if (n.type === 'check') {
           if (!outs.includes('success')) issues.push({ kind: '分支缺口', message: `${label}(缺「成功」分支)`, nav });
           if (!outs.includes('fail')) issues.push({ kind: '分支缺口', message: `${label}(缺「失败」分支)`, nav });
-          checkVars(n.data.checkExpr, label, nav);
+          checkVars(n.data.checkExpr, label, nav, 'number');
         }
-        if (n.type === 'instruction') checkVars(n.data.text, label, nav);
+        if (n.type === 'instruction') checkVars(n.data.text, label, nav, 'instruction');
         if (n.type === 'dialogue' && !n.data.text.trim()) {
           issues.push({ kind: '空对白', message: label, nav });
         }
@@ -142,10 +136,19 @@ export function auditProject(p: Project): Issue[] {
         const src = sub.nodes.find((x) => x.id === e.source);
         const nav: NavTarget = src ? { tab: 'flow', flowId: flow.id, path, nodeId: src.id } : { tab: 'flow', flowId: flow.id, path };
         checkVars(e.condition, `${crumb} · 选项「${e.label || '(未命名)'}」条件`, nav);
-        checkVars(e.effect, `${crumb} · 选项「${e.label || '(未命名)'}」效果`, nav);
+        checkVars(e.effect, `${crumb} · 选项「${e.label || '(未命名)'}」效果`, nav, 'instruction');
       }
     };
     walk(flow, [], flow.name);
+  }
+
+  // 文档剧本块里的条件 / 指令
+  for (const d of p.documents) {
+    for (const b of d.blocks) {
+      const nav: NavTarget = { tab: 'documents', docId: d.id, blockId: b.id };
+      if (b.type === 'condition') checkVars(b.condition, `${d.name} · 条件块`, nav);
+      if (b.type === 'instruction') checkVars(b.instruction, `${d.name} · 指令块`, nav, 'instruction');
+    }
   }
 
   // 悬挂附件引用:attachments 里指向了已删除的 asset

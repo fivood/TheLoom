@@ -40,12 +40,27 @@ describe('脚本指令', () => {
     expect(vars).toEqual({ score: 10, bonus: 3, name: 'Ada', ready: true });
   });
 
-  it('保留除零前的值并报告无法解析的指令', () => {
+  it('保留除零前的值并报告无法解析的指令(带位置)', () => {
     const vars: Record<string, VarValue> = { score: 8 };
     const warnings = applyInstructions('score /= 0; score += unknown; bad statement', vars);
 
     expect(vars.score).toBe(8);
-    expect(warnings).toEqual(['未知的值:score += unknown', '无法解析:bad statement']);
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain('未定义的变量「unknown」');
+    expect(warnings[0]).toMatch(/^第 \d+ 列/);
+    expect(warnings[1]).toContain('= 或 +=');
+  });
+
+  it('R6:指令修改实体属性,读写都过上下文', () => {
+    const vars: Record<string, VarValue> = {};
+    const props: Record<string, Record<string, VarValue>> = { semelvie: { trust: 6, partner: 'valentine' } };
+    const ctx: EvalCtx = { seen: () => false, entityProps: props };
+    const warnings = applyInstructions('semelvie.trust += 2; semelvie.partner = "nobody"; semelvie.ghost = 1', vars, ctx);
+
+    expect(props.semelvie.trust).toBe(8);
+    expect(props.semelvie.partner).toBe('nobody');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('没有字段「ghost」');
   });
 
   it('按变量和实体字段规则转换标量', () => {

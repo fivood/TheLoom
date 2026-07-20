@@ -112,6 +112,7 @@ export default function EntityEditor({ entityId, onClose }: { entityId: string; 
               value={entity.technicalName}
               onChange={(v) => patch({ technicalName: v })}
               displayName={entity.name}
+              onRename={(oldName, newName) => useLoom.getState().renameScriptIdentifier(oldName, newName)}
             />
             <div className="field">
               <label>一句话简介</label>

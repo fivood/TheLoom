@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { uid, useLoom } from '../../store';
 import { confirmDialog } from '../../dialog';
 import type { VariableType } from '../../types';
@@ -10,7 +11,16 @@ const TYPE_LABEL: Record<VariableType, string> = {
 
 export default function Variables() {
   const variables = useLoom((s) => s.project.variables);
-  const { addVariable, updateVariable, removeVariable } = useLoom();
+  const { addVariable, updateVariable, removeVariable, renameScriptIdentifier } = useLoom();
+  // R6 重命名联动:聚焦时记住旧名,失焦时若改名则全项目脚本改写
+  const focusName = useRef<string | null>(null);
+  const commitRename = (next: string) => {
+    const old = focusName.current;
+    focusName.current = null;
+    if (old && next && old !== next && /^[A-Za-z_]\w*$/.test(old) && /^[A-Za-z_]\w*$/.test(next)) {
+      renameScriptIdentifier(old, next);
+    }
+  };
 
   return (
     <div className="pane-col">
@@ -39,6 +49,9 @@ export default function Variables() {
                   <input
                     value={v.name}
                     style={{ fontFamily: 'Consolas, monospace' }}
+                    title="改名后,全项目脚本里的引用会自动跟着改"
+                    onFocus={() => { focusName.current = v.name; }}
+                    onBlur={(e) => commitRename(e.target.value)}
                     onChange={(e) => updateVariable(v.id, { name: e.target.value })}
                   />
                 </td>

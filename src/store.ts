@@ -5,6 +5,7 @@ import type {
 } from './types';
 import { DOC_SNAPSHOT_LIMIT } from './types';
 import { normalizeProject, uid, detachAssetEverywhere, syncNarrativeUnits } from './util';
+import { renameIdentifierEverywhere, renameSeenTargetEverywhere } from './lang/refactor';
 import { getSavedFolder, isTauri, saveToFolder } from './storage';
 import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
@@ -221,6 +222,10 @@ interface LoomState {
   addVariable: (v: Variable) => void;
   updateVariable: (id: string, patch: Partial<Variable>) => void;
   removeVariable: (id: string) => void;
+  /** 重命名脚本标识符(变量名 / 实体技术名):全项目表达式联动改写 */
+  renameScriptIdentifier: (oldName: string, newName: string) => void;
+  /** 重命名节点技术名:全项目 seen("旧名") / unseen("旧名") 联动改写 */
+  renameSeenTarget: (oldName: string, newName: string) => void;
 
   addAsset: (a: import('./types').Asset) => void;
   updateAsset: (id: string, patch: Partial<import('./types').Asset>) => void;
@@ -554,6 +559,13 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeVariable: (id) => commit((p) => {
       p.variables = p.variables.filter((x) => x.id !== id);
+    }),
+
+    renameScriptIdentifier: (oldName, newName) => commit((p) => {
+      renameIdentifierEverywhere(p, oldName, newName);
+    }),
+    renameSeenTarget: (oldName, newName) => commit((p) => {
+      renameSeenTargetEverywhere(p, oldName, newName);
     }),
 
     addAsset: (a) => commit((p) => { p.assets.push(a); }),

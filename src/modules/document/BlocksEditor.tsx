@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import Icon from '../../components/Icon';
 import { RichTextInput } from '../../components/RichText';
+import ScriptInput from '../../components/ScriptInput';
 import type { DocBlock, DocBlockType, Document } from '../../types';
 import { DOC_BLOCK_LABEL } from '../../types';
 import { walkFlowNodes } from '../../util';
@@ -155,21 +156,23 @@ export default function BlocksEditor({ doc, focusBlockId, annotationCounts, onAc
                   <button className="ghost" style={{ alignSelf: 'start' }} onClick={(e) => { e.stopPropagation(); addChoice(b.id); }}>＋ 选项</button>
                 </div>
               ) : b.type === 'condition' ? (
-                <input
-                  className="doc-code-input"
-                  value={b.condition ?? ''}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => patchBlock(b.id, { condition: e.target.value })}
-                  placeholder="变量表达式,如:met_jiang && trust > 5"
-                />
+                <div onClick={(e) => e.stopPropagation()}>
+                  <ScriptInput
+                    value={b.condition ?? ''}
+                    onChange={(v) => patchBlock(b.id, { condition: v })}
+                    mode="condition"
+                    placeholder="变量表达式,如:met_jiang && trust > 5"
+                  />
+                </div>
               ) : b.type === 'instruction' ? (
-                <input
-                  className="doc-code-input"
-                  value={b.instruction ?? ''}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => patchBlock(b.id, { instruction: e.target.value })}
-                  placeholder="指令,如:trust = trust + 1"
-                />
+                <div onClick={(e) => e.stopPropagation()}>
+                  <ScriptInput
+                    value={b.instruction ?? ''}
+                    onChange={(v) => patchBlock(b.id, { instruction: v })}
+                    mode="instruction"
+                    placeholder="指令,如:trust = trust + 1"
+                  />
+                </div>
               ) : b.type === 'action' || b.type === 'dialogue' ? (
                 <RichTextInput
                   value={b.text}

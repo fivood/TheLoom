@@ -78,7 +78,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const seen: EvalCtx['seen'] = (tn) => seenRef.current.has(techToId.get(tn) ?? '__none__');
 
   /** 实体属性对象:技术名 → { 字段名 → 标量值 / 被引用实体技术名 } */
-  const entityProps = useMemo(() => {
+  const buildEntityProps = () => {
     const out: Record<string, Record<string, VarValue>> = {};
     const byId = new Map(entities.map((e) => [e.id, e]));
     for (const e of entities) {
@@ -98,8 +98,14 @@ export default function Player({ flow, path, startNodeId, onClose }: {
       out[e.technicalName] = props;
     }
     return out;
-  }, [entities]);
-  const evalCtx: EvalCtx = { seen, entityProps };
+  };
+  /** 演出期可变副本:指令 实体.字段 = 值 直接改这里,重开时重建 */
+  const entityPropsRef = useRef<Record<string, Record<string, VarValue>> | null>(null);
+  if (entityPropsRef.current === null) entityPropsRef.current = buildEntityProps();
+  const evalCtx: EvalCtx = {
+    seen,
+    get entityProps() { return entityPropsRef.current!; },
+  };
 
   const container = (p: string[]): SubFlow => resolveSub(flow, p) ?? { nodes: [], edges: [] };
 
@@ -212,7 +218,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           if (node.data.title) pushBeat({ kind: 'hub', title: node.data.title, text: '' });
           break;
         case 'instruction': {
-          const warnings = applyInstructions(node.data.text, nextVars);
+          const warnings = applyInstructions(node.data.text, nextVars, evalCtx);
           pushBeat({
             kind: 'instruction', title: node.data.title || '指令', text: node.data.text,
             note: warnings.length ? warnings.join(';') : undefined,
@@ -271,7 +277,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         // 直通型节点自动前进,沿途执行边效果并记录一次性选项
         const c0 = cs[0];
         if (c0.edgeId && c0.once) takenEdges.current.add(c0.edgeId);
-        if (c0.effect) applyInstructions(c0.effect, nextVars);
+        if (c0.effect) applyInstructions(c0.effect, nextVars, evalCtx);
         id = c0.nodeId;
         continue;
       }
@@ -292,7 +298,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     let vv = vars;
     if (c.effect) {
       vv = { ...vars };
-      applyInstructions(c.effect, vv);
+      applyInstructions(c.effect, vv, evalCtx);
     }
     visit(curPath, c.nodeId, vv);
   };
@@ -303,6 +309,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     takenEdges.current.clear();
     checkResults.current.clear();
     seenRef.current = new Set();
+    entityPropsRef.current = buildEntityProps();
     const initVars: Record<string, VarValue> = {};
     for (const x of project.variables) initVars[x.name] = coerceVar(x.type, x.value);
     setVars(initVars);

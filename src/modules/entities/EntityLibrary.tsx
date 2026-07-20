@@ -355,6 +355,7 @@ export default function EntityLibrary() {
               value={selected.technicalName}
               onChange={(v) => updateEntity(selected.id, { technicalName: v })}
               displayName={selected.name}
+              onRename={(oldName, newName) => useLoom.getState().renameScriptIdentifier(oldName, newName)}
             />
             <FieldListEditor
               fields={selected.fields}

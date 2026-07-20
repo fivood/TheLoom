@@ -53,7 +53,7 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
 
           <div className="audit-section">
             <h4>问题检测({issues.length})</h4>
-            {issues.length === 0 && <div className="audit-ok">没有发现问题:无孤儿节点、无分支缺口、无未定义变量、无空对白、无悬挂附件、无重复技术名、无必填缺失、无损坏资产。</div>}
+            {issues.length === 0 && <div className="audit-ok">没有发现问题:无孤儿节点、无分支缺口、无脚本错误(全部表达式通过解析与类型检查)、无空对白、无悬挂附件、无重复技术名、无必填缺失、无损坏资产。</div>}
             {issues.map((it, i) => (
               <div
                 key={i}

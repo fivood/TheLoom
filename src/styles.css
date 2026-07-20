@@ -2029,3 +2029,80 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   color: var(--text-faint);
   font-size: 10px;
 }
+
+/* ---------- 脚本输入(R6:高亮 / 检查 / 补全) ---------- */
+
+.script-input { display: flex; flex-direction: column; gap: 3px; }
+.script-input-box { position: relative; }
+.script-input-hl,
+.script-input-box textarea {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 6px 10px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+.script-input-hl {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  color: var(--text);
+  pointer-events: none;
+}
+.script-input-box { background: var(--bg-card); border-radius: 8px; }
+.script-input-box textarea {
+  position: relative;
+  display: block;
+  width: 100%;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  resize: vertical;
+}
+.script-input-box textarea::placeholder { color: var(--text-faint); }
+.script-input-box textarea::selection { background: rgba(27, 27, 25, 0.18); }
+.sc-num { color: #1f5c8b; }
+.sc-str { color: #7a5c2e; }
+.sc-bool { color: #1f5c8b; font-weight: 650; }
+.sc-op { color: var(--text-faint); }
+.sc-fn { color: #4a3d78; font-weight: 650; }
+.sc-var { color: #2f5d2f; }
+.sc-entity { color: #6b3d5e; font-weight: 650; }
+.sc-prop { color: #6b3d5e; }
+.sc-unknown { color: var(--danger); }
+.sc-err { text-decoration: underline wavy var(--danger) 1px; text-underline-offset: 3px; }
+.script-issue-err { font-size: 11px; color: var(--danger); line-height: 1.4; }
+.script-issue-warn { font-size: 11px; color: #7a5c2e; line-height: 1.4; }
+.script-combo {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin-top: 2px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: 0 6px 18px rgba(27, 27, 25, 0.14);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.script-combo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 5px 10px;
+  text-align: left;
+  font-size: 12px;
+}
+.script-combo-item.active, .script-combo-item:hover { background: var(--bg-hover); }
+.script-combo-name { font-family: Consolas, monospace; color: var(--text); }
+.script-combo-hint { margin-left: auto; font-size: 10px; color: var(--text-faint); }

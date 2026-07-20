@@ -20,8 +20,9 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.17.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 已交付的能力(截至 v0.17.0):
+- 已发布版本:`v0.18.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 已交付的能力(截至 v0.18.0):
+  - **v0.18.0 R6 脚本语言重构** ✅ — 自有 tokenizer / 递归下降解析器 / AST 解释器(零 `new Function`)、带 span 的错误、类型检查、ScriptInput(高亮 + 补全 + 内联错误)、实体属性指令写入、变量 / 技术名重命名联动
   - **v0.17.0 R5 正文修订系统** ✅ — 批注(块级锚定 + 解决状态)、场景快照(每篇 20 个上限 + 恢复可撤销)、版本差异(行级 LCS 对比)、修订轮次(元数据 + 列表筛选)、全局查找替换(跨文档、勾选精确替换、单步撤销)
   - **v0.16.0 R4 小说规划增强** ✅ — 规划模块六视图:关系图(React Flow 浮动边)、角色弧线、伏笔台账(状态推导)、登场统计矩阵、场景卡片墙(章内拖拽排序)、节奏图(字数 + 张力);`Document.tension` 场景元数据
   - **v0.15.0 R3-A 外部知识库 + AI 抽取(轻量)** ✅ — 可切换 LLM 层(OpenAI 兼容/Anthropic/Ollama,Key 仅本机);长文抽取实体/场景/时间线走预检通道;实体 AI 补字段(只填空白)
@@ -44,7 +45,7 @@
 | ~~R3-A~~ | ~~v0.15.0~~ | ~~外部知识库 + AI 抽取(轻量)~~ | ~~LLM 层 / 长文抽取预检 / AI 补字段~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R4~~ | ~~v0.16.0~~ | ~~小说规划增强~~ | ~~人物关系图;角色弧线;伏笔台账;章节登场统计;场景卡片墙;节奏图~~ | ✅ 已完成(详见「最近变更」) | M |
 | ~~R5~~ | ~~v0.17.0~~ | ~~正文修订系统~~ | ~~批注 / 修订轮次 / 文档快照 / 版本差异 / 全局查找替换~~ | ✅ 已完成(详见「最近变更」) | M |
-| R6 | v0.18.0 | **脚本语言重构** | 自有解析器 / AST / 类型检查 / 属性读写 / 语法高亮 / 自动补全 / 重命名联动 | 不再动态执行字符串;错误精确到表达式位置;支持实体属性修改 | L |
+| ~~R6~~ | ~~v0.18.0~~ | ~~脚本语言重构~~ | ~~自有解析器 / AST / 类型检查 / 属性读写 / 语法高亮 / 自动补全 / 重命名联动~~ | ✅ 已完成(详见「最近变更」) | L |
 | R7 | v0.19.0 | **演出与路径测试** | 演出存档;固定随机种子;断点;变量监视;批量路径遍历;路径覆盖率 | 自动发现不可达分支 / 死循环 / 无出口路径;测试结果可复现 | M |
 | R8 | v0.20.0 | **资源原文件闭环** | 图片 / 音频 / 视频 / 文件落盘 / 播放 / 缩略图 / 哈希去重 / 替换 / 缺失重定位 / 授权字段 | 桌面项目迁移后所有媒体仍可用;资源替换不破坏引用 | M |
 | R9 | v0.21.0 | **通用游戏引擎导出** | 带版本的 JSON Schema;导出规则;引用索引;增量导出;类型生成;独立流程运行库 | 示例游戏可在无 React 环境读取项目并运行对白流程 | L |
@@ -95,6 +96,24 @@
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R6 · v0.18.0)
+
+脚本语言重构 —— 新增 `src/lang/` 语言层,全面替换 `new Function` 动态执行:
+
+- `lang/ast.ts`:`Token` / `Expr`(lit / ident / member 一级属性 / unary / binary / call)/ `Assign` / `ScriptIssue`,全部携带 `Span { start, end }`;`ScriptError` 带位置抛出
+- `lang/parser.ts`:手写 tokenizer(标识符含 CJK,字段名常用中文;字符串 / 数字 / 运算符,`===` 归一为 `==`)+ 递归下降解析(优先级 `|| → && → 比较 → 加减 → 乘除 → 一元 → 原子`);call 仅允许 seen / unseen;member 仅一层。`parseExpression` / `parseInstructions` / `parseInstructionsTolerant`(按分号 / 换行切段、每段独立词法与解析、坏语句不影响其他条、span 折算回全文绝对位置)
+- `lang/interp.ts`:AST 解释器 `evalExpr` / `execAssign`(运行时错误带 span;`&&`/`||` 短路返回布尔、`==` 跨类型按数值宽松、`+` 有字符串则拼接、布尔目标复合赋值报错、`/=` 除零保持原值);`RuntimeCtx` 的 entityProps 可变 —— **指令支持 `实体.字段 = 值` 写入**
+- `lang/check.ts`:类型检查器 `checkScript(src, mode: condition|instruction|number, env)` 推断 boolean/number/string,未定义变量 / 实体误用 / 未知字段为 error,类型不匹配为 warning;`describeSpan` 转「第 N 行第 N 列」
+- `lang/env.ts` `buildScriptEnv(project)`:变量表类型 + 有技术名实体的字段类型(entity 引用字段视为 string)
+- `lang/refactor.ts`:`renameIdentInScript`(token 级替换,跳过 `.` 后字段名与字符串)/ `renameSeenArgInScript`(只改 seen/unseen 的字符串参数)/ `rewriteProjectScripts`(流程全层级节点与连线 + 文档块 + 叙事单元同步改写,保持镜像一致避免同步器仲裁)
+- `script.ts` 重写:对外 API 不变(evalCondition / evalNumber / applyInstructions),底层走 lang;`applyInstructions` 增可选 ctx 参数启用实体属性写入,警告带列号、按源码位置排序
+- `Player.tsx`:entityProps 从 useMemo 改为演出期可变 ref(getter 注入 ctx,重开重建);三处 applyInstructions 传 ctx
+- `audit.ts`:正则标识符检查删除,改用 checkScript;新增「脚本错误 / 脚本提醒」两类且覆盖文档条件 / 指令块,消息带 describeSpan 位置
+- 新增 `components/ScriptInput.tsx`:透明 textarea + 高亮 pre 叠层(token 分色,首个 error 区间波浪线)、内联问题列表(最多 3 条)、自动补全(变量 / 实体 / seen / unseen / true / false,`实体.` 后补字段;↑↓ Enter/Tab Esc;seen 补全自动带 `("")`)。**光标同步须覆盖 onChange / onSelect**(CJK 输入不触发 keyup,漏了会导致补全插入错位)。接入:FlowEditor 条件 / 指令节点、检定表达式、连线条件 / 效果;BlocksEditor 条件 / 指令块。ScriptHints 退化为纯快捷插入芯片
+- 重命名联动:store 增 `renameScriptIdentifier` / `renameSeenTarget`;`TechNameField` 增 `onRename`(聚焦记旧名、失焦触发,新旧都合法才改写)—— 实体技术名 → 标识符联动,流程节点技术名 → seen 参数联动;`Variables` 变量名输入同样失焦联动
+- 测试:`lang/lang.test.ts` 12 项(token 位置 / 解析错误定位 / 中文标识符 / 宽容指令 / 求值语义 / 运行时错误 span / 属性写入 / 类型检查定位 / 重命名跳过字段与字符串 / seen 参数改写 / 全项目改写含单元)+ `script.test.ts` 更新(警告带列号 + 实体属性读写);合计 101 项通过
+- 已实测(浏览器,Playwright):高亮分色与零误报;错误列号与波浪线;补全(变量 / 中文字段)Enter 落位正确;演出中指令写实体属性 → 条件走真分支;变量与实体技术名改名后 localStorage 中全部脚本已联动;体检报「脚本错误 · 第 N 列」
 
 ## 最近变更(R5 · v0.17.0)
 

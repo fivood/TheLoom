@@ -1,4 +1,10 @@
-export type VarValue = boolean | number | string;
+import type { VarValue } from './lang/ast';
+import { ScriptError } from './lang/ast';
+import { parseExpression, parseInstructionsTolerant } from './lang/parser';
+import { evalExpr, execAssign, type RuntimeCtx } from './lang/interp';
+import { describeSpan } from './lang/check';
+
+export type { VarValue };
 
 type SeenFn = (technicalName: string) => boolean;
 
@@ -20,24 +26,21 @@ export function coerceScalar(raw: string): VarValue {
   return value;
 }
 
-function evaluate(expr: string, vars: Record<string, VarValue>, ctx: EvalCtx): unknown {
-  const variableNames = Object.keys(vars);
-  const entityNames = Object.keys(ctx.entityProps);
-  const fn = new Function(
-    ...variableNames, ...entityNames, 'seen', 'unseen',
-    `"use strict"; return (${expr});`,
-  );
-  return fn(
-    ...variableNames.map((name) => vars[name]),
-    ...entityNames.map((name) => ctx.entityProps[name]),
-    ctx.seen, (technicalName: string) => !ctx.seen(technicalName),
-  );
+function runtimeCtx(vars: Record<string, VarValue>, ctx?: EvalCtx): RuntimeCtx {
+  return {
+    vars,
+    entityProps: ctx?.entityProps ?? {},
+    seen: ctx?.seen ?? (() => false),
+  };
 }
 
 export function evalCondition(expr: string, vars: Record<string, VarValue>, ctx: EvalCtx): boolean | null {
   if (!expr.trim()) return null;
+  const parsed = parseExpression(expr);
+  if (!parsed.ok) return null;
   try {
-    return Boolean(evaluate(expr, vars, ctx));
+    const value = evalExpr(parsed.value, runtimeCtx(vars, ctx));
+    return typeof value === 'string' ? value.length > 0 : Boolean(value);
   } catch {
     return null;
   }
@@ -45,45 +48,34 @@ export function evalCondition(expr: string, vars: Record<string, VarValue>, ctx:
 
 export function evalNumber(expr: string | undefined, vars: Record<string, VarValue>, ctx: EvalCtx): number {
   if (!expr?.trim()) return 0;
+  const parsed = parseExpression(expr);
+  if (!parsed.ok) return 0;
   try {
-    const value = Number(evaluate(expr, vars, ctx));
+    const value = Number(evalExpr(parsed.value, runtimeCtx(vars, ctx)));
     return Number.isFinite(value) ? value : 0;
   } catch {
     return 0;
   }
 }
 
-export function applyInstructions(text: string, vars: Record<string, VarValue>): string[] {
-  const warnings: string[] = [];
-  for (const raw of text.split(/[;\n]/)) {
-    const statement = raw.trim();
-    if (!statement) continue;
-    const match = statement.match(/^([A-Za-z_]\w*)\s*(=|\+=|-=|\*=|\/=)\s*(.+)$/);
-    if (!match) {
-      warnings.push(`无法解析:${statement}`);
-      continue;
-    }
-    const [, name, operator, rawValue] = match;
-    const source = rawValue.trim();
-    let value: VarValue;
-    if (source === 'true' || source === 'false') value = source === 'true';
-    else if (!Number.isNaN(Number(source))) value = Number(source);
-    else if (/^(['"]).*\1$/.test(source)) value = source.slice(1, -1);
-    else if (source in vars) value = vars[source];
-    else {
-      warnings.push(`未知的值:${statement}`);
-      continue;
-    }
-
-    if (operator === '=') vars[name] = value;
-    else {
-      const current = Number(vars[name]) || 0;
-      const number = Number(value) || 0;
-      vars[name] = operator === '+=' ? current + number
-        : operator === '-=' ? current - number
-          : operator === '*=' ? current * number
-            : number === 0 ? current : current / number;
+/**
+ * 执行指令脚本:变量赋值 / 复合赋值,以及(传入 ctx 时)实体属性修改。
+ * 逐条容错,返回带位置的人读警告;损坏的语句不影响其他语句。
+ */
+export function applyInstructions(text: string, vars: Record<string, VarValue>, ctx?: EvalCtx): string[] {
+  const entries: { at: number; message: string }[] = [];
+  const { stmts, issues } = parseInstructionsTolerant(text);
+  for (const issue of issues) {
+    entries.push({ at: issue.span.start, message: `${describeSpan(text, issue.span)}:${issue.message}` });
+  }
+  const runtime = runtimeCtx(vars, ctx);
+  for (const stmt of stmts) {
+    try {
+      execAssign(stmt, runtime);
+    } catch (e) {
+      if (e instanceof ScriptError) entries.push({ at: e.span.start, message: `${describeSpan(text, e.span)}:${e.message}` });
+      else entries.push({ at: stmt.span.start, message: String(e) });
     }
   }
-  return warnings;
+  return entries.sort((a, b) => a.at - b.at).map((entry) => entry.message);
 }
