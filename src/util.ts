@@ -68,6 +68,46 @@ export function normalizeProject(p: Project): Project {
   cleanAssignments(p.assets, 'asset');
   cleanAssignments(p.documents, 'document');
   cleanAssignments(p.researchCards, 'research');
+  // R14 地图图层与矢量形状:旧项目 / 缺字段自动补默认图层,并把已有 markers/regions/shapes 迁入
+  const validShapeType = new Set(['polyline', 'rect', 'ellipse', 'text']);
+  const validPoint = (pt: unknown): pt is { x: number; y: number } =>
+    !!pt && typeof pt === 'object'
+    && Number.isFinite((pt as { x: unknown }).x) && Number.isFinite((pt as { y: unknown }).y);
+  for (const map of p.maps) {
+    if (!Array.isArray(map.layers)) map.layers = [];
+    map.layers = map.layers.filter((l) => l && typeof l.id === 'string' && typeof l.name === 'string');
+    // 归一化 order / 布尔字段
+    map.layers.forEach((l, i) => {
+      l.visible = l.visible !== false;
+      l.locked = !!l.locked;
+      l.order = Number.isFinite(l.order) ? l.order : i;
+    });
+    // 无图层时补一个默认图层,已有 markers/regions/shapes 默认归入它
+    let defaultLayerId: string | undefined;
+    if (map.layers.length === 0
+      && ((map.markers ?? []).length > 0 || (map.regions ?? []).length > 0 || (map.shapes ?? []).length > 0)) {
+      defaultLayerId = uid();
+      map.layers.push({ id: defaultLayerId, name: '默认', visible: true, locked: false, order: 0 });
+    }
+    const layerIds = new Set(map.layers.map((l) => l.id));
+    // 矢量形状:剔除坏类型 / 坏点 / 未知图层
+    if (!Array.isArray(map.shapes)) map.shapes = [];
+    map.shapes = map.shapes.filter((s) => {
+      if (!s || typeof s.id !== 'string' || !validShapeType.has(s.type)) return false;
+      if (!Array.isArray(s.points) || s.points.length === 0) return false;
+      s.points = s.points.filter(validPoint);
+      if (s.points.length === 0) return false;
+      // rect / ellipse 需要两个点(左上 + 右下);text 只取第一个点
+      if ((s.type === 'rect' || s.type === 'ellipse') && s.points.length < 2) return false;
+      if (s.layerId && !layerIds.has(s.layerId)) s.layerId = defaultLayerId;
+      return true;
+    });
+    // 已有 markers / regions 的 layerId 若指向不存在的图层,同样归默认
+    for (const m of map.markers ?? []) if (m && (m as { layerId?: string }).layerId
+      && !layerIds.has((m as { layerId?: string }).layerId!)) delete (m as { layerId?: string }).layerId;
+    for (const r of map.regions ?? []) if (r && (r as { layerId?: string }).layerId
+      && !layerIds.has((r as { layerId?: string }).layerId!)) delete (r as { layerId?: string }).layerId;
+  }
   const queryObjectTypes = new Set(['all', 'flow', 'entity', 'asset', 'document', 'research', 'timeline']);
   const queryReferenceFilters = new Set(['any', 'referenced', 'unreferenced']);
   const queryFolderModule: Record<string, FolderModule | undefined> = {

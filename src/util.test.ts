@@ -238,3 +238,73 @@ describe('附件级联', () => {
     expect(project.attachments).toEqual({ first: ['asset-b'], third: ['asset-b'] });
   });
 });
+
+describe('R14 地图图层与矢量形状 normalize', () => {
+  const baseMap = () => ({
+    id: 'm1', name: '大陆', markers: [] as any[], regions: [] as any[],
+  });
+
+  it('旧地图(无 layers)有 markers 时自动补默认图层', () => {
+    const p = sampleProject();
+    p.maps = [{ ...baseMap(), markers: [{ id: 'k1', x: 0.5, y: 0.5, label: '灯塔' }] }] as any;
+    normalizeProject(p);
+    expect(p.maps[0].layers).toHaveLength(1);
+    expect(p.maps[0].layers?.[0]).toMatchObject({ name: '默认', visible: true, locked: false, order: 0 });
+    expect(p.maps[0].shapes).toEqual([]);
+  });
+
+  it('空地图不自动建图层(避免噪声)', () => {
+    const p = sampleProject();
+    p.maps = [baseMap()] as any;
+    normalizeProject(p);
+    expect(p.maps[0].layers).toEqual([]);
+  });
+
+  it('已有 layers 保留 + 归一化布尔与 order', () => {
+    const p = sampleProject();
+    p.maps = [{
+      ...baseMap(),
+      layers: [
+        { id: 'L1', name: '地形', visible: false, locked: 1, order: 'x' },
+        { id: 'L2', name: '城市' },
+      ],
+      shapes: [],
+    }] as any;
+    normalizeProject(p);
+    const layers = p.maps[0].layers!;
+    expect(layers).toHaveLength(2);
+    expect(layers[0]).toMatchObject({ id: 'L1', visible: false, locked: true, order: 0 });
+    expect(layers[1]).toMatchObject({ id: 'L2', visible: true, locked: false, order: 1 });
+  });
+
+  it('剔除坏形状:未知类型 / 空点 / 未知图层指针', () => {
+    const p = sampleProject();
+    p.maps = [{
+      ...baseMap(),
+      layers: [{ id: 'L1', name: '默认', visible: true, locked: false, order: 0 }],
+      shapes: [
+        { id: 's1', type: 'polyline', points: [{ x: 0.1, y: 0.1 }, { x: 0.2, y: 0.2 }] },
+        { id: 's2', type: 'polyline', points: [] },
+        { id: 's3', type: '外星', points: [{ x: 0, y: 0 }] },
+        { id: 's4', type: 'rect', points: [{ x: 0.1, y: 0.1 }] },
+        { id: 's5', type: 'text', points: [{ x: 0.3, y: 0.3 }], text: '首都', layerId: 'ghost' },
+      ],
+    }] as any;
+    normalizeProject(p);
+    const shapes = p.maps[0].shapes!;
+    expect(shapes.map((s) => s.id)).toEqual(['s1', 's5']);
+    // s5 的 ghost 图层引用被清除(项目此时只有一个图层 L1,清除后归 undefined = 未指定)
+    expect(shapes[1].layerId).toBe(undefined);
+  });
+
+  it('shapes 有内容但无图层时也自动补默认图层', () => {
+    const p = sampleProject();
+    p.maps = [{
+      ...baseMap(),
+      shapes: [{ id: 's1', type: 'polyline', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }],
+    }] as any;
+    normalizeProject(p);
+    expect(p.maps[0].layers).toHaveLength(1);
+    expect(p.maps[0].shapes).toHaveLength(1);
+  });
+});

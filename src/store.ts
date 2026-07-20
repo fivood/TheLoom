@@ -745,11 +745,17 @@ export const useLoom = create<LoomState>((set, get) => {
     },
     resetProject: () => {
       undoStack = []; redoStack = []; lastUndoPush = 0;
-      swapProject(blankProject());
+      const p = blankProject();
+      normalizeProject(p);
+      swapProject(p);
     },
     loadSampleProject: () => {
       undoStack = []; redoStack = []; lastUndoPush = 0;
-      swapProject(sampleProject());
+      // 手写的示例项目可能缺 R14 之后新增的字段(如 map layers),
+      // 走 normalize 补齐,保持与从 localStorage 加载的项目一致。
+      const p = sampleProject();
+      normalizeProject(p);
+      swapProject(p);
     },
 
     updateFlow: (flowId, fn) => commit((p) => {

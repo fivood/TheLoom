@@ -265,6 +265,8 @@ export interface MapMarker {
   fromPointId?: ID;
   /** 消失的时间点(在此点之后不显示;为空 = 永远存在) */
   toPointId?: ID;
+  /** R14 归属图层;不设 = 默认图层 */
+  layerId?: ID;
 }
 
 /** 多边形区域(常用于阵营领地) */
@@ -275,6 +277,38 @@ export interface MapRegion {
   label: string;
   entityId?: ID;
   color?: string;
+  fromPointId?: ID;
+  toPointId?: ID;
+  /** R14 归属图层;不设 = 默认图层 */
+  layerId?: ID;
+}
+
+/** R14 图层:每个 marker / region / shape 可归属一层;层可整层显隐 / 锁定 */
+export interface MapLayer {
+  id: ID;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  /** 从下到上的绘制顺序 */
+  order: number;
+}
+
+/** R14 矢量形状:polyline(路径 / 河流 / 边界)/ rect / ellipse / text */
+export type MapShapeType = 'polyline' | 'rect' | 'ellipse' | 'text';
+export interface MapShape {
+  id: ID;
+  type: MapShapeType;
+  /** polyline: 多个点;rect / ellipse:左上 + 右下两点;text:锚点一个 */
+  points: { x: number; y: number }[];
+  /** text 类型的文字内容;其他类型的可选标签 */
+  text?: string;
+  color?: string;
+  /** 描边粗细(像素,SVG stroke-width) */
+  strokeWidth?: number;
+  /** rect / ellipse 是否填充 */
+  fill?: boolean;
+  /** 归属图层;不设 = 默认图层 */
+  layerId?: ID;
   fromPointId?: ID;
   toPointId?: ID;
 }
@@ -291,6 +325,9 @@ export interface MapDoc {
   imageHeight?: number;
   markers: MapMarker[];
   regions: MapRegion[];
+  /** R14 图层与矢量形状;旧项目为空 = 全部归入自动创建的「默认」图层 */
+  layers?: MapLayer[];
+  shapes?: MapShape[];
 }
 
 /* ---------- 资料卡片 ---------- */
