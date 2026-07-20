@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { exportProject, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
 import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
@@ -49,7 +49,7 @@ const Variables = lazy(() => import('./modules/variables/Variables'));
 const Planning = lazy(() => import('./modules/planning/Planning'));
 const AiAssistantPanel = lazy(() => import('./components/AiAssistantPanel'));
 
-type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
+export type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
 type TabGroup = 'build' | 'library' | 'plan' | 'logic';
 
 const GROUP_LABEL: Record<TabGroup, string> = {
@@ -72,6 +72,22 @@ const TABS: { key: Tab; icon: IconName; label: string; group: TabGroup }[] = [
 
 const TAB_MEMORY_KEY = 'theloom-last-tab';
 const VALID_TABS: Tab[] = ['flow', 'documents', 'entities', 'assets', 'research', 'planning', 'outline', 'timeline', 'map', 'brainstorm', 'variables'];
+
+function renderTabContent(tab: Tab): React.ReactNode {
+  switch (tab) {
+    case 'flow': return <FlowEditor />;
+    case 'entities': return <EntityLibrary />;
+    case 'assets': return <Assets />;
+    case 'documents': return <DocumentView />;
+    case 'brainstorm': return <Brainstorm />;
+    case 'outline': return <OutlineGrid />;
+    case 'timeline': return <Timeline />;
+    case 'map': return <MapEditor />;
+    case 'research': return <ResearchCards />;
+    case 'variables': return <Variables />;
+    case 'planning': return <Planning />;
+  }
+}
 
 export default function App() {
   // 记住上次停留的模块;首次使用默认落在「文档」(写作是最常见的起点)
@@ -114,6 +130,8 @@ export default function App() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
+  // R14-3 分屏:副 pane 打开时,值为当前副 pane 的模块 tab;null = 单栏
+  const [secondaryTab, setSecondaryTab] = useState<Tab | null>(null);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
 
@@ -157,6 +175,11 @@ export default function App() {
       const k = e.key.toLowerCase();
       if (k === 'k' && e.shiftKey) { e.preventDefault(); setOverview(true); return; }
       if (k === 'k') { e.preventDefault(); setSearching(true); return; }
+      if (e.key === '\\') {
+        e.preventDefault();
+        setSecondaryTab((cur) => cur ? null : (tab === 'documents' ? 'flow' : 'documents'));
+        return;
+      }
       const t = e.target as HTMLElement;
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); useLoom.getState().undo(); }
@@ -297,6 +320,11 @@ export default function App() {
           <ProjectMenu />
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
           <button className="ghost" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
+          <button
+            className={`ghost ${secondaryTab ? 'active' : ''}`}
+            title="分屏:主副两个模块并列显示 (Ctrl+\\)"
+            onClick={() => setSecondaryTab((cur) => cur ? null : (tab === 'documents' ? 'flow' : 'documents'))}
+          >⇆ 分屏</button>
           <button
             className={`ghost ${aiAssistant ? 'active' : ''}`}
             title="打开只读 AI 助手"
@@ -520,20 +548,32 @@ export default function App() {
           </div>
         </header>
 
-        <div className="content" key={revision}>
-          <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
-            {tab === 'flow' && <FlowEditor />}
-            {tab === 'entities' && <EntityLibrary />}
-            {tab === 'assets' && <Assets />}
-            {tab === 'documents' && <DocumentView />}
-            {tab === 'brainstorm' && <Brainstorm />}
-            {tab === 'outline' && <OutlineGrid />}
-            {tab === 'timeline' && <Timeline />}
-            {tab === 'map' && <MapEditor />}
-            {tab === 'research' && <ResearchCards />}
-            {tab === 'variables' && <Variables />}
-            {tab === 'planning' && <Planning />}
-          </Suspense>
+        <div className={`content ${secondaryTab ? 'content-split' : ''}`} key={revision}>
+          <div className="content-pane">
+            <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
+              {renderTabContent(tab)}
+            </Suspense>
+          </div>
+          {secondaryTab && (
+            <div className="content-pane content-pane-secondary">
+              <div className="pane-tabbar">
+                <select
+                  value={secondaryTab}
+                  onChange={(e) => setSecondaryTab(e.target.value as Tab)}
+                  title="副面板显示的模块"
+                >
+                  {TABS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+                <span className="spacer" />
+                <button className="ghost icon-btn" title="关闭副面板" onClick={() => setSecondaryTab(null)}>×</button>
+              </div>
+              <div className="pane-inner">
+                <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
+                  {renderTabContent(secondaryTab)}
+                </Suspense>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

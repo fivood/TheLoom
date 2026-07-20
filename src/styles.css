@@ -253,6 +253,23 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 .content { flex: 1; min-height: 0; min-width: 0; display: flex; overflow: hidden; }
 
+/* R14-3 分屏:两个 content-pane 并列;每个 pane 内部布局与非分屏时一致 */
+.content > .content-pane { flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.content-split > .content-pane { flex: 1 1 0; }
+.content-pane-secondary {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+}
+.content-pane-secondary .pane-inner { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.pane-tabbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-bottom: 1px solid var(--border);
+  background: var(--bg-panel); font-size: 12px;
+}
+.pane-tabbar select { font-size: 12px; padding: 2px 6px; }
+.pane-tabbar .spacer { flex: 1; }
+
+
 .ai-assistant {
   position: fixed;
   top: 8px;
