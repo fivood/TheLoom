@@ -20,8 +20,8 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.25.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.28.0`(R13 首批专业导入导出:TXT / Markdown / EPUB / DOCX 导入、章节编译,以及桌面仅文件夹存储);R12 已暂缓
+- 已发布版本:`v0.29.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.29.0`(R13 收尾:补 MOBI / AZW3 导入,合入两轮 UX 走查修复与工具菜单精简);R12 已暂缓,下一批 R14 地图与工作区增强
 - 当前基线:`v0.24.0`;包含 v0.23.1 文件夹模式稳定性修复与完整 R10
 - 已交付的能力(截至 v0.23.0):
   - **v0.23.0 R9 通用游戏引擎导出** ✅ — 带版本 JSON Schema 的引擎包(zip:数据 + Schema + .d.ts 类型 + README);导出规则(选流程 / 剥布局注释 / 仅引用实体资源);技术名与节点定位等四类索引;内容哈希清单 + 增量包;独立运行库 theloom-runtime(零依赖 ES Module,语义与 Player 一致);examples/engine-demo 无 React 演出示例
