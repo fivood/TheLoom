@@ -131,9 +131,13 @@ func _container(path: Array) -> Dictionary:
 	var cur: Dictionary = flow
 	for id in path:
 		var n = _find_node(cur, id)
-		if n == null or not n.get("data", {}).has("sub"):
+		if n == null:
 			return { "nodes": [], "edges": [] }
-		cur = n["data"]["sub"]
+		var data: Dictionary = n.get("data", {})
+		var sub_dict: Dictionary = data.get("sub", {})
+		if sub_dict.is_empty():
+			return { "nodes": [], "edges": [] }
+		cur = sub_dict
 	return cur
 
 func _start_nodes(sub: Dictionary) -> Array:
@@ -149,11 +153,13 @@ func _start_nodes(sub: Dictionary) -> Array:
 
 func _collect_tech_names(sub: Dictionary) -> void:
 	for n in sub.get("nodes", []):
-		var tn = n.get("data", {}).get("technicalName", "")
+		var data: Dictionary = n.get("data", {})
+		var tn: String = data.get("technicalName", "")
 		if tn != "":
 			_tech_to_id[tn] = n.get("id", "")
-		if n.get("data", {}).has("sub"):
-			_collect_tech_names(n["data"]["sub"])
+		var sub_dict: Dictionary = data.get("sub", {})
+		if not sub_dict.is_empty():
+			_collect_tech_names(sub_dict)
 
 func _push_beat(beat: Dictionary) -> void:
 	log.append(beat)
@@ -253,9 +259,10 @@ func _visit(path: Array, node_id: String) -> void:
 				})
 			"fragment":
 				_push_beat({ "kind": "fragment", "title": data.get("title", "剧情片段"), "text": data.get("text", "") })
-				if data.has("sub") and data["sub"].get("nodes", []).size() > 0:
+				var sub_dict: Dictionary = data.get("sub", {})
+				if not sub_dict.is_empty() and sub_dict.get("nodes", []).size() > 0:
 					cur_p.append(node.get("id", ""))
-					var starts := _start_nodes(data["sub"])
+					var starts := _start_nodes(sub_dict)
 					if starts.size() == 1:
 						id = starts[0].get("id", "")
 						continue
