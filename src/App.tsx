@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { exportProject, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
 import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export';
+import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
@@ -111,6 +112,7 @@ export default function App() {
   const [updateDialog, setUpdateDialog] = useState<UpdateDialogState | null>(null);
   const checkingUpdateRef = useRef(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
 
@@ -121,6 +123,17 @@ export default function App() {
 
   // 恢复本机保存的分栏宽度(启动时一次)
   useEffect(() => { initPaneWidths(); }, []);
+
+  // 首启新手引导:未标记 + 项目实际为空(无文档 / 实体 / 流程节点)才弹
+  useEffect(() => {
+    let done = false;
+    try { done = !!localStorage.getItem(ONBOARDING_KEY); } catch { /* 忽略 */ }
+    if (done) return;
+    const p = useLoom.getState().project;
+    const empty = p.documents.length === 0 && p.entities.length === 0
+      && p.flows.every((f) => f.nodes.length === 0);
+    if (empty) setOnboarding(true);
+  }, []);
   const project = useLoom((s) => s.project);
   const slots = useLoom((s) => s.slots);
   const currentSlotId = useLoom((s) => s.currentSlotId);
@@ -562,6 +575,14 @@ export default function App() {
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
       {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
+      {onboarding && (
+        <Onboarding
+          onContinueBlank={() => { setTab('documents'); }}
+          onLoadSample={() => { useLoom.getState().loadSampleProject(); setTab('flow'); markOnboarded(); }}
+          onAiImport={() => { setProjectImport(true); }}
+          onClose={() => setOnboarding(false)}
+        />
+      )}
       {findReplace && <FindReplace onClose={() => setFindReplace(false)} />}
       {engineExport && <EngineExportModal onClose={() => setEngineExport(false)} />}
       {importFile && (

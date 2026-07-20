@@ -45,6 +45,9 @@ export interface SearchHit {
   title: string;
   snippet: string;
   nav: NavTarget;
+  /** 共享叙事单元的 id。同一 unitId 的多条命中(流程节点 + 文档块)
+   * 在 UI 上会加⇄徽标,提示是同一份内容的镜像。 */
+  unitId?: string;
 }
 
 function snippetOf(text: string, q: string): string {
@@ -79,6 +82,7 @@ export function searchProject(p: Project, query: string): SearchHit[] {
             title: n.data.title || FLOW_NODE_LABEL[n.type],
             snippet: `${crumb} · ${snippetOf(hit, q)}`,
             nav: { tab: 'flow', flowId: flow.id, path, nodeId: n.id },
+            unitId: n.data.unitId,
           });
         }
         if (n.data.sub) walk(n.data.sub, [...path, n.id], `${crumb} ▸ ${n.data.title || '片段'}`);
@@ -166,14 +170,23 @@ export function searchProject(p: Project, query: string): SearchHit[] {
   }
 
   for (const d of p.documents) {
-    const hit = matches(q, d.name, d.notes,
-      ...d.blocks.flatMap((b) => [b.text, ...(b.items ?? [])]),
-    );
+    // 文档级命中(题名 / 备注)
+    const docLevelHit = matches(q, d.name, d.notes);
+    // 逐块命中:携带块 unitId 以便与流程命中做⇄配对
+    const blockUnitIds: string[] = [];
+    let blockHit: string | undefined;
+    for (const b of d.blocks) {
+      const h = matches(q, b.text, ...(b.items ?? []));
+      if (h) { blockHit = blockHit ?? h; if (b.unitId) blockUnitIds.push(b.unitId); }
+    }
+    const hit = docLevelHit ?? blockHit;
     if (hit) {
       push({
         module: '文档', kind: d.category, title: d.name,
         snippet: snippetOf(hit, q),
         nav: { tab: 'documents', docId: d.id },
+        // 单命中就明确关联那个单元;多命中不设 unitId,避免误配
+        unitId: blockUnitIds.length === 1 ? blockUnitIds[0] : undefined,
       });
     }
   }

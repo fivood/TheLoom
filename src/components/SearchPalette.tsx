@@ -12,6 +12,12 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   const hits = useMemo(() => searchProject(project, query), [project, query]);
+  // 共享叙事单元:同一 unitId 在流程与文档各命中一次 → 打⇄徽标提示是同一份内容
+  const sharedUnits = useMemo(() => {
+    const bag = new Map<string, number>();
+    for (const h of hits) if (h.unitId) bag.set(h.unitId, (bag.get(h.unitId) ?? 0) + 1);
+    return new Set([...bag.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+  }, [hits]);
   const grouped = useMemo(() => {
     const g = new Map<string, SearchHit[]>();
     for (const h of hits) {
@@ -59,7 +65,12 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
                     onClick={() => open(h)}
                   >
                     <span className="palette-kind">{h.kind}</span>
-                    <span className="palette-title">{h.title}</span>
+                    <span className="palette-title">
+                      {h.unitId && sharedUnits.has(h.unitId) && (
+                        <span className="palette-shared" title="同一份内容在流程与文档中共享(叙事单元)">⇄</span>
+                      )}
+                      {h.title}
+                    </span>
                     <span className="palette-snippet">{h.snippet}</span>
                   </div>
                 );
