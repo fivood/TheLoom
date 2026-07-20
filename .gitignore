@@ -13,3 +13,7 @@ imports/
 scripts/
 .playwright-mcp/
 npm-dev*.log
+
+# Godot editor cache & UIDs (examples/godot-demo/)
+examples/godot-demo/.godot/
+examples/godot-demo/*.uid

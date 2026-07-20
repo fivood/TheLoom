@@ -403,7 +403,7 @@ func _eval_condition(src: String):
 	var tokens := _tokenize(s)
 	var parser := _Parser.new(tokens, self)
 	var r = parser.parse_expr()
-	if not parser.at_end() or r == parser.ERR:
+	if parser.has_error or not parser.at_end():
 		return null
 	if typeof(r) == TYPE_BOOL:
 		return r
@@ -425,7 +425,7 @@ func _eval_number(src) -> int:
 	var tokens := _tokenize(s)
 	var parser := _Parser.new(tokens, self)
 	var r = parser.parse_expr()
-	if r == null or r == parser.ERR:
+	if parser.has_error or r == null:
 		return 0
 	if typeof(r) == TYPE_INT:
 		return r
@@ -463,7 +463,7 @@ func _eval_rhs(src: String):
 	var tokens := _tokenize(src)
 	var parser := _Parser.new(tokens, self)
 	var r = parser.parse_expr()
-	if r == parser.ERR:
+	if parser.has_error:
 		return null
 	return r
 
@@ -596,10 +596,12 @@ func _is_ident_start(ch: String) -> bool:
 ## 优先级(从低到高):|| → && → 比较 → 加减 → 乘除 → 一元 → 主项
 
 class _Parser:
-	const ERR := "__parse_err__"
+	# 出错时用 has_error 传递,不用哨兵值 —— 避免与 float/int 比较时被
+	# GDScript 4.6 判为 "Invalid operands 'float' and 'String' in operator '=='"
 	var tokens: Array
 	var pos: int = 0
 	var rt
+	var has_error: bool = false
 
 	func _init(t: Array, runtime) -> void:
 		tokens = t
@@ -617,13 +619,17 @@ class _Parser:
 		pos += 1
 		return true
 
+	func _fail():
+		has_error = true
+		return null
+
 	func parse_expr(): return _or()
 
 	func _or():
 		var left = _and()
 		while _consume("op", "||"):
 			var right = _and()
-			if left == ERR or right == ERR: return ERR
+			if has_error: return null
 			left = rt._truthy(left) or rt._truthy(right)
 		return left
 
@@ -631,7 +637,7 @@ class _Parser:
 		var left = _cmp()
 		while _consume("op", "&&"):
 			var right = _cmp()
-			if left == ERR or right == ERR: return ERR
+			if has_error: return null
 			left = rt._truthy(left) and rt._truthy(right)
 		return left
 
@@ -641,7 +647,7 @@ class _Parser:
 		if t != null and t.get("kind", "") == "op" and t.get("value", "") in ["==", "!=", ">", "<", ">=", "<="]:
 			pos += 1
 			var right = _add()
-			if left == ERR or right == ERR: return ERR
+			if has_error: return null
 			match t["value"]:
 				"==": return _loose_eq(left, right)
 				"!=": return not _loose_eq(left, right)
@@ -652,12 +658,18 @@ class _Parser:
 		return left
 
 	func _loose_eq(a, b) -> bool:
+		var ta := typeof(a)
+		var tb := typeof(b)
+		# 数字互比:先都转 float
+		if (ta == TYPE_INT or ta == TYPE_FLOAT) and (tb == TYPE_INT or tb == TYPE_FLOAT):
+			return rt._to_num(a) == rt._to_num(b)
 		# 数字与字符串宽松比较(仿 JS ==)
-		if typeof(a) == typeof(b): return a == b
-		if (typeof(a) in [TYPE_INT, TYPE_FLOAT]) and typeof(b) == TYPE_STRING:
+		if (ta == TYPE_INT or ta == TYPE_FLOAT) and tb == TYPE_STRING:
 			return rt._to_num(a) == rt._to_num(b)
-		if (typeof(b) in [TYPE_INT, TYPE_FLOAT]) and typeof(a) == TYPE_STRING:
+		if (tb == TYPE_INT or tb == TYPE_FLOAT) and ta == TYPE_STRING:
 			return rt._to_num(a) == rt._to_num(b)
+		# 同类型直接比(bool/string/null)
+		if ta == tb: return a == b
 		return false
 
 	func _add():
@@ -669,7 +681,7 @@ class _Parser:
 			if op != "+" and op != "-": break
 			pos += 1
 			var right = _mul()
-			if left == ERR or right == ERR: return ERR
+			if has_error: return null
 			if op == "+" and (typeof(left) == TYPE_STRING or typeof(right) == TYPE_STRING):
 				left = str(left) + str(right)
 			elif op == "+":
@@ -687,7 +699,7 @@ class _Parser:
 			if op != "*" and op != "/": break
 			pos += 1
 			var right = _unary()
-			if left == ERR or right == ERR: return ERR
+			if has_error: return null
 			if op == "*":
 				left = rt._to_num(left) * rt._to_num(right)
 			else:
@@ -698,17 +710,17 @@ class _Parser:
 	func _unary():
 		if _consume("op", "!"):
 			var v = _unary()
-			if v == ERR: return ERR
+			if has_error: return null
 			return not rt._truthy(v)
 		if _consume("op", "-"):
 			var v2 = _unary()
-			if v2 == ERR: return ERR
+			if has_error: return null
 			return -rt._to_num(v2)
 		return _primary()
 
 	func _primary():
 		var t = _peek()
-		if t == null: return ERR
+		if t == null: return _fail()
 		if t.get("kind", "") == "num" or t.get("kind", "") == "str" or t.get("kind", "") == "bool":
 			pos += 1
 			return t["value"]
@@ -717,7 +729,7 @@ class _Parser:
 			return null
 		if _consume("op", "("):
 			var v = parse_expr()
-			if not _consume("op", ")"): return ERR
+			if not _consume("op", ")"): return _fail()
 			return v
 		if t.get("kind", "") == "ident":
 			pos += 1
@@ -734,4 +746,4 @@ class _Parser:
 			if rt.vars.has(name): return rt.vars[name]
 			# 无匹配 → null(让调用侧走 fallback)
 			return null
-		return ERR
+		return _fail()

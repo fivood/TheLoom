@@ -1,39 +1,1601 @@
 {
   "schema": "theloom-package",
   "schemaVersion": "1.0.0",
-  "meta": { "projectName": "雨夜示例", "exportedAt": 0, "generator": "godot-demo" },
-  "variables": [{ "name": "courage", "type": "number", "value": "1" }],
+  "meta": {
+    "projectName": "老伦敦寻人记",
+    "exportedAt": 0,
+    "generator": "godot-demo (sampleProject)"
+  },
+  "rules": {
+    "includeLayout": false,
+    "includeAnnotations": false,
+    "entities": "all",
+    "assets": "all"
+  },
+  "variables": [
+    {
+      "name": "signal_blocked",
+      "type": "boolean",
+      "value": "true",
+      "description": "短信能到、电话不通——存在物理或神秘术屏蔽"
+    },
+    {
+      "name": "has_address",
+      "type": "boolean",
+      "value": "false",
+      "description": "是否已取得白厅七号的地址"
+    },
+    {
+      "name": "delay_noticed",
+      "type": "boolean",
+      "value": "false",
+      "description": "玩家是否自己推理出了短信延迟异常"
+    },
+    {
+      "name": "late_start",
+      "type": "boolean",
+      "value": "false",
+      "description": "误判时间戳谜题,晚出发"
+    },
+    {
+      "name": "alarm",
+      "type": "boolean",
+      "value": "false",
+      "description": "闯楼失败惊动门厅,范肖谈判难度 +2"
+    },
+    {
+      "name": "has_floppy",
+      "type": "boolean",
+      "value": "false",
+      "description": "取得传送软盘"
+    },
+    {
+      "name": "got_intel",
+      "type": "boolean",
+      "value": "false",
+      "description": "范肖交代了软盘来历(检定成功才有)"
+    },
+    {
+      "name": "backup_ready",
+      "type": "boolean",
+      "value": "false",
+      "description": "联系过技术档案室,可发送定位召唤救援"
+    },
+    {
+      "name": "position_sent",
+      "type": "boolean",
+      "value": "false",
+      "description": "已发送定位——决定共振失败后走 B 还是 C 结局"
+    },
+    {
+      "name": "battery",
+      "type": "number",
+      "value": "40",
+      "description": "瓦伦缇娜手机剩余电量(%),各处选择会消耗它"
+    },
+    {
+      "name": "cunning",
+      "type": "number",
+      "value": "2",
+      "description": "检定属性 · 话术"
+    },
+    {
+      "name": "focus",
+      "type": "number",
+      "value": "3",
+      "description": "检定属性 · 感知与专注"
+    },
+    {
+      "name": "resolve",
+      "type": "number",
+      "value": "2",
+      "description": "检定属性 · 胆量与意志"
+    },
+    {
+      "name": "chocolate_rating",
+      "type": "number",
+      "value": "-3",
+      "description": "后勤部巧克力的可食用评分(满分 5)"
+    }
+  ],
   "entities": [
     {
-      "id": "e1", "name": "林晚", "kind": "character",
-      "technicalName": "linwan",
-      "fields": [{ "label": "trust", "value": "5" }]
+      "id": "k7aflbive8il",
+      "name": "塞梅尔维斯",
+      "kind": "character",
+      "fields": [
+        {
+          "label": "能力",
+          "value": "夜视、雾化(需要缝隙与时机)、犬齿"
+        },
+        {
+          "label": "雾化熟练",
+          "value": "2"
+        },
+        {
+          "label": "职业病",
+          "value": "用查案逻辑分析感情问题,随时准备写投诉信"
+        },
+        {
+          "label": "当前状态",
+          "value": "休假中(被迫结束)"
+        },
+        {
+          "label": "关于那部手机",
+          "value": "只是觉得它重量尚可。绝对不是在等谁的短信。"
+        },
+        {
+          "label": "所属",
+          "value": "7adheik7e8il",
+          "type": "entity",
+          "filterKind": "faction"
+        },
+        {
+          "label": "搭档",
+          "value": "4yguilkne8il",
+          "type": "entity",
+          "filterKind": "character"
+        },
+        {
+          "label": "欲望",
+          "value": ""
+        },
+        {
+          "label": "恐惧",
+          "value": ""
+        }
+      ],
+      "technicalName": "semelvie",
+      "color": "#1b1b19",
+      "summary": "基金会高级调查员,血食者。极度自律的理性外壳,以及被高级甜点和某人惯坏的品味内芯。今天放假——放到一半。"
+    },
+    {
+      "id": "4yguilkne8il",
+      "name": "瓦伦缇娜",
+      "kind": "character",
+      "fields": [
+        {
+          "label": "身份",
+          "value": "血食贵族 · 收藏品爱好者"
+        },
+        {
+          "label": "称呼习惯",
+          "value": "亲爱的"
+        },
+        {
+          "label": "当前状态",
+          "value": "失踪 · 被困于维多利亚时期地下收容室"
+        },
+        {
+          "label": "求救风格",
+          "value": "保持标价的体面:「价钱随你开」"
+        },
+        {
+          "label": "欲望",
+          "value": ""
+        },
+        {
+          "label": "恐惧",
+          "value": ""
+        },
+        {
+          "label": "所属",
+          "value": "",
+          "type": "entity",
+          "filterKind": "faction"
+        }
+      ],
+      "technicalName": "valentine",
+      "color": "#3a3936",
+      "summary": "古老血食贵族,神秘术强者,以戏弄塞梅尔维斯为人生乐趣。目前被困在一个讨厌神秘术的盒子里,对此的主要不满集中在空气发霉。"
+    },
+    {
+      "id": "h8bxbn0ke8il",
+      "name": "范肖先生",
+      "kind": "character",
+      "fields": [
+        {
+          "label": "立场",
+          "value": "行规优先,直到听见「法律风险告知书」"
+        },
+        {
+          "label": "弱点",
+          "value": "血食怪圈子的差评比基金会的传票可怕得多"
+        },
+        {
+          "label": "欲望",
+          "value": ""
+        },
+        {
+          "label": "恐惧",
+          "value": ""
+        },
+        {
+          "label": "所属",
+          "value": "",
+          "type": "entity",
+          "filterKind": "faction"
+        }
+      ],
+      "color": "#72716b",
+      "summary": "收藏品交易商,秃头老绅士。姓氏拼作 Featherstonhaugh,念作范肖——这是他给每位访客的第一道谜题,不计分。"
+    },
+    {
+      "id": "di3x6w9re8il",
+      "name": "白厅七号",
+      "kind": "location",
+      "fields": [
+        {
+          "label": "细节",
+          "value": "特制吸水地毯——这里的客人经常带着大量英国天气进门"
+        }
+      ],
+      "color": "#565550",
+      "summary": "维多利亚砖红建筑,没有门牌。对基金会调查员不构成障碍,只是在品味上略显可疑。"
+    },
+    {
+      "id": "97nazqjee8il",
+      "name": "查令十字地下通道",
+      "kind": "location",
+      "fields": [
+        {
+          "label": "规则",
+          "value": "墙内符文干扰,不可使用神秘术;导航靠振动与水声"
+        }
+      ],
+      "color": "#8e8d86",
+      "summary": "站台最西端一扇维修铁门,螺旋台阶通向堤岸工程时期的原始夹层。没有砖缝,一体浇筑。"
+    },
+    {
+      "id": "r4iarkqxe8il",
+      "name": "堤岸夹层收容室",
+      "kind": "location",
+      "fields": [
+        {
+          "label": "弱点",
+          "value": "朱比利延长线施工的振动让部分墙体出现裂缝;整点钟声 + 双向列车交会 = 共振窗口"
+        }
+      ],
+      "technicalName": "containment_vault",
+      "color": "#3a3936",
+      "summary": "维多利亚堤岸填河造陆时建在铁路隧道与下水道主管之间的收容设施,原始图纸毁于二战轰炸。设计上专门存放需要单独隔离的神秘学物品——不含活人,也不含血食怪。"
+    },
+    {
+      "id": "fl4z0odxe8il",
+      "name": "德制直板手机",
+      "kind": "item",
+      "fields": [
+        {
+          "label": "屏幕",
+          "value": "复古像素绿,黑暗里唯一的光源"
+        },
+        {
+          "label": "持有者",
+          "value": "k7aflbive8il",
+          "type": "entity",
+          "filterKind": "character"
+        }
+      ],
+      "color": "#aaa9a1",
+      "summary": "通讯录里只有一个联系人。持有者坚称留着它是因为重量尚可,且德国电路的严谨设计适合记备忘录。绝对不是在等某人发来什么。绝对不是。"
+    },
+    {
+      "id": "g8j4zz5me8il",
+      "name": "传送软盘 LSCC-TPT-LDN-ERR",
+      "kind": "item",
+      "fields": [
+        {
+          "label": "异常点",
+          "value": "徒手接触即触发生命体传送——除非被传送者「从各种意义上都不算活着」"
+        }
+      ],
+      "technicalName": "floppy_err",
+      "color": "#565550",
+      "summary": "五英寸黑色软盘,基金会与拉普拉斯的徽记。设计用途:运送需要单独隔离的非生物神秘学物品。一次性,已损耗。末尾的 ERR 代表「错误」——在任何行业都不是个好词。"
+    },
+    {
+      "id": "7adheik7e8il",
+      "name": "基金会",
+      "kind": "faction",
+      "fields": [
+        {
+          "label": "风格",
+          "value": "公文腔:签 24 小时待命的不平等条约,却给员工发怪味巧克力"
+        }
+      ],
+      "color": "#565550",
+      "summary": "管理神秘事件的组织,视夜行种为稀缺人力。塞的雇主,同时也是她投诉信的常年收件人。"
     }
   ],
   "flows": [
     {
-      "id": "f1", "name": "雨夜", "technicalName": "rain_night",
+      "id": "s6ju9btoe8il",
+      "name": "DEMO · 雨夜寻人",
       "nodes": [
-        { "id": "n1", "type": "dialogue", "data": { "title": "", "text": "雨下得很大。", "speakerId": "e1" } },
-        { "id": "hub", "type": "hub", "data": { "title": "" } },
-        { "id": "go", "type": "instruction", "data": { "title": "", "text": "courage += 2; linwan.trust += 1" } },
-        { "id": "ck", "type": "check", "data": { "title": "推门", "checkExpr": "courage", "checkDc": 8 } },
-        { "id": "win", "type": "dialogue", "data": { "text": "门开了。", "speakerId": "e1" } },
-        { "id": "lose", "type": "dialogue", "data": { "text": "门纹丝不动。" } },
-        { "id": "wait", "type": "dialogue", "data": { "text": "你在屋檐下等雨停。" } }
+        {
+          "id": "j693c4g9e8il",
+          "type": "fragment",
+          "data": {
+            "title": "ACT 0 · 遮阳篷下",
+            "text": "伦敦的雨季长得就像基金会迟迟走不到尽头的走廊。我叫塞梅尔维斯,基金会高级调查员,今天放假。后勤部的怪味巧克力还黏在牙上,兜里那部德制直板手机突然震了。"
+          }
+        },
+        {
+          "id": "40b9cprse8il",
+          "type": "dialogue",
+          "data": {
+            "title": "第一条短信 · 16:09",
+            "text": "我需要你的帮助,亲爱的塞梅尔维斯 @-‵-,--",
+            "speakerId": "4yguilkne8il"
+          }
+        },
+        {
+          "id": "ohfhggr8e8il",
+          "type": "dialogue",
+          "data": {
+            "title": "回敬一句",
+            "text": "堂堂瓦伦缇娜也有做不到的事吗?",
+            "speakerId": "k7aflbive8il",
+            "technicalName": "reply_mock"
+          }
+        },
+        {
+          "id": "lfep0tm6e8il",
+          "type": "dialogue",
+          "data": {
+            "title": "仅存的回复",
+            "text": "……?",
+            "speakerId": "k7aflbive8il",
+            "technicalName": "reply_dot"
+          }
+        },
+        {
+          "id": "7riql0yse8il",
+          "type": "hub",
+          "data": {
+            "title": "装没看见",
+            "technicalName": "reply_silent"
+          }
+        },
+        {
+          "id": "3xi5zd8ye8il",
+          "type": "dialogue",
+          "data": {
+            "title": "第二条短信",
+            "text": "很高兴你没把手机扔了。亲爱的,我好像被困在一个讨厌神秘术的盒子里。若死前只能与发霉的空气作伴,只好请求你发挥调查员本能了。帮我出去,价钱随你开,如何?",
+            "speakerId": "4yguilkne8il"
+          }
+        },
+        {
+          "id": "ziclyouke8il",
+          "type": "fragment",
+          "data": {
+            "title": "谜题 · 时间戳分析",
+            "text": "双击进入解谜子流程。判断错误不会卡关——但会晚出发。",
+            "technicalName": "puzzle_timestamp",
+            "sub": {
+              "nodes": [
+                {
+                  "id": "egwwl266e8il",
+                  "type": "fragment",
+                  "data": {
+                    "title": "便条纸展开",
+                    "text": "第一条:发送 16:09,接收 16:15。第二条:发送 16:27,接收 16:32。伦敦市中心,五六分钟的延迟不正常。拨号尝试:「您拨打的号码暂时无法接通——」"
+                  }
+                },
+                {
+                  "id": "b1r7cu7we8il",
+                  "type": "condition",
+                  "data": {
+                    "title": "短信能到,电话不通?",
+                    "text": "signal_blocked == true"
+                  }
+                },
+                {
+                  "id": "vz5x1qnfe8il",
+                  "type": "exit",
+                  "data": {
+                    "title": "屏蔽确认"
+                  }
+                },
+                {
+                  "id": "qsi99gg4e8il",
+                  "type": "hub",
+                  "data": {
+                    "title": "只是英国的信号"
+                  }
+                }
+              ],
+              "edges": [
+                {
+                  "id": "ezaox55le8il",
+                  "source": "egwwl266e8il",
+                  "target": "b1r7cu7we8il"
+                },
+                {
+                  "id": "f28myr1ve8il",
+                  "source": "b1r7cu7we8il",
+                  "target": "vz5x1qnfe8il",
+                  "sourceHandle": "true",
+                  "label": "存在物理或神秘术屏蔽"
+                },
+                {
+                  "id": "cpmge5z6e8il",
+                  "source": "b1r7cu7we8il",
+                  "target": "qsi99gg4e8il",
+                  "sourceHandle": "false",
+                  "label": "再等等看"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "bwyld4tre8il",
+          "type": "instruction",
+          "data": {
+            "title": "记下地址 · 察觉延迟",
+            "text": "has_address = true; delay_noticed = true"
+          }
+        },
+        {
+          "id": "7bkyt317e8il",
+          "type": "dialogue",
+          "data": {
+            "title": "第三条短信 · 迟来的地址",
+            "text": "半小时前我确实身在伦敦。那张肇事的软盘应该还在原处(还有我的手提包)。交易所地址是威斯敏斯特区白厅七号——噢我那朋友叫费瑟斯顿霍(Featherstonhaugh)",
+            "speakerId": "4yguilkne8il"
+          }
+        },
+        {
+          "id": "kn81kvwqe8il",
+          "type": "instruction",
+          "data": {
+            "title": "迟来的出发",
+            "text": "has_address = true; late_start = true; battery -= 10"
+          }
+        },
+        {
+          "id": "fla02q6ye8il",
+          "type": "fragment",
+          "data": {
+            "title": "ACT 2 · 白厅七号门厅",
+            "text": "维多利亚砖红建筑,没有门牌。戴金属框眼镜的接待员正用两根食指一下一下敲键盘,铭牌上是「菲尔」「比尔」「威尔」之类一眼就会记混的名字。"
+          }
+        },
+        {
+          "id": "y1r7qytle8il",
+          "type": "dialogue",
+          "data": {
+            "title": "亮明身份",
+            "text": "是,我是塞梅尔维斯,今天是来找她的。……签名可真是浪费生命,不过跟 Featherstonhaugh 一比似乎又没那么可悲。",
+            "speakerId": "k7aflbive8il",
+            "technicalName": "front_honest"
+          }
+        },
+        {
+          "id": "e2zuvuxee8il",
+          "type": "check",
+          "data": {
+            "title": "谎称有预约",
+            "text": "「范肖先生半小时前刚约的我,雨天口信慢,您懂的。」",
+            "checkExpr": "cunning",
+            "checkDc": 9
+          }
+        },
+        {
+          "id": "z26mm6uge8il",
+          "type": "dialogue",
+          "data": {
+            "title": "接待员推了推镜框",
+            "text": "没有预约的话,恐怕……啊,等等,您是塞梅尔维斯小姐?瓦伦缇娜女士吩咐过,要按她的级别接待您。",
+            "speakerId": "h8bxbn0ke8il"
+          }
+        },
+        {
+          "id": "nkjj6e4me8il",
+          "type": "check",
+          "data": {
+            "title": "趁乱直接上楼",
+            "text": "接待员敲键盘的间隙足够长。红检定:只有一次机会,失败会惊动整个门厅。",
+            "technicalName": "sneak_upstairs",
+            "checkExpr": "resolve",
+            "checkDc": 11,
+            "checkRed": true
+          }
+        },
+        {
+          "id": "ggdjq6vbe8il",
+          "type": "instruction",
+          "data": {
+            "title": "惊动门厅",
+            "text": "alarm = true"
+          }
+        },
+        {
+          "id": "bh13b7m3e8il",
+          "type": "fragment",
+          "data": {
+            "title": "ACT 2 · 二楼书房",
+            "text": "秃头老绅士在排满书柜的休息室来回踱步,挠着后脑勺仅存的几缕白发。沙发上放着那只手提包,书桌上是五英寸黑色软盘。"
+          }
+        },
+        {
+          "id": "r9txy7xge8il",
+          "type": "dialogue",
+          "data": {
+            "title": "法律风险告知书",
+            "text": "我可以不问软盘的来历。但那次使用机会已经被瓦伦缇娜女士「替你」用掉了——如果您觉得价格不公道,我非常乐意当场拟一份法律风险告知书,以瓦伦缇娜女士的名义。",
+            "speakerId": "k7aflbive8il",
+            "technicalName": "legal_threat"
+          }
+        },
+        {
+          "id": "oq6lutrse8il",
+          "type": "check",
+          "data": {
+            "title": "亮证件施压",
+            "text": "基金会调查员证件拍在桌上。若刚才惊动过门厅(alarm),他的戒备会让施压更难。",
+            "checkExpr": "resolve - (alarm ? 2 : 0)",
+            "checkDc": 9
+          }
+        },
+        {
+          "id": "rne7xhyie8il",
+          "type": "check",
+          "data": {
+            "title": "替他着想的说法",
+            "text": "「您也不希望瓦伦缇娜女士在这失踪的消息传开吧?配合我,我替您在她面前美言几句。」",
+            "checkExpr": "cunning + 1",
+            "checkDc": 10
+          }
+        },
+        {
+          "id": "pi8xlpfie8il",
+          "type": "dialogue",
+          "data": {
+            "title": "范肖投降",
+            "text": "呃……塞梅尔维斯小姐,只要别让瓦伦缇娜女士投诉,软盘随你处置,现在它是你的了。",
+            "speakerId": "h8bxbn0ke8il"
+          }
+        },
+        {
+          "id": "gw5fk4n8e8il",
+          "type": "dialogue",
+          "data": {
+            "title": "范肖全招",
+            "text": "软盘是三个月前一位「处理非生物危险品」的中间人抵的账……编号我从没敢查。手提包和软盘您都拿走,拜托了。",
+            "speakerId": "h8bxbn0ke8il"
+          }
+        },
+        {
+          "id": "ct586poze8il",
+          "type": "dialogue",
+          "data": {
+            "title": "行规在此",
+            "text": "这行的要求不能透露供货商情报,请恕我无法说明,塞梅尔维斯小姐。",
+            "speakerId": "h8bxbn0ke8il"
+          }
+        },
+        {
+          "id": "e7gc27gde8il",
+          "type": "fragment",
+          "data": {
+            "title": "软盘与手提包",
+            "text": "五英寸黑色软盘,基金会与拉普拉斯的徽记,编号 LSCC-TPT-LDN-ERR。末尾的 ERR,在任何行业都不是个好词。",
+            "technicalName": "got_floppy"
+          }
+        },
+        {
+          "id": "4gniggzee8il",
+          "type": "fragment",
+          "data": {
+            "title": "ACT 3 · 雨中的选择",
+            "text": "大本钟傍晚五点的钟声被雨吞了尾音。距离求救已近一小时。是先走官方流程,还是直接下去?"
+          }
+        },
+        {
+          "id": "a18mvsb0e8il",
+          "type": "fragment",
+          "data": {
+            "title": "致电技术档案室",
+            "text": "编号查询:堤岸工程时期的收容室,建在铁路隧道和下水道主管之间的夹层,墙体浇筑时混入抑制神秘术的符文。「如果您确认了具体位置,可以开启通讯器的定位发送功能,我们会派人前往。」",
+            "technicalName": "call_archive"
+          }
+        },
+        {
+          "id": "lswko5afe8il",
+          "type": "hub",
+          "data": {
+            "title": "官方流程太慢",
+            "technicalName": "skip_protocol"
+          }
+        },
+        {
+          "id": "n5ugy91qe8il",
+          "type": "fragment",
+          "data": {
+            "title": "ACT 4 · 查令十字 · 维修通道",
+            "text": "站台最西端的铁门,螺旋台阶,然后是完全的黑暗。双击进入导航子流程。",
+            "sub": {
+              "nodes": [
+                {
+                  "id": "snhcjbyge8il",
+                  "type": "fragment",
+                  "data": {
+                    "title": "铁门之后",
+                    "text": "空气污浊的狭长通道,漂浮的尘埃或许都来自上个世纪。血食怪的夜视在纯黑里也只是扩大虚无——导航靠手、靠耳朵、靠头顶几分钟一次的列车振动。"
+                  }
+                },
+                {
+                  "id": "7eqlrs2re8il",
+                  "type": "check",
+                  "data": {
+                    "title": "摸墙辨向",
+                    "text": "右手扶墙,数着振动往南。白检定:走错还能折返重试,但要付出时间(和瓦伦缇娜的电量)。",
+                    "checkExpr": "focus",
+                    "checkDc": 8
+                  }
+                },
+                {
+                  "id": "fz06m21ye8il",
+                  "type": "hub",
+                  "data": {
+                    "title": "死路 · 折返"
+                  }
+                },
+                {
+                  "id": "dw1hcsrwe8il",
+                  "type": "condition",
+                  "data": {
+                    "title": "她的手机还有电吗?",
+                    "text": "battery > 0"
+                  }
+                },
+                {
+                  "id": "tp8notm7e8il",
+                  "type": "dialogue",
+                  "data": {
+                    "title": "一个字的短信",
+                    "text": "血",
+                    "speakerId": "4yguilkne8il"
+                  }
+                },
+                {
+                  "id": "ien4ud4be8il",
+                  "type": "check",
+                  "data": {
+                    "title": "嗅觉搜索",
+                    "text": "没有短信指引,只能张开鼻腔在裂缝间捕捉那股她认得的气味。白检定,可反复尝试。",
+                    "checkExpr": "focus + 2",
+                    "checkDc": 9
+                  }
+                },
+                {
+                  "id": "8rlaso67e8il",
+                  "type": "hub",
+                  "data": {
+                    "title": "只有铁锈味"
+                  }
+                },
+                {
+                  "id": "kx7pmjlke8il",
+                  "type": "fragment",
+                  "data": {
+                    "title": "找到裂缝",
+                    "text": "列车交会的瞬间,裂缝张开一毫米,血腥味涌进通道——只有淡淡的一抹,若不是对这股血液来源有本能的记忆,她会把它当成铁轨润滑油的金属味忽略掉。",
+                    "technicalName": "found_crack"
+                  }
+                },
+                {
+                  "id": "6gohf5hze8il",
+                  "type": "condition",
+                  "data": {
+                    "title": "有支援渠道吗?",
+                    "text": "backup_ready == true"
+                  }
+                },
+                {
+                  "id": "fbzrfhjhe8il",
+                  "type": "instruction",
+                  "data": {
+                    "title": "按下定位发送",
+                    "text": "position_sent = true"
+                  }
+                },
+                {
+                  "id": "g2yy4ybme8il",
+                  "type": "exit",
+                  "data": {
+                    "title": "裂缝前就位"
+                  }
+                }
+              ],
+              "edges": [
+                {
+                  "id": "nmqzhg7me8il",
+                  "source": "snhcjbyge8il",
+                  "target": "7eqlrs2re8il"
+                },
+                {
+                  "id": "isu7ukane8il",
+                  "source": "7eqlrs2re8il",
+                  "target": "dw1hcsrwe8il",
+                  "sourceHandle": "success",
+                  "label": "沿振动最强的方向"
+                },
+                {
+                  "id": "8ocikvo8e8il",
+                  "source": "7eqlrs2re8il",
+                  "target": "fz06m21ye8il",
+                  "sourceHandle": "fail",
+                  "label": "拐进承重桩夹缝"
+                },
+                {
+                  "id": "7js8l310e8il",
+                  "source": "fz06m21ye8il",
+                  "target": "7eqlrs2re8il",
+                  "label": "折返重来",
+                  "effect": "battery -= 15"
+                },
+                {
+                  "id": "z0tmda0oe8il",
+                  "source": "dw1hcsrwe8il",
+                  "target": "tp8notm7e8il",
+                  "sourceHandle": "true"
+                },
+                {
+                  "id": "bpri11voe8il",
+                  "source": "dw1hcsrwe8il",
+                  "target": "ien4ud4be8il",
+                  "sourceHandle": "false",
+                  "label": "屏幕早就黑了"
+                },
+                {
+                  "id": "m5inzyrle8il",
+                  "source": "tp8notm7e8il",
+                  "target": "kx7pmjlke8il",
+                  "label": "循着那个字面向的方向"
+                },
+                {
+                  "id": "4lp9739je8il",
+                  "source": "ien4ud4be8il",
+                  "target": "kx7pmjlke8il",
+                  "sourceHandle": "success",
+                  "label": "那抹她认得的血腥味"
+                },
+                {
+                  "id": "imkgu0n4e8il",
+                  "source": "ien4ud4be8il",
+                  "target": "8rlaso67e8il",
+                  "sourceHandle": "fail"
+                },
+                {
+                  "id": "y64k6f9ce8il",
+                  "source": "8rlaso67e8il",
+                  "target": "ien4ud4be8il",
+                  "label": "换一段墙再闻"
+                },
+                {
+                  "id": "oyeqdwz7e8il",
+                  "source": "kx7pmjlke8il",
+                  "target": "6gohf5hze8il"
+                },
+                {
+                  "id": "glsr9erge8il",
+                  "source": "6gohf5hze8il",
+                  "target": "fbzrfhjhe8il",
+                  "sourceHandle": "true"
+                },
+                {
+                  "id": "bog8i1gye8il",
+                  "source": "6gohf5hze8il",
+                  "target": "g2yy4ybme8il",
+                  "sourceHandle": "false",
+                  "label": "没有支援渠道"
+                },
+                {
+                  "id": "hgi3dba8e8il",
+                  "source": "fbzrfhjhe8il",
+                  "target": "g2yy4ybme8il"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "c4gpndr4e8il",
+          "type": "check",
+          "data": {
+            "title": "整点共振 · 雾化时机",
+            "text": "大本钟报时与双向列车交会叠加,裂缝撑到最宽只有两声钟响。红检定:错过了,窗口不会再来。",
+            "technicalName": "resonance_leap",
+            "checkExpr": "resolve + semelvie.雾化熟练",
+            "checkDc": 12,
+            "checkRed": true
+          }
+        },
+        {
+          "id": "rpns322de8il",
+          "type": "fragment",
+          "data": {
+            "title": "雾化穿越",
+            "text": "第四声钟声,裂缝张开最宽的瞬间。她化为黑雾——彻底失去重量的一瞬,世界在感知层面上变成另一种质地。第六声钟声结束前,她在墙的另一侧重新凝为实体。"
+          }
+        },
+        {
+          "id": "shunsba0e8il",
+          "type": "fragment",
+          "data": {
+            "title": "结局 B · 七日之后",
+            "text": "窗口关闭。好在定位已经发出——救援小队按信号点拆墙,用了七天。瓦伦缇娜把新陈代谢降到冰点,像根树枝一样躺着等,出来的第一句话是把晚饭改成了一周的连续赔偿。",
+            "technicalName": "ending_rescue"
+          }
+        },
+        {
+          "id": "0b9u37a9e8il",
+          "type": "fragment",
+          "data": {
+            "title": "结局 C · 薛定谔的血食怪",
+            "text": "窗口关闭,而没有任何人知道这里。塞梅尔维斯守在裂缝边,数着一班又一班再也叠不出共振的列车。她终于理解了这个词:在墙被凿开之前,瓦伦缇娜既活着,又不。",
+            "technicalName": "ending_dark"
+          }
+        },
+        {
+          "id": "oypcpdr1e8il",
+          "type": "dialogue",
+          "data": {
+            "title": "黑暗里的笑声 · 记仇版",
+            "text": "感谢我的仁慈吧,塞梅尔维斯。顺带一提,「堂堂瓦伦缇娜」那句我可记下了——晚饭的账单会体现的。",
+            "speakerId": "4yguilkne8il"
+          }
+        },
+        {
+          "id": "q9afnyo8e8il",
+          "type": "dialogue",
+          "data": {
+            "title": "黑暗里的笑声",
+            "text": "感谢我的仁慈吧,塞梅尔维斯,还想多逗逗你的。我特地挑了个墙缝最大的屋子等你。",
+            "speakerId": "4yguilkne8il"
+          }
+        },
+        {
+          "id": "7dbvou3de8il",
+          "type": "dialogue",
+          "data": {
+            "title": "报酬谈判",
+            "text": "我的额外报酬里应该包含一顿晚饭。……现在说的是晚饭的事。你来推荐——不许趁机灌酒,也不能是英国菜。",
+            "speakerId": "k7aflbive8il"
+          }
+        },
+        {
+          "id": "p0ud8kc7e8il",
+          "type": "hub",
+          "data": {
+            "title": "结局 A · 晚饭:待定",
+            "technicalName": "ending_dinner"
+          }
+        }
       ],
       "edges": [
-        { "id": "ed0", "source": "n1", "target": "hub" },
-        { "id": "ed1", "source": "hub", "target": "go", "label": "鼓起勇气推门" },
-        { "id": "ed2", "source": "hub", "target": "wait", "label": "等雨停" },
-        { "id": "ed3", "source": "go", "target": "ck" },
-        { "id": "ed4", "source": "ck", "target": "win", "sourceHandle": "success" },
-        { "id": "ed5", "source": "ck", "target": "lose", "sourceHandle": "fail" }
-      ]
+        {
+          "id": "sah94b7be8il",
+          "source": "j693c4g9e8il",
+          "target": "40b9cprse8il"
+        },
+        {
+          "id": "orzfn54ue8il",
+          "source": "40b9cprse8il",
+          "target": "ohfhggr8e8il",
+          "label": "回敬一句(她会记住的)",
+          "effect": "battery -= 5"
+        },
+        {
+          "id": "2dho8wj6e8il",
+          "source": "40b9cprse8il",
+          "target": "lfep0tm6e8il",
+          "label": "只发一个问号"
+        },
+        {
+          "id": "tp70k9pce8il",
+          "source": "40b9cprse8il",
+          "target": "7riql0yse8il",
+          "label": "装没看见",
+          "effect": "battery -= 10"
+        },
+        {
+          "id": "suy4gysce8il",
+          "source": "ohfhggr8e8il",
+          "target": "3xi5zd8ye8il",
+          "label": "十五分钟后"
+        },
+        {
+          "id": "3ew2myy6e8il",
+          "source": "lfep0tm6e8il",
+          "target": "3xi5zd8ye8il",
+          "label": "十五分钟后"
+        },
+        {
+          "id": "w84uu8iee8il",
+          "source": "7riql0yse8il",
+          "target": "3xi5zd8ye8il",
+          "label": "半小时后,手机还是震了"
+        },
+        {
+          "id": "8852fl0qe8il",
+          "source": "3xi5zd8ye8il",
+          "target": "ziclyouke8il"
+        },
+        {
+          "id": "8ul2v0zse8il",
+          "source": "ziclyouke8il",
+          "target": "bwyld4tre8il",
+          "sourceHandle": "exit:vz5x1qnfe8il",
+          "label": "屏蔽确认 → 目标:白厅七号"
+        },
+        {
+          "id": "0eiimcsqe8il",
+          "source": "ziclyouke8il",
+          "target": "7bkyt317e8il",
+          "label": "误判 · 先回家躺平"
+        },
+        {
+          "id": "nf2r9prre8il",
+          "source": "bwyld4tre8il",
+          "target": "fla02q6ye8il"
+        },
+        {
+          "id": "re4pqhm3e8il",
+          "source": "7bkyt317e8il",
+          "target": "kn81kvwqe8il"
+        },
+        {
+          "id": "1ikbuf9ce8il",
+          "source": "kn81kvwqe8il",
+          "target": "fla02q6ye8il"
+        },
+        {
+          "id": "msqks1y8e8il",
+          "source": "fla02q6ye8il",
+          "target": "y1r7qytle8il",
+          "label": "亮明身份,签访客簿"
+        },
+        {
+          "id": "x1d8l1a5e8il",
+          "source": "fla02q6ye8il",
+          "target": "e2zuvuxee8il",
+          "label": "谎称与范肖有约(白检定)"
+        },
+        {
+          "id": "cylrv649e8il",
+          "source": "fla02q6ye8il",
+          "target": "nkjj6e4me8il",
+          "label": "趁乱直接上楼(红检定)"
+        },
+        {
+          "id": "kazlxrcpe8il",
+          "source": "y1r7qytle8il",
+          "target": "bh13b7m3e8il"
+        },
+        {
+          "id": "ocedc0c8e8il",
+          "source": "e2zuvuxee8il",
+          "target": "bh13b7m3e8il",
+          "sourceHandle": "success",
+          "label": "他放行了"
+        },
+        {
+          "id": "0fxocb99e8il",
+          "source": "e2zuvuxee8il",
+          "target": "z26mm6uge8il",
+          "sourceHandle": "fail",
+          "label": "被识破"
+        },
+        {
+          "id": "dk8e848fe8il",
+          "source": "z26mm6uge8il",
+          "target": "y1r7qytle8il",
+          "label": "只得亮明身份"
+        },
+        {
+          "id": "wqgcot0se8il",
+          "source": "nkjj6e4me8il",
+          "target": "bh13b7m3e8il",
+          "sourceHandle": "success",
+          "label": "悄无声息"
+        },
+        {
+          "id": "busg0uzie8il",
+          "source": "nkjj6e4me8il",
+          "target": "ggdjq6vbe8il",
+          "sourceHandle": "fail",
+          "label": "「女士?!那边不能——」"
+        },
+        {
+          "id": "26ufzo6fe8il",
+          "source": "ggdjq6vbe8il",
+          "target": "bh13b7m3e8il",
+          "label": "带着一楼的骚动上楼"
+        },
+        {
+          "id": "84lwe23ye8il",
+          "source": "bh13b7m3e8il",
+          "target": "r9txy7xge8il",
+          "label": "以瓦伦缇娜的名义拟告知书"
+        },
+        {
+          "id": "cgmr2bsie8il",
+          "source": "bh13b7m3e8il",
+          "target": "oq6lutrse8il",
+          "label": "亮证件施压(白检定)"
+        },
+        {
+          "id": "7rdg1aate8il",
+          "source": "bh13b7m3e8il",
+          "target": "rne7xhyie8il",
+          "label": "替他着想的说法(白检定)"
+        },
+        {
+          "id": "ctevauwoe8il",
+          "source": "r9txy7xge8il",
+          "target": "pi8xlpfie8il"
+        },
+        {
+          "id": "8hoa2qa6e8il",
+          "source": "pi8xlpfie8il",
+          "target": "e7gc27gde8il",
+          "effect": "has_floppy = true"
+        },
+        {
+          "id": "ifunck1je8il",
+          "source": "oq6lutrse8il",
+          "target": "gw5fk4n8e8il",
+          "sourceHandle": "success",
+          "label": "他招了"
+        },
+        {
+          "id": "nurtidiae8il",
+          "source": "oq6lutrse8il",
+          "target": "ct586poze8il",
+          "sourceHandle": "fail"
+        },
+        {
+          "id": "wy5gdr2pe8il",
+          "source": "rne7xhyie8il",
+          "target": "gw5fk4n8e8il",
+          "sourceHandle": "success",
+          "label": "他软下来了"
+        },
+        {
+          "id": "mz3okocse8il",
+          "source": "rne7xhyie8il",
+          "target": "ct586poze8il",
+          "sourceHandle": "fail"
+        },
+        {
+          "id": "jj70fktse8il",
+          "source": "ct586poze8il",
+          "target": "r9txy7xge8il",
+          "label": "换个说法"
+        },
+        {
+          "id": "plbmn9kye8il",
+          "source": "gw5fk4n8e8il",
+          "target": "e7gc27gde8il",
+          "effect": "has_floppy = true; got_intel = true"
+        },
+        {
+          "id": "u6laomxfe8il",
+          "source": "e7gc27gde8il",
+          "target": "4gniggzee8il"
+        },
+        {
+          "id": "7m3nq8pae8il",
+          "source": "4gniggzee8il",
+          "target": "a18mvsb0e8il",
+          "label": "先打给技术档案室"
+        },
+        {
+          "id": "zmournq6e8il",
+          "source": "4gniggzee8il",
+          "target": "lswko5afe8il",
+          "label": "不等官方流程,直接下去"
+        },
+        {
+          "id": "5xyzy0yfe8il",
+          "source": "a18mvsb0e8il",
+          "target": "n5ugy91qe8il",
+          "effect": "backup_ready = true"
+        },
+        {
+          "id": "82lpywhye8il",
+          "source": "lswko5afe8il",
+          "target": "n5ugy91qe8il"
+        },
+        {
+          "id": "hpzi8xd6e8il",
+          "source": "n5ugy91qe8il",
+          "target": "c4gpndr4e8il",
+          "sourceHandle": "exit:g2yy4ybme8il",
+          "label": "等下一个整点"
+        },
+        {
+          "id": "fqjirgame8il",
+          "source": "c4gpndr4e8il",
+          "target": "rpns322de8il",
+          "sourceHandle": "success",
+          "label": "第四声钟声,现在!"
+        },
+        {
+          "id": "l1b0h8vle8il",
+          "source": "c4gpndr4e8il",
+          "target": "shunsba0e8il",
+          "sourceHandle": "fail",
+          "label": "错过了——但救援知道位置",
+          "condition": "position_sent == true"
+        },
+        {
+          "id": "6v5aih3re8il",
+          "source": "c4gpndr4e8il",
+          "target": "0b9u37a9e8il",
+          "sourceHandle": "fail",
+          "label": "错过了,而且没人知道这里",
+          "fallback": true
+        },
+        {
+          "id": "6it2jfdye8il",
+          "source": "rpns322de8il",
+          "target": "oypcpdr1e8il",
+          "condition": "seen(\"reply_mock\")"
+        },
+        {
+          "id": "q31lk4foe8il",
+          "source": "rpns322de8il",
+          "target": "q9afnyo8e8il",
+          "fallback": true
+        },
+        {
+          "id": "wyg65wzde8il",
+          "source": "oypcpdr1e8il",
+          "target": "7dbvou3de8il"
+        },
+        {
+          "id": "4b9ntjq7e8il",
+          "source": "q9afnyo8e8il",
+          "target": "7dbvou3de8il"
+        },
+        {
+          "id": "2s6uty4se8il",
+          "source": "7dbvou3de8il",
+          "target": "p0ud8kc7e8il"
+        }
+      ],
+      "technicalName": "demo_rain_night"
     }
   ],
   "assets": [],
   "attachments": {},
-  "index": { "technicalNames": {}, "nodes": {}, "speakers": {}, "assetOwners": {} },
-  "manifest": {}
+  "index": {
+    "technicalNames": {
+      "demo_rain_night": {
+        "kind": "flow",
+        "id": "s6ju9btoe8il"
+      },
+      "semelvie": {
+        "kind": "entity",
+        "id": "k7aflbive8il"
+      },
+      "valentine": {
+        "kind": "entity",
+        "id": "4yguilkne8il"
+      },
+      "containment_vault": {
+        "kind": "entity",
+        "id": "r4iarkqxe8il"
+      },
+      "floppy_err": {
+        "kind": "entity",
+        "id": "g8j4zz5me8il"
+      },
+      "reply_mock": {
+        "kind": "node",
+        "id": "ohfhggr8e8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "reply_dot": {
+        "kind": "node",
+        "id": "lfep0tm6e8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "reply_silent": {
+        "kind": "node",
+        "id": "7riql0yse8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "puzzle_timestamp": {
+        "kind": "node",
+        "id": "ziclyouke8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "front_honest": {
+        "kind": "node",
+        "id": "y1r7qytle8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "sneak_upstairs": {
+        "kind": "node",
+        "id": "nkjj6e4me8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "legal_threat": {
+        "kind": "node",
+        "id": "r9txy7xge8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "got_floppy": {
+        "kind": "node",
+        "id": "e7gc27gde8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "call_archive": {
+        "kind": "node",
+        "id": "a18mvsb0e8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "skip_protocol": {
+        "kind": "node",
+        "id": "lswko5afe8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "found_crack": {
+        "kind": "node",
+        "id": "kx7pmjlke8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "resonance_leap": {
+        "kind": "node",
+        "id": "c4gpndr4e8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "ending_rescue": {
+        "kind": "node",
+        "id": "shunsba0e8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "ending_dark": {
+        "kind": "node",
+        "id": "0b9u37a9e8il",
+        "flowId": "s6ju9btoe8il"
+      },
+      "ending_dinner": {
+        "kind": "node",
+        "id": "p0ud8kc7e8il",
+        "flowId": "s6ju9btoe8il"
+      }
+    },
+    "nodes": {
+      "j693c4g9e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "40b9cprse8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "ohfhggr8e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "lfep0tm6e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "7riql0yse8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "hub"
+      },
+      "3xi5zd8ye8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "ziclyouke8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "egwwl266e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "ziclyouke8il"
+        ],
+        "type": "fragment"
+      },
+      "b1r7cu7we8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "ziclyouke8il"
+        ],
+        "type": "condition"
+      },
+      "vz5x1qnfe8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "ziclyouke8il"
+        ],
+        "type": "exit"
+      },
+      "qsi99gg4e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "ziclyouke8il"
+        ],
+        "type": "hub"
+      },
+      "bwyld4tre8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "instruction"
+      },
+      "7bkyt317e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "kn81kvwqe8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "instruction"
+      },
+      "fla02q6ye8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "y1r7qytle8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "e2zuvuxee8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "check"
+      },
+      "z26mm6uge8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "nkjj6e4me8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "check"
+      },
+      "ggdjq6vbe8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "instruction"
+      },
+      "bh13b7m3e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "r9txy7xge8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "oq6lutrse8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "check"
+      },
+      "rne7xhyie8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "check"
+      },
+      "pi8xlpfie8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "gw5fk4n8e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "ct586poze8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "e7gc27gde8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "4gniggzee8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "a18mvsb0e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "lswko5afe8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "hub"
+      },
+      "n5ugy91qe8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "snhcjbyge8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "fragment"
+      },
+      "7eqlrs2re8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "check"
+      },
+      "fz06m21ye8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "hub"
+      },
+      "dw1hcsrwe8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "condition"
+      },
+      "tp8notm7e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "dialogue"
+      },
+      "ien4ud4be8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "check"
+      },
+      "8rlaso67e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "hub"
+      },
+      "kx7pmjlke8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "fragment"
+      },
+      "6gohf5hze8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "condition"
+      },
+      "fbzrfhjhe8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "instruction"
+      },
+      "g2yy4ybme8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [
+          "n5ugy91qe8il"
+        ],
+        "type": "exit"
+      },
+      "c4gpndr4e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "check"
+      },
+      "rpns322de8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "shunsba0e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "0b9u37a9e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "fragment"
+      },
+      "oypcpdr1e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "q9afnyo8e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "7dbvou3de8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "dialogue"
+      },
+      "p0ud8kc7e8il": {
+        "flowId": "s6ju9btoe8il",
+        "path": [],
+        "type": "hub"
+      }
+    },
+    "speakers": {
+      "4yguilkne8il": [
+        "40b9cprse8il",
+        "3xi5zd8ye8il",
+        "7bkyt317e8il",
+        "tp8notm7e8il",
+        "oypcpdr1e8il",
+        "q9afnyo8e8il"
+      ],
+      "k7aflbive8il": [
+        "ohfhggr8e8il",
+        "lfep0tm6e8il",
+        "y1r7qytle8il",
+        "r9txy7xge8il",
+        "7dbvou3de8il"
+      ],
+      "h8bxbn0ke8il": [
+        "z26mm6uge8il",
+        "pi8xlpfie8il",
+        "gw5fk4n8e8il",
+        "ct586poze8il"
+      ]
+    },
+    "assetOwners": {}
+  },
+  "manifest": {
+    "flow:s6ju9btoe8il": "03b561392a71b522",
+    "entity:k7aflbive8il": "2120c6a2e5eb2c6c",
+    "entity:4yguilkne8il": "c061e15e9f435339",
+    "entity:h8bxbn0ke8il": "0e8077fb8dbe7a13",
+    "entity:di3x6w9re8il": "c4a371a071525d26",
+    "entity:97nazqjee8il": "c151261aa943e744",
+    "entity:r4iarkqxe8il": "7cd059cb88f9378c",
+    "entity:fl4z0odxe8il": "2287a60f8692f0ee",
+    "entity:g8j4zz5me8il": "e4bf37e259cabd8e",
+    "entity:7adheik7e8il": "e2eadbe4e21b7ac4",
+    "variables": "be713e53b8806825"
+  }
 }
