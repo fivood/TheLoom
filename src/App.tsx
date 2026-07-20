@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { exportProject, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
 import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
+import OverviewPanel from './components/OverviewPanel';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
@@ -112,6 +113,7 @@ export default function App() {
   const checkingUpdateRef = useRef(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
+  const [overview, setOverview] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
 
@@ -153,6 +155,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
+      if (k === 'k' && e.shiftKey) { e.preventDefault(); setOverview(true); return; }
       if (k === 'k') { e.preventDefault(); setSearching(true); return; }
       const t = e.target as HTMLElement;
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
@@ -293,6 +296,7 @@ export default function App() {
         <header className="topbar">
           <ProjectMenu />
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
+          <button className="ghost" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
           <button
             className={`ghost ${aiAssistant ? 'active' : ''}`}
             title="打开只读 AI 助手"
@@ -544,6 +548,7 @@ export default function App() {
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
       {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
+      {overview && <OverviewPanel onClose={() => setOverview(false)} />}
       {onboarding && (
         <Onboarding
           onContinueBlank={() => { setTab('documents'); }}
