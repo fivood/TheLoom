@@ -1,0 +1,39 @@
+{
+  "schema": "theloom-package",
+  "schemaVersion": "1.0.0",
+  "meta": { "projectName": "雨夜示例", "exportedAt": 0, "generator": "godot-demo" },
+  "variables": [{ "name": "courage", "type": "number", "value": "1" }],
+  "entities": [
+    {
+      "id": "e1", "name": "林晚", "kind": "character",
+      "technicalName": "linwan",
+      "fields": [{ "label": "trust", "value": "5" }]
+    }
+  ],
+  "flows": [
+    {
+      "id": "f1", "name": "雨夜", "technicalName": "rain_night",
+      "nodes": [
+        { "id": "n1", "type": "dialogue", "data": { "title": "", "text": "雨下得很大。", "speakerId": "e1" } },
+        { "id": "hub", "type": "hub", "data": { "title": "" } },
+        { "id": "go", "type": "instruction", "data": { "title": "", "text": "courage += 2; linwan.trust += 1" } },
+        { "id": "ck", "type": "check", "data": { "title": "推门", "checkExpr": "courage", "checkDc": 8 } },
+        { "id": "win", "type": "dialogue", "data": { "text": "门开了。", "speakerId": "e1" } },
+        { "id": "lose", "type": "dialogue", "data": { "text": "门纹丝不动。" } },
+        { "id": "wait", "type": "dialogue", "data": { "text": "你在屋檐下等雨停。" } }
+      ],
+      "edges": [
+        { "id": "ed0", "source": "n1", "target": "hub" },
+        { "id": "ed1", "source": "hub", "target": "go", "label": "鼓起勇气推门" },
+        { "id": "ed2", "source": "hub", "target": "wait", "label": "等雨停" },
+        { "id": "ed3", "source": "go", "target": "ck" },
+        { "id": "ed4", "source": "ck", "target": "win", "sourceHandle": "success" },
+        { "id": "ed5", "source": "ck", "target": "lose", "sourceHandle": "fail" }
+      ]
+    }
+  ],
+  "assets": [],
+  "attachments": {},
+  "index": { "technicalNames": {}, "nodes": {}, "speakers": {}, "assetOwners": {} },
+  "manifest": {}
+}

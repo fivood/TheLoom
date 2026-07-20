@@ -1,0 +1,20 @@
+; TheLoom · Godot 4 Demo 项目配置
+
+config_version=5
+
+[application]
+
+config/name="TheLoom Godot Demo"
+config/description="Load a TheLoom engine package and play a flow."
+config/features=PackedStringArray("4.2", "GL Compatibility")
+run/main_scene="res://main.tscn"
+
+[display]
+
+window/size/viewport_width=800
+window/size/viewport_height=600
+window/size/resizable=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
