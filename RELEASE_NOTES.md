@@ -1,3 +1,47 @@
+TheLoom v0.31.0 · R15-Godot 4 接入
+
+R15「引擎接入」首批交付 —— Godot 4 端能直接吃 R9 的通用引擎包并按编辑器语义演出,不需要任何插件、C# 或第三方依赖,一份 GDScript 就够了。基于近两年 Godot 用户量的上升(Unity 定价风波之后),把 Godot 放在 Unity/Unreal 之前先做。
+
+## `examples/godot-demo/`
+
+用 Godot 4.2+ 打开该目录 → F5 即可跑起来「老伦敦寻人记」完整互动剧本(1 流程 36 节点、9 实体、14 变量,含 fragment 子流程与 2d6 检定)。
+
+- **`theloom_runtime.gd`** ~600 行零依赖 GDScript(`class_name TheLoomRuntime`,继承 `RefCounted`):
+  - 复刻 TS 端 FlowRuntime 完整行进语义 —— 直通节点自动前进、无出边逐层回溯、exit 走父层片段命名引脚、fragment 默认引脚、fallback 遮蔽、once、条件边过滤、2d6 检定(白/红)
+  - mulberry32 种子 RNG 位模与 TS `rng.ts` 一致 → 同种子同一份包在 Godot 与 Node 得到相同的选项序列 / 掷骰点数 / 变量终值
+  - 内嵌极简条件 / 指令求值器:`==` `!=` `>=` `<=` `&&` `||` `!`、括号、字面量、变量名、`entity.field` 属性寻址、`= += -= *= /=` 赋值
+  - Godot 4.6 严格静态类型兼容:parser 用 `has_error` 布尔标志传递错误,不用哨兵字符串(避免 float / int 与 String 用 `==` 触发运行时类型错误);Dictionary 访问全部用 `.get()` 兜底 + `is_empty()` 判空,消除 chained subscript
+  - `beat_added(beat: Dictionary)` 信号驱动 UI 更新
+- **`main.tscn` + `main.gd`**:PanelContainer + RichTextLabel(BBCode 演出日志)+ 动态 Button 选项列表 + 重开按钮
+- **`sample_package.json`**:`sampleProject()` 通过 `buildEnginePackage` 导出的老伦敦寻人记完整数据
+- **`export-sample.mjs`**:一行 `npx tsx examples/godot-demo/export-sample.mjs` 重新生成示例包
+- **README.md**:上手 / 替换真实包 / API / 支持的脚本子集 / 与其他运行库的一致性说明
+
+## 不支持的脚本子集
+
+GDScript 极简求值器覆盖 TheLoom 项目里最常用的语法,但比 TS 端 R6 AST 更严格。**不支持**:
+
+- `seen("节点技术名") / unseen(...)` 走过判断 —— 需要在导出前静态展开,或在 GDScript 里在 `entity_props` 上加 seen 表
+- 三元运算符 `? :`
+- 复杂表达式嵌套(极简 parser 尽力而为,失败时回退到「无法求值 → 保留全部分支」)
+
+需要完整脚本表达力的项目,继续用 `examples/engine-demo/`(TS runtime,通过 `runtime-dist/theloom-runtime.js` 在任何 JS 环境演出)。
+
+## 路线图
+
+- R15-Godot 首发 ✅ v0.31.0
+- R15-Unity(可选):UPM 包 + EditorWindow 导入器
+- R15-Unreal(可选):C++ 插件 + Blueprint 节点
+- R16(v1.0.0):稳定版
+
+## 回归
+
+306 项测试全部通过,`npm run build` 与 `cargo check --lib` 通过。用户在 Godot 4.6 里 Import Project + F5 跑通完整老伦敦寻人记剧本(含检定节点后的分支)。
+
+安装包与自动更新清单见下方资产。大陆网络可经 https://theloom.pages.dev/api/download/latest 下载。
+
+---
+
 TheLoom v0.30.0 · R14 地图与工作区增强
 
 R14 「地图与工作区」按路线口径全部到位。地图从「底图 + 少量注解」升级为完整的矢量画布,项目组织增加跨模块总览和分屏两个新工具位。
