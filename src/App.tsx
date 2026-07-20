@@ -1,7 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { exportProject, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
-import { assetsToCsv, downloadCsv, entitiesToCsv, outlineToCsv } from './export';
 import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
@@ -429,25 +428,19 @@ export default function App() {
                   >
                     <Icon name="braces" size={14} /> 引擎包 .zip(游戏引擎)
                   </button>
-                  <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-实体表.csv`, entitiesToCsv(project)); }}>
-                    实体表 CSV
-                  </button>
-                  <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-资源表.csv`, assetsToCsv(project)); }}>
-                    资源表 CSV
-                  </button>
-                  <button onClick={() => { setToolsOpen(false); downloadCsv(`${project.name}-大纲表.csv`, outlineToCsv(project)); }}>
-                    大纲表 CSV
-                  </button>
-                  <button onClick={async () => {
-                    setToolsOpen(false);
-                    const blob = await projectToXlsx(project);
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `${project.name || 'theloom'}.xlsx`;
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                  }}>
-                    Excel 工作簿 .xlsx
+                  <button
+                    title="一份 xlsx 覆盖实体 / 资源 / 大纲 / 变量 / 时间线 / 资料 所有表格数据(比单独 CSV 更完整,且可再导回带预检)"
+                    onClick={async () => {
+                      setToolsOpen(false);
+                      const blob = await projectToXlsx(project);
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `${project.name || 'theloom'}.xlsx`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }}
+                  >
+                    Excel 工作簿 .xlsx(全项目表)
                   </button>
                   <button onClick={() => {
                     setToolsOpen(false);
@@ -517,30 +510,6 @@ export default function App() {
                       e.currentTarget.value = '';
                     }}
                   />
-                  <div className="tools-sep" />
-                  <div className="tools-label">外部工具</div>
-                  <a
-                    className="tools-link"
-                    href="https://70015.net"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setToolsOpen(false)}
-                    title="70015 · 浏览器内运行的通用小工具集(图片压缩、格式转换、二维码等)"
-                  >
-                    <Icon name="archive" size={14} /> 70015 工具集 ↗
-                    <span className="tools-hint">图片/文件/编码 通用小工具</span>
-                  </a>
-                  <a
-                    className="tools-link"
-                    href="https://70015.net/palette"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setToolsOpen(false)}
-                    title="从图片提取主色 → 导出 JSON → 在「配色表」里导入,即可用作项目色板"
-                  >
-                    <Icon name="palette" size={14} /> Color Palette ↗
-                    <span className="tools-hint">图片提色 → 导入到配色表</span>
-                  </a>
                 </div>
               </>
             )}
