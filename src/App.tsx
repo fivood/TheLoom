@@ -8,8 +8,6 @@ import HelpPanel from './components/HelpPanel';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
-import { transferProjectAssetsToFolder } from './assetFiles';
-import { offerClearCurrentBrowserCache } from './folderCache';
 import { useNav } from './search';
 import { confirmDialog, alertDialog } from './dialog';
 import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
@@ -172,8 +170,6 @@ export default function App() {
     if (empty) setOnboarding(true);
   }, []);
   const project = useLoom((s) => s.project);
-  const slots = useLoom((s) => s.slots);
-  const currentSlotId = useLoom((s) => s.currentSlotId);
   const folder = useLoom((s) => s.folder);
   const syncError = useLoom((s) => s.syncError);
   const saveStatus = useLoom((s) => s.saveStatus);
@@ -181,7 +177,6 @@ export default function App() {
   const recoveryNotice = useLoom((s) => s.recoveryNotice);
   const storageUsage = useLoom((s) => s.storageUsage);
   const setFolder = useLoom((s) => s.setFolder);
-  const switchSlot = useLoom((s) => s.switchSlot);
   const revision = useLoom((s) => s.revision);
   const canUndo = useLoom((s) => s.canUndo);
   const canRedo = useLoom((s) => s.canRedo);
@@ -254,62 +249,6 @@ export default function App() {
       });
     // 仅启动时执行一次
   }, []);
-
-  const chooseFolder = async () => {
-    const dir = await pickFolder();
-    if (!dir) return;
-    try {
-      const normalizePath = (value: string) => value.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLocaleLowerCase();
-      const boundSlot = slots.find((slot) => (
-        slot.id !== currentSlotId && slot.folder && normalizePath(slot.folder) === normalizePath(dir)
-      ));
-      if (boundSlot) {
-        if (!await confirmDialog({
-          message: `这个文件夹已绑定到项目「${boundSlot.name || '未命名项目'}」。\n\n是否直接切换到该项目?`,
-          confirmText: '切换项目',
-        })) return;
-        if (!await switchSlot(boundSlot.id)) {
-          const state = useLoom.getState();
-          await alertDialog(state.syncError || state.saveError || '项目切换失败，当前项目仍保持打开。');
-        }
-        return;
-      }
-      if (await folderHasProject(dir)) {
-        if (!await confirmDialog({ message: `该文件夹已有项目数据,加载它并替换当前打开的项目?\n\n${dir}` })) return;
-        const loaded = await loadFromFolder(dir);
-        useLoom.getState().replaceProject(loaded.project);
-        useLoom.getState().setRecoveryNotice(loaded.recoveredFromBackup
-          ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
-          : null);
-      } else {
-        if (!await confirmDialog({ message: `将当前项目「${project.name}」写入该文件夹?\n\n${dir}\n\n之后所有改动都会自动保存到这里。` })) return;
-        await saveToFolder(dir, project);
-        // 把浏览器 IndexedDB 里的资源原文件迁移落盘到 assets/,形成随文件夹走的闭环
-        const moved = await transferProjectAssetsToFolder(project, folder, dir);
-        if (moved.missing > 0) {
-          await alertDialog(`已落盘 ${moved.written} 个资源原文件;${moved.missing} 个在浏览器存储中缺失,可稍后在资源模块「重新定位」。`);
-        }
-      }
-      setFolder(dir);
-      if (useLoom.getState().folder !== dir) throw new Error('无法记录项目文件夹绑定');
-      await offerClearCurrentBrowserCache(dir);
-    } catch (e) {
-      await alertDialog(`操作失败:${e}`);
-    }
-  };
-
-  const reloadFolder = async () => {
-    if (!folder) return;
-    try {
-      const loaded = await loadFromFolder(folder);
-      useLoom.getState().replaceProject(loaded.project);
-      useLoom.getState().setRecoveryNotice(loaded.recoveredFromBackup
-        ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
-        : null);
-    } catch (e) {
-      await alertDialog(`重新加载失败:${e}`);
-    }
-  };
 
   return (
     <div className="app">
@@ -415,19 +354,6 @@ export default function App() {
                       >
                         <Icon name="download" size={14} /> 下载桌面版(Windows)
                       </button>
-                      <div className="tools-sep" />
-                    </>
-                  )}
-                  {isTauri && (
-                    <>
-                      <button onClick={() => { setToolsOpen(false); chooseFolder(); }}>
-                        <Icon name="folder" size={14} /> {folder ? '更换文件夹' : '项目文件夹'}
-                      </button>
-                      {folder && (
-                        <button onClick={() => { setToolsOpen(false); reloadFolder(); }}>
-                          <Icon name="refresh" size={14} /> 重新加载
-                        </button>
-                      )}
                       <div className="tools-sep" />
                     </>
                   )}

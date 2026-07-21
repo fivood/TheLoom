@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLoom } from '../store';
 import { inspectProjectImport, type ImportInspection } from '../diagnostics';
 import { confirmDialog, alertDialog } from '../dialog';
-import { exportBlobsToFolder } from '../assetFiles';
+import { exportBlobsToFolder, transferProjectAssetsToFolder } from '../assetFiles';
 import { offerClearCurrentBrowserCache } from '../folderCache';
 import { folderHasProject, isTauri, loadFromFolder, pickFolder, revealFolder, saveToFolder } from '../storage';
 import Icon from './Icon';
@@ -274,6 +274,41 @@ export default function ProjectMenu() {
           {!inFolder && (
             <>
               <div className="project-dropdown-head">当前项目 · {project.name || '未命名项目'}</div>
+              {isTauri && (
+                <div
+                  className="project-slot"
+                  onClick={async () => {
+                    const dir = await pickFolder();
+                    if (!dir) return;
+                    try {
+                      const norm = (v: string) => v.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLocaleLowerCase();
+                      const boundSlot = slots.find((slot) => (
+                        slot.id !== currentSlotId && slot.folder && norm(slot.folder) === norm(dir)
+                      ));
+                      if (boundSlot) {
+                        await alertDialog(`这个文件夹已绑定到另一个项目「${boundSlot.name || '未命名项目'}」。请另选一个空文件夹或者切换到那个项目。`);
+                        return;
+                      }
+                      if (await folderHasProject(dir)) {
+                        await alertDialog(`该文件夹里已有项目数据。要打开它,请从「新建 · 载入示例」下方或工具菜单打开;若要绑定当前项目请选空文件夹。`);
+                        return;
+                      }
+                      if (!await confirmDialog({ message: `将当前项目「${project.name || '未命名项目'}」写入该文件夹?\n\n${dir}\n\n之后所有改动都会自动保存到这里,并可以和 Obsidian 等编辑器共享。` })) return;
+                      await saveToFolder(dir, project);
+                      const moved = await transferProjectAssetsToFolder(project, folder, dir);
+                      if (moved.missing > 0) {
+                        await alertDialog(`已落盘 ${moved.written} 个资源原文件;${moved.missing} 个在浏览器存储中缺失,可稍后在资源模块「重新定位」。`);
+                      }
+                      useLoom.getState().setFolder(dir);
+                      setOpen(false);
+                    } catch (e) {
+                      await alertDialog(`绑定失败:${e instanceof Error ? e.message : String(e)}`);
+                    }
+                  }}
+                >
+                  <Icon name="folder" /> <span className="project-slot-name">绑定到本地文件夹…</span>
+                </div>
+              )}
               <div
                 className="project-slot danger-hover"
                 onClick={async () => {
