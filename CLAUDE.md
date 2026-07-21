@@ -40,6 +40,7 @@
   - **v0.10.0 附加批** ✅ — 全模块 Navigator(五模块统一)+ 文件夹归档 + 对话框统一 + 拖拽 / 多选 / 批量
   - **v0.11.0 附加批** ✅ — 长篇写作块(subheading / quote / list,无损往返)+ Excel .xlsx 与 Final Draft .fdx 双向互通(带 ImportPreview 预检)+ 配色表系统(zimg JSON 集成)+ 实体宽版编辑窗 + 文件夹 md 往返修复
 - 最近验证(2026-07-17,含当前未提交改动):`npm test` 188 项通过、`npm run build` 通过、`cargo test --lib` 2 项通过;体检筛选 / 跳转、路径报告、组合查询及保存 / 更新 / 套用 / 重命名 / 删除已在浏览器实际点验
+- **性能基线**(R16-4,`npx tsx bench.mjs`,151 场景 / 109 实体 / 15.9 万字 / JSON 743 KB):normalizeProject(clone) 11 ms · **auditProject 879 ms**(全项目 simulateFlow 主要成本)· JSON.stringify 4 ms · structuredClone 7 ms。auditProject 是关键路径,若未来引入 R10-A5 结局验收路径的更多 flow,需评估分片或懒加载。
 
 ### 当前执行顺序
 
