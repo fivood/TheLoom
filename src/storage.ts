@@ -602,6 +602,12 @@ export async function pickFolder(): Promise<string | null> {
   return typeof dir === 'string' ? dir : null;
 }
 
+/** 在系统文件管理器里打开一个已绑定的项目文件夹(仅桌面版) */
+export async function revealFolder(path: string): Promise<void> {
+  if (!isTauri) throw new Error('仅桌面版可用');
+  await invoke<void>('reveal_folder', { path });
+}
+
 export async function folderHasProject(dir: string): Promise<boolean> {
   const files = await invoke<ProjectFiles>('load_project_dir', { dir });
   return files.projectJson !== null || files.entities.length > 0 || files.research.length > 0 || files.documents.length > 0;

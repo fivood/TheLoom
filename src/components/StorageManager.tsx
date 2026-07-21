@@ -4,6 +4,7 @@ import { alertDialog, confirmDialog, promptText } from '../dialog';
 import Icon from './Icon';
 import { useEscape } from '../hooks/useEscape';
 import { listStoredFiles } from '../assetFiles';
+import { isTauri, revealFolder } from '../storage';
 import { makeZip } from '../interop/zip';
 
 /**
@@ -244,6 +245,17 @@ export default function StorageManager({ onClose }: { onClose: () => void }) {
                           {s.folderOnly ? '仅文件夹(浏览器无镜像)' : s.folder ? '文件夹 + 镜像' : '仅浏览器'}
                         </td>
                         <td>
+                          {s.folder && isTauri && (
+                            <button
+                              className="ghost icon-btn"
+                              title="在系统文件管理器中打开这个项目的文件夹"
+                              aria-label="打开文件夹"
+                              onClick={async () => {
+                                try { await revealFolder(s.folder!); }
+                                catch (e) { await alertDialog(`无法打开文件夹:${e instanceof Error ? e.message : String(e)}`); }
+                              }}
+                            >📂</button>
+                          )}
                           <button
                             className="ghost icon-btn danger"
                             title="删除该槽位(桌面绑定文件夹的话仅删镜像,文件夹内容不动)"

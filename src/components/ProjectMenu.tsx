@@ -4,7 +4,7 @@ import { inspectProjectImport, type ImportInspection } from '../diagnostics';
 import { confirmDialog, alertDialog } from '../dialog';
 import { exportBlobsToFolder } from '../assetFiles';
 import { offerClearCurrentBrowserCache } from '../folderCache';
-import { folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder } from '../storage';
+import { folderHasProject, isTauri, loadFromFolder, pickFolder, revealFolder, saveToFolder } from '../storage';
 import Icon from './Icon';
 import ImportProjectDialog from './ImportProjectDialog';
 
@@ -185,6 +185,16 @@ export default function ProjectMenu() {
                   ? '仅文件夹存储；浏览器镜像已清理。'
                   : '这个项目会记住自己的绑定，切换项目时无需解除。'}
               </div>
+              <div
+                className="project-slot"
+                onClick={async () => {
+                  setOpen(false);
+                  try { await revealFolder(folder!); }
+                  catch (e) { await alertDialog(`无法打开文件夹:${e instanceof Error ? e.message : String(e)}`); }
+                }}
+              >
+                <Icon name="folder" /> <span className="project-slot-name">在文件管理器中打开</span>
+              </div>
               {!currentSlot?.folderOnly && (
                 <div
                   className="project-slot"
@@ -233,6 +243,18 @@ export default function ProjectMenu() {
                     </span>
                   )}
                   <span className="project-slot-date">{new Date(s.updatedAt).toLocaleDateString()}</span>
+                  {s.folder && isTauri && (
+                    <button
+                      className="ghost icon-btn"
+                      title="在文件管理器中打开这个项目的文件夹"
+                      aria-label="打开文件夹"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try { await revealFolder(s.folder!); }
+                        catch (err) { await alertDialog(`无法打开文件夹:${err instanceof Error ? err.message : String(err)}`); }
+                      }}
+                    >📂</button>
+                  )}
                   <button
                     className="ghost icon-btn"
                     title="删除该项目(不可撤销)"

@@ -2,6 +2,7 @@ use base64::Engine;
 use keyring_core::Entry;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -702,6 +703,29 @@ mod tests {
     }
 }
 
+/// 在系统文件管理器里打开一个已存在的目录 —— 项目菜单「打开文件夹」入口。
+/// 支持 Windows / macOS / Linux;不递归、不接受非目录路径。
+#[tauri::command]
+fn reveal_folder(path: String) -> Result<(), String> {
+    let dir = PathBuf::from(&path);
+    if !dir.exists() {
+        return Err(format!("目录不存在:{}", path));
+    }
+    if !dir.is_dir() {
+        return Err(format!("不是目录:{}", path));
+    }
+    let canonical = fs::canonicalize(&dir).unwrap_or(dir);
+    let result = if cfg!(target_os = "windows") {
+        Command::new("explorer.exe").arg(&canonical).spawn()
+    } else if cfg!(target_os = "macos") {
+        Command::new("open").arg(&canonical).spawn()
+    } else {
+        // Linux / *BSD
+        Command::new("xdg-open").arg(&canonical).spawn()
+    };
+    result.map(|_| ()).map_err(|e| format!("打开文件管理器失败:{}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -718,7 +742,8 @@ pub fn run() {
             set_llm_secret,
             has_llm_secret,
             delete_llm_secret,
-            llm_http_request
+            llm_http_request,
+            reveal_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
