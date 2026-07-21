@@ -174,6 +174,23 @@ export function normalizeProject(p: Project): Project {
   cleanFavorites(p.assets);
   cleanFavorites(p.documents);
   cleanFavorites(p.researchCards);
+  // 实体别名(R3-A 增强):去空、去重、非字符串剔除;空数组降级 undefined
+  for (const e of p.entities) {
+    if (e.aliases === undefined) continue;
+    if (!Array.isArray(e.aliases)) { delete e.aliases; continue; }
+    const seen = new Set<string>();
+    const cleaned: string[] = [];
+    for (const raw of e.aliases) {
+      const s = typeof raw === 'string' ? raw.trim() : '';
+      if (!s) continue;
+      const key = s.toLowerCase();
+      if (seen.has(key) || key === e.name.trim().toLowerCase()) continue;
+      seen.add(key);
+      cleaned.push(s);
+    }
+    if (cleaned.length) e.aliases = cleaned;
+    else delete e.aliases;
+  }
   // 资源原文件字段(R8):非字符串 / 明显非法的值剔除
   for (const a of p.assets) {
     if (a.hash !== undefined && (typeof a.hash !== 'string' || !/^[0-9a-f]{64}$/.test(a.hash))) delete a.hash;

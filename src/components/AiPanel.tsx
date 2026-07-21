@@ -4,14 +4,16 @@ import { useNav } from '../search';
 import { alertDialog, confirmDialog } from '../dialog';
 import Icon from './Icon';
 import type { Entity } from '../types';
+import { ENTITY_KIND_LABEL as ENTITY_KIND_LABEL_LOCAL } from '../types';
 import {
   chatComplete, deleteLlmCredential, hydrateDesktopLlmConfig, llmHasCredential, llmNeedsApiKey, loadLlmConfig,
   parseModelJson, PROVIDER_DEFAULTS, PROVIDER_LABEL, PROVIDER_META, saveLlmConfig, testLlmConnection,
   type LlmConfig, type LlmProvider,
 } from '../ai/llm';
 import {
-  applyAiImportPreview, buildAiImportPreview, buildFieldFillPrompt, DEFAULT_EXTRACT_PROMPT,
-  normalizeExtracted, normalizeFieldFill, pushAiLog, type AiImportPreview,
+  applyAiImportPreview, buildAiImportPreview, buildFieldFillPrompt, composeExtractSystemPrompt, DEFAULT_EXTRACT_PROMPT,
+  mergeExtracted, normalizeExtracted, normalizeFieldFill, pushAiLog, STAGE1_SUFFIX, STAGE2_SUFFIX,
+  type AiImportPreview,
 } from '../ai/extract';
 
 /* ---------- AI 设置 ---------- */
@@ -170,6 +172,8 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
   const [prompt, setPrompt] = useState(() => project.aiPrompts?.extract || DEFAULT_EXTRACT_PROMPT);
   const [showPrompt, setShowPrompt] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<'idle' | 'stage1' | 'stage2'>('idle');
+  const [twoStage, setTwoStage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<AiImportPreview | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -200,18 +204,58 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     setPreview(null);
+    setStage(twoStage ? 'stage1' : 'idle');
     const source = text.slice(0, 200000);
     const isAbort = (e: unknown) => (e instanceof DOMException && e.name === 'AbortError')
       || (e instanceof Error && (e.message.includes('已取消') || e.message.includes('cancelled') || e.message.includes('aborted')));
+    const callOnce = async (systemBase: string, contextProject: typeof project) => {
+      const system = composeExtractSystemPrompt(systemBase, contextProject);
+      const output = await chatComplete(cfg, { system, user: source, signal: controller.signal });
+      return { output, parsed: normalizeExtracted(parseModelJson(output)) };
+    };
     try {
-      const output = await chatComplete(cfg, { system: prompt, user: source, signal: controller.signal });
-      const { data, warnings } = normalizeExtracted(parseModelJson(output));
-      const built = buildAiImportPreview(project, data, warnings);
-      setPreview(built);
-      update((p) => pushAiLog(p, {
-        provider: cfg.provider, model: cfg.model, purpose: 'extract',
-        inChars: source.length, outChars: output.length, ok: true,
-      }));
+      if (twoStage) {
+        const r1 = await callOnce(prompt + STAGE1_SUFFIX, project);
+        update((p) => pushAiLog(p, {
+          provider: cfg.provider, model: cfg.model, purpose: 'extract',
+          inChars: source.length, outChars: r1.output.length, ok: true,
+        }));
+        setStage('stage2');
+        const virtualProject = {
+          ...project,
+          entities: [
+            ...project.entities,
+            ...r1.parsed.data.entities.map((ex) => ({
+              id: 'aivirt-' + ex.name,
+              kind: ex.kind,
+              name: ex.name,
+              color: '#000',
+              emoji: '',
+              summary: ex.summary,
+              fields: [],
+              notes: '',
+              aliases: ex.aliases,
+              createdAt: 0,
+            })),
+          ],
+        };
+        const r2 = await callOnce(prompt + STAGE2_SUFFIX, virtualProject);
+        update((p) => pushAiLog(p, {
+          provider: cfg.provider, model: cfg.model, purpose: 'extract',
+          inChars: source.length, outChars: r2.output.length, ok: true,
+        }));
+        const merged = mergeExtracted(r1.parsed.data, r2.parsed.data);
+        const built = buildAiImportPreview(project, merged, [...r1.parsed.warnings, ...r2.parsed.warnings]);
+        setPreview(built);
+      } else {
+        const { output, parsed } = await callOnce(prompt, project);
+        const built = buildAiImportPreview(project, parsed.data, parsed.warnings);
+        setPreview(built);
+        update((p) => pushAiLog(p, {
+          provider: cfg.provider, model: cfg.model, purpose: 'extract',
+          inChars: source.length, outChars: output.length, ok: true,
+        }));
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setError(isAbort(e) ? '已停止:未收到模型响应' : message);
@@ -222,6 +266,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setBusy(false);
+      setStage('idle');
     }
   };
 
@@ -240,7 +285,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="palette-backdrop" onClick={onClose}>
-      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 680 }}>
+      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 780 }}>
         <div className="sync-head">
           <Icon name="bulb" size={14} />
           <span>AI 抽取 · 长文 → 实体 / 场景 / 时间线</span>
@@ -253,10 +298,11 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
               <div className="field">
                 <label>源文本(小说 / 剧本 / 设定 / Obsidian 笔记;PDF 请先复制文字粘贴)</label>
                 <textarea
-                  rows={10}
+                  rows={18}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="把长文粘贴到这里,或用下面的按钮读入 .md / .txt 文件…"
+                  style={{ minHeight: 320, resize: 'vertical', fontSize: 13, lineHeight: 1.55 }}
                 />
                 <div className="hint" style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button className="ghost" style={{ fontSize: 12 }} onClick={() => fileRef.current?.click()}>
@@ -272,6 +318,12 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
                   style={{ display: 'none' }}
                   onChange={(e) => { readFiles(e.target.files); e.target.value = ''; }}
                 />
+              </div>
+              <div className="field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={twoStage} onChange={(e) => setTwoStage(e.target.checked)} />
+                  <span>分两轮抽取(先实体+时间线,再场景;结果更稳,但 token 消耗约 1.8×)</span>
+                </label>
               </div>
               <div className="field">
                 <button className="ghost" style={{ alignSelf: 'start', fontSize: 12 }} onClick={() => setShowPrompt((v) => !v)}>
@@ -293,7 +345,9 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
               <div className="sync-actions">
                 <button onClick={onClose}>取消</button>
                 <button className="primary" disabled={busy || !text.trim()} onClick={run}>
-                  {busy ? '抽取中…(长文可能需要一两分钟)' : '开始抽取'}
+                  {busy
+                    ? (stage === 'stage1' ? '1/2 抽实体与时间线…' : stage === 'stage2' ? '2/2 抽场景…' : '抽取中…(长文可能需要一两分钟)')
+                    : '开始抽取'}
                 </button>
               </div>
             </>
@@ -316,6 +370,34 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
               {preview.entityUpdates.length > 0 && (
                 <div className="hint" style={{ fontSize: 11 }}>
                   更新只补空白:已有实体仅填充空简介与缺失字段,不覆盖现有内容
+                </div>
+              )}
+              {preview.newDocs.length > 0 && (
+                <div className="field">
+                  <details>
+                    <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-faint)' }}>
+                      新增场景清单({preview.newDocs.length})· 顺序即故事顺序
+                    </summary>
+                    <ol style={{ margin: '6px 0 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.7, maxHeight: 220, overflowY: 'auto' }}>
+                      {preview.newDocs.map((d) => (
+                        <li key={d.id}>{d.name}<span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>· {d.blocks.length} 块</span></li>
+                      ))}
+                    </ol>
+                  </details>
+                </div>
+              )}
+              {preview.newEntities.length > 0 && (
+                <div className="field">
+                  <details>
+                    <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-faint)' }}>
+                      新增实体清单({preview.newEntities.length})
+                    </summary>
+                    <ul style={{ margin: '6px 0 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.7, maxHeight: 220, overflowY: 'auto' }}>
+                      {preview.newEntities.map((e) => (
+                        <li key={e.id}>{e.name}<span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>· {ENTITY_KIND_LABEL_LOCAL[e.kind]}</span></li>
+                      ))}
+                    </ul>
+                  </details>
                 </div>
               )}
               {preview.warnings.length > 0 && (

@@ -370,6 +370,19 @@ export default function EntityLibrary() {
               onRenamed={(oldV, newV) => useLoom.getState().renameScriptIdentifier(oldV, newV)}
             />
             <div className="field">
+              <label title="常见简称、昵称、代称;AI 长文抽取时会告诉模型这些别名指向本实体,避免把「塞」「塞梅」「塞梅尔维斯」当成三个人">
+                别名(用于 AI 消歧)
+              </label>
+              <input
+                value={(selected.aliases ?? []).join(', ')}
+                placeholder="例如:塞, 塞梅, Semmelweis(逗号分隔)"
+                onChange={(e) => {
+                  const list = e.target.value.split(/[,,、]/).map((s) => s.trim()).filter(Boolean);
+                  updateEntity(selected.id, { aliases: list.length ? list : undefined });
+                }}
+              />
+            </div>
+            <div className="field">
               <label>模板</label>
               <select
                 value={selected.templateId ?? ''}

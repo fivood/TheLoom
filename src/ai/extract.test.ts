@@ -3,7 +3,8 @@ import { sampleProject } from '../sample';
 import { normalizeProject } from '../util';
 import { parseModelJson } from './llm';
 import {
-  applyAiImportPreview, buildAiImportPreview, normalizeExtracted, normalizeFieldFill, pushAiLog,
+  applyAiImportPreview, buildAiImportPreview, composeExtractSystemPrompt,
+  mergeExtracted, normalizeExtracted, normalizeFieldFill, pushAiLog,
 } from './extract';
 
 describe('parseModelJson', () => {
@@ -123,6 +124,95 @@ describe('buildAiImportPreview + apply', () => {
 describe('normalizeFieldFill', () => {
   it('只保留请求过的字段,大小写宽容', () => {
     expect(normalizeFieldFill({ 年龄: '27', Age: 'x', 无关: 'y', 职业: '' }, ['年龄', '职业'])).toEqual({ 年龄: '27' });
+  });
+});
+
+describe('实体别名(R3-A 增强)', () => {
+  it('composeExtractSystemPrompt 附加已有实体清单,别名并入括注', () => {
+    const project = sampleProject();
+    normalizeProject(project);
+    const target = project.entities.find((e) => e.kind === 'character');
+    expect(target).toBeTruthy();
+    target!.aliases = ['塞', '塞梅'];
+    const composed = composeExtractSystemPrompt('BASE', project);
+    expect(composed.startsWith('BASE\n\n---\n')).toBe(true);
+    expect(composed).toContain(target!.name);
+    expect(composed).toContain('别名:塞、塞梅');
+  });
+  it('buildAiImportPreview 用别名解析已有角色,不产生重复实体也不入 unknownSpeakers', () => {
+    const project = sampleProject();
+    normalizeProject(project);
+    const target = project.entities.find((e) => e.kind === 'character' && !e.aliases);
+    expect(target).toBeTruthy();
+    target!.aliases = ['塞', '塞梅'];
+    const preview = buildAiImportPreview(project, {
+      entities: [{ kind: 'character', name: '塞', summary: '', fields: [] }],
+      scenes: [{ title: '测试', blocks: [{ type: 'dialogue', speaker: '塞梅', text: '喂' }] }],
+      timelinePoints: [],
+      timelineEvents: [],
+    });
+    expect(preview.newEntities).toHaveLength(0);
+    expect(preview.unknownSpeakers).toHaveLength(0);
+    expect(preview.newDocs[0].blocks[0].speakerId).toBe(target!.id);
+  });
+  it('normalizeProject 清理空 / 重复 / 与本名相同的别名', () => {
+    const project = sampleProject();
+    const target = project.entities.find((e) => e.kind === 'character')!;
+    target.aliases = ['  ', '塞', '塞', target.name, 'Semmelweis', ''];
+    normalizeProject(project);
+    expect(target.aliases).toEqual(['塞', 'Semmelweis']);
+    target.aliases = [];
+    normalizeProject(project);
+    expect(target.aliases).toBeUndefined();
+  });
+});
+
+describe('分两轮抽取 mergeExtracted', () => {
+  it('实体/时间线取第一轮,场景取第二轮', () => {
+    const first = {
+      entities: [{ kind: 'character' as const, name: 'A', summary: '', fields: [], aliases: ['a'] }],
+      scenes: [],
+      timelinePoints: ['T1'],
+      timelineEvents: [{ point: 'T1', title: 'x', text: '', entities: [] }],
+    };
+    const second = {
+      entities: [],
+      scenes: [{ title: 'S1', blocks: [{ type: 'action' as const, text: '走进' }] }],
+      timelinePoints: [],
+      timelineEvents: [],
+    };
+    const merged = mergeExtracted(first, second);
+    expect(merged.entities).toEqual(first.entities);
+    expect(merged.timelinePoints).toEqual(first.timelinePoints);
+    expect(merged.timelineEvents).toEqual(first.timelineEvents);
+    expect(merged.scenes).toEqual(second.scenes);
+  });
+  it('第二轮意外没给出场景时,退回第一轮的场景', () => {
+    const first = {
+      entities: [], timelinePoints: [], timelineEvents: [],
+      scenes: [{ title: '备用', blocks: [{ type: 'action' as const, text: 'x' }] }],
+    };
+    const second = { entities: [], timelinePoints: [], timelineEvents: [], scenes: [] };
+    expect(mergeExtracted(first, second).scenes).toEqual(first.scenes);
+  });
+  it('新实体带 aliases 时,buildAiImportPreview 落到实体上,已有实体只补新别名', () => {
+    const project = sampleProject();
+    normalizeProject(project);
+    const target = project.entities.find((e) => e.kind === 'character')!;
+    target.aliases = ['塞'];
+    const preview = buildAiImportPreview(project, {
+      entities: [
+        { kind: 'character', name: '新角色', summary: '', fields: [], aliases: ['xx', 'yy'] },
+        { kind: 'character', name: target.name, summary: '', fields: [], aliases: ['塞', '塞梅'] },
+      ],
+      scenes: [],
+      timelinePoints: [],
+      timelineEvents: [],
+    });
+    const created = preview.newEntities.find((e) => e.name === '新角色');
+    expect(created?.aliases).toEqual(['xx', 'yy']);
+    const upd = preview.entityUpdates.find((u) => u.id === target.id);
+    expect(upd?.addAliases).toEqual(['塞梅']);
   });
 });
 

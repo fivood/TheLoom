@@ -91,6 +91,8 @@ export interface Entity {
   notes: string;
   /** 技术名:项目内唯一的稳定标识符,用于脚本寻址与导出,如 semelvie */
   technicalName?: string;
+  /** 别名 / 常见简称,用于 AI 抽取时消歧(如「塞」「塞梅」都指向「塞梅尔维斯」) */
+  aliases?: string[];
   createdAt: number;
 }
 

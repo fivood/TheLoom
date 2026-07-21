@@ -71,6 +71,7 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
     createdAt: e.createdAt,
   };
   if (e.technicalName) meta.technicalName = e.technicalName;
+  if (e.aliases && e.aliases.length) meta.aliases = [...e.aliases];
   if (e.templateId) meta.templateId = e.templateId;
   if (e.favorite) meta.favorite = true;
   if (e.folderId) meta.folderId = e.folderId;
@@ -175,6 +176,11 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
     fields,
     notes,
     technicalName: typeof meta.technicalName === 'string' && meta.technicalName ? meta.technicalName : undefined,
+    aliases: (() => {
+      if (!Array.isArray(meta.aliases)) return undefined;
+      const list = (meta.aliases as unknown[]).map((x) => String(x ?? '').trim()).filter(Boolean);
+      return list.length ? list : undefined;
+    })(),
     templateId: typeof meta.templateId === 'string' && meta.templateId ? meta.templateId : undefined,
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
   };
