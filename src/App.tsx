@@ -147,6 +147,20 @@ export default function App() {
   // 恢复本机保存的分栏宽度(启动时一次)
   useEffect(() => { initPaneWidths(); }, []);
 
+  // 未保存离开警告:防抖持久化窗口内直接关标签会丢改动 —— beforeunload 提示
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      const s = useLoom.getState();
+      if (s.saveStatus === 'saving' || s.saveStatus === 'error') {
+        e.preventDefault();
+        // 现代浏览器忽略自定义文案,只看是否 preventDefault;returnValue 兼容老浏览器
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
   // 首启新手引导:未标记 + 项目实际为空(无文档 / 实体 / 流程节点)才弹
   useEffect(() => {
     let done = false;
@@ -344,7 +358,19 @@ export default function App() {
           {recoveryNotice ? (
             <button className="ghost saved-hint recovery-status" onClick={() => setRecovering(true)} title={recoveryNotice}>⚠ 恢复提醒</button>
           ) : saveStatus === 'error' ? (
-            <button className="ghost saved-hint" style={{ color: 'var(--danger)' }} onClick={() => setRecovering(true)} title={saveError ?? undefined}>⚠ 保存失败</button>
+            <span style={{ display: 'inline-flex', gap: 4 }}>
+              <button
+                className="ghost saved-hint"
+                style={{ color: 'var(--danger)' }}
+                onClick={() => setRecovering(true)}
+                title={saveError ?? undefined}
+              >⚠ 保存失败</button>
+              <button
+                className="primary"
+                title="立即把当前内存里的项目 JSON 下载到本地(浏览器磁盘配额满 / IndexedDB 崩了时的抢救按钮)"
+                onClick={() => exportProject(project)}
+              >↓ 应急下载</button>
+            </span>
           ) : saveError ? (
             <button className="ghost saved-hint" style={{ color: 'var(--danger)' }} onClick={() => setRecovering(true)} title={saveError}>⚠ 备份失败</button>
           ) : syncError ? (
