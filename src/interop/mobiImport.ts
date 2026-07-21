@@ -183,20 +183,37 @@ class HuffCdic {
   }
 
   unpack(data: Uint8Array): Uint8Array {
+    // 输入侧
     let bitsleft = data.length * 8;
     const padded = new Uint8Array(data.length + 8);
     padded.set(data);
     let pos = 0;
-    let x = this.readU64(padded, pos);
+    // 64 位窗口用两个 32 位无符号整数模拟,避免 BigInt(慢 10-100 倍)
+    let high = readU32(padded, 0);
+    let low = readU32(padded, 4);
     let n = 32;
-    const result: number[] = [];
+    // 输出侧:预分配 8x 输入字节的缓冲区,不够就倍增;比 Array.push 快数十倍
+    let out = new Uint8Array(Math.max(64, data.length * 8));
+    let outLen = 0;
+    const ensure = (need: number) => {
+      if (outLen + need <= out.length) return;
+      let newSize = out.length;
+      while (newSize < outLen + need) newSize *= 2;
+      const bigger = new Uint8Array(newSize);
+      bigger.set(out.subarray(0, outLen));
+      out = bigger;
+    };
     for (;;) {
       if (n <= 0) {
         pos += 4;
-        x = this.readU64(padded, pos);
+        high = readU32(padded, pos);
+        low = pos + 4 < padded.length ? readU32(padded, pos + 4) : 0;
         n += 32;
       }
-      const code = Number((x >> BigInt(n)) & 0xffffffffn) >>> 0;
+      // code = (u64 >> n) & 0xFFFFFFFF —— n∈[1,32] 由代码路径保证
+      const code = n >= 32
+        ? (high >>> (n - 32)) >>> 0
+        : (((high << (32 - n)) | (low >>> n)) >>> 0);
       const top8 = code >>> 24;
       let codelen = this.dict1[top8].codelen;
       const term = this.dict1[top8].term;
@@ -212,22 +229,18 @@ class HuffCdic {
       const r = (((maxcodeVal - code) >>> 0) >>> (32 - codelen));
       if (r >= this.dictionary.length) break;
       const entry = this.dictionary[r];
+      let slice: Uint8Array;
       if (entry.flag) {
-        for (const b of entry.data) result.push(b);
+        slice = entry.data;
       } else {
-        const unpacked = this.unpack(entry.data);
-        for (const b of unpacked) result.push(b);
-        this.dictionary[r] = { data: unpacked, flag: true };
+        slice = this.unpack(entry.data);
+        this.dictionary[r] = { data: slice, flag: true };
       }
+      ensure(slice.length);
+      out.set(slice, outLen);
+      outLen += slice.length;
     }
-    return new Uint8Array(result);
-  }
-
-  private readU64(data: Uint8Array, pos: number): bigint {
-    if (pos + 8 > data.length) return 0n;
-    let v = 0n;
-    for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(data[pos + i]);
-    return v;
+    return out.subarray(0, outLen);
   }
 }
 
