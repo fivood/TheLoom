@@ -295,7 +295,9 @@ interface MobiText {
   isKf8: boolean;
 }
 
-function extractSegmentHtml(records: Uint8Array[]): { html: string; meta: { title?: string; author?: string } } {
+export type MobiProgress = (stage: 'read' | 'decompress' | 'split', pct: number) => void;
+
+function extractSegmentHtml(records: Uint8Array[], onProgress?: MobiProgress): { html: string; meta: { title?: string; author?: string } } {
   const rec0 = records[0];
   if (rec0.length < 18) throw new Error('MOBI 首记录损坏');
   const compression = readU16(rec0, 0);
@@ -322,6 +324,10 @@ function extractSegmentHtml(records: Uint8Array[]): { html: string; meta: { titl
     const parts: Uint8Array[] = [];
     for (let i = 1; i < textEnd; i++) {
       parts.push(huff.unpack(stripRecordTrailers(records[i], extraFlags)));
+      // 每记录回调一次;textRecordCount 决定分辨率(几百记录对 700 章书来说够用)
+      if (onProgress && (i % 8 === 0 || i === textEnd - 1)) {
+        onProgress('decompress', i / (textEnd - 1));
+      }
     }
     const total = parts.reduce((s, p) => s + p.length, 0);
     raw = new Uint8Array(total);
@@ -333,6 +339,9 @@ function extractSegmentHtml(records: Uint8Array[]): { html: string; meta: { titl
       const trimmed = stripRecordTrailers(records[i], extraFlags);
       if (compression === 1) for (const b of trimmed) buf.push(b);
       else for (const b of decompressPalmDoc(trimmed)) buf.push(b);
+      if (onProgress && (i % 8 === 0 || i === textEnd - 1)) {
+        onProgress('decompress', i / (textEnd - 1));
+      }
     }
     raw = new Uint8Array(buf);
   } else {
@@ -349,7 +358,7 @@ function extractSegmentHtml(records: Uint8Array[]): { html: string; meta: { titl
 }
 
 /** 提取正文 HTML:合订(BOUNDARY)优先用 MOBI6 段,纯 KF8(AZW3)整体解析 */
-function extractMobiText(bytes: Uint8Array): MobiText {
+function extractMobiText(bytes: Uint8Array, onProgress?: MobiProgress): MobiText {
   const records = parsePalmDb(bytes);
   const boundaryIdx = records.findIndex((r) => ascii(r, 0, 8) === 'BOUNDARY');
   const rec0 = records[0];
@@ -357,7 +366,7 @@ function extractMobiText(bytes: Uint8Array): MobiText {
 
   // 合订本:BOUNDARY 之前是完整的 MOBI6 段,解析简单且文本一致
   const segment = boundaryIdx > 0 ? records.slice(0, boundaryIdx) : records;
-  const { html, meta } = extractSegmentHtml(segment);
+  const { html, meta } = extractSegmentHtml(segment, onProgress);
   return { html, title: meta.title, author: meta.author, isKf8: pureKf8 };
 }
 
@@ -380,22 +389,28 @@ function htmlToPlainText(html: string): string {
     .join('\n');
 }
 
-/** 主入口:MOBI / AZW3 二进制 → ParsedManuscript(单卷,分页符切章) */
-export function parseMobi(buffer: ArrayBuffer): ParsedManuscript {
+/** 主入口:MOBI / AZW3 二进制 → ParsedManuscript(单卷,分页符切章)
+ *  onProgress:('decompress', 0..1)HUFF/CDIC 或 PalmDoc 解压进度;
+ *             ('split', 0..1)章节切分进度(700 章级书里很快,不必刷太密) */
+export function parseMobi(buffer: ArrayBuffer, onProgress?: MobiProgress): ParsedManuscript {
   const bytes = new Uint8Array(buffer);
   const warnings: string[] = [];
-  const { html, title, author } = extractMobiText(bytes);
+  const { html, title, author } = extractMobiText(bytes, onProgress);
 
   const parts = html.split(PAGEBREAK_RE).filter((p) => p.trim().length > 0);
   if (parts.length === 0) parts.push(html);
 
   const chapters: ParsedChapter[] = [];
+  const total = parts.length;
   parts.forEach((part, i) => {
     try {
       const ch = xhtmlToChapter(part, `第 ${i + 1} 篇`);
       if (ch.scenes.some((s) => s.blocks.length > 0) || ch.title) chapters.push(ch);
     } catch (e) {
       warnings.push(`第 ${i + 1} 段解析失败:${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (onProgress && (i % 16 === 0 || i === total - 1)) {
+      onProgress('split', total > 0 ? (i + 1) / total : 1);
     }
   });
   if (chapters.length === 0) warnings.push('MOBI 中未提取到可导入的正文');

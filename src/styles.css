@@ -2580,6 +2580,19 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .update-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 20px 8px; }
 .update-defer-hint { padding: 0 20px 16px; color: var(--text-faint); font-size: 11px; text-align: right; }
 
+/* ---------- 导入进度条 ---------- */
+.import-progress {
+  width: 100%; max-width: 400px; height: 6px; margin: 0 auto;
+  background: var(--bg-panel); border-radius: 999px; overflow: hidden; position: relative;
+}
+.import-progress-bar {
+  height: 100%; background: var(--focus); border-radius: 999px;
+}
+@keyframes import-progress-slide {
+  0% { margin-left: -30%; }
+  100% { margin-left: 100%; }
+}
+
 @keyframes update-progress {
   from { transform: translateX(-110%); }
   to { transform: translateX(300%); }

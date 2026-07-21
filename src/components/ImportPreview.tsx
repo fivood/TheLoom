@@ -30,6 +30,8 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
   const replaceProject = useLoom((s) => s.replaceProject);
   const update = useLoom((s) => s.update);
   const [loading, setLoading] = useState(true);
+  const [progressLabel, setProgressLabel] = useState('正在读入文件…');
+  const [progressPct, setProgressPct] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [xlsx, setXlsx] = useState<XlsxImportPreview | null>(null);
   const [fdx, setFdx] = useState<FdxImportPreview | null>(null);
@@ -37,18 +39,29 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
   const [manuscript, setManuscript] = useState<ParsedManuscript | null>(null);
   const abortRef = useRef(false);
 
+  // 让 React 有机会把当前 state 渲染出来后再继续下一个同步阶段
+  const yieldToUi = () => new Promise<void>((r) => setTimeout(r, 0));
+
   useEffect(() => {
     abortRef.current = false;
     (async () => {
+      const setStage = async (label: string, pct: number | null = null) => {
+        setProgressLabel(label);
+        setProgressPct(pct);
+        await yieldToUi();
+      };
       try {
+        await setStage(`正在读入文件…(${(file.size / 1024 / 1024).toFixed(1)} MB)`);
         if (mode === 'xlsx') {
           const buf = new Uint8Array(await file.arrayBuffer());
           if (abortRef.current) return;
+          await setStage('正在解析 Excel…');
           const p = await previewProjectXlsx(buf, project);
           if (!abortRef.current) setXlsx(p);
         } else if (mode === 'fdx') {
           const text = await file.text();
           if (abortRef.current) return;
+          await setStage('正在解析剧本…');
           const name = file.name.replace(/\.fdx$/i, '') || '导入剧本';
           setFdxDocName(name);
           setFdx(previewFdxImport(text, project, name));
@@ -56,18 +69,33 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
           if (/\.epub$/i.test(file.name)) {
             const buf = await file.arrayBuffer();
             if (abortRef.current) return;
+            await setStage('正在解压 EPUB 并抽取正文…');
             setManuscript(await parseEpub(buf));
           } else if (/\.(mobi|azw3?|prc)$/i.test(file.name)) {
             const buf = await file.arrayBuffer();
             if (abortRef.current) return;
-            setManuscript(parseMobi(buf));
+            await setStage('正在解压 MOBI…', 0);
+            let lastLabelStage: string | null = null;
+            const onProgress = (stage: 'read' | 'decompress' | 'split', pct: number) => {
+              // 阶段切换时更新文案,把 pct 归零重新走进度
+              if (stage !== lastLabelStage) {
+                lastLabelStage = stage;
+                setProgressLabel(stage === 'split' ? '正在切分章节…' : '正在解压 MOBI…');
+              }
+              setProgressPct(pct);
+            };
+            const ms = parseMobi(buf, onProgress);
+            if (abortRef.current) return;
+            setManuscript(ms);
           } else if (/\.docx$/i.test(file.name)) {
             const buf = await file.arrayBuffer();
             if (abortRef.current) return;
+            await setStage('正在解压 DOCX 并抽取正文…');
             setManuscript(await parseDocx(buf));
           } else {
             const { text, format } = await readManuscriptFile(file);
             if (abortRef.current) return;
+            await setStage('正在按章节切分…');
             setManuscript(parseManuscript(text, { format }));
           }
         }
@@ -130,7 +158,31 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
             <div className="hint" style={{ fontSize: 12 }}>{file.name} · {(file.size / 1024).toFixed(1)} KB</div>
           </div>
 
-          {loading && <div className="empty-hint" style={{ padding: 24 }}>正在解析…</div>}
+          {loading && (
+            <div className="empty-hint" style={{ padding: 24 }}>
+              <div style={{ marginBottom: 8 }}>{progressLabel}</div>
+              <div
+                className="import-progress"
+                role="progressbar"
+                aria-label={progressLabel}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progressPct != null ? Math.round(progressPct * 100) : undefined}
+              >
+                <div
+                  className="import-progress-bar"
+                  style={{
+                    width: progressPct != null ? `${Math.round(progressPct * 100)}%` : '30%',
+                    transition: progressPct != null ? 'width 0.2s' : 'none',
+                    animation: progressPct != null ? 'none' : 'import-progress-slide 1.2s infinite',
+                  }}
+                />
+              </div>
+              {progressPct != null && (
+                <div className="hint" style={{ fontSize: 11, marginTop: 6 }}>{Math.round(progressPct * 100)}%</div>
+              )}
+            </div>
+          )}
 
           {err && (
             <div className="field">
