@@ -20,8 +20,8 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.31.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.31.0`(R15-Godot 首发:GDScript runtime + Godot 4 demo,老伦敦寻人记完整剧本);R12 已暂缓;R15-Unity / Unreal 可选;下一批 R16 稳定版 v1.0.0
+- 已发布版本:`v0.32.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.32.0`(存储管理面板 + 使用指南 + 老伦敦示例扩充 + R16-1 自动快照 + R16-2 应急下载与 beforeunload 保护);R12 已暂缓;R15-Unity / Unreal 可选;R16 继续小步推进,v1.0.0 留待多轮测试后
 - 当前基线:`v0.24.0`;包含 v0.23.1 文件夹模式稳定性修复与完整 R10
 - 已交付的能力(截至 v0.23.0):
   - **v0.23.0 R9 通用游戏引擎导出** ✅ — 带版本 JSON Schema 的引擎包(zip:数据 + Schema + .d.ts 类型 + README);导出规则(选流程 / 剥布局注释 / 仅引用实体资源);技术名与节点定位等四类索引;内容哈希清单 + 增量包;独立运行库 theloom-runtime(零依赖 ES Module,语义与 Player 一致);examples/engine-demo 无 React 演出示例
