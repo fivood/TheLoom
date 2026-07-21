@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
-  applyNodeChanges, MarkerType, Handle, Position,
+  MarkerType, Handle, Position,
   BaseEdge, EdgeLabelRenderer, getStraightPath, useInternalNode,
   type Node, type Edge, type NodeChange, type Connection, type NodeProps,
   type EdgeProps, type InternalNode,
@@ -59,15 +59,31 @@ function borderPoint(node: InternalNode, toward: { x: number; y: number }): { x:
   return { x: c.x + dx * s, y: c.y + dy * s };
 }
 
-/** 浮动边:忽略固定把手,始终沿两节点边框最短方向连线 */
-function FloatingEdge({ id, source, target, markerEnd, style, label, selected }: EdgeProps) {
+/** 浮动边:忽略固定把手,始终沿两节点边框最短方向连线;同对节点的多条边做垂直位移分开 */
+function FloatingEdge({ id, source, target, markerEnd, style, label, selected, data }: EdgeProps) {
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
   if (!sourceNode || !targetNode) return null;
-  const p1 = borderPoint(sourceNode, centerOf(targetNode));
-  const p2 = borderPoint(targetNode, centerOf(sourceNode));
+  const cs = centerOf(sourceNode);
+  const ct = centerOf(targetNode);
+  const p1 = borderPoint(sourceNode, ct);
+  const p2 = borderPoint(targetNode, cs);
+  const siblingIndex = (data as { siblingIndex?: number } | undefined)?.siblingIndex ?? 0;
+  const siblingCount = (data as { siblingCount?: number } | undefined)?.siblingCount ?? 1;
+  const spacing = 22;
+  const offset = (siblingIndex - (siblingCount - 1) / 2) * spacing;
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const len = Math.hypot(dx, dy) || 1;
+  // 垂直单位向量(逆时针 90°)
+  const nx = -dy / len;
+  const ny = dx / len;
+  const sx = p1.x + nx * offset;
+  const sy = p1.y + ny * offset;
+  const tx = p2.x + nx * offset;
+  const ty = p2.y + ny * offset;
   const [path, labelX, labelY] = getStraightPath({
-    sourceX: p1.x, sourceY: p1.y, targetX: p2.x, targetY: p2.y,
+    sourceX: sx, sourceY: sy, targetX: tx, targetY: ty,
   });
   return (
     <>
@@ -115,50 +131,79 @@ function Canvas() {
     [project.entities, kinds, relatedIds],
   );
 
-  const [nodes, setNodes] = useState<RelNode[]>([]);
+  // 拖拽产生的临时位置(store 未 commit 前的中间态,避免每一帧都写 store)
+  const [dragPos, setDragPos] = useState<Record<string, { x: number; y: number }>>({});
 
-  // 实体集 / 布局变化时重建节点,保留本地已有位置
-  useEffect(() => {
-    setNodes((prev) => {
-      const prevById = new Map(prev.map((n) => [n.id, n]));
-      return visible.map((e, i) => {
-        const old = prevById.get(e.id);
-        const position = old?.position ?? project.relationLayout?.[e.id] ?? defaultPosition(i, visible.length);
-        return {
-          id: e.id,
-          type: 'relEntity' as const,
-          position,
-          selected: old?.selected,
-          data: { name: e.name, emoji: e.emoji, avatar: e.avatar, color: e.color, kind: e.kind },
-        };
-      });
-    });
-  }, [visible, project.relationLayout]);
+  const nodes: RelNode[] = useMemo(() => visible.map((e, i) => {
+    const position = dragPos[e.id]
+      ?? project.relationLayout?.[e.id]
+      ?? defaultPosition(i, visible.length);
+    return {
+      id: e.id,
+      type: 'relEntity' as const,
+      position,
+      data: { name: e.name, emoji: e.emoji, avatar: e.avatar, color: e.color, kind: e.kind },
+    };
+  }), [visible, project.relationLayout, dragPos]);
 
   const visibleIds = useMemo(() => new Set(visible.map((e) => e.id)), [visible]);
-  const edges: Edge[] = useMemo(() => relations
-    .filter((r) => visibleIds.has(r.fromId) && visibleIds.has(r.toId))
-    .map((r) => ({
-      id: r.id,
-      type: 'floating' as const,
-      source: r.fromId,
-      target: r.toId,
-      label: r.label || '(未命名)',
-      selected: r.id === selectedRelId,
-      markerEnd: r.bidirectional ? undefined : { type: MarkerType.ArrowClosed, color: r.color || '#72716b' },
-      style: { stroke: r.color || 'var(--edge)', strokeWidth: r.id === selectedRelId ? 2.5 : 1.5 },
-    })), [relations, visibleIds, selectedRelId]);
+  const edges: Edge[] = useMemo(() => {
+    const filtered = relations.filter((r) => visibleIds.has(r.fromId) && visibleIds.has(r.toId));
+    const pairKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`;
+    const groupMembers = new Map<string, string[]>();
+    for (const r of filtered) {
+      const k = pairKey(r.fromId, r.toId);
+      const arr = groupMembers.get(k) ?? [];
+      arr.push(r.id);
+      groupMembers.set(k, arr);
+    }
+    return filtered.map((r) => {
+      const k = pairKey(r.fromId, r.toId);
+      const members = groupMembers.get(k) ?? [r.id];
+      const siblingIndex = members.indexOf(r.id);
+      return {
+        id: r.id,
+        type: 'floating' as const,
+        source: r.fromId,
+        target: r.toId,
+        label: r.label || '(未命名)',
+        selected: r.id === selectedRelId,
+        markerEnd: r.bidirectional ? undefined : { type: MarkerType.ArrowClosed, color: r.color || '#72716b' },
+        style: { stroke: r.color || 'var(--edge)', strokeWidth: r.id === selectedRelId ? 2.5 : 1.5 },
+        data: { siblingIndex, siblingCount: members.length },
+      };
+    });
+  }, [relations, visibleIds, selectedRelId]);
 
   const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
 
   const onNodesChange = useCallback((changes: NodeChange<RelNode>[]) => {
-    setNodes((ns) => applyNodeChanges(changes, ns));
+    // 只处理位置变化,累积到 dragPos;其他 change 交给 React Flow 内部
+    setDragPos((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const c of changes) {
+        if (c.type === 'position' && c.position) {
+          next[c.id] = { x: c.position.x, y: c.position.y };
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, []);
 
   const onNodeDragStop = useCallback((_e: unknown, _node: RelNode, dragged: RelNode[]) => {
     const positions: Record<string, { x: number; y: number }> = {};
     for (const n of dragged) positions[n.id] = { x: n.position.x, y: n.position.y };
-    if (Object.keys(positions).length > 0) setRelationLayout(positions);
+    if (Object.keys(positions).length > 0) {
+      setRelationLayout(positions);
+      // commit 到 store 后清掉临时态,让 nodes 从 project.relationLayout 读
+      setDragPos((prev) => {
+        const next = { ...prev };
+        for (const id of Object.keys(positions)) delete next[id];
+        return next;
+      });
+    }
   }, [setRelationLayout]);
 
   const onConnect = useCallback(async (conn: Connection) => {
