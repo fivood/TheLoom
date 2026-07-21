@@ -339,7 +339,7 @@ export default function App() {
           <ProjectMenu />
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
           <button className="ghost" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
-          <button className="ghost" title="使用指南 (F1)" onClick={() => setHelp(true)}>?</button>
+          <button className="ghost" title="使用指南 (F1)" aria-label="使用指南" onClick={() => setHelp(true)}>?</button>
           <button
             className={`ghost ${secondaryTab ? 'active' : ''}`}
             title="分屏:主副两个模块并列显示 (Ctrl+\\)"

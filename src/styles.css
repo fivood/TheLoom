@@ -99,6 +99,24 @@ button.ghost:hover { background: var(--bg-hover); color: var(--text); }
 button.icon-btn { padding: 4px 8px; line-height: 1; }
 button:disabled { opacity: 0.4; cursor: default; }
 
+/* R16-3 无障碍:键盘导航时可见的 focus 环(鼠标点击不显示) */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* 有明显边框的表单控件用 offset 0 更好看 */
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline-offset: 0;
+  border-color: var(--focus);
+}
+
 input, textarea, select {
   font: inherit;
   color: var(--text);

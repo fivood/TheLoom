@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 /**
  * 帮助面板 · 按模块列出用途、上手动作与常用快捷键。
@@ -140,6 +141,7 @@ const SECTIONS: Section[] = [
 ];
 
 export default function HelpPanel({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const [active, setActive] = useState<SectionKey>('overview');
   const sec = SECTIONS.find((s) => s.key === active)!;
   return (
@@ -150,7 +152,7 @@ export default function HelpPanel({ onClose }: { onClose: () => void }) {
           <span>使用指南</span>
           <span className="spacer" />
           <span className="hint" style={{ fontSize: 11 }}>更详细的说明与设计准则见 README.md</span>
-          <button className="ghost icon-btn" onClick={onClose}>×</button>
+          <button className="ghost icon-btn" title="关闭 (Esc)" aria-label="关闭" onClick={onClose}>×</button>
         </div>
         <div className="help-body">
           <nav className="help-nav">

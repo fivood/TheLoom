@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLoom } from '../store';
 import { alertDialog, confirmDialog, promptText } from '../dialog';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 import { listStoredFiles } from '../assetFiles';
 import { makeZip } from '../interop/zip';
 
@@ -71,6 +72,7 @@ async function backupSlotsToZip(slots: SlotStats[]) {
 }
 
 export default function StorageManager({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const slots = useLoom((s) => s.slots);
   const currentSlotId = useLoom((s) => s.currentSlotId);
   const deleteSlot = useLoom((s) => s.deleteSlot);
@@ -214,7 +216,7 @@ export default function StorageManager({ onClose }: { onClose: () => void }) {
           <Icon name="archive" size={14} />
           <span>存储管理 · 本机数据</span>
           <span className="spacer" />
-          <button className="ghost icon-btn" onClick={onClose}>×</button>
+          <button className="ghost icon-btn" title="关闭 (Esc)" aria-label="关闭" onClick={onClose}>×</button>
         </div>
         <div className="sync-body" style={{ overflowY: 'auto', padding: 12 }}>
           {busy && <div className="empty-hint" style={{ padding: 20 }}>{busy}</div>}

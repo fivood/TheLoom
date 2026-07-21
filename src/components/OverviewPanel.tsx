@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLoom } from '../store';
 import { useNav, type NavTab } from '../search';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 import type { Folder, FolderModule, Project } from '../types';
 
 /**
@@ -57,6 +58,7 @@ const OBJECT_NAV_KEY: Record<FolderModule, 'flowId' | 'docId' | 'entityId' | 'as
 };
 
 export default function OverviewPanel({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const go = useNav((s) => s.go);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -135,7 +137,7 @@ export default function OverviewPanel({ onClose }: { onClose: () => void }) {
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
           />
-          <button className="ghost icon-btn" onClick={onClose}>×</button>
+          <button className="ghost icon-btn" title="关闭 (Esc)" aria-label="关闭" onClick={onClose}>×</button>
         </div>
         <div className="overview-body">
           {modules.map((m) => {
