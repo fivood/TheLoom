@@ -42,6 +42,20 @@ export interface Snapshot {
   createdAt: number;
   /** 项目 JSON 序列化(完整快照,含所有模块) */
   data: string;
+  /** 自动快照:由定时器 / commit 计数触发,和手动快照分开配额;可在设置里关闭 */
+  auto?: boolean;
+}
+
+const MANUAL_SNAPSHOT_LIMIT = 30;
+const AUTO_SNAPSHOT_LIMIT = 20;
+const AUTO_SNAPSHOT_MIN_INTERVAL_MS = 15 * 60 * 1000; // 15 分钟
+const AUTO_SNAPSHOT_COMMIT_INTERVAL = 100;             // 每 100 次 commit
+
+/** 混入手动 + 自动快照,按创建时间倒序,并各自截到配额 */
+export function trimSnapshots(list: Snapshot[]): Snapshot[] {
+  const manual = list.filter((s) => !s.auto).slice(0, MANUAL_SNAPSHOT_LIMIT);
+  const auto = list.filter((s) => s.auto).slice(0, AUTO_SNAPSHOT_LIMIT);
+  return [...manual, ...auto].sort((a, b) => b.createdAt - a.createdAt);
 }
 
 function readSnapshots(slotId: string): Snapshot[] {
@@ -332,6 +346,8 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let folderSaveQueue: Promise<void> = Promise.resolve();
 
 const UNDO_LIMIT = 50;
+let commitCount = 0;
+let lastAutoSnapshotAt = 0;
 const UNDO_COALESCE_MS = 800;
 let undoStack: Project[] = [];
 let redoStack: Project[] = [];
@@ -502,6 +518,32 @@ export const useLoom = create<LoomState>((set, get) => {
     next.updatedAt = Date.now();
     persist(next);
     set({ project: next, saveStatus: 'saving', saveError: null, canUndo: true, canRedo: false });
+    commitCount++;
+    maybeAutoSnapshot();
+  };
+
+  /** 满足时间 / 计数任一阈值就打一次自动快照;写入失败静默,不打扰用户 */
+  const maybeAutoSnapshot = () => {
+    const now = Date.now();
+    const bySchedule = now - lastAutoSnapshotAt > AUTO_SNAPSHOT_MIN_INTERVAL_MS;
+    const byCount = commitCount >= AUTO_SNAPSHOT_COMMIT_INTERVAL;
+    if (!bySchedule && !byCount) return;
+    // 首次 commit 后就跳过一次以免瞬间产生快照;lastAutoSnapshotAt = 0 表示未打过,允许
+    if (lastAutoSnapshotAt === 0 && commitCount < 3) return;
+    lastAutoSnapshotAt = now;
+    commitCount = 0;
+    const cur = get();
+    const snap: Snapshot = {
+      id: uid(),
+      name: `自动 · ${new Date(now).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`,
+      createdAt: now,
+      data: JSON.stringify(cur.project),
+      auto: true,
+    };
+    const list = trimSnapshots([snap, ...cur.snapshots]);
+    if (writeSnapshots(cur.currentSlotId, list) === null) {
+      set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
+    }
   };
 
   /** 整项目替换(撤销/重做/导入/重置)后递增 revision,让画布重新挂载 */
@@ -1078,7 +1120,7 @@ export const useLoom = create<LoomState>((set, get) => {
     createSnapshot: (name) => {
       const cur = get();
       const snap: Snapshot = { id: uid(), name: name || `版本 ${new Date().toLocaleString()}`, createdAt: Date.now(), data: JSON.stringify(cur.project) };
-      const list = [snap, ...cur.snapshots].slice(0, 30); // 上限 30 个,避免 localStorage 爆
+      const list = trimSnapshots([snap, ...cur.snapshots]);
       const error = writeSnapshots(cur.currentSlotId, list);
       if (error) {
         set({ saveError: `快照保存失败:${error}`, storageUsage: getStorageUsage(localStorage) });

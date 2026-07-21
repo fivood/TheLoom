@@ -2295,7 +2295,13 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   background: var(--bg-card);
 }
 .snapshot-meta { flex: 1; min-width: 0; }
-.snapshot-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snapshot-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.snapshot-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  background: var(--accent-soft); color: var(--text-dim); font-weight: 500;
+  cursor: help; flex-shrink: 0;
+}
+.snapshot-auto { opacity: 0.85; }
 .snapshot-time { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
 .snapshot-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
