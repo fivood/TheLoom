@@ -88,7 +88,7 @@ describe('R16-5 升级迁移:老版本 JSON 加载后不炸', () => {
       notes: '', createdAt: Date.now(), updatedAt: Date.now(),
     });
     normalizeProject(p);
-    expect(p.units.length).toBeGreaterThan(0);
+    expect((p.units ?? []).length).toBeGreaterThan(0);
     // 文档块应被回填 unitId
     const block = p.documents[0].blocks[0];
     expect(typeof block.unitId).toBe('string');
@@ -119,8 +119,8 @@ describe('R16-5 升级迁移:老版本 JSON 加载后不炸', () => {
       id: 'd1', name: '场景', category: '正文', blocks: [],
       notes: '', createdAt: Date.now(), updatedAt: Date.now(),
     });
-    p.annotations = [{ id: 'an1', docId: 'd1', text: '备注', resolved: false }];
-    p.docSnapshots = [{ id: 'sn1', docId: 'd1', label: '存档', blocks: [], revision: 1 }];
+    p.annotations = [{ id: 'an1', docId: 'd1', text: '备注', resolved: false, createdAt: Date.now() }];
+    p.docSnapshots = [{ id: 'sn1', docId: 'd1', label: '存档', blocks: [], revision: 1, createdAt: Date.now() }];
     normalizeProject(p);
     expect(p.annotations).toHaveLength(1);
     expect(p.docSnapshots).toHaveLength(1);

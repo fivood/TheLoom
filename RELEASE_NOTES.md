@@ -1,3 +1,47 @@
+TheLoom v0.33.0 · R16 稳定性收尾三批
+
+R16 稳定版继续小步推进 · 无障碍第一批 + 性能基线 + 升级迁移测试。三块都是"让软件敢让不认识的人来用"的支持工作,没有肉眼可见的新功能,但是把长期使用的隐患提前铲掉。
+
+## R16-3a · 无障碍(键盘可达第一批)
+
+- **全局 `:focus-visible` 环**:button / input / textarea / select / a / [tabindex] / summary 键盘 Tab 导航时会显示 2 px 焦点环,鼠标点击不显示;有边框的表单控件用 offset 0
+- 新增 `useEscape(active, onEscape)` hook —— HelpPanel / StorageManager / OverviewPanel 三个 modal 现在支持 Esc 关闭
+- 顶栏「?」补 `aria-label="使用指南"`(屏幕阅读器不再念「问号按钮」);三个 modal 的 × 按钮补 aria-label + title 双管齐下
+
+无障碍剩余工作(全应用 Tab 顺序审查、skip link、屏幕阅读器实测)保留到后续,视目标用户群体决定优先级。
+
+## R16-4 · 性能基线
+
+新增 `bench.mjs`(本地跑,不进 CI),构造 30 万字级项目(151 场景 / 109 实体 / 15.9 万字 / JSON 743 KB)量化关键路径耗时:
+
+| 路径 | 平均耗时 |
+|---|---:|
+| normalizeProject(clone) | **11 ms** |
+| **auditProject** | **879 ms** |
+| JSON.stringify | 4 ms |
+| structuredClone | 7 ms |
+
+`auditProject` 是主要热点(内置全项目 simulateFlow),但当前规模下用户主动点「体检」等待不到 1 秒,可接受。基线已写入 CLAUDE.md 供未来纵向对比 —— 任何一批改动如让 auditProject 超过 1.5 秒,应评估分片 / 懒加载。
+
+## R16-5 · 升级迁移测试
+
+6 项新单元测试把「旧项目导入不炸」这道底线焊死:
+
+- **v0.9 极简 JSON**(基础模块 + 变量 + 附件,无 folders / units / relations 等):normalize 后必要字段(folders / relations / arcs / foreshadows / units / annotations / docSnapshots / palettes / savedQueries)自动补齐
+- **v0.11 → 当前**:folder 树无破损
+- **v0.12 → 当前**:文档块无 unitId 时 syncNarrativeUnits 建单元 + 回填
+- **v0.16 → 当前**:规划模块 relations / arcs / foreshadows 保留
+- **v0.17 → 当前**:annotations / docSnapshots 幂等
+- **化石项目**(缺全部新字段):normalize 不抛异常且字段齐全
+
+未来引入新字段的任何一批都必须走 `??=` 补齐路径,否则这里会先炸出来。
+
+## 回归
+
+315 项测试全部通过(比 v0.32.0 的 309 项多 6 项 · 全是升级迁移),`npm run build` 与 `cargo check --lib` 通过。桌面 Release Desktop 构建 Windows 安装包见下方资产。
+
+---
+
 TheLoom v0.32.0 · 存储管理 + 使用指南 + R16 收尾第一批
 
 日常使用与稳定版收尾并进。这一批把「让人放心长期用」的边角补齐:数据可见可控、示例项目覆盖完整功能、写作时崩了也不丢。
