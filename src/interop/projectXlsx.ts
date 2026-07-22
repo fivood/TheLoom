@@ -70,7 +70,7 @@ function entityFieldsSheet(p: Project): Sheet {
 
 function outlineSheet(p: Project): Sheet {
   const cols = p.outlineColumns;
-  const header = ['ID', '章节号', '故事时间', '章节标题', '主线剧情', ...cols.map((c) => `【线】${c.title}`)];
+  const header = ['ID', '章节号', '故事时间', '章节标题', '主线剧情', '章节文件夹ID', '场景ID', ...cols.map((c) => `【线】${c.title}`)];
   const rows: (string | number | boolean)[][] = [header];
   const colIds = cols.map((c) => c.id);
   for (const r of p.outlineRows) {
@@ -80,6 +80,8 @@ function outlineSheet(p: Project): Sheet {
       r.time ?? '',
       r.title ?? '',
       r.main ?? '',
+      r.chapterFolderId ?? '',
+      r.documentId ?? '',
       ...colIds.map((id) => r.cells[id] ?? ''),
     ]);
   }
@@ -112,17 +114,20 @@ function timelineEventsSheet(p: Project): Sheet {
   const trackName = new Map(p.timelineTracks.map((t) => [t.id, t.name] as const));
   const pointLabel = new Map(p.timelinePoints.map((pt) => [pt.id, pt.label] as const));
   const entName = new Map(p.entities.map((e) => [e.id, e.name] as const));
+  const documentName = new Map(p.documents.map((document) => [document.id, document.name] as const));
   const rows: (string | number | boolean)[][] = [
-    ['ID', '轨道ID', '轨道名', '时间点ID', '时间点', '标题', '描述', '关联实体名', '关联实体ID', '颜色'],
+    ['ID', '轨道ID', '轨道名', '时间点ID', '时间点', '标题', '描述', '关联实体名', '关联实体ID', '关联场景名', '关联场景ID', '颜色'],
   ];
   for (const ev of p.timelineEvents) {
     const names = ev.entityIds.map((id) => entName.get(id) ?? '').filter(Boolean).join(' / ');
+    const documentNames = (ev.documentIds ?? []).map((id) => documentName.get(id) ?? '').filter(Boolean).join(' / ');
     rows.push([
       ev.id,
       ev.trackId, trackName.get(ev.trackId) ?? '',
       ev.pointId, pointLabel.get(ev.pointId) ?? '',
       ev.title, ev.text ?? '',
       names, ev.entityIds.join(','),
+      documentNames, (ev.documentIds ?? []).join(','),
       ev.color ?? '',
     ]);
   }
@@ -398,6 +403,8 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
     const cTime = findCol(h, '故事时间', 'time');
     const cTitle = findCol(h, '章节标题', 'title');
     const cMain = findCol(h, '主线剧情', 'main');
+    const cChapterFolderId = findCol(h, '章节文件夹ID', 'chapterFolderId');
+    const cDocumentId = findCol(h, '场景ID', 'documentId');
     // 剧情线列都以 【线】 前缀开头
     const lineCols: { title: string; idx: number }[] = [];
     h.forEach((name, i) => {
@@ -415,6 +422,10 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
       }
     }
     const byId = new Map(next.outlineRows.map((r) => [r.id, r] as const));
+    const chapterFolderIds = new Set(next.folders
+      .filter((folder) => folder.module === 'document' && folder.documentRole === 'chapter')
+      .map((folder) => folder.id));
+    const documentIds = new Set(next.documents.map((document) => document.id));
     for (const r of oSheet.rows) {
       const id = cId >= 0 ? (r[cId] ?? '').trim() : '';
       const cells: Record<string, string> = {};
@@ -423,11 +434,19 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
         if (col) cells[col.id] = r[lc.idx] ?? '';
       }
       const existing = id ? byId.get(id) : undefined;
+      const chapterFolderId = cChapterFolderId >= 0 && chapterFolderIds.has((r[cChapterFolderId] ?? '').trim())
+        ? (r[cChapterFolderId] ?? '').trim()
+        : undefined;
+      const documentId = cDocumentId >= 0 && documentIds.has((r[cDocumentId] ?? '').trim())
+        ? (r[cDocumentId] ?? '').trim()
+        : undefined;
       if (existing) {
         if (cNo >= 0) existing.no = r[cNo] ?? existing.no;
         if (cTime >= 0) existing.time = r[cTime] ?? existing.time;
         if (cTitle >= 0) existing.title = r[cTitle] ?? existing.title;
         if (cMain >= 0) existing.main = r[cMain] ?? existing.main;
+        if (cDocumentId >= 0) existing.documentId = documentId;
+        if (cChapterFolderId >= 0) existing.chapterFolderId = documentId ? undefined : chapterFolderId;
         existing.cells = { ...existing.cells, ...cells };
         counts.outlineRows.update++;
       } else {
@@ -438,6 +457,8 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
           title: cTitle >= 0 ? (r[cTitle] ?? '') : '',
           main: cMain >= 0 ? (r[cMain] ?? '') : '',
           cells,
+          documentId,
+          chapterFolderId: documentId ? undefined : chapterFolderId,
         };
         next.outlineRows.push(created);
         byId.set(created.id, created);
@@ -515,6 +536,8 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
     const cText = findCol(h, '描述', 'text');
     const cEntNames = findCol(h, '关联实体名', 'entityNames');
     const cEntIds = findCol(h, '关联实体ID', 'entityIds');
+    const cDocumentNames = findCol(h, '关联场景名', 'documentNames');
+    const cDocumentIds = findCol(h, '关联场景ID', 'documentIds');
     const cColor = findCol(h, '颜色', 'color');
     if (cTitle < 0) warnings.push('[时间线事件] 缺少「标题」列');
     else {
@@ -525,6 +548,8 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
       const pointByLabel = new Map(next.timelinePoints.map((p) => [p.label, p] as const));
       const entById = new Map(next.entities.map((e) => [e.id, e] as const));
       const entByName = new Map(next.entities.map((e) => [e.name, e] as const));
+      const documentById = new Map(next.documents.map((document) => [document.id, document] as const));
+      const documentByName = new Map(next.documents.map((document) => [document.name, document] as const));
       for (const r of teSheet.rows) {
         const title = (r[cTitle] ?? '').trim();
         if (!title) continue;
@@ -544,6 +569,14 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
           if (entById.has(raw)) entIds.push(raw);
           else if (entByName.has(raw)) entIds.push(entByName.get(raw)!.id);
         }
+        const documentRefsRaw: string[] = [];
+        if (cDocumentIds >= 0) documentRefsRaw.push(...(r[cDocumentIds] ?? '').split(/[,，、;]/).map((value) => value.trim()).filter(Boolean));
+        if (cDocumentNames >= 0) documentRefsRaw.push(...(r[cDocumentNames] ?? '').split(/[\/|,，;；]/).map((value) => value.trim()).filter(Boolean));
+        const documentIds: string[] = [];
+        for (const raw of documentRefsRaw) {
+          if (documentById.has(raw)) documentIds.push(raw);
+          else if (documentByName.has(raw)) documentIds.push(documentByName.get(raw)!.id);
+        }
         const id = cId >= 0 ? (r[cId] ?? '').trim() : '';
         const existing = id ? byId.get(id) : undefined;
         const color = cColor >= 0 ? (r[cColor] ?? undefined) : undefined;
@@ -553,6 +586,7 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
           existing.title = title;
           existing.text = cText >= 0 ? (r[cText] ?? '') : existing.text;
           existing.entityIds = [...new Set(entIds)];
+          if (cDocumentIds >= 0 || cDocumentNames >= 0) existing.documentIds = [...new Set(documentIds)];
           if (color !== undefined) existing.color = color || undefined;
           counts.timelineEvents.update++;
         } else {
@@ -560,6 +594,7 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
             id: id || uid(), trackId: track.id, pointId: point.id, title,
             text: cText >= 0 ? (r[cText] ?? '') : '',
             entityIds: [...new Set(entIds)],
+            documentIds: [...new Set(documentIds)],
             color: color || undefined,
           };
           next.timelineEvents.push(created);

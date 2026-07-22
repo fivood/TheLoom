@@ -55,6 +55,18 @@ describe('R4 章节分组', () => {
     expect(groups[1].docs.map((d) => d.id)).toEqual(['s3']);
     expect(groups[2].docs.map((d) => d.id)).toEqual(['s0']);
   });
+
+  it('卷章角色存在时，小节场景归入最近章节', () => {
+    const p = planningProject();
+    p.folders[0].documentRole = 'volume';
+    p.folders[1].documentRole = 'chapter';
+    p.folders[2].documentRole = 'chapter';
+    p.folders.push({ id: 'sec', name: '小节', module: 'document', parentId: 'c1', documentRole: 'section', order: 0 });
+    p.documents[0].folderId = 'sec';
+    const groups = groupDocsByChapter(p.documents, p.folders);
+    expect(groups[0].folderId).toBe('c1');
+    expect(groups[0].docs.map((d) => d.id)).toEqual(['s1', 's2']);
+  });
 });
 
 describe('R4 登场统计', () => {

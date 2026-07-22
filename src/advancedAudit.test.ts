@@ -73,13 +73,13 @@ describe('R10 高级体检', () => {
     ];
     p.timelinePoints = [{ id: 'point', label: '午夜' }];
     p.timelineEvents = [
-      { id: 'event-1', trackId: 'track-1', pointId: 'point', title: '事件一', text: '', entityIds: ['char'] },
+      { id: 'event-1', trackId: 'track-1', pointId: 'point', title: '事件一', text: '', entityIds: ['char'], documentIds: ['missing-doc'] },
       { id: 'event-2', trackId: 'track-2', pointId: 'point', title: '事件二', text: '', entityIds: ['char'] },
     ];
     p.maps = [{ id: 'map', name: '地图', markers: [{ id: 'marker', x: 0, y: 0, label: '标记', entityId: 'missing' }], regions: [] }];
     p.attachments = { 'missing-owner': [] };
     p.brainstormEdges = [{ id: 'brain-edge', source: 'missing-a', target: 'missing-b' }];
-    p.outlineRows = [{ id: 'row', no: '1', time: '', title: '章节', main: '', cells: { missing: '遗留内容' } }];
+    p.outlineRows = [{ id: 'row', no: '1', time: '', title: '章节', main: '', cells: { missing: '遗留内容' }, documentId: 'missing-doc' }];
     p.arcs = [{ id: 'arc', entityId: 'item', title: '错误弧线', note: '' }];
 
     const issues = advancedAuditProject(p);
@@ -98,6 +98,8 @@ describe('R10 高级体检', () => {
       'reference.attachment-owner',
       'reference.brain-edge',
       'reference.outline-column',
+      'reference.outline-document',
+      'reference.timeline-document',
       'consistency.arc-entity-kind',
     ];
     expect(expectedCodes.every((code) => codes.has(code))).toBe(true);
@@ -115,5 +117,21 @@ describe('R10 高级体检', () => {
 
     const issues = advancedAuditProject(p);
     expect(issues.some((issue) => issue.code === 'path.loop')).toBe(true);
+  });
+
+  it('卷章层级错误以警告报告且不改动项目', () => {
+    const p = project();
+    p.folders = [
+      { id: 'chapter', name: '孤立章', module: 'document', documentRole: 'chapter' },
+      { id: 'volume', name: '第一卷', module: 'document', documentRole: 'volume' },
+    ];
+    p.documents = [{
+      id: 'scene', name: '直属卷场景', folderId: 'volume', category: '', blocks: [], notes: '', createdAt: 1, updatedAt: 1,
+    }];
+    const before = structuredClone(p);
+    const issues = advancedAuditProject(p).filter((issue) => issue.code.startsWith('document-structure.'));
+    expect(issues).toHaveLength(2);
+    expect(issues.every((issue) => issue.severity === 'warning')).toBe(true);
+    expect(p).toEqual(before);
   });
 });

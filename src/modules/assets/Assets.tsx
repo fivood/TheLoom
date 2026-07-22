@@ -87,6 +87,9 @@ export default function Assets() {
   }, [assets, kindFilter, tagFilter, query]);
 
   const selected = assets.find((a) => a.id === selectedId) ?? null;
+  useEffect(() => {
+    if (selected) useNav.getState().visit({ tab: 'assets', assetId: selected.id }, `资源 · ${selected.name}`);
+  }, [selected?.id, selected?.name]);
   const refs = useMemo(
     () => selected ? findAssetRefs(project, selected) : [],
     [project, selected],

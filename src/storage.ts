@@ -16,7 +16,6 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { DocBlock, DocBlockType, DocStatus, Document, Entity, EntityField, EntityFieldType, EntityKind, Folder, Project, ResearchCard } from './types';
 import { DOC_BLOCK_LABEL, DOC_STATUS_LABEL, ENTITY_KIND_LABEL, PALETTE } from './types';
 import { normalizeProject, uid } from './util';
-import { parseProjectData } from './recovery';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -565,8 +564,8 @@ export function assignDocumentFilenames(documents: Document[], folders: Folder[]
 
 /* ---------- Tauri 文件夹读写 ---------- */
 
-interface MdFile { name: string; content: string }
-interface ProjectFiles {
+export interface MdFile { name: string; content: string }
+export interface ProjectFiles {
   projectJson: string | null;
   recoveredFromBackup: boolean;
   entities: MdFile[];
@@ -624,17 +623,32 @@ export interface LoadedFolderProject {
   recoveredFromBackup: boolean;
 }
 
+function parseFolderProjectData(data: string): Project | null {
+  try {
+    const project = JSON.parse(data) as Project;
+    if (!project || typeof project !== 'object' || project.version !== 1) return null;
+    if (typeof project.name !== 'string' || typeof project.updatedAt !== 'number') return null;
+    const arrays = [
+      'flows', 'brainstormNotes', 'brainstormEdges', 'outlineColumns', 'outlineRows',
+      'timelineTracks', 'timelinePoints', 'timelineEvents', 'maps', 'researchCategories',
+      'variables', 'assets', 'documentCategories', 'folders',
+    ] as const;
+    if (arrays.some((field) => project[field] !== undefined && !Array.isArray(project[field]))) return null;
+    return project;
+  } catch {
+    return null;
+  }
+}
+
 export function projectToFolderJson(project: Project): string {
   const slim = { ...project, entities: [], researchCards: [], documents: [] };
   return JSON.stringify(slim, null, 2);
 }
 
-export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> {
-  const files = await invoke<ProjectFiles>('load_project_dir', { dir });
-  recordKnown(dir, files);
+export function projectFromFolderFiles(files: ProjectFiles): LoadedFolderProject {
   let base: Project;
   if (files.projectJson) {
-    const parsed = parseProjectData(files.projectJson);
+    const parsed = parseFolderProjectData(files.projectJson);
     if (!parsed) throw new Error('project.json 格式不正确');
     base = parsed;
   } else {
@@ -650,7 +664,6 @@ export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> 
       updatedAt: Date.now(),
     };
   }
-  normalizeProject(base);
   const assets = new Map(files.assets.map((f) => [f.name, `data:${assetMime(f.name)};base64,${f.content}`]));
   base.entities = files.entities
     .map((f, i) => mdToEntity(f.name, f.content, i, assets))
@@ -659,21 +672,27 @@ export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> 
   base.researchCards = files.research
     .map((f, i) => mdToCard(f.name, f.content, i))
     .sort((a, b) => b.createdAt - a.createdAt);
+  if (!Array.isArray(base.researchCategories)) base.researchCategories = [];
   for (const c of base.researchCards) {
     if (c.category && !base.researchCategories.includes(c.category)) base.researchCategories.push(c.category);
   }
   // documents/:优先以 md 为准(可 Obsidian 直接编辑),project.json 的同名文档被覆盖
-  const docByName = new Map(files.documents.map((f) => [f.name, f]));
   base.documents = files.documents
     .map((f, i) => mdToDocument(f.name, f.content, i))
     .sort((a, b) => b.updatedAt - a.updatedAt);
   // 同步分类:把 md 里出现的 category 合并进 project.documentCategories
+  if (!Array.isArray(base.documentCategories)) base.documentCategories = [];
   for (const d of base.documents) {
     if (d.category && !base.documentCategories.includes(d.category)) base.documentCategories.push(d.category);
-    docByName.delete(`${d.name}.md`); // 标记已消费
   }
   normalizeProject(base);
   return { project: base, recoveredFromBackup: files.recoveredFromBackup };
+}
+
+export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> {
+  const files = await invoke<ProjectFiles>('load_project_dir', { dir });
+  recordKnown(dir, files);
+  return projectFromFolderFiles(files);
 }
 
 export async function saveToFolder(dir: string, project: Project): Promise<void> {

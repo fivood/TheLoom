@@ -228,6 +228,8 @@ export interface OutlineRow {
   title: string; // 章节标题
   main: string;  // 主线剧情
   cells: Record<ID, string>; // 各剧情线单元格
+  chapterFolderId?: ID;
+  documentId?: ID;
 }
 
 /* ---------- 时间线(轨道 × 时间点) ---------- */
@@ -251,6 +253,7 @@ export interface TimelineEvent {
   text: string;
   color?: string;
   entityIds: ID[]; // 关联的实体
+  documentIds?: ID[];
 }
 
 /* ---------- 地图 ---------- */
@@ -565,6 +568,14 @@ export interface Document {
 
 export type FolderModule = 'flow' | 'entity' | 'asset' | 'document' | 'research';
 
+export type DocumentFolderRole = 'volume' | 'chapter' | 'section';
+
+export const DOCUMENT_FOLDER_ROLE_LABEL: Record<DocumentFolderRole, string> = {
+  volume: '卷',
+  chapter: '章',
+  section: '小节',
+};
+
 export interface Folder {
   id: ID;
   name: string;
@@ -574,6 +585,7 @@ export interface Folder {
   parentId?: ID | null;
   /** 同级排序序号;空 = 按默认(插入顺序)排序 */
   order?: number;
+  documentRole?: DocumentFolderRole;
 }
 
 /* ---------- 正文修订(R5) ---------- */
@@ -711,9 +723,13 @@ export interface SavedProjectQuery {
 
 /* ---------- 项目 ---------- */
 
+export type WorkspacePreset = 'novel' | 'interactive' | 'universal';
+
 export interface Project {
   version: 1;
   name: string;
+  /** 项目工作区预设:只控制导航优先级与术语，不改变项目数据 */
+  workspacePreset?: WorkspacePreset;
   flows: Flow[];
   entities: Entity[];
   brainstormNotes: BrainNote[];

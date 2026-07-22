@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import Icon from './Icon';
 import { useLoom } from '../store';
 import { compileDocuments, type CompileFormat } from '../interop/chapterCompile';
-import { linearizeByFolders, folderPath } from '../util';
+import { linearizeByFolders } from '../util';
+import { groupDocsByChapter } from '../planning';
 import type { Document } from '../types';
 
 const FORMAT_LABEL: Record<CompileFormat, string> = {
@@ -24,14 +25,7 @@ export default function ChapterCompileDialog({ onClose }: { onClose: () => void 
   const [selected, setSelected] = useState<Set<string>>(() => new Set(ordered.map((d) => d.id)));
 
   const groups = useMemo(() => {
-    const map = new Map<string, Document[]>();
-    for (const d of ordered) {
-      const path = folderPath(d.folderId, project.folders) || '(未分组)';
-      const list = map.get(path) ?? [];
-      list.push(d);
-      map.set(path, list);
-    }
-    return [...map.entries()];
+    return groupDocsByChapter(ordered, project.folders);
   }, [ordered, project.folders]);
 
   const toggle = (id: string) => {
@@ -97,11 +91,12 @@ export default function ChapterCompileDialog({ onClose }: { onClose: () => void 
               </div>
               <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, padding: 8, fontSize: 12 }}>
                 {groups.length === 0 && <div className="hint">项目里还没有文档</div>}
-                {groups.map(([path, docs]) => {
+                {groups.map((group) => {
+                  const { label: path, docs } = group;
                   const allIn = docs.every((d) => selected.has(d.id));
                   const someIn = !allIn && docs.some((d) => selected.has(d.id));
                   return (
-                    <div key={path} style={{ marginBottom: 8 }}>
+                    <div key={group.key || 'ungrouped'} style={{ marginBottom: 8 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
                         <input
                           type="checkbox"

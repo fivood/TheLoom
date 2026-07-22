@@ -128,13 +128,21 @@ describe('项目 xlsx 往返', () => {
       variables: [{ id: 'v1', name: 'x', type: 'boolean', value: 'false', description: '' }],
       timelineTracks: [{ id: trackId, name: '明线', color: '#111' }],
       timelinePoints: [{ id: pointId, label: '傍晚' }],
-      timelineEvents: [{ id: 'te1', trackId, pointId, title: '事件', text: '', entityIds: [] }],
+      folders: [
+        { id: 'volume', name: '第一卷', module: 'document', documentRole: 'volume' },
+        { id: 'chapter', name: '第一章', module: 'document', parentId: 'volume', documentRole: 'chapter' },
+      ],
+      documents: [{ id: 'doc-1', name: '开场', folderId: 'chapter', category: '正文', blocks: [], notes: '', createdAt: 1, updatedAt: 1 }],
+      outlineRows: [{ id: 'row-1', no: '1', time: '', title: '开场', main: '', cells: {}, chapterFolderId: 'chapter' }],
+      timelineEvents: [{ id: 'te1', trackId, pointId, title: '事件', text: '', entityIds: [], documentIds: ['doc-1'] }],
     });
     const blob = await projectToXlsx(project);
     const preview = await previewProjectXlsx(new Uint8Array(await blob.arrayBuffer()), project);
     expect(preview.next.entities.length).toBe(project.entities.length);
     expect(preview.next.variables.length).toBe(project.variables.length);
     expect(preview.next.timelineEvents.length).toBe(project.timelineEvents.length);
+    expect(preview.next.timelineEvents[0].documentIds).toEqual(['doc-1']);
+    expect(preview.next.outlineRows[0].chapterFolderId).toBe('chapter');
     expect(preview.counts.entities.add).toBe(0);
     expect(preview.counts.variables.add).toBe(0);
     expect(preview.counts.timelineEvents.add).toBe(0);

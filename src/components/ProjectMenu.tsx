@@ -7,6 +7,8 @@ import { offerClearCurrentBrowserCache } from '../folderCache';
 import { folderHasProject, isTauri, loadFromFolder, pickFolder, revealFolder, saveToFolder } from '../storage';
 import Icon from './Icon';
 import ImportProjectDialog from './ImportProjectDialog';
+import { WORKSPACE_PRESET_HINT, WORKSPACE_PRESET_LABEL } from '../workspace';
+import type { WorkspacePreset } from '../types';
 
 /**
  * 顶栏项目切换菜单:项目名可直接改,点开抽屉列出全部槽位并新建/导入/删除。
@@ -176,6 +178,20 @@ export default function ProjectMenu() {
 
       {open && (
         <div className="project-dropdown">
+          <div className="project-dropdown-head">工作区布局</div>
+          <div className="project-workspace-preset">
+            <select
+              value={project.workspacePreset ?? 'universal'}
+              onChange={(event) => update((p) => { p.workspacePreset = event.target.value as WorkspacePreset; })}
+              aria-label="工作区布局"
+            >
+              {(Object.keys(WORKSPACE_PRESET_LABEL) as WorkspacePreset[]).map((preset) => (
+                <option key={preset} value={preset}>{WORKSPACE_PRESET_LABEL[preset]}</option>
+              ))}
+            </select>
+            <span>{WORKSPACE_PRESET_HINT[project.workspacePreset ?? 'universal']}</span>
+          </div>
+          <div className="project-dropdown-sep" />
           {inFolder && (
             <>
               <div className="project-dropdown-head">项目文件夹</div>

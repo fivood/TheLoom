@@ -8,7 +8,7 @@ import HelpPanel from './components/HelpPanel';
 import {
   folderHasProject, isTauri, loadFromFolder, pickFolder, saveToFolder,
 } from './storage';
-import { useNav } from './search';
+import { describeNavTarget, useNav } from './search';
 import { confirmDialog, alertDialog } from './dialog';
 import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
 import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
@@ -34,6 +34,7 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { projectToXlsx } from './interop/projectXlsx';
 import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
+import { WORKSPACE_PRIMARY_TABS, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
 const FlowEditor = lazy(() => import('./modules/flow/FlowEditor'));
@@ -49,7 +50,7 @@ const Variables = lazy(() => import('./modules/variables/Variables'));
 const Planning = lazy(() => import('./modules/planning/Planning'));
 const AiAssistantPanel = lazy(() => import('./components/AiAssistantPanel'));
 
-export type Tab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
+export type Tab = WorkspaceTab;
 type TabGroup = 'build' | 'library' | 'plan' | 'logic';
 
 const GROUP_LABEL: Record<TabGroup, string> = {
@@ -128,6 +129,8 @@ export default function App() {
   const [updateDialog, setUpdateDialog] = useState<UpdateDialogState | null>(null);
   const checkingUpdateRef = useRef(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const [moreModulesOpen, setMoreModulesOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
   const [storageMgr, setStorageMgr] = useState(false);
@@ -136,11 +139,22 @@ export default function App() {
   const [secondaryTab, setSecondaryTab] = useState<Tab | null>(null);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
+  const navBackCount = useNav((s) => s.backStack.length);
+  const recentVisits = useNav((s) => s.recent);
 
   // 搜索/反向引用跳转:切到目标模块,细节由模块自行消费
   useEffect(() => {
-    if (navTarget) setTab(navTarget.tab);
+    if (navTarget) {
+      setTab(navTarget.tab);
+      useNav.getState().setCurrentLabel(describeNavTarget(useLoom.getState().project, navTarget));
+      if (Object.keys(navTarget).length === 1) useNav.getState().clear();
+    }
   }, [navSeq]);
+
+  useEffect(() => {
+    const navigation = useNav.getState();
+    if (!navigation.current) navigation.visit({ tab }, describeNavTarget(useLoom.getState().project, { tab }));
+  }, []);
 
   // 恢复本机保存的分栏宽度(启动时一次)
   useEffect(() => { initPaneWidths(); }, []);
@@ -180,6 +194,12 @@ export default function App() {
   const revision = useLoom((s) => s.revision);
   const canUndo = useLoom((s) => s.canUndo);
   const canRedo = useLoom((s) => s.canRedo);
+  const workspacePreset = project.workspacePreset ?? 'universal';
+  const primaryTabKeys = workspacePrimaryTabs(workspacePreset);
+  const primaryTabs = WORKSPACE_PRIMARY_TABS[workspacePreset]
+    .map((key) => TABS.find((item) => item.key === key)!)
+    .filter(Boolean);
+  const moreTabs = TABS.filter((item) => !primaryTabKeys.has(item.key));
 
   // 全局撤销/重做快捷键;焦点在输入框时交给浏览器原生文本撤销
   useEffect(() => {
@@ -254,28 +274,102 @@ export default function App() {
     <div className="app">
       <nav className="sidebar">
         <div className="logo" title="叙事织机 TheLoom"><img src="/logo.svg" alt="TheLoom" width={26} height={26} /></div>
-        {TABS.map((t, i) => {
-          const prev = i > 0 ? TABS[i - 1].group : null;
-          const showSep = prev !== null && prev !== t.group;
+        {primaryTabs.map((t, i) => {
+          const prev = i > 0 ? primaryTabs[i - 1].group : null;
+          const showSep = workspacePreset === 'universal' && prev !== null && prev !== t.group;
+          const label = workspaceTabLabel(workspacePreset, t.key);
           return (
             <div key={t.key} style={{ display: 'contents' }}>
               {showSep && <div className="nav-sep" title={GROUP_LABEL[t.group]}><span>{GROUP_LABEL[t.group]}</span></div>}
               <button
                 className={`nav-btn ${tab === t.key ? 'active' : ''}`}
-                onClick={() => setTab(t.key)}
-                title={t.label}
+                onClick={() => {
+                  useNav.getState().visit({ tab: t.key }, label);
+                  setTab(t.key);
+                }}
+                title={label}
               >
                 <Icon name={t.icon} size={18} />
-                <span>{t.label}</span>
+                <span>{label}</span>
               </button>
             </div>
           );
         })}
+        {moreTabs.length > 0 && (
+          <div className="sidebar-more">
+            <button
+              className={`nav-btn ${moreTabs.some((item) => item.key === tab) ? 'active' : ''}`}
+              title="更多模块"
+              onClick={() => setMoreModulesOpen((open) => !open)}
+            >
+              <span className="sidebar-more-icon">•••</span>
+              <span>更多</span>
+            </button>
+            {moreModulesOpen && (
+              <>
+                <div className="backdrop" onClick={() => setMoreModulesOpen(false)} />
+                <div className="sidebar-more-menu">
+                  <strong>更多模块</strong>
+                  <span className="hint">这些模块仍然完整保留</span>
+                  {moreTabs.map((item) => {
+                    const label = workspaceTabLabel(workspacePreset, item.key);
+                    return (
+                      <button
+                        key={item.key}
+                        className={tab === item.key ? 'active' : undefined}
+                        onClick={() => {
+                          setMoreModulesOpen(false);
+                          useNav.getState().visit({ tab: item.key }, label);
+                          setTab(item.key);
+                        }}
+                      >
+                        <Icon name={item.icon} size={17} />
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </nav>
 
       <div className="main">
         <header className="topbar">
           <ProjectMenu />
+          <button
+            className="ghost icon-btn"
+            title="返回上一个位置"
+            aria-label="返回上一个位置"
+            disabled={navBackCount === 0}
+            onClick={() => useNav.getState().back()}
+          >←</button>
+          <div className="nav-history-wrap">
+            <button className={`ghost ${recentOpen ? 'active' : ''}`} title="最近访问" onClick={() => setRecentOpen((open) => !open)}>
+              ◴ 最近
+            </button>
+            {recentOpen && (
+              <>
+                <div className="backdrop" onClick={() => setRecentOpen(false)} />
+                <div className="nav-history-menu">
+                  <div className="tools-label">最近访问</div>
+                  {recentVisits.map((visit) => {
+                    const liveLabel = describeNavTarget(project, visit.target);
+                    return (
+                    <button key={JSON.stringify(visit.target)} onClick={() => {
+                      setRecentOpen(false);
+                      useNav.getState().go(visit.target, liveLabel);
+                    }}>
+                      {liveLabel}
+                    </button>
+                    );
+                  })}
+                  {recentVisits.length === 0 && <span className="hint">还没有访问记录</span>}
+                </div>
+              </>
+            )}
+          </div>
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
           <button className="ghost" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
           <button className="ghost" title="使用指南 (F1)" aria-label="使用指南" onClick={() => setHelp(true)}>?</button>

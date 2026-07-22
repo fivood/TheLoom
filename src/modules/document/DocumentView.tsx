@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
-import { useNav } from '../../search';
+import { findDocumentRefs, useNav } from '../../search';
 import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import Icon from '../../components/Icon';
 import ObjectTemplateSection from '../../components/ObjectTemplateSection';
@@ -17,6 +17,7 @@ import RevisionDiff from './RevisionDiff';
 import Inspector from '../../components/Inspector';
 
 export default function DocumentView() {
+  const project = useLoom((s) => s.project);
   const documents = useLoom((s) => s.project.documents);
   const categories = useLoom((s) => s.project.documentCategories);
   const entities = useLoom((s) => s.project.entities);
@@ -93,6 +94,13 @@ export default function DocumentView() {
   const linkedFlow = selected
     ? flows.find((f) => f.id === selected.linkedFlowId || f.documentId === selected.id)
     : undefined;
+  const documentRefs = useMemo(
+    () => selected ? findDocumentRefs(project, selected) : [],
+    [project, selected],
+  );
+  useEffect(() => {
+    if (selected) useNav.getState().visit({ tab: 'documents', docId: selected.id }, `场景 · ${selected.name}`);
+  }, [selected?.id, selected?.name]);
 
   // R5:当前文档的批注与快照
   const docAnnotations = useMemo(
@@ -142,10 +150,10 @@ export default function DocumentView() {
     createDocSnapshot(selected.id, label.trim() || new Date().toLocaleString());
   };
 
-  const createDoc = () => {
+  const createDoc = (folderId = selected?.folderId) => {
     const d: Document = {
       id: uid(),
-      folderId: selected?.folderId,
+      folderId,
       name: '新场景',
       category: catFilter === 'all' ? (categories[0] ?? '未分类') : catFilter,
       blocks: [emptyBlock('paragraph')],
@@ -287,13 +295,14 @@ export default function DocumentView() {
           for (const d of p.documents) if (map.has(d.id)) d.order = map.get(d.id);
         })}
         onCreate={createDoc}
+        onCreateInFolder={createDoc}
         createLabel="新建场景"
         emptyLabel="还没有场景"
       />}
 
       <div className="pane-col">
         <div className="toolbar">
-          <button className="btn-create" onClick={createDoc}>＋ 新场景</button>
+          <button className="btn-create" onClick={() => createDoc()}>＋ 新场景</button>
           <div className="doc-mode-switch">
             <button className={mode === 'writing' ? 'primary' : 'ghost'} onClick={() => setMode('writing')}>写作</button>
             <button className={mode === 'structure' ? 'primary' : 'ghost'} onClick={() => setMode('structure')}>结构</button>
@@ -422,7 +431,16 @@ export default function DocumentView() {
               className="ghost icon-btn"
               title="删除文档"
               onClick={async () => {
-                if (!await confirmDialog({ message: `删除文档「${selected.name}」?`, danger: true, confirmText: '删除' })) return;
+                const referenceLines = documentRefs.slice(0, 8).map((ref) => `• ${ref.module} / ${ref.kind}：${ref.title}`);
+                const hiddenCount = Math.max(0, documentRefs.length - referenceLines.length);
+                const referenceText = referenceLines.length > 0
+                  ? `\n\n将同时解除 ${documentRefs.length} 处跨模块引用：\n${referenceLines.join('\n')}${hiddenCount ? `\n• 另有 ${hiddenCount} 处` : ''}`
+                  : '';
+                if (!await confirmDialog({
+                  message: `删除场景「${selected.name}」？${referenceText}\n\n正文、批注和快照会删除；关联对象本身会保留。`,
+                  danger: true,
+                  confirmText: '删除并解除引用',
+                })) return;
                 removeDocument(selected.id);
                 setSelectedId(null);
               }}
@@ -455,6 +473,19 @@ export default function DocumentView() {
               )}
             </div>
           )}
+
+          <div className="field">
+            <label>跨模块引用 ({documentRefs.length})</label>
+            <div className="document-ref-list">
+              {documentRefs.map((ref) => (
+                <button key={ref.key} className="ref-item document-ref-item" onClick={() => go(ref.nav)} title={ref.snippet}>
+                  <span>{ref.module} · {ref.kind}</span>
+                  <strong>{ref.title}</strong>
+                </button>
+              ))}
+              {documentRefs.length === 0 && <span className="hint">尚未被其他模块引用</span>}
+            </div>
+          </div>
 
           <ObjectTemplateSection
             module="document"

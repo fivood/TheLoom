@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import type { Asset, Entity, FlowNode, Project, SubFlow } from './types';
+import type { Asset, Document, Entity, FlowNode, Project, SubFlow } from './types';
 import { ENTITY_KIND_LABEL, FLOW_NODE_LABEL } from './types';
+import { workspaceTabLabel } from './workspace';
 
 export type NavTab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
 
@@ -17,6 +18,7 @@ export interface NavTarget {
   assetId?: string;
   docId?: string;
   blockId?: string;
+  outlineRowId?: string;
   /** 规划模块:定位伏笔台账条目 */
   foreshadowId?: string;
   /** 规划模块:打开的子视图 */
@@ -26,17 +28,99 @@ export interface NavTarget {
 interface NavState {
   target: NavTarget | null;
   seq: number;
-  go: (t: NavTarget) => void;
+  current: NavVisit | null;
+  backStack: NavVisit[];
+  recent: NavVisit[];
+  go: (t: NavTarget, label?: string) => void;
+  visit: (t: NavTarget, label: string) => void;
+  back: () => void;
+  setCurrentLabel: (label: string) => void;
   clear: () => void;
 }
+
+export interface NavVisit {
+  target: NavTarget;
+  label: string;
+}
+
+const navKey = (target: NavTarget): string => JSON.stringify(target);
+const isModuleRootFor = (current: NavVisit | null, target: NavTarget): boolean => Boolean(
+  current
+  && current.target.tab === target.tab
+  && Object.keys(current.target).length === 1,
+);
+const pushRecent = (recent: NavVisit[], visit: NavVisit): NavVisit[] => [
+  visit,
+  ...recent.filter((item) => navKey(item.target) !== navKey(visit.target)),
+].slice(0, 12);
 
 /** 跨模块跳转:搜索结果 / 反向引用点击后,由目标模块消费 */
 export const useNav = create<NavState>((set) => ({
   target: null,
   seq: 0,
-  go: (t) => set((s) => ({ target: t, seq: s.seq + 1 })),
+  current: null,
+  backStack: [],
+  recent: [],
+  go: (target, label) => set((state) => {
+    const visit = { target, label: label ?? '前往目标' };
+    const changed = !state.current || navKey(state.current.target) !== navKey(target);
+    const pushCurrent = changed && state.current && !isModuleRootFor(state.current, target);
+    return {
+      target,
+      seq: state.seq + 1,
+      current: visit,
+      backStack: pushCurrent ? [...state.backStack, state.current!].slice(-30) : state.backStack,
+      recent: pushRecent(state.recent, visit),
+    };
+  }),
+  visit: (target, label) => set((state) => {
+    const visit = { target, label };
+    const changed = !state.current || navKey(state.current.target) !== navKey(target);
+    const pushCurrent = changed && state.current && !isModuleRootFor(state.current, target);
+    return {
+      current: visit,
+      backStack: pushCurrent ? [...state.backStack, state.current!].slice(-30) : state.backStack,
+      recent: pushRecent(state.recent, visit),
+    };
+  }),
+  back: () => set((state) => {
+    const previous = state.backStack[state.backStack.length - 1];
+    if (!previous) return state;
+    return {
+      target: previous.target,
+      seq: state.seq + 1,
+      current: previous,
+      backStack: state.backStack.slice(0, -1),
+      recent: pushRecent(state.recent, previous),
+    };
+  }),
+  setCurrentLabel: (label) => set((state) => state.current ? {
+    current: { ...state.current, label },
+    recent: pushRecent(state.recent, { ...state.current, label }),
+  } : state),
   clear: () => set({ target: null }),
 }));
+
+export function describeNavTarget(project: Project, target: NavTarget): string {
+  const preset = project.workspacePreset ?? 'universal';
+  if (target.docId) return `场景 · ${project.documents.find((document) => document.id === target.docId)?.name ?? '已删除场景'}`;
+  if (target.flowId) return `流程 · ${project.flows.find((flow) => flow.id === target.flowId)?.name ?? '已删除流程'}`;
+  if (target.planningView) {
+    const labels: Record<NonNullable<NavTarget['planningView']>, string> = {
+      relations: '关系图', arcs: '角色弧线', foreshadow: '伏笔台账', appearance: '登场统计', wall: '场景墙', pacing: '节奏图',
+    };
+    return `规划 · ${labels[target.planningView]}`;
+  }
+  if (target.entityId) return `${preset === 'novel' ? '人物' : '实体'} · ${project.entities.find((entity) => entity.id === target.entityId)?.name ?? '已删除实体'}`;
+  if (target.eventId) return `时间线 · ${project.timelineEvents.find((event) => event.id === target.eventId)?.title ?? '已删除事件'}`;
+  if (target.outlineRowId) {
+    const row = project.outlineRows.find((candidate) => candidate.id === target.outlineRowId);
+    return `大纲 · ${row?.title || row?.no || '已删除行'}`;
+  }
+  if (target.cardId) return `资料 · ${project.researchCards.find((card) => card.id === target.cardId)?.title ?? '已删除资料'}`;
+  if (target.assetId) return `资源 · ${project.assets.find((asset) => asset.id === target.assetId)?.name ?? '已删除资源'}`;
+  return workspaceTabLabel(preset, target.tab);
+}
 
 export interface SearchHit {
   key: string;
@@ -119,7 +203,7 @@ export function searchProject(p: Project, query: string): SearchHit[] {
       push({
         module: '大纲', kind: `第 ${r.no || '?'} 章`, title: r.title || '(未命名章节)',
         snippet: snippetOf(hit, q),
-        nav: { tab: 'outline' },
+        nav: { tab: 'outline', outlineRowId: r.id },
       });
     }
   }
@@ -267,7 +351,7 @@ export function findEntityRefs(p: Project, entity: Entity): SearchHit[] {
       push({
         module: '大纲', kind: `第 ${r.no || '?'} 章`, title: r.title || '(未命名章节)',
         snippet: snippetOf(all.find(mention) ?? '', name),
-        nav: { tab: 'outline' },
+        nav: { tab: 'outline', outlineRowId: r.id },
       });
     }
   }
@@ -350,6 +434,61 @@ export function findEntityRefs(p: Project, entity: Entity): SearchHit[] {
         });
       }
     }
+  }
+
+  return hits;
+}
+
+export function findDocumentRefs(p: Project, document: Document): SearchHit[] {
+  const hits: SearchHit[] = [];
+  const push = (hit: Omit<SearchHit, 'key'>) => {
+    if (hits.length < 40) hits.push({ ...hit, key: `doc-ref-${hits.length}` });
+  };
+
+  for (const flow of p.flows) {
+    if (flow.documentId !== document.id) continue;
+    push({
+      module: '流程', kind: '关联流程', title: flow.name,
+      snippet: '流程结构与该场景关联',
+      nav: { tab: 'flow', flowId: flow.id },
+    });
+  }
+  for (const row of p.outlineRows) {
+    if (row.documentId !== document.id) continue;
+    push({
+      module: '大纲', kind: `第 ${row.no || '?'} 行`, title: row.title || '(未命名章节)',
+      snippet: row.main.slice(0, 50),
+      nav: { tab: 'outline', outlineRowId: row.id },
+    });
+  }
+  for (const event of p.timelineEvents) {
+    if (!event.documentIds?.includes(document.id)) continue;
+    const point = p.timelinePoints.find((candidate) => candidate.id === event.pointId);
+    push({
+      module: '时间线', kind: point?.label || '事件', title: event.title,
+      snippet: event.text.slice(0, 50),
+      nav: { tab: 'timeline', eventId: event.id },
+    });
+  }
+  for (const stage of p.arcs ?? []) {
+    if (stage.docId !== document.id) continue;
+    const entity = p.entities.find((candidate) => candidate.id === stage.entityId);
+    push({
+      module: '规划', kind: `弧线 · ${entity?.name ?? '?'}`, title: stage.title || '(未命名阶段)',
+      snippet: stage.note.slice(0, 50),
+      nav: { tab: 'planning', planningView: 'arcs', entityId: stage.entityId },
+    });
+  }
+  for (const foreshadow of p.foreshadows ?? []) {
+    const plants = foreshadow.plants.filter((ref) => ref.docId === document.id).length;
+    const payoffs = foreshadow.payoffs.filter((ref) => ref.docId === document.id).length;
+    if (plants + payoffs === 0) continue;
+    push({
+      module: '规划', kind: plants > 0 && payoffs > 0 ? '伏笔埋设与回收' : plants > 0 ? '伏笔埋设' : '伏笔回收',
+      title: foreshadow.title,
+      snippet: foreshadow.note.slice(0, 50),
+      nav: { tab: 'planning', planningView: 'foreshadow', foreshadowId: foreshadow.id },
+    });
   }
 
   return hits;

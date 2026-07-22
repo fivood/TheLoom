@@ -576,6 +576,13 @@ export default function FlowEditor() {
   }, [navSeq]);
 
   const active = flows.find((f) => f.id === activeId) ?? flows[0] ?? null;
+  useEffect(() => {
+    if (!active) return;
+    const target = path.length > 0
+      ? { tab: 'flow' as const, flowId: active.id, path }
+      : { tab: 'flow' as const, flowId: active.id };
+    useNav.getState().visit(target, `流程 · ${active.name}`);
+  }, [active?.id, active?.name, path.join('/')]);
 
   // 路径失效(节点被删 / 数据重载)时裁剪到最近的有效层级
   const validPath = useMemo(() => {

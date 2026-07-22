@@ -22,7 +22,7 @@ export type CompileFormat = 'md' | 'txt' | 'fdx';
 
 export interface CompileOptions {
   format: CompileFormat;
-  /** 参与编译的文档 id 集合(空集 = 全部);顺序不由集合决定,仍走 folder 树顺序 */
+  /** 参与编译的文档 id 集合;未提供 = 全部,空集 = 不编译;顺序仍走 folder 树顺序 */
   documentIds?: Set<string>;
   /** 在每篇文档前显示所在卷/章路径 */
   includeFolderPath?: boolean;
@@ -42,7 +42,7 @@ export interface CompileResult {
 export function compileDocuments(project: Project, options: CompileOptions): CompileResult {
   const { format, documentIds, includeFolderPath = true } = options;
   const linear = linearizeByFolders(project.documents, project.folders, 'document');
-  const filter = documentIds && documentIds.size > 0
+  const filter = documentIds
     ? (d: Document) => documentIds.has(d.id)
     : () => true;
   const docs = linear.filter(filter);

@@ -44,7 +44,10 @@ export default function Planning() {
             key={v.key}
             className={view === v.key ? 'primary' : undefined}
             title={v.hint}
-            onClick={() => setView(v.key)}
+            onClick={() => {
+              setView(v.key);
+              useNav.getState().visit({ tab: 'planning', planningView: v.key }, `规划 · ${v.label}`);
+            }}
           >{v.label}</button>
         ))}
         <span className="hint">{active.hint}</span>

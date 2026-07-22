@@ -19,6 +19,7 @@ import {
 } from './recovery';
 import { getStorageUsage, type StorageUsage } from './diagnostics';
 import type { AiProposalApplyResult, ApplyAiProposalOptions } from './ai/proposal';
+import { unlinkDocumentReferences } from './documentReferences';
 
 export { uid, normalizeProject };
 
@@ -95,6 +96,7 @@ function blankProject(): Project {
   return {
     version: 1,
     name: '未命名项目',
+    workspacePreset: 'universal',
     flows: [{ id: uid(), name: '第一章', nodes: [], edges: [] }],
     entities: [],
     brainstormNotes: [],
@@ -982,14 +984,7 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeDocument: (id) => commit((p) => {
       p.documents = p.documents.filter((x) => x.id !== id);
-      for (const flow of p.flows) if (flow.documentId === id) flow.documentId = undefined;
-      for (const a of p.arcs ?? []) if (a.docId === id) a.docId = undefined;
-      for (const f of p.foreshadows ?? []) {
-        f.plants = f.plants.filter((ref) => ref.docId !== id);
-        f.payoffs = f.payoffs.filter((ref) => ref.docId !== id);
-      }
-      p.annotations = (p.annotations ?? []).filter((a) => a.docId !== id);
-      p.docSnapshots = (p.docSnapshots ?? []).filter((s) => s.docId !== id);
+      unlinkDocumentReferences(p, id);
     }),
 
     addAnnotation: (a) => commit((p) => { p.annotations ??= []; p.annotations.push(a); }),
@@ -1034,7 +1029,11 @@ export const useLoom = create<LoomState>((set, get) => {
     addFolder: (f) => commit((p) => { p.folders.push(f); }),
     updateFolder: (id, patch) => commit((p) => {
       const f = p.folders.find((x) => x.id === id);
-      if (f) Object.assign(f, patch);
+      if (!f) return;
+      Object.assign(f, patch);
+      if ('documentRole' in patch && f.documentRole !== 'chapter') {
+        for (const row of p.outlineRows) if (row.chapterFolderId === id) row.chapterFolderId = undefined;
+      }
     }),
     removeFolder: (id) => commit((p) => {
       // 递归收集该文件夹及其所有后代文件夹 id
@@ -1050,6 +1049,9 @@ export const useLoom = create<LoomState>((set, get) => {
         }
       }
       p.folders = p.folders.filter((f) => !toDelete.has(f.id));
+      for (const row of p.outlineRows) {
+        if (row.chapterFolderId && toDelete.has(row.chapterFolderId)) row.chapterFolderId = undefined;
+      }
       for (const saved of p.savedQueries ?? []) {
         if (toDelete.has(saved.query.folderId)) saved.query.folderId = 'any';
       }

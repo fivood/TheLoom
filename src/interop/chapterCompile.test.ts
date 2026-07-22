@@ -27,6 +27,9 @@ describe('compileDocuments', () => {
   const project = makeProject();
   project.name = '测试稿';
   project.folders.push(folder('v1', '第一卷', null, 0), folder('c1', '第一章', 'v1', 0), folder('c2', '第二章', 'v1', 1));
+  project.folders[0].documentRole = 'volume';
+  project.folders[1].documentRole = 'chapter';
+  project.folders[2].documentRole = 'chapter';
   project.documents.push(
     doc('s1', '开场', 'c1', 0, '雨要停了。'),
     doc('s2', '尾声', 'c2', 0, '天亮了。'),
@@ -77,6 +80,12 @@ describe('compileDocuments', () => {
 
   it('空选择时 docCount=0,content 是空字符串或空 fdx 骨架', () => {
     const res = compileDocuments(project, { format: 'md', documentIds: new Set(['nope']) });
+    expect(res.docCount).toBe(0);
+    expect(res.content).toBe('');
+  });
+
+  it('显式空集合不会回退为全选', () => {
+    const res = compileDocuments(project, { format: 'md', documentIds: new Set() });
     expect(res.docCount).toBe(0);
     expect(res.content).toBe('');
   });

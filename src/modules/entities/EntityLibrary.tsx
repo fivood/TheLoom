@@ -170,6 +170,9 @@ export default function EntityLibrary() {
     (!query || e.name.includes(query) || e.summary.includes(query)),
   ), [entities, kindFilter, query]);
   const selected = entities.find((e) => e.id === selectedId) ?? null;
+  useEffect(() => {
+    if (selected) useNav.getState().visit({ tab: 'entities', entityId: selected.id }, `实体 · ${selected.name}`);
+  }, [selected?.id, selected?.name]);
 
   const project = useLoom((s) => s.project);
   const refs = useMemo(() => (selected ? findEntityRefs(project, selected) : []), [project, selected]);

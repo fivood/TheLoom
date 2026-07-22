@@ -2,6 +2,7 @@ import type { EntityField, Project, SubFlow } from './types';
 import { createIssue, pathReportIssues, type IssueScope, type IssueSeverity, type ProjectIssue } from './issues';
 import type { NavTarget } from './search';
 import { simulateFlow } from './simulate';
+import { inspectDocumentStructure } from './documentStructure';
 
 interface AddIssue {
   code: string;
@@ -17,6 +18,9 @@ export function advancedAuditProject(p: Project): ProjectIssue[] {
   const issues: ProjectIssue[] = [];
   const entities = new Map(p.entities.map((entity) => [entity.id, entity]));
   const documents = new Map(p.documents.map((document) => [document.id, document]));
+  const chapterFolders = new Set(p.folders
+    .filter((folder) => folder.module === 'document' && folder.documentRole === 'chapter')
+    .map((folder) => folder.id));
   const units = new Set((p.units ?? []).map((unit) => unit.id));
   const timelineTracks = new Set(p.timelineTracks.map((track) => track.id));
   const timelinePoints = new Set(p.timelinePoints.map((point) => point.id));
@@ -38,6 +42,18 @@ export function advancedAuditProject(p: Project): ProjectIssue[] {
     nav: input.nav,
     objectId: input.objectId,
   }));
+
+  for (const issue of inspectDocumentStructure(p.documents, p.folders)) {
+    add({
+      code: issue.code,
+      kind: '卷章结构',
+      message: issue.message,
+      severity: 'warning',
+      scope: 'document',
+      nav: issue.documentId ? { tab: 'documents', docId: issue.documentId } : { tab: 'documents' },
+      objectId: issue.documentId ?? issue.folderId,
+    });
+  }
 
   const checkEntityFields = (fields: EntityField[], owner: string, nav: NavTarget, objectId: string) => {
     for (const field of fields) {
@@ -164,6 +180,11 @@ export function advancedAuditProject(p: Project): ProjectIssue[] {
     if (!timelinePoints.has(event.pointId)) {
       add({ code: 'reference.timeline-point', kind: '无效引用', message: `时间线事件「${event.title}」的时间点不存在`, scope: 'timeline', nav, objectId: event.id });
     }
+    for (const documentId of event.documentIds ?? []) {
+      if (!documents.has(documentId)) {
+        add({ code: 'reference.timeline-document', kind: '无效场景引用', message: `时间线事件「${event.title}」关联的场景不存在`, scope: 'timeline', nav, objectId: event.id });
+      }
+    }
     for (const entityId of new Set(event.entityIds)) {
       const entity = entities.get(entityId);
       if (!entity) {
@@ -216,6 +237,12 @@ export function advancedAuditProject(p: Project): ProjectIssue[] {
     }
   }
   for (const row of p.outlineRows) {
+    if (row.documentId && !documents.has(row.documentId)) {
+      add({ code: 'reference.outline-document', kind: '无效场景引用', message: `大纲「${row.title || row.no}」关联的场景不存在`, scope: 'outline', nav: { tab: 'outline', outlineRowId: row.id }, objectId: row.id });
+    }
+    if (row.chapterFolderId && !chapterFolders.has(row.chapterFolderId)) {
+      add({ code: 'reference.outline-chapter', kind: '无效章节引用', message: `大纲「${row.title || row.no}」关联的章节不存在或不再标记为章`, scope: 'outline', nav: { tab: 'outline', outlineRowId: row.id }, objectId: row.id });
+    }
     for (const columnId of Object.keys(row.cells)) {
       if (!outlineColumns.has(columnId)) {
         add({ code: 'reference.outline-column', kind: '无效引用', message: `大纲「${row.title || row.no}」保留了已删除剧情线的单元格`, scope: 'outline', nav: { tab: 'outline' }, objectId: row.id });

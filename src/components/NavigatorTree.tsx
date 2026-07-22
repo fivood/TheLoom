@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uid, useLoom } from '../store';
 import { confirmDialog, promptText } from '../dialog';
-import type { Folder, FolderModule } from '../types';
+import type { DocumentFolderRole, Folder, FolderModule } from '../types';
+import { DOCUMENT_FOLDER_ROLE_LABEL } from '../types';
+import { suggestedDocumentChildRole } from '../documentStructure';
 import { setObjectFavorites } from '../batch';
 import BatchEditDialog from './BatchEditDialog';
 import PaneHandle from './PaneHandle';
@@ -33,6 +35,7 @@ interface NavigatorTreeProps<T extends NavigatorItem> {
   /** 在某文件夹内重排对象;orderedIds 为新顺序,模块据此写回 order */
   onReorder?: (parentId: string | null, orderedIds: string[]) => void;
   onCreate?: () => void;
+  onCreateInFolder?: (folderId: string) => void;
   createLabel?: string;
   emptyLabel?: string;
 }
@@ -66,6 +69,11 @@ function flattenFolders(folders: Folder[]): { folder: Folder; depth: number }[] 
   return rows;
 }
 
+function folderOptionLabel(folder: Folder, depth: number): string {
+  const role = folder.documentRole ? `[${DOCUMENT_FOLDER_ROLE_LABEL[folder.documentRole]}] ` : '';
+  return `${'　'.repeat(depth)}${role}${folder.name}`;
+}
+
 export function FolderSelect({ module, value, onChange }: {
   module: FolderModule;
   value?: string;
@@ -78,7 +86,7 @@ export function FolderSelect({ module, value, onChange }: {
     <select value={value ?? ''} onChange={(event) => onChange(event.target.value || undefined)}>
       <option value="">未分组</option>
       {rows.map(({ folder, depth }) => (
-        <option key={folder.id} value={folder.id}>{`${'　'.repeat(depth)}${folder.name}`}</option>
+        <option key={folder.id} value={folder.id}>{folderOptionLabel(folder, depth)}</option>
       ))}
     </select>
   );
@@ -88,7 +96,7 @@ type DropTarget = { id: string; kind: 'folder' | 'item'; position: 'before' | 'a
 
 export default function NavigatorTree<T extends NavigatorItem>({
   module, title, items, selectedId, getLabel, getDetail, renderItemMeta, renderItemActions,
-  onSelect, onItemDoubleClick, onMove, onMoveMany, onReorder, onCreate,
+  onSelect, onItemDoubleClick, onMove, onMoveMany, onReorder, onCreate, onCreateInFolder,
   createLabel = '新建', emptyLabel = '这里还没有内容',
 }: NavigatorTreeProps<T>) {
   const allFolders = useLoom((s) => s.project.folders);
@@ -157,14 +165,16 @@ export default function NavigatorTree<T extends NavigatorItem>({
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const createFolder = async (parentId: string | null) => {
+  const createFolder = async (parentId: string | null, requestedRole?: DocumentFolderRole) => {
+    const parent = parentId ? folderById.get(parentId) : undefined;
+    const documentRole = module === 'document' ? (requestedRole ?? suggestedDocumentChildRole(parent)) : undefined;
     const name = await promptText({
       message: parentId ? '子文件夹名称' : '文件夹名称',
       placeholder: '文件夹名称',
     });
     if (!name?.trim()) return;
     const id = uid();
-    addFolder({ id, name: name.trim(), module, parentId });
+    addFolder({ id, name: name.trim(), module, parentId, documentRole });
     setExpanded((previous) => new Set(previous).add(id).add(parentId ?? id));
   };
   const renameFolder = async (folder: Folder) => {
@@ -326,6 +336,8 @@ export default function NavigatorTree<T extends NavigatorItem>({
           if (trail.has(folder.id)) return null;
           const open = expanded.has(folder.id);
           const isDrop = dropTarget?.id === folder.id && dropTarget.kind === 'folder';
+          const childRole = module === 'document' ? suggestedDocumentChildRole(folder) : undefined;
+          const childLabel = childRole ? `新建${DOCUMENT_FOLDER_ROLE_LABEL[childRole]}` : '新建子文件夹';
           return (
             <div key={folder.id}>
               <div
@@ -342,10 +354,40 @@ export default function NavigatorTree<T extends NavigatorItem>({
               >
                 {isDrop && dropTarget?.position === 'before' && <span className="drop-line" />}
                 <span className="caret">{open ? '▾' : '▸'}</span>
+                {folder.documentRole && (
+                  <span className={`navigator-folder-role role-${folder.documentRole}`}>
+                    {DOCUMENT_FOLDER_ROLE_LABEL[folder.documentRole]}
+                  </span>
+                )}
                 <span className="navigator-label">{folder.name}</span>
                 <span className="count">{countItemsIn(folder.id)}</span>
                 <span className="navigator-folder-actions">
-                  <button className="ghost icon-btn" title="新建子文件夹" onClick={(event) => { event.stopPropagation(); createFolder(folder.id); }}>＋</button>
+                  {module === 'document' && onCreateInFolder && (folder.documentRole === 'chapter' || folder.documentRole === 'section') && (
+                    <button className="ghost navigator-structure-add" title={`在${folder.name}中新建场景`} onClick={(event) => { event.stopPropagation(); onCreateInFolder(folder.id); }}>
+                      ＋场景
+                    </button>
+                  )}
+                  {module === 'document' && (
+                    <select
+                      className="navigator-folder-role-select"
+                      value={folder.documentRole ?? ''}
+                      title="设置卷章角色"
+                      aria-label={`设置${folder.name}的卷章角色`}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) => {
+                        event.stopPropagation();
+                        updateFolder(folder.id, { documentRole: (event.target.value || undefined) as DocumentFolderRole | undefined });
+                      }}
+                    >
+                      <option value="">普通</option>
+                      <option value="volume">卷</option>
+                      <option value="chapter">章</option>
+                      <option value="section">小节</option>
+                    </select>
+                  )}
+                  <button className={`ghost${childRole ? ' navigator-structure-add' : ' icon-btn'}`} title={childLabel} onClick={(event) => { event.stopPropagation(); createFolder(folder.id); }}>
+                    ＋{childRole ? DOCUMENT_FOLDER_ROLE_LABEL[childRole] : ''}
+                  </button>
                   <button className="ghost icon-btn" title="重命名文件夹" onClick={(event) => { event.stopPropagation(); renameFolder(folder); }}>✎</button>
                   <button className="ghost icon-btn" title="删除文件夹" onClick={(event) => { event.stopPropagation(); deleteFolder(folder); }}>×</button>
                 </span>
@@ -397,7 +439,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
                 >
                   <option value="">未分组</option>
                   {folderRows.map(({ folder, depth: folderDepth }) => (
-                    <option key={folder.id} value={folder.id}>{`${'　'.repeat(folderDepth)}${folder.name}`}</option>
+                    <option key={folder.id} value={folder.id}>{folderOptionLabel(folder, folderDepth)}</option>
                   ))}
                 </select>
               </span>
@@ -458,8 +500,13 @@ export default function NavigatorTree<T extends NavigatorItem>({
           <button className="ghost navigator-head-btn" onClick={() => createFolder(null)} title="新建文件夹(用于分组归档)">
             <span className="btn-glyph">▤</span> 文件夹
           </button>
+          {module === 'document' && (
+            <button className="ghost navigator-head-btn" onClick={() => createFolder(null, 'volume')} title="新建卷">
+              <span className="btn-glyph">卷</span> 新建卷
+            </button>
+          )}
           {onCreate && (
-            <button className="ghost navigator-head-btn primary-ghost" onClick={onCreate} title={createLabel}>
+            <button className="ghost navigator-head-btn primary-ghost" onClick={() => onCreate()} title={createLabel}>
               <span className="btn-glyph">＋</span> {createLabel}
             </button>
           )}
@@ -491,7 +538,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
             <option value="" disabled>移到文件夹…</option>
             <option value="">未分组</option>
             {folderRows.map(({ folder, depth: fd }) => (
-              <option key={folder.id} value={folder.id}>{`${'　'.repeat(fd)}${folder.name}`}</option>
+              <option key={folder.id} value={folder.id}>{folderOptionLabel(folder, fd)}</option>
             ))}
           </select>
           <button className="ghost navigator-batch-edit" onClick={() => setBatchEditIds(batchIds)}>批量编辑…</button>

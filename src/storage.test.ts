@@ -202,6 +202,7 @@ category: 正文
 
   it('文件夹 project.json 保留保存查询,正文对象继续由 Markdown 承载', () => {
     const project = sampleProject();
+    project.workspacePreset = 'interactive';
     project.savedQueries = [{
       id: 'query-1',
       name: '未引用资源',
@@ -222,6 +223,7 @@ category: 正文
     const restored = JSON.parse(projectToFolderJson(project));
 
     expect(restored.savedQueries).toEqual(project.savedQueries);
+    expect(restored.workspacePreset).toBe('interactive');
     expect(restored.entities).toEqual([]);
     expect(restored.researchCards).toEqual([]);
     expect(restored.documents).toEqual([]);

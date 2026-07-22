@@ -1,7 +1,8 @@
 import type {
   ArcStage, DocStatus, Document, Entity, Folder, Foreshadow, ForeshadowStatus, Project,
 } from './types';
-import { documentWordCount, folderPath, linearizeByFolders } from './util';
+import { documentWordCount, linearizeByFolders } from './util';
+import { documentChapterIdentity } from './documentStructure';
 
 /* ---------- 伏笔状态推导 ---------- */
 
@@ -24,19 +25,18 @@ export interface ChapterGroup {
 }
 
 export function groupDocsByChapter(documents: Document[], folders: Folder[]): ChapterGroup[] {
-  const docFolderIds = new Set(folders.filter((f) => f.module === 'document').map((f) => f.id));
   const ordered = linearizeByFolders(documents, folders, 'document');
   const groups: ChapterGroup[] = [];
   for (const d of ordered) {
-    const fid = d.folderId && docFolderIds.has(d.folderId) ? d.folderId : '';
+    const identity = documentChapterIdentity(d, folders);
     const last = groups[groups.length - 1];
-    if (last && last.key === fid) {
+    if (last && last.key === identity.key) {
       last.docs.push(d);
     } else {
       groups.push({
-        key: fid,
-        folderId: fid || undefined,
-        label: fid ? folderPath(fid, folders) : '未分组',
+        key: identity.key,
+        folderId: identity.folderId,
+        label: identity.label,
         docs: [d],
       });
     }

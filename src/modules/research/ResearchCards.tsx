@@ -48,6 +48,9 @@ export default function ResearchCards() {
   }, [cards, catFilter, tagFilter, query]);
 
   const selected = cards.find((c) => c.id === selectedId) ?? null;
+  useEffect(() => {
+    if (selected) useNav.getState().visit({ tab: 'research', cardId: selected.id }, `资料 · ${selected.title}`);
+  }, [selected?.id, selected?.title]);
 
   const createCard = () => {
     const cols = activePaletteColors(useLoom.getState().project);

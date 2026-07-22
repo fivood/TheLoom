@@ -1,21 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { confirmDialog, promptText } from '../../dialog';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import Inspector from '../../components/Inspector';
 import type { TimelineEvent } from '../../types';
-import { PALETTE } from '../../types';
-import { activePaletteColors } from '../../util';
+import { DOC_STATUS_LABEL, PALETTE } from '../../types';
+import { activePaletteColors, linearizeByFolders } from '../../util';
 import ColorPicker from '../../components/ColorPicker';
+import { documentSceneLabel } from '../../documentStructure';
 
 export default function Timeline() {
   const tracks = useLoom((s) => s.project.timelineTracks);
   const points = useLoom((s) => s.project.timelinePoints);
   const events = useLoom((s) => s.project.timelineEvents);
   const entities = useLoom((s) => s.project.entities);
+  const documents = useLoom((s) => s.project.documents);
+  const folders = useLoom((s) => s.project.folders);
   const update = useLoom((s) => s.update);
+  const go = useNav((s) => s.go);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const orderedDocuments = useMemo(
+    () => linearizeByFolders(documents, folders, 'document'),
+    [documents, folders],
+  );
 
   const navSeq = useNav((s) => s.seq);
   useEffect(() => {
@@ -27,6 +35,9 @@ export default function Timeline() {
   }, [navSeq]);
 
   const selected = events.find((e) => e.id === selectedId) ?? null;
+  useEffect(() => {
+    if (selected) useNav.getState().visit({ tab: 'timeline', eventId: selected.id }, `时间线 · ${selected.title}`);
+  }, [selected?.id, selected?.title]);
 
   const addTrack = async () => {
     const name = await promptText({ message: '新轨道名称(例如:主线、某角色的暗线、世界大事)', placeholder: '轨道名称' });
@@ -192,6 +203,18 @@ export default function Timeline() {
                                   })}
                                 </div>
                               )}
+                              {(ev.documentIds?.length ?? 0) > 0 && (
+                                <div className="card-tags timeline-scene-tags">
+                                  {ev.documentIds?.map((documentId) => {
+                                    const document = documents.find((candidate) => candidate.id === documentId);
+                                    return document ? (
+                                      <span key={documentId} className="tag" title={documentSceneLabel(document, folders)}>
+                                        场景 · {document.name}{document.status ? ` · ${DOC_STATUS_LABEL[document.status]}` : ''}
+                                      </span>
+                                    ) : null;
+                                  })}
+                                </div>
+                              )}
                             </div>
                           ))}
                           <button className="ghost tl-add" onClick={() => addEvent(tr.id, pt.id)}>＋</button>
@@ -248,6 +271,44 @@ export default function Timeline() {
                   );
                 })}
                 {entities.length === 0 && <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>实体库为空</span>}
+              </div>
+            </div>
+            <div className="field">
+              <label>关联场景</label>
+              <select
+                value=""
+                onChange={(event) => {
+                  const documentId = event.target.value;
+                  if (!documentId || selected.documentIds?.includes(documentId)) return;
+                  patchEvent(selected.id, { documentIds: [...(selected.documentIds ?? []), documentId] });
+                }}
+              >
+                <option value="">＋ 选择场景…</option>
+                {orderedDocuments
+                  .filter((document) => !selected.documentIds?.includes(document.id))
+                  .map((document) => (
+                    <option key={document.id} value={document.id}>{documentSceneLabel(document, folders)}</option>
+                  ))}
+              </select>
+              <div className="timeline-linked-scenes">
+                {(selected.documentIds ?? []).map((documentId) => {
+                  const document = documents.find((candidate) => candidate.id === documentId);
+                  if (!document) return null;
+                  return (
+                    <div key={documentId} className="ref-item timeline-linked-scene">
+                      <button className="ghost timeline-linked-scene-open" onClick={() => go({ tab: 'documents', docId: document.id })}>
+                        {documentSceneLabel(document, folders)}
+                      </button>
+                      {document.status && <span className={`ms-status ms-status-${document.status}`}>{DOC_STATUS_LABEL[document.status]}</span>}
+                      <button
+                        className="ghost icon-btn"
+                        title="解除场景关联"
+                        onClick={() => patchEvent(selected.id, { documentIds: selected.documentIds?.filter((id) => id !== documentId) })}
+                      >×</button>
+                    </div>
+                  );
+                })}
+                {(selected.documentIds?.length ?? 0) === 0 && <span className="hint">尚未关联场景</span>}
               </div>
             </div>
             <div className="field">

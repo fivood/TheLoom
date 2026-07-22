@@ -10,6 +10,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 
 /** 兼容旧版本数据:补齐后加字段 */
 export function normalizeProject(p: Project): Project {
+  if (!['novel', 'interactive', 'universal'].includes(p.workspacePreset ?? '')) p.workspacePreset = 'universal';
   p.flows ??= [];
   p.entities ??= [];
   p.brainstormNotes ??= [];
@@ -39,6 +40,9 @@ export function normalizeProject(p: Project): Project {
   migrateTemplateInstances(p);
   const folderById = new Map(p.folders.map((folder) => [folder.id, folder]));
   for (const folder of p.folders) {
+    if (folder.module !== 'document' || !['volume', 'chapter', 'section'].includes(folder.documentRole ?? '')) {
+      delete folder.documentRole;
+    }
     const parent = folder.parentId ? folderById.get(folder.parentId) : null;
     if (folder.parentId === folder.id || (folder.parentId && (!parent || parent.module !== folder.module))) {
       folder.parentId = null;
@@ -225,6 +229,22 @@ export function normalizeProject(p: Project): Project {
     if (!d.linkedFlowId) continue;
     const f = p.flows.find((x) => x.id === d.linkedFlowId);
     if (f && !f.documentId) f.documentId = d.id;
+  }
+  const chapterFolderIds = new Set(p.folders
+    .filter((folder) => folder.module === 'document' && folder.documentRole === 'chapter')
+    .map((folder) => folder.id));
+  for (const row of p.outlineRows) {
+    if (row.documentId && !documentIds.has(row.documentId)) delete row.documentId;
+    if (row.chapterFolderId && !chapterFolderIds.has(row.chapterFolderId)) delete row.chapterFolderId;
+    if (row.documentId && row.chapterFolderId) delete row.chapterFolderId;
+  }
+  for (const event of p.timelineEvents) {
+    if (!Array.isArray(event.documentIds)) {
+      delete event.documentIds;
+      continue;
+    }
+    event.documentIds = [...new Set(event.documentIds.filter((id) => typeof id === 'string' && documentIds.has(id)))];
+    if (event.documentIds.length === 0) delete event.documentIds;
   }
   // 小说规划(R4):清理指向已删除实体 / 文档的关系、弧线、伏笔引用
   p.relations ??= [];
