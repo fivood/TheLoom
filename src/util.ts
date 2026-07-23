@@ -5,6 +5,8 @@ import type {
 import type { AssetKind } from './types';
 import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL, FLOW_NODE_LABEL, PALETTE } from './types';
 import { cleanTemplateRefs, migrateLegacyTemplates, migrateTemplateInstances } from './templates';
+import { normalizeWritingProgress } from './writingProgress';
+import { normalizeRevisionTasks } from './revisionWorkflow';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -281,6 +283,8 @@ export function normalizeProject(p: Project): Project {
       }
     }
   }
+  normalizeWritingProgress(p);
+  normalizeRevisionTasks(p);
   syncNarrativeUnits(p);
   return p;
 }

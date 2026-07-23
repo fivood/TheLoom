@@ -615,6 +615,26 @@ export interface DocSnapshot {
 /** 每篇文档最多保留的快照数,超出丢最旧 */
 export const DOC_SNAPSHOT_LIMIT = 20;
 
+export type RevisionDecision = 'accept' | 'keep' | 'discuss';
+
+export interface RevisionChange {
+  id: ID;
+  oldText: string[];
+  newText: string[];
+  decision?: RevisionDecision;
+}
+
+export interface RevisionTask {
+  id: ID;
+  docId: ID;
+  snapshotId: ID;
+  snapshotLabel: string;
+  title: string;
+  changes: RevisionChange[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 /* ---------- 小说规划(R4) ---------- */
 
 /** 人物关系:两个实体之间的一条有标签连线,展示在关系图 */
@@ -725,6 +745,26 @@ export interface SavedProjectQuery {
 
 export type WorkspacePreset = 'novel' | 'interactive' | 'universal';
 
+export type WritingCountMode = 'cjk' | 'characters' | 'englishWords';
+
+export interface WritingDailyStat {
+  date: string;
+  cjk: number;
+  characters: number;
+  englishWords: number;
+  bodyCjk: number;
+  bodyCharacters: number;
+  bodyEnglishWords: number;
+}
+
+export interface WritingProgressState {
+  projectTarget?: number;
+  folderTargets?: Record<ID, number>;
+  countMode?: WritingCountMode;
+  bodyOnly?: boolean;
+  daily?: WritingDailyStat[];
+}
+
 export interface Project {
   version: 1;
   name: string;
@@ -769,6 +809,8 @@ export interface Project {
   annotations?: Annotation[];
   /** 文档快照(R5 正文修订) */
   docSnapshots?: DocSnapshot[];
+  revisionTasks?: RevisionTask[];
+  proofreadingIgnores?: string[];
   /** 人物关系(R4 关系图) */
   relations?: EntityRelation[];
   /** 角色弧线阶段(R4) */
@@ -783,6 +825,7 @@ export interface Project {
   activePaletteId?: ID;
   /** 项目内命名保存的组合查询 */
   savedQueries?: SavedProjectQuery[];
+  writingProgress?: WritingProgressState;
   updatedAt: number;
 }
 

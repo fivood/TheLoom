@@ -38,6 +38,10 @@ export default function BatchEditDialog({ module, ids, onClose }: {
   const [templateId, setTemplateId] = useState('');
   const [entityKind, setEntityKind] = useState('');
   const [documentStatus, setDocumentStatus] = useState('');
+  const [revisionEnabled, setRevisionEnabled] = useState(false);
+  const [revision, setRevision] = useState('');
+  const [wordTargetEnabled, setWordTargetEnabled] = useState(false);
+  const [wordTarget, setWordTarget] = useState('');
   const [categoryEnabled, setCategoryEnabled] = useState(false);
   const [category, setCategory] = useState('');
   const [pinned, setPinned] = useState('');
@@ -55,6 +59,7 @@ export default function BatchEditDialog({ module, ids, onClose }: {
   const categories = module === 'document' ? project.documentCategories : project.researchCategories;
   const hasChanges = Boolean(
     favorite || folderId || templateId || entityKind || documentStatus || categoryEnabled || pinned
+    || revisionEnabled || wordTargetEnabled
     || addTags.trim() || removeTags.trim(),
   );
 
@@ -73,6 +78,14 @@ export default function BatchEditDialog({ module, ids, onClose }: {
     if (templateId) patch.templateId = templateId === '__none__' ? null : templateId;
     if (entityKind) patch.entityKind = entityKind as EntityKind;
     if (documentStatus) patch.documentStatus = documentStatus === '__none__' ? null : documentStatus as DocStatus;
+    if (revisionEnabled) {
+      const value = Number(revision);
+      patch.documentRevision = Number.isFinite(value) && value >= 1 ? Math.floor(value) : null;
+    }
+    if (wordTargetEnabled) {
+      const value = Number(wordTarget);
+      patch.documentWordTarget = Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+    }
     if (categoryEnabled) {
       const clean = category.trim() || '未分类';
       if (module === 'document') patch.documentCategory = clean;
@@ -146,16 +159,54 @@ export default function BatchEditDialog({ module, ids, onClose }: {
             </label>
           )}
           {module === 'document' && (
-            <label>
-              <span>写作状态</span>
-              <select value={documentStatus} onChange={(event) => setDocumentStatus(event.target.value)}>
-                <option value="">保持不变</option>
-                <option value="__none__">清除状态</option>
-                {DOC_STATUS_ORDER.map((status) => (
-                  <option key={status} value={status}>{DOC_STATUS_LABEL[status]}</option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label>
+                <span>写作状态</span>
+                <select value={documentStatus} onChange={(event) => setDocumentStatus(event.target.value)}>
+                  <option value="">保持不变</option>
+                  <option value="__none__">清除状态</option>
+                  {DOC_STATUS_ORDER.map((status) => (
+                    <option key={status} value={status}>{DOC_STATUS_LABEL[status]}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={revisionEnabled}
+                    onChange={(event) => setRevisionEnabled(event.target.checked)}
+                  />
+                  修改修订轮次
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  value={revision}
+                  onChange={(event) => setRevision(event.target.value)}
+                  placeholder="留空则清除"
+                  disabled={!revisionEnabled}
+                />
+              </label>
+              <label>
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={wordTargetEnabled}
+                    onChange={(event) => setWordTargetEnabled(event.target.checked)}
+                  />
+                  修改字数目标
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  value={wordTarget}
+                  onChange={(event) => setWordTarget(event.target.value)}
+                  placeholder="留空则清除"
+                  disabled={!wordTargetEnabled}
+                />
+              </label>
+            </>
           )}
           {(module === 'document' || module === 'research') && (
             <label className="batch-edit-category">

@@ -30,7 +30,8 @@ const HEADING_STYLES = new Set(['heading1', 'heading2', 'heading3', 'heading4', 
 
 function styleLevel(name: string): number | null {
   const norm = name.replace(/\s+/g, '').toLowerCase();
-  if (norm === 'title') return 0;
+  if (norm === 'title' || norm === 'manuscripttitle') return 0;
+  if (norm === 'author' || norm === 'manuscriptauthor' || norm === 'covermeta') return -1;
   if (norm === 'subtitle') return 0.5;
   if (HEADING_STYLES.has(norm)) return Number(norm.slice(-1));
   return null;
@@ -133,6 +134,7 @@ function assembleVolumes(paragraphs: DocParagraph[], warnings: string[]): { volu
   const ensureScene = () => { if (!scene) { scene = { title: '', blocks: [], chars: 0 }; ensureChapter().scenes.push(scene); } return scene; };
 
   for (const p of paragraphs) {
+    if (p.level === -1) continue;
     if (p.level === 0) {
       // Title:取第一个非空的作为项目名
       if (!projectName && p.text) projectName = p.text;

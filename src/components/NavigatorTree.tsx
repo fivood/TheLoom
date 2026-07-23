@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uid, useLoom } from '../store';
-import { confirmDialog, promptText } from '../dialog';
+import { alertDialog, confirmDialog, promptText } from '../dialog';
 import type { DocumentFolderRole, Folder, FolderModule } from '../types';
 import { DOCUMENT_FOLDER_ROLE_LABEL } from '../types';
 import { suggestedDocumentChildRole } from '../documentStructure';
@@ -34,6 +34,7 @@ interface NavigatorTreeProps<T extends NavigatorItem> {
   onMoveMany?: (ids: string[], folderId: string | undefined) => void;
   /** 在某文件夹内重排对象;orderedIds 为新顺序,模块据此写回 order */
   onReorder?: (parentId: string | null, orderedIds: string[]) => void;
+  onMoveAndReorder?: (ids: string[], parentId: string | null, orderedIds: string[]) => void;
   onCreate?: () => void;
   onCreateInFolder?: (folderId: string) => void;
   createLabel?: string;
@@ -96,7 +97,7 @@ type DropTarget = { id: string; kind: 'folder' | 'item'; position: 'before' | 'a
 
 export default function NavigatorTree<T extends NavigatorItem>({
   module, title, items, selectedId, getLabel, getDetail, renderItemMeta, renderItemActions,
-  onSelect, onItemDoubleClick, onMove, onMoveMany, onReorder, onCreate, onCreateInFolder,
+  onSelect, onItemDoubleClick, onMove, onMoveMany, onReorder, onMoveAndReorder, onCreate, onCreateInFolder,
   createLabel = '新建', emptyLabel = '这里还没有内容',
 }: NavigatorTreeProps<T>) {
   const allFolders = useLoom((s) => s.project.folders);
@@ -211,6 +212,21 @@ export default function NavigatorTree<T extends NavigatorItem>({
       (foldersByParent.get(folderId) ?? []).reduce((sum, child) => sum + countItemsIn(child.id, nextTrail), 0);
   };
 
+  const acceptsDocumentParent = (folderId: string, parentId: string | null): boolean => {
+    if (module !== 'document') return true;
+    const folder = folderById.get(folderId);
+    const parent = parentId ? folderById.get(parentId) : undefined;
+    if (!folder?.documentRole) return true;
+    if (folder.documentRole === 'volume') return !parent?.documentRole;
+    if (folder.documentRole === 'chapter') return parent?.documentRole === 'volume';
+    return parent?.documentRole === 'chapter' || parent?.documentRole === 'section';
+  };
+
+  const rejectDocumentParent = () => {
+    void alertDialog('卷、章、小节需要保持“卷 → 章 → 小节”的层级；请拖到相同层级，或拖入允许的上级。');
+    onDragEnd();
+  };
+
   // ---- 拖拽 ----
   const onDragStartItem = (e: React.DragEvent, id: string) => {
     dragRef.current = { kind: 'item', id };
@@ -254,13 +270,14 @@ export default function NavigatorTree<T extends NavigatorItem>({
       const target = folderById.get(folderId);
       if (!target) { onDragEnd(); return; }
       if (zone === 'into') {
+        if (!acceptsDocumentParent(d.id, folderId)) { rejectDocumentParent(); return; }
         updateFolder(d.id, { parentId: folderId });
         setExpanded((s) => new Set(s).add(folderId));
       } else {
         const parentId = target.parentId ?? null;
         if (d.id === parentId || isDescendant(parentId ?? '', d.id)) { onDragEnd(); return; }
-        updateFolder(d.id, { parentId });
-        reorderSiblings(parentId, d.id, folderId, zone);
+        if (!acceptsDocumentParent(d.id, parentId)) { rejectDocumentParent(); return; }
+        moveFolderAndReorder(parentId, d.id, folderId, zone);
       }
     } else {
       // item → folder
@@ -283,23 +300,40 @@ export default function NavigatorTree<T extends NavigatorItem>({
     if (!item) { onDragEnd(); return; }
     const parentId = item.folderId && folderById.has(item.folderId) ? item.folderId : null;
     if (d.kind === 'item') {
-      moveItemsTo(parentId);
-      if (onReorder) {
-        const siblings = (itemsByFolder.get(parentId) ?? []).map((it) => it.id).filter((id) => id !== d.id);
+      let movedIds = [d.id];
+      if (multiSelect.has(d.id)) movedIds = [...multiSelect];
+      else clearMulti();
+      if (onMoveAndReorder) {
+        const moved = new Set(movedIds);
+        const siblings = (itemsByFolder.get(parentId) ?? []).map((it) => it.id).filter((id) => !moved.has(id));
         const idx = siblings.indexOf(itemId);
+        if (idx < 0) { onDragEnd(); return; }
         const insertAt = zone === 'before' ? idx : idx + 1;
-        siblings.splice(insertAt, 0, d.id);
-        onReorder(parentId, siblings);
+        siblings.splice(insertAt, 0, ...movedIds);
+        onMoveAndReorder(movedIds, parentId, siblings);
+      } else {
+        moveItemsTo(parentId);
+        if (onReorder) {
+          const siblings = (itemsByFolder.get(parentId) ?? []).map((it) => it.id).filter((id) => id !== d.id);
+          const idx = siblings.indexOf(itemId);
+          const insertAt = zone === 'before' ? idx : idx + 1;
+          siblings.splice(insertAt, 0, d.id);
+          onReorder(parentId, siblings);
+        }
       }
     } else {
       // folder → item:把文件夹挂到该对象所在层级
       if (parentId === d.id || isDescendant(parentId ?? '', d.id)) { onDragEnd(); return; }
+      if (!acceptsDocumentParent(d.id, parentId)) { rejectDocumentParent(); return; }
       updateFolder(d.id, { parentId: parentId ?? undefined });
     }
     onDragEnd();
   };
-  const reorderSiblings = (parentId: string | null, draggedId: string, anchorId: string, zone: 'before' | 'after') => {
+  const moveFolderAndReorder = (parentId: string | null, draggedId: string, anchorId: string, zone: 'before' | 'after') => {
     update((p) => {
+      const dragged = p.folders.find((folder) => folder.id === draggedId && folder.module === module);
+      if (!dragged) return;
+      dragged.parentId = parentId;
       const siblings = p.folders.filter((f) => f.module === module && (f.parentId ?? null) === parentId);
       const ordered = byOrder(siblings);
       const ids = ordered.map((f) => f.id).filter((id) => id !== draggedId);

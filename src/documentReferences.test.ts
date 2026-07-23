@@ -23,6 +23,16 @@ describe('R17-2 场景权威引用', () => {
       arcs: (project.arcs ?? []).length,
       foreshadows: (project.foreshadows ?? []).length,
     };
+    project.revisionTasks = [{
+      id: 'task-tunnel',
+      docId: 'doc-tunnel',
+      snapshotId: 'snapshot-tunnel',
+      snapshotLabel: '初稿',
+      title: '隧道修订',
+      changes: [{ id: 'change-tunnel', oldText: ['旧'], newText: ['新'] }],
+      createdAt: 1,
+      updatedAt: 1,
+    }];
     unlinkDocumentReferences(project, 'doc-tunnel');
     expect(project.outlineRows).toHaveLength(counts.rows);
     expect(project.timelineEvents).toHaveLength(counts.events);
@@ -33,6 +43,7 @@ describe('R17-2 场景权威引用', () => {
     expect(project.timelineEvents[1].documentIds).toBeUndefined();
     expect(project.arcs?.find((stage) => stage.id === 'arc-lin-2')?.docId).toBeUndefined();
     expect(project.foreshadows?.[0].payoffs).toEqual([]);
+    expect(project.revisionTasks).toEqual([]);
   });
 
   it('迁移时清理失效与重复引用，不从标题推断关联', () => {

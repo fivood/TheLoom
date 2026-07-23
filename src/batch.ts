@@ -8,6 +8,8 @@ export interface BatchEditPatch {
   entityKind?: EntityKind;
   documentCategory?: string;
   documentStatus?: DocStatus | null;
+  documentRevision?: number | null;
+  documentWordTarget?: number | null;
   researchCategory?: string;
   researchPinned?: boolean;
   addTags?: string[];
@@ -73,7 +75,9 @@ export function applyBatchEdit(project: Project, module: FolderModule, ids: stri
   } else if (module === 'document') {
     const touchDocument = patch.templateId !== undefined
       || patch.documentCategory !== undefined
-      || patch.documentStatus !== undefined;
+      || patch.documentStatus !== undefined
+      || patch.documentRevision !== undefined
+      || patch.documentWordTarget !== undefined;
     for (const item of project.documents) {
       if (!wanted.has(item.id)) continue;
       applyCommon(item, patch);
@@ -83,6 +87,8 @@ export function applyBatchEdit(project: Project, module: FolderModule, ids: stri
       }
       if (patch.documentCategory !== undefined) item.category = patch.documentCategory;
       if (patch.documentStatus !== undefined) item.status = patch.documentStatus || undefined;
+      if (patch.documentRevision !== undefined) item.revision = patch.documentRevision || undefined;
+      if (patch.documentWordTarget !== undefined) item.wordTarget = patch.documentWordTarget || undefined;
       if (touchDocument) item.updatedAt = Date.now();
       changed++;
     }

@@ -20,6 +20,7 @@ import {
 import { getStorageUsage, type StorageUsage } from './diagnostics';
 import type { AiProposalApplyResult, ApplyAiProposalOptions } from './ai/proposal';
 import { unlinkDocumentReferences } from './documentReferences';
+import { recordWritingProgress } from './writingProgress';
 
 export { uid, normalizeProject };
 
@@ -517,7 +518,8 @@ export const useLoom = create<LoomState>((set, get) => {
     const next = structuredClone(prev);
     fn(next);
     syncNarrativeUnits(next, prev);
-    next.updatedAt = Date.now();
+    recordWritingProgress(prev, next, now);
+    next.updatedAt = now;
     persist(next);
     set({ project: next, saveStatus: 'saving', saveError: null, canUndo: true, canRedo: false });
     commitCount++;

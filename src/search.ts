@@ -22,7 +22,7 @@ export interface NavTarget {
   /** 规划模块:定位伏笔台账条目 */
   foreshadowId?: string;
   /** 规划模块:打开的子视图 */
-  planningView?: 'relations' | 'arcs' | 'foreshadow' | 'appearance' | 'wall' | 'pacing';
+  planningView?: 'progress' | 'revision' | 'relations' | 'arcs' | 'foreshadow' | 'appearance' | 'wall' | 'pacing';
 }
 
 interface NavState {
@@ -107,7 +107,7 @@ export function describeNavTarget(project: Project, target: NavTarget): string {
   if (target.flowId) return `流程 · ${project.flows.find((flow) => flow.id === target.flowId)?.name ?? '已删除流程'}`;
   if (target.planningView) {
     const labels: Record<NonNullable<NavTarget['planningView']>, string> = {
-      relations: '关系图', arcs: '角色弧线', foreshadow: '伏笔台账', appearance: '登场统计', wall: '场景墙', pacing: '节奏图',
+      progress: '写作进度', revision: '修订校对', relations: '关系图', arcs: '角色弧线', foreshadow: '伏笔台账', appearance: '登场统计', wall: '场景墙', pacing: '节奏图',
     };
     return `规划 · ${labels[target.planningView]}`;
   }

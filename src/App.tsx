@@ -551,9 +551,9 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => { setToolsOpen(false); setChapterCompile(true); }}
-                    title="按卷/章勾选文档,编译为 Markdown / TXT / Final Draft 成品稿件"
+                    title="按卷/章勾选文档，编译为 Word / Markdown / TXT / Final Draft 成品稿件"
                   >
-                    <Icon name="script" size={12} /> 章节编译…
+                    <Icon name="script" size={12} /> 成稿导出 / 章节编译…
                   </button>
                   <div className="tools-sep" />
                   <div className="tools-label">导入</div>

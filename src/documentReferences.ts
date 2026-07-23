@@ -14,4 +14,5 @@ export function unlinkDocumentReferences(project: Project, documentId: string): 
   }
   project.annotations = (project.annotations ?? []).filter((annotation) => annotation.docId !== documentId);
   project.docSnapshots = (project.docSnapshots ?? []).filter((snapshot) => snapshot.docId !== documentId);
+  project.revisionTasks = (project.revisionTasks ?? []).filter((task) => task.docId !== documentId);
 }

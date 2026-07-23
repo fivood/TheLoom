@@ -74,7 +74,7 @@ describe('R11-3 批量编辑', () => {
     }
   });
 
-  it('文档可批量改分类、状态和模板', () => {
+  it('文档可批量改分类、状态、修订轮次、目标字数和模板', () => {
     const p = project();
     const ids = p.documents.slice(0, 2).map((document) => document.id);
     const before = Date.now();
@@ -91,12 +91,16 @@ describe('R11-3 批量编辑', () => {
     applyBatchEdit(p, 'document', ids, {
       documentCategory: '第二卷',
       documentStatus: 'revising',
+      documentRevision: 3,
+      documentWordTarget: 3600,
       templateId: template.id,
     });
 
     for (const document of p.documents.filter((item) => ids.includes(item.id))) {
       expect(document.category).toBe('第二卷');
       expect(document.status).toBe('revising');
+      expect(document.revision).toBe(3);
+      expect(document.wordTarget).toBe(3600);
       expect(document.templateId).toBe(template.id);
       expect(document.fields?.some((field) => field.label === '章节目标')).toBe(true);
       expect(document.updatedAt).toBeGreaterThanOrEqual(before);

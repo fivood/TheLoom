@@ -6,10 +6,15 @@ import ForeshadowLedger from './ForeshadowLedger';
 import AppearanceGrid from './AppearanceGrid';
 import SceneWall from './SceneWall';
 import PacingChart from './PacingChart';
+import WritingDashboard from './WritingDashboard';
+import { useLoom } from '../../store';
+import RevisionCenter from './RevisionCenter';
 
-export type PlanningView = 'relations' | 'arcs' | 'foreshadow' | 'appearance' | 'wall' | 'pacing';
+export type PlanningView = 'progress' | 'revision' | 'relations' | 'arcs' | 'foreshadow' | 'appearance' | 'wall' | 'pacing';
 
 const VIEWS: { key: PlanningView; label: string; hint: string }[] = [
+  { key: 'progress', label: '写作进度', hint: '目标、每日新增、修订进度与待办入口' },
+  { key: 'revision', label: '修订校对', hint: '快照差异决策与中文一致性检查' },
   { key: 'relations', label: '关系图', hint: '实体间拖拽连线,标注人物关系' },
   { key: 'arcs', label: '角色弧线', hint: '角色发展阶段,可关联具体场景' },
   { key: 'foreshadow', label: '伏笔台账', hint: '追踪伏笔的埋设与回收' },
@@ -19,7 +24,8 @@ const VIEWS: { key: PlanningView; label: string; hint: string }[] = [
 ];
 
 export default function Planning() {
-  const [view, setView] = useState<PlanningView>('relations');
+  const workspacePreset = useLoom((state) => state.project.workspacePreset);
+  const [view, setView] = useState<PlanningView>(workspacePreset === 'novel' ? 'progress' : 'relations');
   const [navEntityId, setNavEntityId] = useState<string | null>(null);
   const [navForeshadowId, setNavForeshadowId] = useState<string | null>(null);
 
@@ -52,6 +58,8 @@ export default function Planning() {
         ))}
         <span className="hint">{active.hint}</span>
       </div>
+      {view === 'progress' && <WritingDashboard />}
+      {view === 'revision' && <RevisionCenter />}
       {view === 'relations' && <RelationGraph />}
       {view === 'arcs' && <ArcBoard focusEntityId={navEntityId} onConsumeFocus={() => setNavEntityId(null)} />}
       {view === 'foreshadow' && <ForeshadowLedger focusId={navForeshadowId} onConsumeFocus={() => setNavForeshadowId(null)} />}

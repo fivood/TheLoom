@@ -69,6 +69,8 @@ describe('R16-5 升级迁移:老版本 JSON 加载后不炸', () => {
     expect(Array.isArray(p.units)).toBe(true);
     expect(Array.isArray(p.annotations)).toBe(true);
     expect(Array.isArray(p.docSnapshots)).toBe(true);
+    expect(Array.isArray(p.revisionTasks)).toBe(true);
+    expect(Array.isArray(p.proofreadingIgnores)).toBe(true);
     expect(Array.isArray(p.palettes)).toBe(true);
     expect(Array.isArray(p.savedQueries)).toBe(true);
   });
@@ -144,7 +146,7 @@ describe('R16-5 升级迁移:老版本 JSON 加载后不炸', () => {
       'timelineEvents', 'maps', 'researchCards', 'researchCategories',
       'variables', 'assets', 'documents', 'documentCategories',
       'folders', 'palettes', 'relations', 'arcs', 'foreshadows',
-      'units', 'annotations', 'docSnapshots', 'savedQueries'] as const) {
+      'units', 'annotations', 'docSnapshots', 'revisionTasks', 'proofreadingIgnores', 'savedQueries'] as const) {
       expect(Array.isArray((p as unknown as Record<string, unknown>)[k])).toBe(true);
     }
     expect(typeof p.attachments).toBe('object');

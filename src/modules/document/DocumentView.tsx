@@ -15,6 +15,14 @@ import BlocksEditor, { emptyBlock } from './BlocksEditor';
 import Manuscript from './Manuscript';
 import RevisionDiff from './RevisionDiff';
 import Inspector from '../../components/Inspector';
+import DocumentStructureDialog from './DocumentStructureDialog';
+import {
+  countDocumentReferences,
+  mergeAdjacentDocuments,
+  nextAdjacentDocument,
+  previewDocumentMerge,
+  splitDocumentAfterBlock,
+} from '../../documentOperations';
 
 export default function DocumentView() {
   const project = useLoom((s) => s.project);
@@ -42,6 +50,7 @@ export default function DocumentView() {
   const [diffOpen, setDiffOpen] = useState<{ leftId?: string } | null>(null);
   const [mode, setMode] = useState<'writing' | 'structure' | 'manuscript'>('writing');
   const [focusMode, setFocusMode] = useState(false);
+  const [structureToolsOpen, setStructureToolsOpen] = useState(false);
 
   const navSeq = useNav((s) => s.seq);
   useEffect(() => {
@@ -81,7 +90,7 @@ export default function DocumentView() {
           (b.items ?? []).some((item) => item.toLowerCase().includes(q)),
         )),
     );
-    return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
+    return list;
   }, [documents, catFilter, revFilter, query]);
 
   // 连续稿顺序:与 Navigator 树一致(卷 / 章文件夹递归,场景按 order)
@@ -91,6 +100,10 @@ export default function DocumentView() {
   );
 
   const selected = documents.find((d) => d.id === selectedId) ?? null;
+  const nextDocument = useMemo(
+    () => selected ? nextAdjacentDocument(project, selected.id) : undefined,
+    [project, selected],
+  );
   const linkedFlow = selected
     ? flows.find((f) => f.id === selected.linkedFlowId || f.documentId === selected.id)
     : undefined;
@@ -206,6 +219,60 @@ export default function DocumentView() {
     updateDocument(selectedId, fn);
   };
 
+  const splitSelected = async () => {
+    if (!selected || !activeBlockId) return;
+    const index = selected.blocks.findIndex((block) => block.id === activeBlockId);
+    if (index < 0 || index >= selected.blocks.length - 1) {
+      await alertDialog('请先把光标放在拆分位置的前一个正文块中；最后一个块之后没有可拆分的内容。');
+      return;
+    }
+    const movedAnnotations = (annotations ?? []).filter((annotation) =>
+      annotation.docId === selected.id
+      && !!annotation.blockId
+      && selected.blocks.slice(index + 1).some((block) => block.id === annotation.blockId)).length;
+    const name = await promptText({
+      title: '拆分场景',
+      message: `将在“${blockExcerpt(activeBlockId)}”之后拆分：前半 ${index + 1} 块，后半 ${selected.blocks.length - index - 1} 块。\n\n`
+        + `后半正文的 ${movedAnnotations} 条块级批注会随块移动；${countDocumentReferences(project, selected.id)} 处跨模块引用和关联流程保留在前半场景，不会丢失。`,
+      defaultValue: `${selected.name}（后半）`,
+      confirmText: '拆分场景',
+    });
+    if (!name?.trim()) return;
+    const newId = uid();
+    update((next) => splitDocumentAfterBlock(next, selected.id, activeBlockId, name.trim(), { newId }));
+    setSelectedId(newId);
+    setFocusBlockId(null);
+  };
+
+  const formatConflictValue = (field: string, value: unknown): string => {
+    if (value === undefined || value === '') return '未设置';
+    if (field === 'status') return DOC_STATUS_LABEL[value as DocStatus] ?? String(value);
+    if (field === 'povId' || field === 'locationId') return entities.find((entity) => entity.id === value)?.name ?? String(value);
+    if (field === 'templateId') return (project.templates ?? []).find((template) => template.id === value)?.name ?? String(value);
+    if (field === 'linkedFlowId') return flows.find((flow) => flow.id === value)?.name ?? String(value);
+    if (field === 'fields') return `${Array.isArray(value) ? value.length : 0} 个字段`;
+    return String(value);
+  };
+
+  const mergeNext = async () => {
+    if (!selected || !nextDocument) return;
+    const preview = previewDocumentMerge(project, selected.id, nextDocument.id);
+    const conflictLines = preview.conflicts.slice(0, 7).map((conflict) =>
+      `• ${conflict.label}：保留“${formatConflictValue(conflict.field, conflict.first)}”，舍弃“${formatConflictValue(conflict.field, conflict.second)}”`);
+    const hiddenCount = Math.max(0, preview.conflicts.length - conflictLines.length);
+    const conflictText = conflictLines.length
+      ? `\n\n元数据冲突（保留前场景）：\n${conflictLines.join('\n')}${hiddenCount ? `\n• 另有 ${hiddenCount} 项` : ''}`
+      : '\n\n两场景元数据一致。';
+    if (!await confirmDialog({
+      title: '合并相邻场景',
+      message: `把下一场“${nextDocument.name}”合并进“${selected.name}”？`
+        + `${conflictText}\n\n第二场景的 ${preview.migratedReferenceCount} 处跨模块引用、批注和快照会迁到第一场景。正文与附件不会丢失。`,
+      confirmText: '合并并迁移引用',
+    })) return;
+    update((next) => mergeAdjacentDocuments(next, selected.id, nextDocument.id));
+    setFocusBlockId(null);
+  };
+
   const convertToFlow = async () => {
     if (!selected) return;
     const flowable = selected.blocks.filter((b) =>
@@ -294,6 +361,14 @@ export default function DocumentView() {
           const map = new Map(orderedIds.map((id, i) => [id, i]));
           for (const d of p.documents) if (map.has(d.id)) d.order = map.get(d.id);
         })}
+        onMoveAndReorder={(ids, parentId, orderedIds) => update((p) => {
+          const moved = new Set(ids);
+          const order = new Map(orderedIds.map((id, index) => [id, index]));
+          for (const document of p.documents) {
+            if (moved.has(document.id)) document.folderId = parentId ?? undefined;
+            if (order.has(document.id)) document.order = order.get(document.id);
+          }
+        })}
         onCreate={createDoc}
         onCreateInFolder={createDoc}
         createLabel="新建场景"
@@ -315,6 +390,7 @@ export default function DocumentView() {
             title="隐藏导航与属性栏，专注正文"
             onClick={() => setFocusMode((value) => !value)}
           >{focusMode ? '退出专注' : '专注'}</button>
+          <button className="ghost" onClick={() => setStructureToolsOpen(true)}>长篇工具</button>
           <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -399,6 +475,18 @@ export default function DocumentView() {
                   <Icon name="flow" size={13} /> 生成流程
                 </button>
               )}
+              <button
+                className="ghost"
+                onClick={splitSelected}
+                disabled={!activeBlockId || selected.blocks.findIndex((block) => block.id === activeBlockId) >= selected.blocks.length - 1}
+                title="在当前正文块之后拆成两个场景"
+              >拆分场景</button>
+              <button
+                className="ghost"
+                onClick={mergeNext}
+                disabled={!nextDocument}
+                title={nextDocument ? `合并下一场：${nextDocument.name}` : '同一章内没有下一场'}
+              >合并下一场</button>
             </div>
             <BlocksEditor
               doc={selected}
@@ -637,6 +725,12 @@ export default function DocumentView() {
                 title="比较任意两个版本(含当前正文)的差异"
                 onClick={() => setDiffOpen({ leftId: docSnaps[0]?.id })}
               >比较版本</button>
+              <button
+                className="ghost"
+                style={{ flex: 1 }}
+                title="进入项目级修订任务与中文校对"
+                onClick={() => go({ tab: 'planning', planningView: 'revision' })}
+              >修订中心</button>
             </div>
             <div className="snap-list">
               {docSnaps.map((s) => (
@@ -718,6 +812,7 @@ export default function DocumentView() {
       {diffOpen && selected && (
         <RevisionDiff doc={selected} initialLeftId={diffOpen.leftId} onClose={() => setDiffOpen(null)} />
       )}
+      {structureToolsOpen && <DocumentStructureDialog onClose={() => setStructureToolsOpen(false)} />}
     </>
   );
 }
