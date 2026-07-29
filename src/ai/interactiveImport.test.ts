@@ -183,7 +183,8 @@ describe('verifyInteractiveImport 验收闭环', () => {
     normalizeProject(project);
     expect(project.flows.length).toBe(before.flows + 1);
     expect(project.variables.length).toBeGreaterThan(before.vars);
-  });
+  // 本例在示例项目上多次跑 auditProject(每次约 1.5s),并行时会越过 5s 默认超时
+  }, 20000);
 
   it('脚本使用未声明变量 → 新增脚本 error → blocked', () => {
     const raw = goodGenerated() as Record<string, unknown>;

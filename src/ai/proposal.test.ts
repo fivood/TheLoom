@@ -105,7 +105,8 @@ describe('AI 提案安全内核', () => {
     expect(result.preview?.documents[0].blocks[0].text).toContain('补充一句');
     expect(project.documents[0].blocks[0].text).toBe(originalBlock);
     expect(project.entities.find((item) => item.id === entity.id)?.fields[0].value).toBe(originalField);
-  });
+  // 同上:dry-run 会前后各跑一次全项目 audit,单测本身就重
+  }, 20000);
 
   it('项目变化后阻止过期提案', async () => {
     const project = sampleProject();

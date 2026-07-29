@@ -6,14 +6,14 @@ import {
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
-import { confirmDialog, promptText } from '../../dialog';
-import { countSubNodes, resolveSub, walkFlowNodes } from '../../util';
+import { alertDialog, confirmDialog, promptText } from '../../dialog';
+import { countSubNodes, resolveSub, sanitizeTechnicalName, walkFlowNodes } from '../../util';
 import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
 import PathTestPanel from '../../components/PathTestPanel';
 import { loadBreakpoints, toggleBreakpoint } from '../../playSaves';
-import type { Flow, FlowNodeData, FlowNodeType, SubFlow } from '../../types';
-import { FLOW_NODE_LABEL } from '../../types';
+import type { Flow, FlowEntry, FlowNodeData, FlowNodeType, FlowParam, SubFlow } from '../../types';
+import { ANNOTATION_TYPES, FLOW_NODE_LABEL } from '../../types';
 import ColorPicker from '../../components/ColorPicker';
 import NavigatorTree from '../../components/NavigatorTree';
 import { useLoom as useLoomStore } from '../../store';
@@ -69,6 +69,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   const updateFlow = useLoom((s) => s.updateFlow);
   const entities = useLoom((s) => s.project.entities);
   const projectForSpecs = useLoom((s) => s.project);
+  /** R19-2:跨流程节点的目标下拉需要全部流程 */
+  const allFlows = useLoom((s) => s.project.flows);
   const documents = useLoom((s) => s.project.documents);
   // 被文档块共享的叙事单元 id:节点 inspector 显示双向同步提示
   const docUnitIds = useMemo(() => {
@@ -78,6 +80,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   }, [documents]);
   const [playing, setPlaying] = useState(false);
   const [pathTesting, setPathTesting] = useState(false);
+  const [editingEntries, setEditingEntries] = useState(false);
   const [editingTpl, setEditingTpl] = useState<FlowNodeType | null>(null);
   const slotId = useLoom((s) => s.currentSlotId);
   const [bp, setBp] = useState<Set<string>>(() => loadBreakpoints(slotId, flow.id));
@@ -240,6 +243,12 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
               </button>
             ))}
+          {path.length === 0 && (
+            <button
+              title="管理本流程的命名入口:其他流程的跳转 / 调用与宿主引擎按 key 稳定寻址"
+              onClick={() => { writeBack(); setEditingEntries(true); }}
+            >⌗ 入口{(flow.entries?.length ?? 0) > 0 ? `(${flow.entries!.length})` : ''}</button>
+          )}
           <button
             className="primary"
             title="从选中节点(或本层起点)开始播放流程"
@@ -353,6 +362,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
         />
       )}
 
+      {editingEntries && (
+        <FlowEntriesModal
+          flow={useLoom.getState().project.flows.find((f) => f.id === flow.id) ?? flow}
+          onClose={() => setEditingEntries(false)}
+        />
+      )}
+
       {editingTpl && (
         <NodeTemplateModal initialType={editingTpl} onClose={() => setEditingTpl(null)} />
       )}
@@ -394,10 +410,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 {selectedNode.type === 'dialogue' ? '台词'
                   : selectedNode.type === 'condition' ? '条件表达式'
                   : selectedNode.type === 'instruction' ? '指令(如 took_book = true)'
-                  : selectedNode.type === 'jump' ? '跳转目标说明'
+                  : selectedNode.type === 'jump' ? '跳转说明'
+                  : selectedNode.type === 'call' ? '调用说明'
+                  : selectedNode.type === 'return' ? '返回说明'
                   : '内容'}
               </label>
-              {selectedNode.type === 'dialogue' || selectedNode.type === 'fragment' || selectedNode.type === 'jump' ? (
+              {selectedNode.type === 'dialogue' || selectedNode.type === 'fragment' || selectedNode.type === 'jump'
+                || selectedNode.type === 'call' || selectedNode.type === 'return' ? (
                 <RichTextInput
                   value={selectedNode.data.text}
                   onChange={(v) => patchSelectedNode({ text: v })}
@@ -414,6 +433,28 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 <textarea rows={5} value={selectedNode.data.text} onChange={(e) => patchSelectedNode({ text: e.target.value })} />
               )}
             </div>
+            {(selectedNode.type === 'jump' || selectedNode.type === 'call') && (
+              <CrossFlowFields
+                data={selectedNode.data}
+                isCall={selectedNode.type === 'call'}
+                flows={allFlows}
+                onPatch={patchSelectedNode}
+              />
+            )}
+            {selectedNode.type === 'return' && (
+              <div className="field">
+                <label>返回值表达式(可选,写入调用方指定的变量)</label>
+                <ScriptInput
+                  mode="number"
+                  value={selectedNode.data.returnExpr ?? ''}
+                  onChange={(v) => patchSelectedNode({ returnExpr: v })}
+                  rows={1}
+                />
+                <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
+                  留空 = 只返回不带值。调用栈为空时,返回节点即演出结束。
+                </div>
+              </div>
+            )}
             {selectedNode.type === 'check' && (
               <>
                 <div className="field">
@@ -701,5 +742,256 @@ export default function FlowEditor() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * R19-2 跨流程节点(jump / call)的目标与实参编辑。
+ * 目标按技术名保存(没有技术名才退回 id),这样重命名流程不会断链。
+ */
+function CrossFlowFields({ data, isCall, flows, onPatch }: {
+  data: FlowNodeData;
+  isCall: boolean;
+  flows: Flow[];
+  onPatch: (patch: Partial<FlowNodeData>) => void;
+}) {
+  const targetRef = (data.targetFlow ?? '').trim();
+  const target = flows.find((f) => f.id === targetRef || f.technicalName === targetRef);
+  const entries = target?.entries ?? [];
+  const entryKey = (data.targetEntry ?? '').trim();
+  const entry = entries.find((e) => e.key === entryKey);
+  const params = entry?.params ?? [];
+  const args = data.args ?? [];
+
+  const setArg = (name: string, expr: string) => {
+    const next = args.filter((a) => a.name !== name);
+    if (expr.trim()) next.push({ name, expr });
+    onPatch({ args: next.length > 0 ? next : undefined });
+  };
+
+  return (
+    <>
+      <div className="field">
+        <label>目标流程</label>
+        <select
+          value={targetRef}
+          onChange={(e) => {
+            const v = e.target.value;
+            const f = flows.find((x) => x.id === v);
+            // 优先存技术名:重命名流程不断链
+            onPatch({ targetFlow: f ? (f.technicalName || f.id) : undefined, targetEntry: undefined, args: undefined });
+          }}
+        >
+          <option value="">(不跨流程 · 仅作说明节点)</option>
+          {flows.map((f) => (
+            <option key={f.id} value={f.id}>{f.name}{f.technicalName ? ` · ${f.technicalName}` : ''}</option>
+          ))}
+        </select>
+        {targetRef && !target && (
+          <div className="hint" style={{ fontSize: 11, marginTop: 4, color: 'var(--danger)' }}>
+            找不到目标流程「{targetRef}」,演出时会降级为说明节点
+          </div>
+        )}
+      </div>
+      {target && (
+        <div className="field">
+          <label>目标入口</label>
+          <select
+            value={entryKey}
+            onChange={(e) => onPatch({ targetEntry: e.target.value || undefined, args: undefined })}
+          >
+            <option value="">(默认起点)</option>
+            {entries.map((en) => (
+              <option key={en.key} value={en.key}>{en.label ? `${en.label} · ${en.key}` : en.key}</option>
+            ))}
+          </select>
+          {entries.length === 0 && (
+            <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
+              「{target.name}」还没有命名入口。可在该流程的工具栏「入口」里添加。
+            </div>
+          )}
+          {entryKey && !entry && (
+            <div className="hint" style={{ fontSize: 11, marginTop: 4, color: 'var(--danger)' }}>
+              入口「{entryKey}」已不存在,演出时会降级为说明节点
+            </div>
+          )}
+        </div>
+      )}
+      {params.length > 0 && (
+        <div className="field">
+          <label>实参(按入口声明的参数)</label>
+          {params.map((p) => (
+            <div key={p.name} className="kv-row" style={{ alignItems: 'center', gap: 6 }}>
+              <span style={{ minWidth: 90, fontSize: 12 }}>{p.name}<span style={{ color: 'var(--text-faint)' }}> · {p.type}</span></span>
+              <input
+                style={{ flex: 1 }}
+                value={args.find((a) => a.name === p.name)?.expr ?? ''}
+                placeholder={p.type === 'string' ? '直接写文本' : '表达式,如 courage + 1'}
+                onChange={(e) => setArg(p.name, e.target.value)}
+              />
+            </div>
+          ))}
+          <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
+            文本参数按字面量取值;布尔与数值走表达式求值。留空则用入口声明的默认值。
+          </div>
+        </div>
+      )}
+      {isCall && (
+        <div className="field">
+          <label>接收返回值的变量(可选)</label>
+          <input
+            value={data.returnVar ?? ''}
+            placeholder="留空 = 不接收返回值"
+            onChange={(e) => onPatch({ returnVar: e.target.value.trim() || undefined })}
+          />
+        </div>
+      )}
+      <div className="hint" style={{ fontSize: 11 }}>
+        {isCall
+          ? '调用会记住返回点:被调流程结束(走到无出边处或返回节点)后回到本节点继续走出边。'
+          : '跳转不返回:控制权交给目标流程,本节点之后的出边不会再走到。'}
+      </div>
+    </>
+  );
+}
+
+/**
+ * R19-2 流程命名入口管理。
+ * 入口 = 稳定 key + 顶层节点 + 可选参数声明,供其他流程的 jump / call
+ * 与宿主引擎寻址;key 不随节点改名或重排变化。
+ */
+function FlowEntriesModal({ flow, onClose }: { flow: Flow; onClose: () => void }) {
+  const updateFlow = useLoom((s) => s.updateFlow);
+  const entries = flow.entries ?? [];
+  // 只有顶层叙事节点能作入口(子流程内部节点不能被外部直接进入)
+  const candidates = flow.nodes.filter((n) => !ANNOTATION_TYPES.has(n.type));
+
+  const patch = (fn: (list: FlowEntry[]) => FlowEntry[]) => {
+    updateFlow(flow.id, (f) => {
+      const next = fn([...(f.entries ?? [])]);
+      if (next.length > 0) f.entries = next;
+      else delete f.entries;
+    });
+  };
+
+  const add = async () => {
+    if (candidates.length === 0) {
+      await alertDialog('本流程还没有可作入口的节点,请先在画布上添加节点。');
+      return;
+    }
+    const key = await promptText({
+      message: '入口 key(技术名格式,流程内唯一)',
+      placeholder: '如 after_rain / boss_fight',
+      confirmText: '添加',
+    });
+    if (key === null) return;
+    const clean = sanitizeTechnicalName(key);
+    if (!clean) { await alertDialog('key 不能为空,且只能用字母、数字与下划线。'); return; }
+    if (entries.some((e) => e.key === clean)) { await alertDialog(`入口「${clean}」已存在。`); return; }
+    patch((list) => [...list, { key: clean, nodeId: candidates[0].id }]);
+  };
+
+  return (
+    <div className="palette-backdrop" onClick={onClose}>
+      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 720 }}>
+        <div className="sync-head">
+          <span>⌗ 命名入口 · {flow.name}</span>
+          <span className="spacer" />
+          <button className="ghost icon-btn" onClick={onClose} aria-label="关闭">×</button>
+        </div>
+        <div className="sync-body">
+          <div className="hint" style={{ fontSize: 12 }}>
+            入口让别的流程用稳定 key 跳转 / 调用进来,也让宿主引擎能直接从中途启动。
+            改节点标题或调整画布顺序都不会影响 key。
+          </div>
+          {entries.length === 0 && (
+            <div className="empty-hint" style={{ padding: '16px 0' }}>
+              还没有命名入口。没有入口时,外部只能从「默认起点」(唯一无入边节点)进入。
+            </div>
+          )}
+          {entries.map((entry) => (
+            <div key={entry.key} className="field" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+              <div className="kv-row" style={{ alignItems: 'center', gap: 6 }}>
+                <b style={{ minWidth: 110 }}>{entry.key}</b>
+                <input
+                  style={{ flex: 1 }}
+                  value={entry.label ?? ''}
+                  placeholder="显示名(可选)"
+                  onChange={(e) => patch((list) => list.map((x) =>
+                    x.key === entry.key ? { ...x, label: e.target.value.trim() || undefined } : x))}
+                />
+                <select
+                  style={{ flex: 1 }}
+                  value={entry.nodeId}
+                  onChange={(e) => patch((list) => list.map((x) =>
+                    x.key === entry.key ? { ...x, nodeId: e.target.value } : x))}
+                >
+                  {candidates.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.data.title || FLOW_NODE_LABEL[n.type]}({FLOW_NODE_LABEL[n.type]})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="ghost icon-btn"
+                  aria-label={`删除入口 ${entry.key}`}
+                  onClick={() => patch((list) => list.filter((x) => x.key !== entry.key))}
+                >×</button>
+              </div>
+              <div style={{ marginTop: 6, paddingLeft: 110 }}>
+                {(entry.params ?? []).map((p, i) => (
+                  <div key={i} className="kv-row" style={{ alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <input
+                      style={{ flex: 1 }}
+                      value={p.name}
+                      placeholder="参数名"
+                      onChange={(e) => patch((list) => list.map((x) => x.key === entry.key
+                        ? { ...x, params: (x.params ?? []).map((q, j) => j === i ? { ...q, name: e.target.value } : q) }
+                        : x))}
+                    />
+                    <select
+                      value={p.type}
+                      onChange={(e) => patch((list) => list.map((x) => x.key === entry.key
+                        ? { ...x, params: (x.params ?? []).map((q, j) => j === i ? { ...q, type: e.target.value as FlowParam['type'] } : q) }
+                        : x))}
+                    >
+                      <option value="string">文本</option>
+                      <option value="number">数值</option>
+                      <option value="boolean">布尔</option>
+                    </select>
+                    <input
+                      style={{ flex: 1 }}
+                      value={p.default ?? ''}
+                      placeholder="默认值(可选)"
+                      onChange={(e) => patch((list) => list.map((x) => x.key === entry.key
+                        ? { ...x, params: (x.params ?? []).map((q, j) => j === i ? { ...q, default: e.target.value || undefined } : q) }
+                        : x))}
+                    />
+                    <button
+                      className="ghost icon-btn"
+                      aria-label="删除参数"
+                      onClick={() => patch((list) => list.map((x) => x.key === entry.key
+                        ? { ...x, params: (x.params ?? []).filter((_, j) => j !== i) }
+                        : x))}
+                    >×</button>
+                  </div>
+                ))}
+                <button
+                  className="ghost"
+                  style={{ fontSize: 11 }}
+                  onClick={() => patch((list) => list.map((x) => x.key === entry.key
+                    ? { ...x, params: [...(x.params ?? []), { name: '', type: 'string' as const }] }
+                    : x))}
+                >＋ 参数</button>
+              </div>
+            </div>
+          ))}
+          <div className="sync-actions">
+            <button onClick={add}>＋ 新增入口</button>
+            <button className="primary" onClick={onClose}>完成</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

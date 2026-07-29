@@ -1,4 +1,5 @@
 import type { EntityField, Project, SubFlow } from './types';
+import { ANNOTATION_TYPES } from './types';
 import { createIssue, pathReportIssues, type IssueScope, type IssueSeverity, type ProjectIssue } from './issues';
 import type { NavTarget } from './search';
 import { simulateFlow } from './simulate';
@@ -91,7 +92,32 @@ export function advancedAuditProject(p: Project): ProjectIssue[] {
     checkEntityFields(entity.fields, entity.name, { tab: 'entities', entityId: entity.id }, entity.id);
   }
 
+  // R19-2:目标流程可按 id 或技术名引用;技术名优先(重命名不断链)
+  const flowByRef = new Map<string, Project['flows'][number]>();
+  for (const f of p.flows) {
+    flowByRef.set(f.id, f);
+    if (f.technicalName) flowByRef.set(f.technicalName, f);
+  }
+  /** 顶层无入边的叙事节点数;== 1 时"默认起点"才是确定的 */
+  const startNodeCount = (f: Project['flows'][number]): number => {
+    const hasIncoming = new Set(f.edges.map((e) => e.target));
+    const story = f.nodes.filter((n) => !ANNOTATION_TYPES.has(n.type));
+    return story.filter((n) => !hasIncoming.has(n.id)).length;
+  };
+  /** 哪些流程被 call 指向:决定 return 的返回值是否有人接收 */
+  const calledRefs = new Set<string>();
+  for (const f of p.flows) {
+    const scan = (sub: SubFlow) => {
+      for (const n of sub.nodes) {
+        if (n.type === 'call' && (n.data.targetFlow ?? '').trim()) calledRefs.add((n.data.targetFlow as string).trim());
+        if (n.data.sub) scan(n.data.sub);
+      }
+    };
+    scan(f);
+  }
+
   for (const flow of p.flows) {
+    const hasCaller = calledRefs.has(flow.id) || (!!flow.technicalName && calledRefs.has(flow.technicalName));
     const walk = (sub: SubFlow, path: string[]) => {
       const nodeIds = new Set(sub.nodes.map((node) => node.id));
       for (const edge of sub.edges) {
@@ -128,6 +154,68 @@ export function advancedAuditProject(p: Project): ProjectIssue[] {
         }
         if (node.data.unitId && !units.has(node.data.unitId)) {
           add({ code: 'reference.flow-unit', kind: '无效叙事单元', message: `${label}引用的叙事单元不存在`, scope: 'flow', nav, objectId: node.id });
+        }
+        // R19-2 跨流程调用:目标流程 / 入口 / 实参的引用完整性
+        if (node.type === 'jump' || node.type === 'call') {
+          const targetRef = (node.data.targetFlow ?? '').trim();
+          if (targetRef) {
+            const target = flowByRef.get(targetRef);
+            if (!target) {
+              add({
+                code: 'reference.flow-target',
+                kind: '无效跨流程目标',
+                message: `${label}的目标流程「${targetRef}」不存在`,
+                scope: 'flow', nav, objectId: node.id,
+              });
+            } else {
+              const entryKey = (node.data.targetEntry ?? '').trim();
+              const entry = entryKey ? (target.entries ?? []).find((e) => e.key === entryKey) : undefined;
+              if (entryKey && !entry) {
+                add({
+                  code: 'reference.flow-entry',
+                  kind: '无效跨流程入口',
+                  message: `${label}的目标入口「${entryKey}」在流程「${target.name}」中不存在`,
+                  scope: 'flow', nav, objectId: node.id,
+                });
+              } else if (!entryKey && startNodeCount(target) !== 1) {
+                // 没指定入口时靠"唯一无入边节点",目标有多个或零个起点就不确定
+                add({
+                  code: 'consistency.flow-entry-ambiguous',
+                  kind: '跨流程入口不确定',
+                  message: `${label}未指定入口,而「${target.name}」有 ${startNodeCount(target)} 个起点,进入位置不稳定`,
+                  severity: 'warning', scope: 'flow', nav, objectId: node.id,
+                });
+              }
+              // 实参与入口声明对不上
+              const params = entry?.params ?? [];
+              for (const arg of node.data.args ?? []) {
+                if (!params.some((param) => param.name === arg.name)) {
+                  add({
+                    code: 'reference.flow-arg',
+                    kind: '多余实参',
+                    message: `${label}传了「${arg.name}」,但目标入口没有声明这个参数`,
+                    severity: 'warning', scope: 'flow', nav, objectId: node.id,
+                  });
+                }
+              }
+            }
+          }
+          if (node.type === 'jump' && node.data.returnVar) {
+            add({
+              code: 'consistency.flow-jump-return',
+              kind: '跳转不会返回',
+              message: `${label}是跳转节点,设置的「接收返回值」不会生效(应改用调用节点)`,
+              severity: 'warning', scope: 'flow', nav, objectId: node.id,
+            });
+          }
+        }
+        if (node.type === 'return' && node.data.returnExpr && !hasCaller) {
+          add({
+            code: 'consistency.flow-return-unused',
+            kind: '返回值无人接收',
+            message: `${label}带返回值,但项目里没有任何调用节点指向「${flow.name}」`,
+            severity: 'warning', scope: 'flow', nav, objectId: node.id,
+          });
         }
         checkEntityFields(node.data.fields ?? [], label, nav, node.id);
         if (node.data.sub) walk(node.data.sub, [...path, node.id]);

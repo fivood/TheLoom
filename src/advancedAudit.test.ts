@@ -135,3 +135,77 @@ describe('R10 高级体检', () => {
     expect(p).toEqual(before);
   });
 });
+
+describe('R19-2 跨流程调用的引用完整性', () => {
+  const node = (id: string, type: string, data: Record<string, unknown> = {}) => ({
+    id, type, position: { x: 0, y: 0 }, data: { title: id, text: '', ...data },
+  }) as Project['flows'][number]['nodes'][number];
+
+  it('目标流程与入口不存在时各报一条', () => {
+    const p = project();
+    p.flows = [
+      {
+        id: 'main', name: '主线', technicalName: 'main',
+        nodes: [
+          node('a', 'call', { targetFlow: '不存在' }),
+          node('b', 'call', { targetFlow: 'side', targetEntry: '没这个入口' }),
+        ],
+        edges: [],
+      },
+      { id: 'side', name: '支线', technicalName: 'side', nodes: [node('s', 'dialogue')], edges: [] },
+    ];
+    const codes = advancedAuditProject(p).map((i) => i.code);
+    expect(codes).toContain('reference.flow-target');
+    expect(codes).toContain('reference.flow-entry');
+  });
+
+  it('未指定入口且目标有多个起点时警告进入位置不稳定', () => {
+    const p = project();
+    p.flows = [
+      { id: 'main', name: '主线', nodes: [node('a', 'call', { targetFlow: 'side' })], edges: [] },
+      {
+        id: 'side', name: '支线', technicalName: 'side',
+        nodes: [node('s1', 'dialogue'), node('s2', 'dialogue')],
+        edges: [],
+      },
+    ];
+    const issue = advancedAuditProject(p).find((i) => i.code === 'consistency.flow-entry-ambiguous');
+    expect(issue).toBeTruthy();
+    expect(issue!.message).toContain('2 个起点');
+  });
+
+  it('跳转节点设了接收返回值、以及多余实参都会警告', () => {
+    const p = project();
+    p.flows = [
+      {
+        id: 'main', name: '主线',
+        nodes: [node('j', 'jump', {
+          targetFlow: 'side', targetEntry: 'go', returnVar: 'x',
+          args: [{ name: '没声明的参数', expr: '1' }],
+        })],
+        edges: [],
+      },
+      {
+        id: 'side', name: '支线', technicalName: 'side',
+        entries: [{ key: 'go', nodeId: 's' }],
+        nodes: [node('s', 'dialogue')], edges: [],
+      },
+    ];
+    const codes = advancedAuditProject(p).map((i) => i.code);
+    expect(codes).toContain('consistency.flow-jump-return');
+    expect(codes).toContain('reference.flow-arg');
+  });
+
+  it('无人调用的流程里带返回值的 return 会提示;有调用方则不提示', () => {
+    const lone = project();
+    lone.flows = [{ id: 'f', name: '孤立', nodes: [node('r', 'return', { returnExpr: '1' })], edges: [] }];
+    expect(advancedAuditProject(lone).map((i) => i.code)).toContain('consistency.flow-return-unused');
+
+    const called = project();
+    called.flows = [
+      { id: 'main', name: '主线', nodes: [node('c', 'call', { targetFlow: 'sub' })], edges: [] },
+      { id: 'sub', name: '被调', technicalName: 'sub', nodes: [node('r', 'return', { returnExpr: '1' })], edges: [] },
+    ];
+    expect(advancedAuditProject(called).map((i) => i.code)).not.toContain('consistency.flow-return-unused');
+  });
+});
