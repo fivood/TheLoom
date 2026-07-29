@@ -10,6 +10,7 @@ import { performance } from 'node:perf_hooks';
 const { sampleProject } = await import('./src/sample.ts');
 const { normalizeProject, uid } = await import('./src/util.ts');
 const { auditProject } = await import('./src/audit.ts');
+const { clearPathCache } = await import('./src/pathCache.ts');
 
 /** 造 300k 字项目 —— 2 卷 × 5 章 × 15 场 × 2400 字,加实体与变量 */
 function makeLargeProject() {
@@ -77,7 +78,16 @@ bench('normalizeProject(clone)', () => {
   const clone = structuredClone(project);
   normalizeProject(clone);
 });
-bench('auditProject', () => { auditProject(project); });
+// R19-P:路径报告有内容哈希缓存,冷热必须分开测 —— 否则基准量的是缓存命中,
+// 看不出真实回归。冷启动是「首次体检 / AI dry-run 首轮」的实际代价。
+clearPathCache();
+{
+  const t = performance.now();
+  auditProject(project);
+  console.log('  auditProject(冷 · 首次)'.padEnd(30), String(Math.round(performance.now() - t)).padStart(4), 'ms');
+}
+bench('auditProject(热 · 命中缓存)', () => { auditProject(project); });
+bench('auditProject(仅结构 · 面板首屏)', () => { auditProject(project, { includePaths: false }); });
 bench('JSON.stringify', () => { JSON.stringify(project); });
 bench('structuredClone', () => { structuredClone(project); });
 

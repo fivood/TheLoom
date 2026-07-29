@@ -7,7 +7,9 @@ import { specsForEntity } from './templates';
 import { checkCondition, checkInstructions, checkNumberExpr } from './script/check';
 import type { Diagnostic } from './script/ast';
 import { createIssue, type IssueScope, type IssueSeverity, type ProjectIssue, type ProjectIssueInput } from './issues';
-import { advancedAuditProject } from './advancedAudit';
+import { advancedAuditProject, type AuditOptions } from './advancedAudit';
+
+export type { AuditOptions };
 
 /** 中文按字计,拉丁与数字按词计 */
 export function countWords(text: string | undefined): number {
@@ -122,7 +124,7 @@ function normalizeIssue(raw: RawIssue): ProjectIssue {
   });
 }
 
-export function auditProject(p: Project): ProjectIssue[] {
+export function auditProject(p: Project, options: AuditOptions = {}): ProjectIssue[] {
   const issues: RawIssue[] = [];
   const scope = buildScriptScope(p);
 
@@ -244,5 +246,5 @@ export function auditProject(p: Project): ProjectIssue[] {
     issues.push({ kind: '重复技术名', message: `${dup.name} → ${where}` });
   }
 
-  return [...issues.map(normalizeIssue), ...advancedAuditProject(p)];
+  return [...issues.map(normalizeIssue), ...advancedAuditProject(p, options)];
 }

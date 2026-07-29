@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLoom } from '../store';
 import { auditProject, projectStats } from '../audit';
 import { useNav } from '../search';
@@ -8,7 +8,25 @@ import { useAiPanelBus } from '../ai/panelBus';
 export default function AuditPanel({ onClose }: { onClose: () => void }) {
   const project = useLoom((s) => s.project);
   const stats = useMemo(() => projectStats(project), [project]);
-  const issues = useMemo(() => auditProject(project), [project]);
+  /**
+   * R19-P 懒加载:全项目路径遍历占体检耗时的绝大部分(示例项目上约 0.9 秒),
+   * 先只算结构问题让面板秒开,再让出一帧补齐路径问题。
+   * 路径结果本身有内容哈希缓存,第二次打开面板通常直接命中。
+   */
+  const structural = useMemo(() => auditProject(project, { includePaths: false }), [project]);
+  const [full, setFull] = useState<ReturnType<typeof auditProject> | null>(null);
+  useEffect(() => {
+    setFull(null);
+    let alive = true;
+    // setTimeout 而非同步:先让浏览器把首屏画出来
+    const timer = setTimeout(() => {
+      const result = auditProject(project);
+      if (alive) setFull(result);
+    }, 0);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [project]);
+  const issues = full ?? structural;
+  const pathsPending = full === null;
   const [severity, setSeverity] = useState<IssueSeverity | 'all'>('all');
   const [scope, setScope] = useState<IssueScope | 'all'>('all');
   const scopes = useMemo(() => [...new Set(issues.map((issue) => issue.scope))], [issues]);
@@ -65,7 +83,12 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
           )}
 
           <div className="audit-section">
-            <h4>问题检测({issues.length})</h4>
+            <h4>
+              问题检测({issues.length})
+              {pathsPending && (
+                <span className="audit-pending" aria-live="polite"> · 路径分析中…</span>
+              )}
+            </h4>
             {issues.length > 0 && (
               <div className="audit-filters">
                 <button className={severity === 'all' ? 'active' : ''} onClick={() => setSeverity('all')}>全部 {issues.length}</button>
@@ -84,7 +107,7 @@ export default function AuditPanel({ onClose }: { onClose: () => void }) {
                 )}
               </div>
             )}
-            {issues.length === 0 && <div className="audit-ok">没有发现引用、结构、时间、角色、脚本或内容完整性问题。</div>}
+            {issues.length === 0 && !pathsPending && <div className="audit-ok">没有发现引用、结构、时间、角色、脚本或内容完整性问题。</div>}
             {visibleIssues.map((it) => (
               <div
                 key={it.id}

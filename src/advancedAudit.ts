@@ -2,7 +2,7 @@ import type { EntityField, Project, SubFlow } from './types';
 import { ANNOTATION_TYPES } from './types';
 import { createIssue, pathReportIssues, type IssueScope, type IssueSeverity, type ProjectIssue } from './issues';
 import type { NavTarget } from './search';
-import { simulateFlow } from './simulate';
+import { cachedSimulateFlow } from './pathCache';
 import { inspectDocumentStructure } from './documentStructure';
 
 interface AddIssue {
@@ -15,7 +15,18 @@ interface AddIssue {
   objectId?: string;
 }
 
-export function advancedAuditProject(p: Project): ProjectIssue[] {
+export interface AuditOptions {
+  /**
+   * R19-P:是否跑全项目路径遍历(simulateFlow)。
+   * 它占 auditProject 总耗时的绝大部分,体检面板可以先只要结构问题秒开,
+   * 再异步补齐路径问题。默认 true —— 校验类调用方(AI dry-run、导入验收)
+   * 依赖路径结果,不能悄悄少给。
+   */
+  includePaths?: boolean;
+}
+
+export function advancedAuditProject(p: Project, options: AuditOptions = {}): ProjectIssue[] {
+  const includePaths = options.includePaths ?? true;
   const issues: ProjectIssue[] = [];
   const entities = new Map(p.entities.map((entity) => [entity.id, entity]));
   const documents = new Map(p.documents.map((document) => [document.id, document]));
@@ -222,7 +233,9 @@ export function advancedAuditProject(p: Project): ProjectIssue[] {
       }
     };
     walk(flow, []);
-    issues.push(...pathReportIssues(flow.id, simulateFlow(flow, p.variables, p.entities)));
+    if (includePaths) {
+      issues.push(...pathReportIssues(flow.id, cachedSimulateFlow(flow, p.variables, p.entities)));
+    }
   }
 
   for (const document of p.documents) {
