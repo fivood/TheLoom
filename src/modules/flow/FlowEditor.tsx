@@ -36,6 +36,12 @@ type LoomNode = Node<FlowNodeData>;
 /** 稳定的空数组:避免 selector 每次返回新引用触发无限重渲染 */
 const NO_EVENTS: ExternalEvent[] = [];
 
+/**
+ * R19-5 节点剪贴板。放模块级(而不是组件 state)才能跨流程、跨子流程层级粘贴 ——
+ * 切换流程会重挂 Canvas,组件内的状态会丢。
+ */
+let nodeClipboard: { nodes: LoomNode[]; edges: Edge[] } | null = null;
+
 const EDGE_STYLE = {
   markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
 } as const;
@@ -167,6 +173,30 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
 
   useEffect(() => () => writeBack(), [writeBack]);
 
+  /**
+   * R19-5 画布快捷键。挂在 window 但先判断焦点是否在输入控件里 ——
+   * 否则在 inspector 里按 Ctrl+C 会复制节点而不是文字。
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if (typing) return;
+      const key = e.key.toLowerCase();
+      if (key === 'c') {
+        if (copySelection() > 0) e.preventDefault();
+      } else if (key === 'v') {
+        if (pasteClipboard() > 0) e.preventDefault();
+      } else if (key === 'd') {
+        // 浏览器默认是「加书签」,选中节点时必须拦下
+        if (duplicateSelection() > 0) e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const onNodesChange = useCallback((changes: NodeChange<LoomNode>[]) => {
     dirty.current = true;
     setNodes((ns) => applyNodeChanges(changes, ns));
@@ -220,6 +250,61 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
       : [...ns.map((n) => ({ ...n, selected: false })), node]);
   };
 
+  /**
+   * R19-5 复制:只带选中节点之间的连线(一端在选区外的边没有意义)。
+   * 深拷贝以免后续编辑影响剪贴板内容。
+   */
+  const copySelection = () => {
+    const picked = latest.current.nodes.filter((n) => n.selected);
+    if (picked.length === 0) return 0;
+    const ids = new Set(picked.map((n) => n.id));
+    nodeClipboard = {
+      nodes: structuredClone(picked),
+      edges: structuredClone(latest.current.edges.filter((e) => ids.has(e.source) && ids.has(e.target))),
+    };
+    return picked.length;
+  };
+
+  /**
+   * 粘贴:重新分配 id 并整体偏移,内部连线按新 id 重接。
+   * 技术名不复制 —— 它是项目内唯一的,复制过来必然重复。
+   */
+  const pasteClipboard = (offset = 40) => {
+    if (!nodeClipboard || nodeClipboard.nodes.length === 0) return 0;
+    const idMap = new Map<string, string>();
+    for (const n of nodeClipboard.nodes) idMap.set(n.id, uid());
+    const newNodes: LoomNode[] = nodeClipboard.nodes.map((n) => {
+      const data = structuredClone(n.data);
+      delete data.technicalName;
+      return {
+        ...structuredClone(n),
+        id: idMap.get(n.id)!,
+        position: { x: n.position.x + offset, y: n.position.y + offset },
+        data,
+        selected: true,
+      };
+    });
+    const newEdges: Edge[] = nodeClipboard.edges.map((e) => ({
+      ...structuredClone(e),
+      id: uid(),
+      source: idMap.get(e.source)!,
+      target: idMap.get(e.target)!,
+    }));
+    dirty.current = true;
+    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), ...newNodes]);
+    setEdges((es) => [...es, ...newEdges]);
+    return newNodes.length;
+  };
+
+  /** 就地复制一份(Ctrl+D):等价于复制 + 立即粘贴,但不覆盖剪贴板 */
+  const duplicateSelection = () => {
+    const keep = nodeClipboard;
+    const n = copySelection();
+    if (n > 0) pasteClipboard(30);
+    nodeClipboard = keep ?? nodeClipboard;
+    return n;
+  };
+
   const enterSub = (nodeId: string) => {
     writeBack();
     navigate([...path, nodeId]);
@@ -257,6 +342,14 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
               </button>
             ))}
+          <button
+            title="复制选中节点(Ctrl+C)。可跨流程、跨子流程层级粘贴"
+            onClick={copySelection}
+          >⧉ 复制</button>
+          <button
+            title="粘贴节点(Ctrl+V)。技术名不会一起复制,避免重名"
+            onClick={() => pasteClipboard()}
+          >⎘ 粘贴</button>
           <button
             title="场景化回归测试:把演出录下来固化成断言,流程改动后批量重跑"
             onClick={() => { writeBack(); setFlowTesting(true); }}
