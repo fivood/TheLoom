@@ -706,7 +706,14 @@ export default function FlowEditor() {
       defaultValue: current ?? '',
       placeholder: '如 act1_rain',
     });
-    if (tn !== null) update((p) => { const f = p.flows.find((x) => x.id === id); if (f) f.technicalName = tn || undefined; });
+    if (tn === null) return;
+    const next = tn || undefined;
+    // R19-5:先改引用再改自身 —— 两次 commit 会各自入撤销栈,但顺序反了
+    // 就会用新名去找旧引用,一个都改不到
+    if (current && next && current !== next) {
+      useLoomStore.getState().renameFlowRefs(current, next);
+    }
+    update((p) => { const f = p.flows.find((x) => x.id === id); if (f) f.technicalName = next; });
   };
   const removeFlow = async (id: string) => {
     if (!await confirmDialog({ message: '删除该流程及其全部节点?', danger: true, confirmText: '删除' })) return;

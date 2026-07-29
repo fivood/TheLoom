@@ -295,6 +295,10 @@ interface LoomState {
   renameScriptIdentifier: (oldName: string, newName: string) => void;
   renameScriptEntityField: (entityTech: string, oldField: string, newField: string) => void;
   renameScriptSeenTarget: (oldName: string, newName: string) => void;
+  /** R19-5:流程技术名改名时,跟着改所有 jump / call 节点的 targetFlow */
+  renameFlowRefs: (oldName: string, newName: string) => void;
+  /** R19-5:外部事件改名时,跟着改所有 event 节点的 eventName */
+  renameExternalEventRefs: (oldName: string, newName: string) => void;
 
   addAsset: (a: import('./types').Asset) => void;
   updateAsset: (id: string, patch: Partial<import('./types').Asset>) => void;
@@ -961,6 +965,35 @@ export const useLoom = create<LoomState>((set, get) => {
     renameScriptSeenTarget: (oldName, newName) => {
       if (!oldName || !newName || oldName === newName) return;
       commit((p) => { mapProjectScripts(p, (s) => renameSeenTarget(s, oldName, newName)); });
+    },
+    /**
+     * R19-5 安全重命名 · 跨流程目标。
+     * R19-2 起 jump / call 节点按技术名指向目标流程,改名不跟着改就会留下
+     * 悬空引用(体检虽然报得出来,但重命名本就该是安全操作)。
+     */
+    renameFlowRefs: (oldName, newName) => {
+      if (!oldName || !newName || oldName === newName) return;
+      // isolated:重命名是一次有意的结构操作,不该被前后的输入合并进同一步撤销
+      commit((p) => {
+        for (const f of p.flows) {
+          walkFlowNodes(f.nodes, (n) => {
+            if ((n.type === 'jump' || n.type === 'call') && n.data.targetFlow === oldName) {
+              n.data.targetFlow = newName;
+            }
+          });
+        }
+      }, true);
+    },
+    /** R19-5 安全重命名 · 外部事件(R19-3 的 event 节点按技术名引用声明) */
+    renameExternalEventRefs: (oldName, newName) => {
+      if (!oldName || !newName || oldName === newName) return;
+      commit((p) => {
+        for (const f of p.flows) {
+          walkFlowNodes(f.nodes, (n) => {
+            if (n.type === 'event' && n.data.eventName === oldName) n.data.eventName = newName;
+          });
+        }
+      }, true);
     },
 
     addAsset: (a) => commit((p) => { p.assets.push(a); }),

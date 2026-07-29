@@ -110,6 +110,9 @@ function ExternalEvents({ onBack }: { onBack: () => void }) {
   const eventsRaw = useLoom((s) => s.project.externalEvents);
   const events = eventsRaw ?? NO_EVENTS;
   const update = useLoom((s) => s.update);
+  const renameExternalEventRefs = useLoom((s) => s.renameExternalEventRefs);
+  /** 改名输入聚焦时的原名,blur 时做引用联动(与变量名改名同模式) */
+  const focusEventName = useRef<string | undefined>(undefined);
 
   const patch = (fn: (list: ExternalEvent[]) => ExternalEvent[]) => {
     update((p) => {
@@ -150,6 +153,13 @@ function ExternalEvents({ onBack }: { onBack: () => void }) {
                 value={ev.name}
                 placeholder="事件技术名"
                 onChange={(e) => patchOne(ev.id, { name: e.target.value })}
+                onFocus={() => { focusEventName.current = ev.name; }}
+                onBlur={() => {
+                  // R19-5 安全重命名:blur 时才联动,避免逐键改坏引用
+                  const from = focusEventName.current;
+                  if (from && ev.name && from !== ev.name) renameExternalEventRefs(from, ev.name);
+                  focusEventName.current = undefined;
+                }}
               />
               <input
                 style={{ width: 160 }}
