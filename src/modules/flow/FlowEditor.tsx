@@ -12,8 +12,8 @@ import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
 import PathTestPanel from '../../components/PathTestPanel';
 import { loadBreakpoints, toggleBreakpoint } from '../../playSaves';
-import type { Flow, FlowEntry, FlowNodeData, FlowNodeType, FlowParam, SubFlow } from '../../types';
-import { ANNOTATION_TYPES, FLOW_NODE_LABEL } from '../../types';
+import type { EventWait, ExternalEvent, Flow, FlowEntry, FlowNodeData, FlowNodeType, FlowParam, SubFlow } from '../../types';
+import { ANNOTATION_TYPES, EVENT_WAIT_LABEL, FLOW_NODE_LABEL } from '../../types';
 import ColorPicker from '../../components/ColorPicker';
 import NavigatorTree from '../../components/NavigatorTree';
 import { useLoom as useLoomStore } from '../../store';
@@ -71,6 +71,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   const projectForSpecs = useLoom((s) => s.project);
   /** R19-2:跨流程节点的目标下拉需要全部流程 */
   const allFlows = useLoom((s) => s.project.flows);
+  /** R19-3:外部事件节点的事件下拉 */
+  const externalEvents = useLoom((s) => s.project.externalEvents ?? []);
   const documents = useLoom((s) => s.project.documents);
   // 被文档块共享的叙事单元 id:节点 inspector 显示双向同步提示
   const docUnitIds = useMemo(() => {
@@ -413,10 +415,11 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                   : selectedNode.type === 'jump' ? '跳转说明'
                   : selectedNode.type === 'call' ? '调用说明'
                   : selectedNode.type === 'return' ? '返回说明'
+                  : selectedNode.type === 'event' ? '事件说明'
                   : '内容'}
               </label>
               {selectedNode.type === 'dialogue' || selectedNode.type === 'fragment' || selectedNode.type === 'jump'
-                || selectedNode.type === 'call' || selectedNode.type === 'return' ? (
+                || selectedNode.type === 'call' || selectedNode.type === 'return' || selectedNode.type === 'event' ? (
                 <RichTextInput
                   value={selectedNode.data.text}
                   onChange={(v) => patchSelectedNode({ text: v })}
@@ -438,6 +441,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 data={selectedNode.data}
                 isCall={selectedNode.type === 'call'}
                 flows={allFlows}
+                onPatch={patchSelectedNode}
+              />
+            )}
+            {selectedNode.type === 'event' && (
+              <ExternalEventFields
+                data={selectedNode.data}
+                events={externalEvents}
                 onPatch={patchSelectedNode}
               />
             )}
@@ -993,5 +1003,111 @@ function FlowEntriesModal({ flow, onClose }: { flow: Flow; onClose: () => void }
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * R19-3 外部事件节点的编辑面板。
+ * 事件本身在「变量 → 外部事件」里声明,这里只做引用 + 传参 + 等待模式。
+ */
+function ExternalEventFields({ data, events, onPatch }: {
+  data: FlowNodeData;
+  events: ExternalEvent[];
+  onPatch: (patch: Partial<FlowNodeData>) => void;
+}) {
+  const name = (data.eventName ?? '').trim();
+  const ev = events.find((e) => e.name === name);
+  const params = ev?.params ?? [];
+  const args = data.eventArgs ?? [];
+  const wait: EventWait = data.eventWait ?? 'continue';
+
+  const setArg = (argName: string, expr: string) => {
+    const next = args.filter((a) => a.name !== argName);
+    if (expr.trim()) next.push({ name: argName, expr });
+    onPatch({ eventArgs: next.length > 0 ? next : undefined });
+  };
+
+  return (
+    <>
+      <div className="field">
+        <label>事件</label>
+        <select
+          value={name}
+          onChange={(e) => onPatch({ eventName: e.target.value || undefined, eventArgs: undefined })}
+        >
+          <option value="">(未选择)</option>
+          {events.map((e) => (
+            <option key={e.id} value={e.name}>{e.label ? `${e.label} · ${e.name}` : e.name}</option>
+          ))}
+        </select>
+        {events.length === 0 && (
+          <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
+            还没有声明外部事件。请到「变量」模块的「⚡ 外部事件」里先加一个。
+          </div>
+        )}
+        {name && !ev && (
+          <div className="hint" style={{ fontSize: 11, marginTop: 4, color: 'var(--danger)' }}>
+            事件「{name}」已不存在,演出时会跳过并给出提示
+          </div>
+        )}
+        {ev?.description && (
+          <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>{ev.description}</div>
+        )}
+      </div>
+      {params.length > 0 && (
+        <div className="field">
+          <label>实参(按事件声明的参数)</label>
+          {params.map((prm) => (
+            <div key={prm.name} className="kv-row" style={{ alignItems: 'center', gap: 6 }}>
+              <span style={{ minWidth: 90, fontSize: 12 }}>
+                {prm.name}<span style={{ color: 'var(--text-faint)' }}> · {prm.type}</span>
+              </span>
+              <input
+                style={{ flex: 1 }}
+                value={args.find((a) => a.name === prm.name)?.expr ?? ''}
+                placeholder={prm.type === 'string' ? '直接写文本' : '表达式,如 courage + 1'}
+                onChange={(e) => setArg(prm.name, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="field">
+        <label>等待模式</label>
+        <select value={wait} onChange={(e) => onPatch({ eventWait: e.target.value as EventWait })}>
+          {(Object.keys(EVENT_WAIT_LABEL) as EventWait[]).map((w) => (
+            <option key={w} value={w}>{EVENT_WAIT_LABEL[w]}</option>
+          ))}
+        </select>
+        <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
+          {wait === 'continue' && '发出事件后立刻沿出边继续,不等引擎。'}
+          {wait === 'ack' && '演出会停下,直到宿主引擎报告事件完成(如动画播完)。'}
+          {wait === 'value' && '演出会停下,直到宿主引擎回一个值(如谜题结果)。'}
+        </div>
+      </div>
+      {wait === 'value' && (
+        <>
+          <div className="field">
+            <label>接收返回值的变量</label>
+            <input
+              value={data.eventResultVar ?? ''}
+              placeholder="留空 = 丢弃返回值"
+              onChange={(e) => onPatch({ eventResultVar: e.target.value.trim() || undefined })}
+            />
+          </div>
+          <div className="field">
+            <label>模拟返回值(仅本机试跑)</label>
+            <input
+              value={data.eventSimValue ?? ''}
+              placeholder={ev?.returnType === 'boolean' ? 'true / false' : '演出时预填这个值'}
+              onChange={(e) => onPatch({ eventSimValue: e.target.value || undefined })}
+            />
+            <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
+              只影响编辑器里的演出,不会写进引擎包 —— 实际运行时由宿主提供。
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }

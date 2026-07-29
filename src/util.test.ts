@@ -308,3 +308,24 @@ describe('R14 地图图层与矢量形状 normalize', () => {
     expect(p.maps[0].shapes).toHaveLength(1);
   });
 });
+
+describe('R19-3 外部事件声明的规范化', () => {
+  it('剔除空名与重名,清理非法参数类型与返回类型,空数组降级', () => {
+    const p = sampleProject();
+    p.externalEvents = [
+      { id: '1', name: '  play_anim  ', params: [{ name: ' clip ', type: 'number' }] },
+      { id: '2', name: 'play_anim' },
+      { id: '3', name: '   ' },
+      { id: '4', name: 'weird', returnType: 'date' as never, params: [{ name: 'a', type: 'blob' as never }, { name: '', type: 'string' }] },
+    ];
+    normalizeProject(p);
+    expect(p.externalEvents!.map((e) => e.name)).toEqual(['play_anim', 'weird']);
+    expect(p.externalEvents![0].params).toEqual([{ name: 'clip', type: 'number' }]);
+    expect(p.externalEvents![1].returnType).toBeUndefined();
+    expect(p.externalEvents![1].params).toEqual([{ name: 'a', type: 'string' }]);
+
+    p.externalEvents = [];
+    normalizeProject(p);
+    expect(p.externalEvents).toBeUndefined();
+  });
+});

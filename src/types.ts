@@ -107,6 +107,7 @@ export type FlowNodeType =
   | 'jump'        // 跳转(R19-2 起可跨流程,不返回)
   | 'call'        // 调用(R19-2:进入目标流程入口,结束后回到调用点)
   | 'return'      // 返回(R19-2:结束当前被调流程,可带返回值)
+  | 'event'       // 外部事件(R19-3:声明式请求宿主引擎做一件事)
   | 'exit'        // 出口(子流程 → 父层的命名引脚)
   | 'check'       // 检定(2d6 + 技能 vs 难度;白可重试,红仅一次)
   | 'note'        // 画布注释(不参与演出与导出)
@@ -121,6 +122,7 @@ export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   jump: '跳转',
   call: '调用',
   return: '返回',
+  event: '外部事件',
   exit: '出口',
   check: '检定',
   note: '注释',
@@ -162,6 +164,16 @@ export interface FlowNodeData {
   returnVar?: string;
   /** 仅返回节点(R19-2):返回值表达式;空 = 不带返回值 */
   returnExpr?: string;
+  /** 仅外部事件节点(R19-3):引用 ExternalEvent.name */
+  eventName?: string;
+  /** 仅外部事件节点:实参表达式,按事件声明的 params 绑定 */
+  eventArgs?: { name: string; expr: string }[];
+  /** 仅外部事件节点:等待模式;空 = continue */
+  eventWait?: EventWait;
+  /** 仅外部事件节点且 wait='value':宿主回值写入该变量 */
+  eventResultVar?: string;
+  /** 仅外部事件节点:编辑器演出用的模拟返回值(不发给引擎,只影响本机试跑) */
+  eventSimValue?: string;
   /** 引用的叙事单元 id:与文档块共享同一份内容(对白 / 片段 / 条件 / 指令等) */
   unitId?: ID;
   /** 模板驱动的自定义字段(与实体同构,便于跨对象复用) */
@@ -219,6 +231,42 @@ export interface FlowEntry {
   label?: string;
   /** 参数声明;调用时按名绑定,返回时还原原值(局部作用域) */
   params?: FlowParam[];
+}
+
+/** R19-3 外部事件的等待模式 */
+export type EventWait =
+  | 'continue'  // 发出即继续,不等宿主
+  | 'ack'       // 等宿主确认完成(播完动画 / 关掉演出镜头)
+  | 'value';    // 等宿主回一个值(谜题结果 / 玩家在引擎侧的输入)
+
+export const EVENT_WAIT_LABEL: Record<EventWait, string> = {
+  continue: '立即继续',
+  ack: '等待宿主确认',
+  value: '等待宿主返回值',
+};
+
+export interface ExternalEventParam {
+  name: string;
+  type: VariableType;
+  /** 节点未传该实参时使用 */
+  default?: string;
+}
+
+/**
+ * R19-3 外部事件声明:流程可以请求宿主引擎做一件事(播动画、切场景、
+ * 启动谜题),但**不直接执行引擎代码**。声明放在项目层,节点只引用它的
+ * 技术名 —— 这样参数能做类型检查,导出时也能给引擎生成确定的类型。
+ */
+export interface ExternalEvent {
+  id: ID;
+  /** 技术名:宿主按它分发,项目内唯一 */
+  name: string;
+  /** 显示名 */
+  label?: string;
+  description?: string;
+  params?: ExternalEventParam[];
+  /** 仅 wait='value' 有意义:宿主回值的类型 */
+  returnType?: VariableType;
 }
 
 export interface Flow {
@@ -825,6 +873,8 @@ export interface Project {
   researchCards: ResearchCard[];
   researchCategories: string[];
   variables: Variable[];
+  /** R19-3 外部事件声明:流程用 event 节点请求宿主引擎做事,声明放这里统一管理 */
+  externalEvents?: ExternalEvent[];
   /** 实体字段模板:按类型预设字段名(字符串等价于文本类型),新建实体时自动填入 */
   /** R11 命名模板库(实体 / 流程节点);旧版 entityTemplates / nodeTemplates 加载时自动迁移进来 */
   templates?: ObjectTemplate[];

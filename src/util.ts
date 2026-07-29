@@ -220,13 +220,48 @@ export function normalizeProject(p: Project): Project {
       }
     }
   }
+  // R19-3 外部事件声明:剔除空技术名与重名,清理参数与返回类型
+  if (p.externalEvents !== undefined) {
+    if (!Array.isArray(p.externalEvents)) {
+      delete p.externalEvents;
+    } else {
+      const seenEventNames = new Set<string>();
+      const keptEvents = p.externalEvents.filter((e) => {
+        const name = typeof e?.name === 'string' ? e.name.trim() : '';
+        if (!name || seenEventNames.has(name)) return false;
+        seenEventNames.add(name);
+        e.name = name;
+        return true;
+      });
+      for (const e of keptEvents) {
+        if (e.returnType !== undefined
+          && e.returnType !== 'boolean' && e.returnType !== 'number' && e.returnType !== 'string') {
+          delete e.returnType;
+        }
+        if (e.params === undefined) continue;
+        if (!Array.isArray(e.params)) { delete e.params; continue; }
+        const seenParams = new Set<string>();
+        e.params = e.params.filter((param) => {
+          const name = typeof param?.name === 'string' ? param.name.trim() : '';
+          if (!name || seenParams.has(name)) return false;
+          seenParams.add(name);
+          param.name = name;
+          if (param.type !== 'boolean' && param.type !== 'number' && param.type !== 'string') param.type = 'string';
+          return true;
+        });
+        if (e.params.length === 0) delete e.params;
+      }
+      if (keptEvents.length > 0) p.externalEvents = keptEvents;
+      else delete p.externalEvents;
+    }
+  }
   for (const f of p.flows) {
     if (f.documentId && !documentIds.has(f.documentId)) delete f.documentId;
     if (f.documentId) {
       const d = p.documents.find((x) => x.id === f.documentId);
       if (d && (!d.linkedFlowId || !flowIds.has(d.linkedFlowId))) d.linkedFlowId = f.id;
     }
-    // R19-2 命名入口:剔除空 key / 指向已删节点的入口,同 key 保留第一条;参数去空名与非法类型
+  // R19-2 命名入口:剔除空 key / 指向已删节点的入口,同 key 保留第一条;参数去空名与非法类型
     if (f.entries !== undefined) {
       if (!Array.isArray(f.entries)) {
         delete f.entries;

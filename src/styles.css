@@ -47,6 +47,7 @@
   --node-instruction: #72716b;
   --node-jump: #4a4946;
   --node-call: #3b3a37;
+  --node-event: #5f5e58;
   --node-return: #8d8c85;
   --node-exit: #aaa9a1;
   --node-check: #2f2e2b;
@@ -3407,6 +3408,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
     --node-instruction: #a8a69e;
     --node-jump: #bcbab2;
     --node-call: #d2d0c8;
+  --node-event: #a8a69e;
+    --node-event: #a8a69e;
     --node-return: #94928b;
     --node-exit: #7c7a73;
     --node-check: #dedcd4;
@@ -3467,6 +3470,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   --node-instruction: #a8a69e;
   --node-jump: #bcbab2;
   --node-call: #d2d0c8;
+  --node-event: #a8a69e;
   --node-return: #94928b;
   --node-exit: #7c7a73;
   --node-check: #dedcd4;

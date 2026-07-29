@@ -209,3 +209,70 @@ describe('R19-2 跨流程调用的引用完整性', () => {
     expect(advancedAuditProject(called).map((i) => i.code)).not.toContain('consistency.flow-return-unused');
   });
 });
+
+describe('R19-3 外部事件的引用完整性', () => {
+  const node = (id: string, type: string, data: Record<string, unknown> = {}) => ({
+    id, type, position: { x: 0, y: 0 }, data: { title: id, text: '', ...data },
+  }) as Project['flows'][number]['nodes'][number];
+
+  it('未选择事件、引用未声明事件各报一条', () => {
+    const p = project();
+    p.externalEvents = [{ id: 'ev1', name: 'play_anim' }];
+    p.flows = [{
+      id: 'f', name: '流程',
+      nodes: [node('a', 'event'), node('b', 'event', { eventName: '没声明的' })],
+      edges: [],
+    }];
+    const codes = advancedAuditProject(p).map((i) => i.code);
+    expect(codes).toContain('reference.event-missing');
+    expect(codes).toContain('reference.event-undeclared');
+  });
+
+  it('多余实参与「等返回值但事件没声明返回类型」都会警告', () => {
+    const p = project();
+    p.externalEvents = [{ id: 'ev1', name: 'solve', params: [{ name: 'level', type: 'number' }] }];
+    p.flows = [{
+      id: 'f', name: '流程',
+      nodes: [node('a', 'event', {
+        eventName: 'solve', eventWait: 'value',
+        eventArgs: [{ name: 'level', expr: '2' }, { name: '没声明的', expr: '1' }],
+      })],
+      edges: [],
+    }];
+    const codes = advancedAuditProject(p).map((i) => i.code);
+    expect(codes).toContain('reference.event-arg');
+    expect(codes).toContain('consistency.event-return-type');
+  });
+
+  it('非 value 模式设了接收变量会警告;value 模式指向不存在的变量报错', () => {
+    const p = project();
+    p.externalEvents = [{ id: 'ev1', name: 'solve', returnType: 'number' }];
+    p.flows = [{
+      id: 'f', name: '流程',
+      nodes: [
+        node('a', 'event', { eventName: 'solve', eventWait: 'ack', eventResultVar: 'x' }),
+        node('b', 'event', { eventName: 'solve', eventWait: 'value', eventResultVar: '不存在的变量' }),
+      ],
+      edges: [],
+    }];
+    const codes = advancedAuditProject(p).map((i) => i.code);
+    expect(codes).toContain('consistency.event-result-unused');
+    expect(codes).toContain('reference.event-result-var');
+  });
+
+  it('声明齐备且实参匹配时不报事件相关问题', () => {
+    const p = project();
+    p.externalEvents = [{ id: 'ev1', name: 'solve', params: [{ name: 'level', type: 'number' }], returnType: 'number' }];
+    p.variables = [{ id: 'r', name: 'result', type: 'number', value: '0', description: '' }];
+    p.flows = [{
+      id: 'f', name: '流程',
+      nodes: [node('a', 'event', {
+        eventName: 'solve', eventWait: 'value', eventResultVar: 'result',
+        eventArgs: [{ name: 'level', expr: '2' }],
+      })],
+      edges: [],
+    }];
+    const codes = advancedAuditProject(p).map((i) => i.code);
+    expect(codes.filter((c) => c.includes('event'))).toEqual([]);
+  });
+});

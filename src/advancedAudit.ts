@@ -127,6 +127,9 @@ export function advancedAuditProject(p: Project, options: AuditOptions = {}): Pr
     scan(f);
   }
 
+  // R19-3:外部事件声明按技术名索引,供节点引用校验
+  const eventByName = new Map((p.externalEvents ?? []).map((e) => [e.name, e]));
+
   for (const flow of p.flows) {
     const hasCaller = calledRefs.has(flow.id) || (!!flow.technicalName && calledRefs.has(flow.technicalName));
     const walk = (sub: SubFlow, path: string[]) => {
@@ -217,6 +220,66 @@ export function advancedAuditProject(p: Project, options: AuditOptions = {}): Pr
               kind: '跳转不会返回',
               message: `${label}是跳转节点,设置的「接收返回值」不会生效(应改用调用节点)`,
               severity: 'warning', scope: 'flow', nav, objectId: node.id,
+            });
+          }
+        }
+        // R19-3 外部事件:声明存在性、实参匹配、等待模式与返回值的自洽
+        if (node.type === 'event') {
+          const evName = (node.data.eventName ?? '').trim();
+          const wait = node.data.eventWait ?? 'continue';
+          if (!evName) {
+            add({
+              code: 'reference.event-missing',
+              kind: '外部事件未选择',
+              message: `${label}还没有选择要请求的事件`,
+              severity: 'warning', scope: 'flow', nav, objectId: node.id,
+            });
+          } else {
+            const decl = eventByName.get(evName);
+            if (!decl) {
+              add({
+                code: 'reference.event-undeclared',
+                kind: '未声明的外部事件',
+                message: `${label}引用的事件「${evName}」不在项目的外部事件声明里`,
+                scope: 'flow', nav, objectId: node.id,
+              });
+            } else {
+              const declared = new Set((decl.params ?? []).map((prm) => prm.name));
+              for (const arg of node.data.eventArgs ?? []) {
+                if (!declared.has(arg.name)) {
+                  add({
+                    code: 'reference.event-arg',
+                    kind: '多余实参',
+                    message: `${label}给事件「${evName}」传了未声明的参数「${arg.name}」`,
+                    severity: 'warning', scope: 'flow', nav, objectId: node.id,
+                  });
+                }
+              }
+              if (wait === 'value' && !decl.returnType) {
+                add({
+                  code: 'consistency.event-return-type',
+                  kind: '事件返回值未声明',
+                  message: `${label}要等待返回值,但事件「${evName}」没有声明返回类型`,
+                  severity: 'warning', scope: 'flow', nav, objectId: node.id,
+                });
+              }
+            }
+          }
+          if (wait !== 'value' && node.data.eventResultVar) {
+            add({
+              code: 'consistency.event-result-unused',
+              kind: '返回值不会写入',
+              message: `${label}的等待模式不是「等待宿主返回值」,设置的接收变量不会生效`,
+              severity: 'warning', scope: 'flow', nav, objectId: node.id,
+            });
+          }
+          if (wait === 'value' && node.data.eventResultVar
+            && !p.variables.some((v) => v.name === node.data.eventResultVar)) {
+            add({
+              code: 'reference.event-result-var',
+              kind: '无效变量',
+              message: `${label}要把返回值写入不存在的变量「${node.data.eventResultVar}」`,
+              scope: 'flow', nav, objectId: node.id,
             });
           }
         }

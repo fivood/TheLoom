@@ -1,6 +1,6 @@
 import { Handle, NodeResizer, Position, useEdges, useReactFlow, type NodeProps, type Node } from '@xyflow/react';
-import type { FlowNodeData, FlowNodeType } from '../../types';
-import { FLOW_NODE_LABEL } from '../../types';
+import type { EventWait, FlowNodeData, FlowNodeType } from '../../types';
+import { EVENT_WAIT_LABEL, FLOW_NODE_LABEL } from '../../types';
 import { useLoom } from '../../store';
 import { countSubNodes } from '../../util';
 import Icon, { KIND_ICON } from '../../components/Icon';
@@ -16,6 +16,7 @@ export const TYPE_COLORS: Record<FlowNodeType, string> = {
   jump: 'var(--node-jump)',
   call: 'var(--node-call)',
   return: 'var(--node-return)',
+  event: 'var(--node-event)',
   exit: 'var(--node-exit)',
   check: 'var(--node-check)',
   note: 'var(--node-note)',
@@ -125,10 +126,45 @@ export function InstructionNode(props: NodeProps<LoomNode>) {
   );
 }
 
+/** 跳转 / 调用 / 返回:R19-2 起显示真实的跨流程目标而不只是说明文字 */
 export function JumpNode(props: NodeProps<LoomNode>) {
+  const t = props.type as FlowNodeType;
+  const target = (props.data.targetFlow as string | undefined)?.trim();
+  const entry = (props.data.targetEntry as string | undefined)?.trim();
+  const mark = t === 'call' ? '⤿' : t === 'return' ? '⤺' : '↪';
+  let head: string;
+  if (t === 'return') {
+    const expr = (props.data.returnExpr as string | undefined)?.trim();
+    head = expr ? `返回 ${expr}` : '返回调用点';
+  } else if (target) {
+    head = `${target}${entry ? ` · ${entry}` : ''}`;
+  } else {
+    head = t === 'call' ? '(未指定调用目标)' : '(本流程内说明)';
+  }
   return (
     <BaseNode {...props}>
-      <div className="node-body">↪ {props.data.text ? <RichText text={props.data.text} /> : '(未指定跳转目标)'}</div>
+      <div className="node-body">
+        <div style={{ fontFamily: 'Consolas, monospace' }}>{mark} {head}</div>
+        {props.data.text && <div style={{ marginTop: 4 }}><RichText text={props.data.text} /></div>}
+      </div>
+    </BaseNode>
+  );
+}
+
+/** R19-3 外部事件:显示事件名与等待模式,让画布上一眼看出这里会交给引擎 */
+export function EventNode(props: NodeProps<LoomNode>) {
+  const wait = (props.data.eventWait as EventWait | undefined) ?? 'continue';
+  return (
+    <BaseNode {...props}>
+      <div className="node-body">
+        <div style={{ fontFamily: 'Consolas, monospace' }}>
+          ⚡ {props.data.eventName || '(未选择事件)'}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+          {EVENT_WAIT_LABEL[wait]}
+        </div>
+        {props.data.text && <div style={{ marginTop: 4 }}><RichText text={props.data.text} /></div>}
+      </div>
     </BaseNode>
   );
 }
@@ -221,6 +257,9 @@ export const nodeTypes = {
   condition: ConditionNode,
   instruction: InstructionNode,
   jump: JumpNode,
+  call: JumpNode,
+  return: JumpNode,
+  event: EventNode,
   hub: HubNode,
   exit: ExitNode,
   check: CheckNode,
