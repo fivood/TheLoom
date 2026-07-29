@@ -20,10 +20,14 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.33.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.33.0`(R16 稳定性三批:R16-3a 无障碍首批 + R16-4 性能基线 + R16-5 升级迁移测试);R12 已暂缓;R15-Unity / Unreal 可选;R16 剩余无障碍深入工作视需求推进,v1.0.0 留待多轮测试后
-- 当前基线:`v0.24.0`;包含 v0.23.1 文件夹模式稳定性修复与完整 R10
-- 已交付的能力(截至 v0.23.0):
+- 已发布版本:`v0.35.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.35.0` + 已提交待发布的 **R19-1 运行时事件协议 v2**;R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
+- 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
+- 已交付的能力(截至 v0.35.0):
+  - **R19-1 运行时事件协议 v2**(已提交,待发版)— 引擎包 schema `1.1.0` + 顶层 `runtimeProtocolVersion: 2`;TS 与 Godot 运行库对每个叙事节点依次产生 `enter / display / leave`,带流程 / 节点定位、子流程 path 栈、自定义字段、附件 assetIds、说话人、触发边与稳定 `choiceKey`;入边 effect 归目标节点 `enter.changes`、指令节点归 `display.changes`,变量与实体属性都给前后值;v1 beat / log / onBeat 全保留,旧包旧存档缺字段确定性补齐;两端共用 `examples/godot-demo/runtime_v2_fixture.json` 对拍。协议见 `docs/R19_RUNTIME_PROTOCOL_V2.md`
+  - **v0.35.0 R18 小说生产闭环** ✅ — 场景按正文块拆分 / 同章合并(迁移批注 / 快照 / 流程 / 大纲 / 时间线 / 弧线 / 伏笔 / 附件 / 修订任务引用);DOCX 成稿导出(投稿稿 + 编辑审阅稿两套预设,正式 OOXML 样式,下载前重解析自检);写作进度工作台(全书 / 卷 / 章 / 场景四级目标 + 今日新增 + 七日趋势,删字不倒扣、撤销与导入不制造虚假新增);修订任务(快照差异冻结 + 逐项接受 / 保留 / 待议,只存结论不覆盖正文)+ 本地中文校对
+  - **v0.34.0 R17 场景权威主轴与创作工作区** ✅ — 文档文件夹显式标记卷 / 章 / 小节(不再靠名字猜),错误嵌套进体检;场景成为大纲行与时间线事件共同引用的权威对象,改名移动自动同步,删除前展示跨模块影响;顶栏「返回上一位置」+「最近访问」;小说 / 互动叙事 / 通用三套工作区排序
+  - 以下为 R0-R9 历史交付(R10-R16 的细节见下方路线图表与各「最近变更」小节):
   - **v0.23.0 R9 通用游戏引擎导出** ✅ — 带版本 JSON Schema 的引擎包(zip:数据 + Schema + .d.ts 类型 + README);导出规则(选流程 / 剥布局注释 / 仅引用实体资源);技术名与节点定位等四类索引;内容哈希清单 + 增量包;独立运行库 theloom-runtime(零依赖 ES Module,语义与 Player 一致);examples/engine-demo 无 React 演出示例
   - **v0.22.0 R8 资源原文件闭环** ✅ — 原文件按 SHA-256 内容寻址存储(桌面 `assets/asset-{hash16}.{ext}` / 网页 IndexedDB);播放与下载;视频首帧缩略图;哈希去重;替换保引用;缺失徽标 + 重新定位;删除不吞字节 + 显式孤儿清理;授权字段;绑定文件夹时 IndexedDB 原文件自动落盘
   - **v0.21.0 R7 演出与路径测试** ✅ — 种子化 RNG(mulberry32,同种子掷骰可复现);演出存档/读档(全部运行态 + RNG 快进,本机);节点断点(自动前进暂停,本机);变量监视高亮 + 实体属性;`simulateFlow` 批量路径遍历(确定性枚举 + 合流剪枝,报告覆盖率/不可达/死循环/卡死,可点击跳节点)
@@ -39,10 +43,12 @@
   - **v0.9.0 R0 工程安全基线** ✅ — 测试框架、恢复面板、损坏隔离、诊断导出、大项目性能兜底、桌面项目文件原子替换
   - **v0.10.0 附加批** ✅ — 全模块 Navigator(五模块统一)+ 文件夹归档 + 对话框统一 + 拖拽 / 多选 / 批量
   - **v0.11.0 附加批** ✅ — 长篇写作块(subheading / quote / list,无损往返)+ Excel .xlsx 与 Final Draft .fdx 双向互通(带 ImportPreview 预检)+ 配色表系统(zimg JSON 集成)+ 实体宽版编辑窗 + 文件夹 md 往返修复
-- 最近验证(2026-07-17,含当前未提交改动):`npm test` 188 项通过、`npm run build` 通过、`cargo test --lib` 2 项通过;体检筛选 / 跳转、路径报告、组合查询及保存 / 更新 / 套用 / 重命名 / 删除已在浏览器实际点验
-- **性能基线**(R16-4,`npx tsx bench.mjs`,151 场景 / 109 实体 / 15.9 万字 / JSON 743 KB):normalizeProject(clone) 11 ms · **auditProject 879 ms**(全项目 simulateFlow 主要成本)· JSON.stringify 4 ms · structuredClone 7 ms。auditProject 是关键路径,若未来引入 R10-A5 结局验收路径的更多 flow,需评估分片或懒加载。
+- 最近验证(2026-07-29,R19-1 提交时全门禁):`npx tsc -b` 通过、`npx vitest run` **58 文件 370 项通过**、`npm run build` 与 `npm run build:runtime` 通过、`cargo test --lib` 3 项通过、`node examples/engine-demo/demo.mjs` 演出输出正确
+- **性能基线**(`npx tsx bench.mjs`,151 场景 / 109 实体 / 15.9 万字 / JSON 743 KB):normalizeProject(clone) 13 ms · **auditProject 1052 ms**(全项目 simulateFlow 主要成本)· JSON.stringify 4 ms · structuredClone 6 ms。
+  - 对比 R16-4 基线(auditProject 879 ms)增长约 20%,是 R17 / R18 新增校验与结构的自然成本,仍在同数量级
+  - auditProject 是关键路径:若继续往体检里加全项目 flow 遍历,先评估分片或懒加载,不要直接叠加
 
-### 当前执行顺序
+### R10 执行顺序(已完成,历史记录)
 
 1. **v0.23.1 文件夹模式稳定性小批**:✅ 已随 v0.24.0 发布
 2. **R10-1 · 统一问题模型**:✅ audit、脚本诊断和路径测试已收敛为稳定 ID + 来源 + 严重级别 + 范围 + 导航目标;体检支持按严重级别筛选
@@ -52,7 +58,7 @@
 
 R10-A 详细设计见 `docs/R10A_AI_ASSISTANT.md`:模型只拥有白名单只读工具,修改必须形成带基线指纹的结构化提案,在项目副本上经过脚本 / 引用 / audit / path 验证与用户预览后单次 `commit`。
 
-### R10-A 执行顺序
+### R10-A 执行顺序(已完成,历史记录)
 
 1. **R10-A1 · 安全内核**:Provider 能力、JSON Schema 结构化输出、取消 / usage / 错误分类;显式上下文与字符预算;结构化提案、dry-run 和过期保护
 2. **R10-A2 · 只读助手与自然语言查询**:✅ 统一面板、本机会话、带对象引用问答、自然语言 → `ProjectQuery` → 本地执行 → 可选保存
@@ -61,7 +67,7 @@ R10-A 详细设计见 `docs/R10A_AI_ASSISTANT.md`:模型只拥有白名单只读
 5. **R10-A5 · 完整互动项目生成**:✅ 项目导入向导新增「互动游戏剧本」类型(分支密度 / 目标结局数 / 检定开关 / 失败回路配置);计划阶段产出变量与结局清单供审阅;生成阶段在 R5-A 内容结构上叠加流程(hub 选择 / 条件 / 指令 / 检定 / fallback,BFS 分层自动布局,id 重映射 + 技术名消歧);`verifyInteractiveImport` 在克隆项目上 audit 前后对比(issueKey 与 A3 dry-run 同口径,覆盖脚本 error / 悬挂引用 / 卡死 / 死循环 / 不可达)+ 每个结局 simulateFlow 可达断言;blocked 不显示导入按钮,只能调整后重新生成
 6. **R10-A6 · 收尾**:大项目性能与成本基线、隐私、取消 / 离线恢复、浏览器 / Tauri、主题 / 键盘与发布回归
 
-当前开发:R11 完整模板与数据库进行中。R11-1 ✅ 命名模板对象(`src/templates.ts`):`ObjectTemplate`(module entity/node + entityKind/nodeType 默认类别 + parentId 继承,子覆盖父同名字段、环安全);`Entity.templateId` / 节点 `data.templateId` 分配;`migrateTemplateInstances` 实例安全迁移(模板新增字段自动补齐、绝不改写已有值,normalizeProject 与模板编辑 commit 双触发);旧 `entityTemplates`/`nodeTemplates` 加载时自动迁移为命名模板并分配到既有对象后删除旧键;audit 必填 / AI 提案只读与枚举约束改走 `specsForEntity`;实体 inspector 增模板分配下拉;实体 md frontmatter 往返 `templateId`。R11-2 ✅ 模板扩展与管理器:`TemplateModule` 增 asset/document/map,三类对象增 `templateId?`/`fields?`(迁移 / 清理 / specs 全覆盖);inspector 共用 `ObjectTemplateSection`(资源 / 文档 / 地图);文档 `templateId`+`fields` 经 md frontmatter 无损往返;新增 `TemplateManager`(工具菜单)。R11-3 ✅ 收藏夹(NavigatorTree 的 `favoriteMode`)+ 批量编辑(`src/batch.ts` + `BatchEditDialog.tsx`,149 项测试)+ 写作 / 结构 / 连续稿三视图(BlocksEditor 大改)+ 文件夹模式改为可读 Markdown 正文为权威内容。已发版 v0.26.0,现在基线 v0.26.2。下一批 R13。
+R11 完整模板与数据库(已完成,v0.26.0 发布)。R11-1 ✅ 命名模板对象(`src/templates.ts`):`ObjectTemplate`(module entity/node + entityKind/nodeType 默认类别 + parentId 继承,子覆盖父同名字段、环安全);`Entity.templateId` / 节点 `data.templateId` 分配;`migrateTemplateInstances` 实例安全迁移(模板新增字段自动补齐、绝不改写已有值,normalizeProject 与模板编辑 commit 双触发);旧 `entityTemplates`/`nodeTemplates` 加载时自动迁移为命名模板并分配到既有对象后删除旧键;audit 必填 / AI 提案只读与枚举约束改走 `specsForEntity`;实体 inspector 增模板分配下拉;实体 md frontmatter 往返 `templateId`。R11-2 ✅ 模板扩展与管理器:`TemplateModule` 增 asset/document/map,三类对象增 `templateId?`/`fields?`(迁移 / 清理 / specs 全覆盖);inspector 共用 `ObjectTemplateSection`(资源 / 文档 / 地图);文档 `templateId`+`fields` 经 md frontmatter 无损往返;新增 `TemplateManager`(工具菜单)。R11-3 ✅ 收藏夹(NavigatorTree 的 `favoriteMode`)+ 批量编辑(`src/batch.ts` + `BatchEditDialog.tsx`,149 项测试)+ 写作 / 结构 / 连续稿三视图(BlocksEditor 大改)+ 文件夹模式改为可读 Markdown 正文为权威内容。已发版 v0.26.0(补丁 v0.26.2)。
 
 R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完整项目导入向导补取消按钮(AbortSignal 传入 chatComplete,`已取消 / cancelled / aborted` 归类为 cancel 提示);README 补 AI 隐私说明(凭据、发送范围、绝不擅自修改、可切换服务商、可取消);30 万字级 auditProject ~1.3s、verifyInteractiveImport ~3.3s,深色主题下 AI 助手、导入向导与所有面板正确渲染。R10-A5 实现要点:`src/ai/interactiveImport.ts`(计划 / 生成扩展、normalize 宽容修复 condition/check 缺失引脚、`buildInteractiveImportPreview` 复用 R5-A 预检并叠加流程 / 变量 / 结局、验收闭环);向导 `interactive` 分流;新项目槽位默认流程与生成流程可能重名,按 technicalName 定位。R10-A3 实现要点:`src/ai/fixAssistant.ts`(提案生成)、`src/ai/panelBus.ts`(体检 → 助手的任务通道)、`AiAssistantPanel` 修复任务 UI、`AI_FIX_OPERATION_SCHEMAS` 从提案 schema 拆出复用;路径安全依赖 auditProject 内置的全项目 simulateFlow(不要另加重复的路径校验层)。
 
@@ -86,10 +92,11 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 | **R10-A** | **v0.25.0** | **🆕 AI 智能助手(深度)** | 消费 R6 AST → AI 生成 / 改写脚本即时校验;消费 R10 体检结果 → AI 修复方案一键 apply;自然语言 → 保存查询;演出路径分析建议;人物一致性诊断;完整互动剧本生成配置 | AI 建议全部通过类型 / 结构检查后才允许 apply;互动项目生成的变量、条件、指令与分支通过脚本和路径检查,不产生"跑不通"的输出 | L |
 | ~~R11~~ | ~~v0.26.0~~ | ~~完整模板与数据库 + 写作工作台~~ | ~~模块化模板 / 分配 / 继承 / 迁移;资源 / 文档 / 地图套模板;收藏夹 (NavigatorTree.favoriteMode);批量编辑 (BatchEditDialog);写作 / 结构 / 连续稿三视图~~ | ✅ 已完成(v0.26.0 首发,v0.26.2 补丁) | L |
 | ~~R12~~ | ~~v0.27.0~~ | **暂缓(2026-07-17)** — 用户决定 Localization 与 VO 往后放,后续需要时再重新排入路线图 | — | — | — |
-| R13 | v0.28.0 | **专业导入导出(含 AI 辅助解析)** | DOCX / PDF / EPUB / 完整 Markdown / Excel / Final Draft;可选章节编译;AI 辅助反向解析扫描件 PDF 表格、图注 | 小说可直接生成投稿稿件;FDX / Excel 可往返且有冲突报告 | L |
-| R14 | v0.29.0 | **地图与工作区增强** | 地图图层 / 路径 / 形状 / 文字 / 锁定 / 显隐;跨模块树状目录;多面板 / 多窗口 | 地图承担空间设计;实体 / 资料 / 文档 / 资源都支持文件夹树 | M |
-| R15 | v0.31.0+ | **引擎接入(分批)** | R15-Godot(v0.31.0,Godot 4:GDScript runtime + demo)→ R15-Unity(可选)→ R15-Unreal(可选)。基于通用引擎包制作各引擎的导入器 / 运行库 / 示例工程 | 引擎可导入实体 / 对白 / 变量,并运行分支 | M(Godot) + 后续 |
-| R16 | v1.0.0 | **稳定版** | 性能 / 崩溃恢复 / 备份策略 / 无障碍 / 快捷键 / 帮助文档 / 安装升级测试 | 大型真实项目长期使用无数据丢失;完成完整回归测试 | L |
+| ~~R13~~ | ~~v0.28.0 / v0.29.0~~ | ~~专业导入导出~~ | ~~TXT / MD / EPUB / DOCX / MOBI / AZW3 导入 + 章节编译 + Excel / FDX 往返~~ | ✅ 已完成(PDF 明确跳过) | L |
+| ~~R14~~ | ~~v0.30.0~~ | ~~地图与工作区增强~~ | ~~地图图层 / 四种形状 / 跨模块总览 / 网页分屏~~ | ✅ 已完成 | M |
+| ~~R15~~ | ~~v0.31.0~~ | ~~引擎接入 · Godot~~ | ~~Godot 4 GDScript runtime + 示例工程~~ | ✅ Godot 已完成;Unity / Unreal 可选,未排期 | M |
+| R16 | v0.32.0 / v0.33.0 | **稳定性** | 存储管理、使用指南、自动快照、应急恢复、无障碍首批、性能基线、升级迁移测试 | 🔶 R16-1~R16-5 已交付;**v1.0.0 尚未发布**,留待多轮真实项目测试后 | L |
+| R17-R19 | v0.34.0+ | **两条主工作流收束** | 详见 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` | 🔶 R17 / R18 已发布,R19-1 已提交待发版 | L |
 
 ### 关于 AI / 知识库集成的设计准则
 
