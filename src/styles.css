@@ -1671,6 +1671,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   background: var(--bg-panel);
 }
 .player-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+/* R19-2:跨流程调用中,标题追加当前所在流程 */
+.player-subflow { font-weight: 500; font-size: 13px; color: var(--text-faint); }
 .player-head .spacer { flex: 1; }
 .player-body { flex: 1; display: flex; min-height: 0; justify-content: center; }
 .player-log {

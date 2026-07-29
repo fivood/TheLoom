@@ -196,3 +196,49 @@ describe('simulateFlow 可复现与上限', () => {
     expect(r.pathCount).toBeLessThanOrEqual(8);
   });
 });
+
+describe('simulateFlow · R19-2 跨流程调用的局部建模', () => {
+  it('带目标的 jump 终止本地路径,其后节点被正确报为不可达', () => {
+    const f = flow(
+      [
+        node('a', 'dialogue'),
+        node('j', 'jump', { targetFlow: 'other' }),
+        node('dead', 'dialogue'),
+      ],
+      [edge('a', 'j'), edge('j', 'dead')],
+    );
+    const r = simulateFlow(f, [], noEntities);
+    expect(r.ends.end).toBe(1);
+    expect(r.unreachable.map((x) => x.nodeId)).toEqual(['dead']);
+  });
+
+  it('无目标的 jump 保持旧行为:装饰性节点,照常走出边', () => {
+    const f = flow(
+      [node('a', 'dialogue'), node('j', 'jump'), node('b', 'dialogue')],
+      [edge('a', 'j'), edge('j', 'b')],
+    );
+    const r = simulateFlow(f, [], noEntities);
+    expect(r.coverage).toBe(1);
+    expect(r.unreachable).toHaveLength(0);
+  });
+
+  it('call 假设被调流程会返回,继续走出边', () => {
+    const f = flow(
+      [node('a', 'dialogue'), node('c', 'call', { targetFlow: 'sub' }), node('after', 'dialogue')],
+      [edge('a', 'c'), edge('c', 'after')],
+    );
+    const r = simulateFlow(f, [], noEntities);
+    expect(r.coverage).toBe(1);
+    expect(r.unreachable).toHaveLength(0);
+  });
+
+  it('return 终止本地路径', () => {
+    const f = flow(
+      [node('a', 'dialogue'), node('r', 'return'), node('dead', 'dialogue')],
+      [edge('a', 'r'), edge('r', 'dead')],
+    );
+    const r = simulateFlow(f, [], noEntities);
+    expect(r.ends.end).toBe(1);
+    expect(r.unreachable.map((x) => x.nodeId)).toEqual(['dead']);
+  });
+});

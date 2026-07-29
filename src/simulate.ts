@@ -14,6 +14,13 @@ import {
  *   fallback 遮蔽、一次性选项、条件边过滤、红色检定结果沿用
  * - 检定不掷骰而是枚举成功 / 失败两支;条件无法求值时双向分叉
  * - 完全确定性:同一流程与变量初值,报告永远一致(可复现)
+ *
+ * R19-2 跨流程调用在这里是**局部建模**,与 Player / runtime 的完整调用栈不同:
+ * 本模拟器只负责单个流程,auditProject 会对每个流程各跑一次。
+ *   - 带目标的 jump 与 return:控制权离开本流程 → 本地路径终止
+ *   - call:假设被调流程会返回 → 继续走出边(被调流程由它自己那次模拟覆盖)
+ * 这样每份报告自洽、不重复计数,也不会让 auditProject 的成本随调用图爆炸。
+ * 代价是"被调流程永不返回"这种情况检测不到,由 R19-4 的场景化回归测试补。
  */
 
 export interface SimOptions {
@@ -258,6 +265,15 @@ export function simulateFlow(
       const failNext = nextEdges(fail, node);
       forkEdges(fail, node, failNext);
       s.checks.set(node.id, true);
+    }
+    // R19-2 跨流程:每个流程各自跑一次 simulateFlow,这里只对本流程做局部建模,
+    // 不跟进目标流程 —— 否则会重复统计,也会让 auditProject 的成本随调用图爆炸。
+    //   jump(带目标)/ return → 控制权离开本流程,本地路径到此为止
+    //   call → 假设被调流程会返回,继续走出边(被调流程由它自己那次模拟负责)
+    //   无目标的 jump 保持旧行为(装饰性节点,照常走出边)
+    if ((node.type === 'jump' && (node.data.targetFlow ?? '').trim()) || node.type === 'return') {
+      endPath(s, 'end');
+      continue;
     }
     if (node.type === 'fragment' && node.data.sub && node.data.sub.nodes.length > 0) {
       // 钻入子流程:每个起点一支

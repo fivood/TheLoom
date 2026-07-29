@@ -28,6 +28,16 @@ export interface PlaySave {
   choices: { label: string; nodeId: string | null; edgeId?: string; effect?: string; once?: boolean }[];
   ended: boolean;
   log: SavedBeat[];
+  /** R19-2:存档时所在流程 id;旧存档缺失时按演出入口流程恢复 */
+  flowId?: string;
+  /** R19-2:调用栈;旧存档缺失时按空栈恢复 */
+  callStack?: {
+    flowId: string;
+    path: string[];
+    nodeId: string;
+    returnVar?: string;
+    savedParams: { name: string; value: VarValue | null }[];
+  }[];
 }
 
 const savesKey = (slotId: string) => `theloom-plays-${slotId}`;

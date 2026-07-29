@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLoom } from '../../store';
 import { resolveSub } from '../../util';
-import type { Entity, Flow, FlowEdge, FlowNode, SubFlow } from '../../types';
+import type { Entity, Flow, FlowEdge, FlowNode, FlowParam, SubFlow } from '../../types';
 import { ANNOTATION_TYPES, FLOW_NODE_LABEL } from '../../types';
+import { MAX_CALL_DEPTH } from '../../runtime/player';
 import { TYPE_COLORS } from './nodes';
 import Icon from '../../components/Icon';
 import { RichText } from '../../components/RichText';
@@ -31,6 +32,18 @@ interface Choice {
   effect?: string;
   once?: boolean;
 }
+
+/** R19-2 调用帧(与运行库 RuntimeFrame 同构,演出侧不带事件协议字段) */
+interface PlayFrame {
+  flowId: string;
+  path: string[];
+  nodeId: string;
+  returnVar?: string;
+  savedParams: { name: string; value: VarValue | null }[];
+}
+
+/** 单出边时自动前进的直通型节点(与运行库 AUTO_ADVANCE 保持一致) */
+const AUTO_ADVANCE_TYPES = ['hub', 'instruction', 'condition', 'exit', 'check', 'call'];
 
 function startNodes(sub: SubFlow): FlowNode[] {
   const hasIncoming = new Set(sub.edges.map((e) => e.target));
@@ -79,7 +92,20 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   /** 节点断点(本机,演出自动前进在断点前暂停) */
   const breakpoints = useMemo(() => loadBreakpoints(slotId, flow.id), [slotId, flow.id]);
 
-  /** 技术名 → 节点 id 映射,递归遍历流程所有层级 */
+  /**
+   * R19-2:当前所在流程。跨流程 jump / call 会切换它。
+   * 用 ref 是因为 visit 循环内切流程后必须同步生效(setState 要等下一次渲染)。
+   */
+  const activeFlowRef = useRef<Flow>(flow);
+  const [activeFlowName, setActiveFlowName] = useState(flow.name);
+  /** R19-2 调用栈:栈顶是最近一次 call 的返回点 */
+  const callStackRef = useRef<PlayFrame[]>([]);
+
+  /**
+   * 技术名 → 节点 id 映射,递归遍历全部流程所有层级。
+   * R19-2:seen() 的目标可能落在被调流程里,所以索引跨流程
+   * (技术名项目内唯一,由体检的重复技术名检查保证)。
+   */
   const techToId = useMemo(() => {
     const m = new Map<string, string>();
     const walk = (sub: SubFlow) => {
@@ -88,16 +114,55 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         if (n.data.sub) walk(n.data.sub);
       }
     };
-    walk(flow);
+    for (const f of project.flows) walk(f);
     return m;
-  }, [flow]);
+  }, [project.flows]);
   const seen: EvalCtx['seen'] = (tn) => seenRef.current.has(techToId.get(tn) ?? '__none__');
 
   /** 实体属性运行态副本:指令可写(实体.字段 = ...),重新开始时还原 */
   const entityPropsRef = useRef<Record<string, Record<string, VarValue>>>(buildEntityProps(entities));
   const evalCtx: EvalCtx = { seen, entityProps: entityPropsRef.current };
 
-  const container = (p: string[]): SubFlow => resolveSub(flow, p) ?? { nodes: [], edges: [] };
+  /** 容器解析始终针对「当前流程」,跨流程切换后所有调用点自动跟随 */
+  const container = (p: string[]): SubFlow => resolveSub(activeFlowRef.current, p) ?? { nodes: [], edges: [] };
+
+  /** R19-2:按技术名或 id 找流程 */
+  const findFlow = (ref: string): Flow | undefined =>
+    project.flows.find((f) => f.id === ref || (f.technicalName && f.technicalName === ref));
+
+  /** R19-2:解析目标入口;返回 null = 无法进入 */
+  const resolveEntry = (f: Flow, entryKey?: string): { nodeId: string; params: FlowParam[] } | null => {
+    if (entryKey) {
+      const entry = (f.entries ?? []).find((e) => e.key === entryKey);
+      if (!entry || !f.nodes.some((n) => n.id === entry.nodeId)) return null;
+      return { nodeId: entry.nodeId, params: entry.params ?? [] };
+    }
+    const starts = startNodes(f);
+    return starts.length === 0 ? null : { nodeId: starts[0].id, params: [] };
+  };
+
+  /** R19-2:绑定实参并返回被覆盖变量的原值(call 弹栈时还原) */
+  const bindArgs = (
+    params: FlowParam[],
+    args: { name: string; expr: string }[] | undefined,
+    vv: Record<string, VarValue>,
+  ): { name: string; value: VarValue | null }[] => {
+    const saved: { name: string; value: VarValue | null }[] = [];
+    if (params.length === 0) return saved;
+    const byName = new Map((args ?? []).map((a) => [a.name, a.expr]));
+    for (const p of params) {
+      saved.push({ name: p.name, value: p.name in vv ? vv[p.name] : null });
+      const expr = byName.get(p.name);
+      if (expr !== undefined && expr.trim()) {
+        if (p.type === 'boolean') vv[p.name] = evalCondition(expr, vv, evalCtx) ?? false;
+        else if (p.type === 'number') vv[p.name] = evalNumber(expr, vv, evalCtx);
+        else vv[p.name] = expr;
+      } else {
+        vv[p.name] = coerceVar(p.type, p.default ?? '');
+      }
+    }
+    return saved;
+  };
 
   const pushBeat = (b: Omit<Beat, 'id'>) => setLog((l) => [...l, { ...b, id: String(++beatSeq) }]);
 
@@ -184,6 +249,30 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     return picked.length > 0 ? picked : [];
   };
 
+  /**
+   * R19-2:弹出一个调用帧回到调用点。
+   * 先还原参数原值再写返回值 —— 两者同名时返回值胜出。
+   */
+  const popFrame = (
+    returnValue: VarValue | null,
+    vv: Record<string, VarValue>,
+  ): { node: FlowNode; path: string[] } | null => {
+    const frame = callStackRef.current.pop();
+    if (!frame) return null;
+    for (const s of frame.savedParams) {
+      if (s.value === null) delete vv[s.name];
+      else vv[s.name] = s.value;
+    }
+    const f = project.flows.find((x) => x.id === frame.flowId);
+    if (!f) return null;
+    activeFlowRef.current = f;
+    setActiveFlowName(f.name);
+    if (frame.returnVar && returnValue !== null) vv[frame.returnVar] = returnValue;
+    const node = container(frame.path).nodes.find((n) => n.id === frame.nodeId);
+    if (!node) return null;
+    return { node, path: [...frame.path] };
+  };
+
   /** 进入并展示一个节点,自动处理直通型节点 */
   const visit = (p: string[], nodeId: string, vv: Record<string, VarValue>) => {
     let curP = [...p];
@@ -197,6 +286,13 @@ export default function Player({ flow, path, startNodeId, onClose }: {
       seenRef.current.add(id);
 
       const speaker = entities.find((e) => e.id === node.data.speakerId);
+      // R19-2:本节点是否要切流程 / 弹栈返回
+      let crossTarget: { flow: Flow; nodeId: string } | null = null;
+      let doReturn = false;
+      let returnValue: VarValue | null = null;
+      // 出边计算的落点节点:正常是本节点,弹栈返回后是调用点
+      let node2: FlowNode = node;
+      let autoAdvance = AUTO_ADVANCE_TYPES.includes(node.type);
 
       switch (node.type) {
         case 'dialogue':
@@ -237,8 +333,57 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           break;
         }
         case 'jump':
-          pushBeat({ kind: 'jump', title: node.data.title || '跳转', text: node.data.text });
+        case 'call': {
+          const isCall = node.type === 'call';
+          const targetRef = (node.data.targetFlow ?? '').trim();
+          if (!targetRef) {
+            pushBeat({ kind: node.type, title: node.data.title || '跳转', text: node.data.text });
+            break;
+          }
+          const target = findFlow(targetRef);
+          const entry = target ? resolveEntry(target, node.data.targetEntry) : null;
+          if (!target || !entry) {
+            pushBeat({
+              kind: node.type, title: node.data.title || (isCall ? '调用' : '跳转'), text: node.data.text,
+              note: !target ? `目标流程不存在:${targetRef}` : `目标入口不存在:${node.data.targetEntry || '默认起点'}`,
+            });
+            break;
+          }
+          if (isCall) {
+            if (callStackRef.current.length >= MAX_CALL_DEPTH) {
+              pushBeat({
+                kind: 'call', title: node.data.title || '调用', text: node.data.text,
+                note: `调用深度超过 ${MAX_CALL_DEPTH} 层,已停止(可能是无限递归)`,
+              });
+              break;
+            }
+            const saved = bindArgs(entry.params, node.data.args, nextVars);
+            callStackRef.current.push({
+              flowId: activeFlowRef.current.id, path: [...curP], nodeId: node.id,
+              returnVar: node.data.returnVar, savedParams: saved,
+            });
+          } else {
+            bindArgs(entry.params, node.data.args, nextVars);
+          }
+          pushBeat({
+            kind: node.type, title: node.data.title || (isCall ? '调用' : '跳转'), text: node.data.text,
+            note: `${isCall ? '调用' : '跳转'} → ${target.name}${node.data.targetEntry ? ` · ${node.data.targetEntry}` : ''}`,
+          });
+          crossTarget = { flow: target, nodeId: entry.nodeId };
           break;
+        }
+        case 'return': {
+          const hasValue = typeof node.data.returnExpr === 'string' && node.data.returnExpr.trim() !== '';
+          if (hasValue) returnValue = evalNumber(node.data.returnExpr, nextVars, evalCtx);
+          pushBeat({
+            kind: 'return', title: node.data.title || '返回', text: node.data.text,
+            note: callStackRef.current.length === 0
+              ? '调用栈为空,演出结束'
+              : hasValue ? `返回值 ${returnValue}` : '返回调用点',
+          });
+          doReturn = true;
+          break;
+        }
         case 'exit':
           pushBeat({ kind: 'exit', title: `⇥ 经「${node.data.title || '出口'}」离开子流程`, text: '' });
           break;
@@ -267,17 +412,45 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         }
       }
 
-      const { choices: cs, path: outP } = outgoingChoices(curP, node, nextVars);
-      curP = outP;
-
-      if (cs.length === 0) {
-        setCurPath(curP);
-        commitVars(nextVars);
-        setChoices([]);
-        setEnded(true);
-        return;
+      // R19-2:切到目标流程入口
+      if (crossTarget) {
+        activeFlowRef.current = crossTarget.flow;
+        setActiveFlowName(crossTarget.flow.name);
+        curP = [];
+        id = crossTarget.nodeId;
+        continue;
       }
-      if (cs.length === 1 && ['hub', 'instruction', 'condition', 'exit', 'check'].includes(node.type)) {
+
+      // R19-2:显式返回 —— 弹栈后从调用点的出边继续
+      if (doReturn) {
+        const resumed = popFrame(returnValue, nextVars);
+        if (!resumed) {
+          setCurPath(curP); commitVars(nextVars); setChoices([]); setEnded(true);
+          return;
+        }
+        node2 = resumed.node;
+        curP = resumed.path;
+        autoAdvance = true;
+      }
+
+      // 从 node2 的出边继续(正常情况 node2 === node;返回时是调用点)
+      let cs: Choice[];
+      for (;;) {
+        const r = outgoingChoices(curP, node2, nextVars);
+        curP = r.path;
+        if (r.choices.length > 0) { cs = r.choices; break; }
+        // R19-2:被调流程走到尽头 = 隐式返回
+        const resumed = popFrame(null, nextVars);
+        if (!resumed) {
+          setCurPath(curP); commitVars(nextVars); setChoices([]); setEnded(true);
+          return;
+        }
+        node2 = resumed.node;
+        curP = resumed.path;
+        autoAdvance = true;
+      }
+
+      if (cs.length === 1 && autoAdvance) {
         const c0 = cs[0];
         // 断点:自动前进的目标带断点时暂停,交还手动控制
         if (c0.nodeId && breakpoints.has(c0.nodeId)) {
@@ -325,6 +498,10 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     takenEdges.current.clear();
     checkResults.current.clear();
     seenRef.current = new Set();
+    // R19-2:重开回到入口流程,清空调用栈
+    activeFlowRef.current = flow;
+    setActiveFlowName(flow.name);
+    callStackRef.current = [];
     entityPropsRef.current = buildEntityProps(entities);
     setPropsView(structuredClone(entityPropsRef.current));
     const initVars: Record<string, VarValue> = {};
@@ -360,6 +537,8 @@ export default function Player({ flow, path, startNodeId, onClose }: {
       choices: choices.map(({ label, nodeId, edgeId, effect, once }) => ({ label, nodeId, edgeId, effect, once })),
       ended,
       log: log.map((b) => ({ id: b.id, kind: b.kind, title: b.title, text: b.text, speakerId: b.speaker?.id, note: b.note })),
+      flowId: activeFlowRef.current.id,
+      callStack: structuredClone(callStackRef.current),
     };
     const err = storePlaySave(slotId, flow.id, save);
     if (!err) setSaveInfo(save);
@@ -375,6 +554,11 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     takenEdges.current = new Set(save.taken);
     checkResults.current = new Map(save.checks);
     seenRef.current = new Set(save.seen);
+    // R19-2:旧存档没有 flowId / callStack,按入口流程 + 空栈恢复
+    const savedFlow = (save.flowId && project.flows.find((f) => f.id === save.flowId)) || flow;
+    activeFlowRef.current = savedFlow;
+    setActiveFlowName(savedFlow.name);
+    callStackRef.current = structuredClone(save.callStack ?? []);
     entityPropsRef.current = structuredClone(save.entityProps);
     setPropsView(structuredClone(save.entityProps));
     varsRef.current = { ...save.vars };
@@ -403,7 +587,14 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   return (
     <div className="player-overlay">
       <div className="player-head">
-        <span className="player-title"><Icon name="play" size={14} /> 演出 · {flow.name}</span>
+        <span className="player-title">
+          <Icon name="play" size={14} /> 演出 · {flow.name}
+          {activeFlowName !== flow.name && (
+            <span className="player-subflow" title="跨流程调用中,当前正在这个流程里">
+              {' '}▸ {activeFlowName}
+            </span>
+          )}
+        </span>
         <span className="player-seed" title="随机种子:同种子重开时,检定掷骰序列完全一致(测试可复现)">种子 {seed}</span>
         <span className="spacer" />
         <button onClick={saveGame} title="保存当前演出进度(变量 / 走过的节点 / 掷骰进度),存在本机">存档</button>
