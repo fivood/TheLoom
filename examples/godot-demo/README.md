@@ -87,12 +87,25 @@ Godot runtime 内置一个**极简条件 / 指令求值器**,覆盖 TheLoom 项�
 - 无出边逐层回溯 + exit 命名引脚
 - fragment 默认引脚 + fallback 遮蔽
 - 一次性选项 once + 条件边过滤
+- **数值整数归一**:无小数部分的结果一律回落为 int。TypeScript 的 JS number
+  序列化后 `1` 就是 `1`,Godot 若留成 `1.0`,引擎拿到的变量终值、事件
+  `changes` 与存档 JSON 都会与 TS 不一致(Godot 的 Dictionary 深比较区分
+  INT / FLOAT)
+- **R19-2 跨流程调用**:命名入口、jump / call / return、参数局部作用域、
+  返回值回写、32 层递归保护,与 TS 逐条对应
 
-可用 Godot 的无界面模式执行 v2 契约验收：
+`runtime_v2_fixture.json` 是 TS 与 GDScript **共用**的协议夹具,两端各写一份
+逐条对应的断言。改任一端的行进语义,都要让两端都对着这份夹具重新跑通。
+
+可用 Godot 的无界面模式执行 v2 契约验收:
 
 ```bash
 godot --headless --path examples/godot-demo --script runtime_v2_test.gd
 ```
+
+实测通过的版本:Godot 4.6.2-stable(mono)与 4.8-dev1。TS 侧对应断言在
+`src/runtime/runtime.test.ts` 的「事件协议 v2」一节,`npx vitest run src/runtime/`
+即可执行。
 
 ## 授权
 

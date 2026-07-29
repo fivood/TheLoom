@@ -839,19 +839,30 @@ func _assign(lhs: String, op: String, rhs_val, warnings: Array) -> void:
 		vars[lhs] = 0
 	vars[lhs] = _combine(vars[lhs], op, rhs_val)
 
+## 数值归一:无小数部分的一律回落为 int。
+## TypeScript 侧 JS number 序列化后 1 就是 1;Godot 若留成 1.0,
+## 引擎拿到的变量终值、事件 changes 与存档 JSON 都会与 TS 不一致。
+func _norm_num(v):
+	if typeof(v) != TYPE_FLOAT:
+		return v
+	var f: float = v
+	if is_inf(f) or is_nan(f):
+		return f
+	return f if fposmod(f, 1.0) != 0.0 else int(f)
+
 func _combine(cur, op: String, val):
 	match op:
-		"=": return val
+		"=": return _norm_num(val)
 		"+=":
 			if typeof(cur) == TYPE_STRING or typeof(val) == TYPE_STRING:
 				return str(cur) + str(val)
-			return _to_num(cur) + _to_num(val)
-		"-=": return _to_num(cur) - _to_num(val)
-		"*=": return _to_num(cur) * _to_num(val)
+			return _norm_num(_to_num(cur) + _to_num(val))
+		"-=": return _norm_num(_to_num(cur) - _to_num(val))
+		"*=": return _norm_num(_to_num(cur) * _to_num(val))
 		"/=":
 			var d := _to_num(val)
-			return 0 if d == 0 else _to_num(cur) / d
-	return val
+			return 0 if d == 0 else _norm_num(_to_num(cur) / d)
+	return _norm_num(val)
 
 func _to_num(v) -> float:
 	match typeof(v):
