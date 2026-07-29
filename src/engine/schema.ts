@@ -86,6 +86,30 @@ export const ENGINE_PACKAGE_SCHEMA = {
               id: { type: 'string' },
               name: { type: 'string' },
               technicalName: { type: 'string' },
+              entries: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['key', 'nodeId'],
+                  properties: {
+                    key: { type: 'string' },
+                    nodeId: { type: 'string' },
+                    label: { type: 'string' },
+                    params: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        required: ['name', 'type'],
+                        properties: {
+                          name: { type: 'string' },
+                          type: { type: 'string', enum: ['boolean', 'number', 'string'] },
+                          default: { type: 'string' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         ],
@@ -176,6 +200,18 @@ export const ENGINE_PACKAGE_SCHEMA = {
             color: { type: 'string' },
             w: { type: 'number' },
             h: { type: 'number' },
+            targetFlow: { type: 'string' },
+            targetEntry: { type: 'string' },
+            args: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['name', 'expr'],
+                properties: { name: { type: 'string' }, expr: { type: 'string' } },
+              },
+            },
+            returnVar: { type: 'string' },
+            returnExpr: { type: 'string' },
           },
         },
       },

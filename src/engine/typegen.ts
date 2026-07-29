@@ -20,6 +20,8 @@ export function generateTypes(pkg: EnginePackage): string {
   const nodeTechs = Object.entries(pkg.index.technicalNames)
     .filter(([, v]) => v.kind === 'node')
     .map(([k]) => k);
+  // R19-2:入口 key 在流程间可以重名,去重后再生成字面量联合
+  const entryKeys = [...new Set(pkg.flows.flatMap((f) => (f.entries ?? []).map((e) => e.key)))];
 
   const varLines = pkg.variables.map((v) => {
     const doc = v.description ? `  /** ${v.description.replace(/\*\//g, '* /')} */\n` : '';
@@ -45,6 +47,8 @@ export type AssetTechnicalName = ${literalUnion(assetTechs)};
 export type NodeTechnicalName = ${literalUnion(nodeTechs)};
 /** 变量名 */
 export type VariableName = ${literalUnion(pkg.variables.map((v) => v.name))};
+/** R19-2 流程入口 key(jump / call 与宿主引擎的稳定寻址目标) */
+export type FlowEntryKey = ${literalUnion(entryKeys)};
 
 /** 全局变量表(初始值见包内 variables) */
 export interface EngineVariables {
@@ -125,10 +129,25 @@ export interface EngineEdge {
 
 export interface EngineSub { nodes: EngineNode[]; edges: EngineEdge[] }
 
+export interface EngineParam {
+  name: VariableName | string;
+  type: 'boolean' | 'number' | 'string';
+  default?: string;
+}
+
+export interface EngineEntry {
+  key: FlowEntryKey;
+  nodeId: string;
+  label?: string;
+  params?: EngineParam[];
+}
+
 export interface EngineFlow extends EngineSub {
   id: string;
   name: string;
   technicalName?: FlowTechnicalName;
+  /** R19-2 命名入口 */
+  entries?: EngineEntry[];
 }
 
 export interface EngineEntity {

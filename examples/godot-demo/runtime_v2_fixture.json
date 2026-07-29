@@ -5,6 +5,16 @@
       "name": "n",
       "type": "number",
       "value": "0"
+    },
+    {
+      "name": "who",
+      "type": "string",
+      "value": "原值"
+    },
+    {
+      "name": "result",
+      "type": "number",
+      "value": "0"
     }
   ],
   "entities": [
@@ -64,6 +74,105 @@
           "target": "say",
           "choiceId": "choice-next",
           "effect": "n += 2"
+        }
+      ]
+    },
+    {
+      "id": "caller",
+      "name": "调用方",
+      "technicalName": "caller",
+      "nodes": [
+        {
+          "id": "c1",
+          "type": "call",
+          "data": {
+            "title": "去支线",
+            "text": "",
+            "targetFlow": "callee",
+            "targetEntry": "front",
+            "args": [
+              {
+                "name": "who",
+                "expr": "林晚"
+              },
+              {
+                "name": "bonus",
+                "expr": "2 + 3"
+              }
+            ],
+            "returnVar": "result"
+          }
+        },
+        {
+          "id": "c2",
+          "type": "dialogue",
+          "data": {
+            "title": "",
+            "text": "回来了"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "c-next",
+          "source": "c1",
+          "target": "c2"
+        }
+      ]
+    },
+    {
+      "id": "callee",
+      "name": "被调方",
+      "technicalName": "callee",
+      "entries": [
+        {
+          "key": "front",
+          "nodeId": "k1",
+          "label": "正门",
+          "params": [
+            {
+              "name": "who",
+              "type": "string"
+            },
+            {
+              "name": "bonus",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "nodes": [
+        {
+          "id": "k0",
+          "type": "dialogue",
+          "data": {
+            "title": "",
+            "text": "默认起点(不该走到)"
+          }
+        },
+        {
+          "id": "k1",
+          "type": "dialogue",
+          "data": {
+            "title": "",
+            "text": "支线开场"
+          }
+        },
+        {
+          "id": "k2",
+          "type": "return",
+          "data": {
+            "title": "",
+            "text": "",
+            "returnExpr": "bonus + 10"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "k-next",
+          "source": "k1",
+          "target": "k2"
         }
       ]
     }

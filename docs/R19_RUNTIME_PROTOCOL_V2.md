@@ -102,3 +102,69 @@ Godot 契约测试：
 ```bash
 godot --headless --path examples/godot-demo --script runtime_v2_test.gd
 ```
+
+## R19-2 跨流程调用
+
+### 数据
+
+流程可声明命名入口:
+
+```json
+{
+  "id": "callee", "name": "被调方", "technicalName": "callee",
+  "entries": [{
+    "key": "front",
+    "nodeId": "k1",
+    "label": "正门",
+    "params": [{ "name": "who", "type": "string" }, { "name": "bonus", "type": "number" }]
+  }]
+}
+```
+
+`jump` / `call` 节点的 `data`:
+
+| 字段 | 含义 |
+|---|---|
+| `targetFlow` | 目标流程技术名或 id;空 = 装饰性节点,照常走出边 |
+| `targetEntry` | 目标入口 key;空 = 目标流程默认起点(唯一无入边节点) |
+| `args` | `[{ name, expr }]`,按目标入口的 `params` 逐个绑定 |
+| `returnVar` | 仅 `call`:接收返回值的变量名 |
+
+`return` 节点的 `data.returnExpr` 是返回值表达式,留空 = 只返回不带值。
+
+### 语义
+
+- `call` 压栈并绑定实参;`return` 或走到无出边处弹栈,回到调用点继续走出边。
+- `jump` 切流程但**不压栈**,目标流程走完即结束。
+- **参数是真局部作用域**:进入时保存被覆盖变量的原值,弹栈时还原;原本不存在的参数变量在返回后删除。
+- 返回值写入调用方 `returnVar`。与参数同名时返回值胜出(先还原参数,再写返回值)。
+- 实参求值:`boolean` 走条件求值、`number` 走数值表达式、`string` 取字面量(避免把普通文案当标识符)。未传实参用入口声明的 `default`,再空则取类型零值。
+- 目标流程或入口不存在时**降级为装饰性节点**并在 `note` 里说明,不抛错、不中断演出。
+- 调用深度上限 32 层,超过就地停下,避免无限递归爆栈。
+
+### 存档
+
+快照增加 `flowId`(当前所在流程)与 `callStack`。旧存档缺失这两个字段时,按入口流程 + 空栈恢复。
+
+调用帧结构:
+
+```ts
+interface RuntimeFrame {
+  flowId: string;     // 返回点所在流程
+  path: string[];     // 返回点的容器 path
+  nodeId: string;     // 调用节点自身,弹栈后从它的出边继续
+  returnVar?: string;
+  savedParams: { name: string; value: VarValue | null }[];  // null = 原本不存在
+}
+```
+
+### 四处实现的一致性
+
+| 实现 | 跨流程处理 |
+|---|---|
+| `src/runtime/player.ts`(TS 运行库) | 完整调用栈 |
+| `src/modules/flow/Player.tsx`(编辑器演出) | 完整调用栈,标题显示当前所在流程 |
+| `examples/godot-demo/theloom_runtime.gd`(Godot) | 完整调用栈,与 TS 共用 `runtime_v2_fixture.json` 对拍 |
+| `src/simulate.ts`(路径遍历) | **局部建模**:带目标的 jump 与 return 终止本地路径,call 假设会返回。因为 auditProject 会对每个流程各跑一次,跟进会重复计数并让成本随调用图爆炸 |
+
+前三者必须逐条同步;`simulate.ts` 的差异是有意为之,代价(检测不到"被调流程永不返回")留给 R19-4 场景化回归测试。

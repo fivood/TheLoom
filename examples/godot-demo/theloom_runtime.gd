@@ -24,12 +24,20 @@ const _NODE_LABEL := {
 	"dialogue": "对白", "fragment": "剧情片段", "hub": "汇聚点",
 	"condition": "条件分支", "instruction": "指令",
 	"jump": "跳转", "exit": "出口", "check": "检定",
+	"call": "调用", "return": "返回",
 }
 const _ANNOTATION := ["note", "zone"]
-const _AUTO_ADVANCE := ["hub", "instruction", "condition", "exit", "check"]
+## R19-2:call 返回后也自动继续
+const _AUTO_ADVANCE := ["hub", "instruction", "condition", "exit", "check", "call"]
+## R19-2 调用栈深度上限:超过按无限递归处理
+const MAX_CALL_DEPTH := 32
 
 var project: Dictionary
+## 入口流程;跨流程调用时 flow 会变,这个始终是最初进入的那个
+var root_flow: Dictionary
 var flow: Dictionary
+## R19-2 调用栈:栈顶是最近一次 call 的返回点
+var call_stack: Array = []         # Array[Dictionary]
 var protocol_version: int = RUNTIME_PROTOCOL_VERSION
 var source_protocol_version: int = 1
 var seed_val: int = 0
@@ -65,6 +73,7 @@ func _init(pkg: Dictionary, flow_ref: String) -> void:
 		flow = { "id": "", "nodes": [], "edges": [] }
 	else:
 		flow = found
+	root_flow = flow
 	seed_val = _random_seed()
 	for e in _entities():
 		_entity_by_id[e.get("id", "")] = e
@@ -81,6 +90,8 @@ func start(start_node_id: String = "", seed_override: int = -1) -> void:
 	choices.clear()
 	ended = false
 	_cur_path.clear()
+	flow = root_flow
+	call_stack.clear()
 	_seen.clear()
 	_taken.clear()
 	_checks.clear()
@@ -92,6 +103,13 @@ func start(start_node_id: String = "", seed_override: int = -1) -> void:
 	if start_node_id != "" and _find_node(flow, start_node_id) != null:
 		_visit([], start_node_id, { "choice_key": "start:%s" % start_node_id })
 		return
+	# R19-2:start_node_id 也可以是命名入口的 key
+	if start_node_id != "":
+		var by_key := _find_entry(flow, start_node_id)
+		if not by_key.is_empty():
+			_bind_args(by_key.get("params", []), [])
+			_visit([], String(by_key.get("nodeId", "")), { "choice_key": "entry:%s" % start_node_id })
+			return
 	var starts := _start_nodes(flow)
 	if starts.is_empty():
 		ended = true
@@ -126,6 +144,90 @@ func choose(index: int) -> void:
 		{ "edge_id": c.get("edge_id", ""), "choice_key": c.get("choice_key", "") },
 		_state_changes(before_vars, before_entities),
 	)
+
+
+## ---------- R19-2 跨流程调用 ----------
+
+## 按技术名或 id 找流程;找不到返回空字典
+func _find_flow(ref: String) -> Dictionary:
+	for f in _flows():
+		if f.get("id", "") == ref or f.get("technicalName", "") == ref:
+			return f
+	return {}
+
+## 找命名入口;找不到返回空字典
+func _find_entry(f: Dictionary, key: String) -> Dictionary:
+	for e in f.get("entries", []):
+		if String(e.get("key", "")) == key and _find_node(f, String(e.get("nodeId", ""))) != null:
+			return e
+	return {}
+
+## 解析目标入口 → { node_id, params };无法进入时返回空字典
+func _resolve_entry(f: Dictionary, entry_key: String) -> Dictionary:
+	if entry_key != "":
+		var e := _find_entry(f, entry_key)
+		if e.is_empty():
+			return {}
+		return { "node_id": String(e.get("nodeId", "")), "params": e.get("params", []) }
+	var starts := _start_nodes(f)
+	if starts.is_empty():
+		return {}
+	return { "node_id": String(starts[0].get("id", "")), "params": [] }
+
+## 绑定实参,返回被覆盖变量的原值(call 弹栈时还原;has=false 表示原本不存在)
+func _bind_args(params: Array, args: Array) -> Array:
+	var saved: Array = []
+	if params.is_empty():
+		return saved
+	var by_name: Dictionary = {}
+	for a in args:
+		by_name[String(a.get("name", ""))] = String(a.get("expr", ""))
+	for pm in params:
+		var pname := String(pm.get("name", ""))
+		var ptype := String(pm.get("type", "string"))
+		saved.append({ "name": pname, "has": vars.has(pname), "value": vars.get(pname, null) })
+		var expr := String(by_name.get(pname, ""))
+		if expr.strip_edges() != "":
+			# 文本参数取字面量;布尔与数值走表达式求值
+			if ptype == "boolean":
+				var b = _eval_condition(expr)
+				vars[pname] = false if b == null else b
+			elif ptype == "number":
+				vars[pname] = _eval_number(expr)
+			else:
+				vars[pname] = expr
+		else:
+			vars[pname] = _coerce_var(ptype, String(pm.get("default", "")))
+	return saved
+
+## 还原参数原值
+func _restore_params(saved: Array) -> void:
+	for sv in saved:
+		var nm := String(sv.get("name", ""))
+		if sv.get("has", false):
+			vars[nm] = sv.get("value")
+		else:
+			vars.erase(nm)
+
+## 弹出调用帧回到调用点。先还原参数再写返回值 —— 两者同名时返回值胜出。
+## 返回 { node, path };栈空或调用点失效时返回空字典
+func _pop_frame(return_value) -> Dictionary:
+	if call_stack.is_empty():
+		return {}
+	var frame: Dictionary = call_stack.pop_back()
+	_restore_params(frame.get("saved_params", []))
+	var f := _find_flow(String(frame.get("flow_id", "")))
+	if f.is_empty():
+		return {}
+	flow = f
+	var rv := String(frame.get("return_var", ""))
+	if rv != "" and return_value != null:
+		vars[rv] = return_value
+	var path: Array = frame.get("path", [])
+	var node = _find_node(_container(path), String(frame.get("node_id", "")))
+	if node == null:
+		return {}
+	return { "node": node, "path": path.duplicate() }
 
 
 ## ---------- 内部辅助 ----------
@@ -323,6 +425,10 @@ func _visit(
 		var display_note := ""
 		var nested_starts = null
 		var nested_path = null
+		# R19-2:本节点是否要切流程 / 弹栈返回
+		var cross_target = null
+		var do_return := false
+		var return_value = null
 
 		match node.get("type", ""):
 			"dialogue":
@@ -352,8 +458,74 @@ func _visit(
 				var result = _eval_condition(data.get("text", ""))
 				display_note = "无法求值,请手动选择分支" if result == null else ("→ 真" if result else "→ 假")
 				_push_beat({ "kind": "condition", "title": data.get("title", "条件分支"), "text": data.get("text", ""), "note": display_note })
-			"jump":
-				_push_beat({ "kind": "jump", "title": data.get("title", "跳转"), "text": data.get("text", "") })
+			"jump", "call":
+				var is_call: bool = node.get("type", "") == "call"
+				var target_ref := String(data.get("targetFlow", "")).strip_edges()
+				if target_ref == "":
+					# 无目标 = R19-2 之前的装饰性跳转:只留一条 beat,继续走出边
+					_push_beat({ "kind": node.get("type", ""), "title": data.get("title", "跳转"), "text": data.get("text", "") })
+				else:
+					var target := _find_flow(target_ref)
+					var entry_key := String(data.get("targetEntry", "")).strip_edges()
+					var entry: Dictionary = {} if target.is_empty() else _resolve_entry(target, entry_key)
+					var fallback_title := "调用" if is_call else "跳转"
+					if target.is_empty() or entry.is_empty():
+						var why := ""
+						if target.is_empty():
+							why = "目标流程不存在:%s" % target_ref
+						else:
+							why = "目标入口不存在:%s" % (entry_key if entry_key != "" else "默认起点")
+						display_note = why
+						_push_beat({
+							"kind": node.get("type", ""), "title": data.get("title", fallback_title),
+							"text": data.get("text", ""), "note": why,
+						})
+					elif is_call and call_stack.size() >= MAX_CALL_DEPTH:
+						var deep := "调用深度超过 %d 层,已停止(可能是无限递归)" % MAX_CALL_DEPTH
+						display_note = deep
+						_push_beat({
+							"kind": "call", "title": data.get("title", "调用"),
+							"text": data.get("text", ""), "note": deep,
+						})
+					else:
+						var saved := _bind_args(entry.get("params", []), data.get("args", []))
+						if is_call:
+							call_stack.append({
+								"flow_id": flow.get("id", ""),
+								"path": cur_p.duplicate(),
+								"node_id": node.get("id", ""),
+								"return_var": String(data.get("returnVar", "")),
+								"saved_params": saved,
+							})
+						var label := String(target.get("name", ""))
+						if label == "":
+							label = target_ref
+						var note := "%s → %s" % ["调用" if is_call else "跳转", label]
+						if entry_key != "":
+							note += " · %s" % entry_key
+						display_note = note
+						_push_beat({
+							"kind": node.get("type", ""), "title": data.get("title", fallback_title),
+							"text": data.get("text", ""), "note": note,
+						})
+						cross_target = { "flow": target, "node_id": String(entry["node_id"]), "entry_key": entry_key }
+			"return":
+				var ret_expr := String(data.get("returnExpr", "")).strip_edges()
+				if ret_expr != "":
+					return_value = _eval_number(ret_expr)
+				var rnote := ""
+				if call_stack.is_empty():
+					rnote = "调用栈为空,演出结束"
+				elif ret_expr != "":
+					rnote = "返回值 %s" % str(return_value)
+				else:
+					rnote = "返回调用点"
+				display_note = rnote
+				_push_beat({
+					"kind": "return", "title": data.get("title", "返回"),
+					"text": data.get("text", ""), "note": rnote,
+				})
+				do_return = true
 			"exit":
 				_push_beat({ "kind": "exit", "title": "⇥ 经「%s」离开子流程" % data.get("title", "出口"), "text": "" })
 			"check":
@@ -378,6 +550,33 @@ func _visit(
 		_push_event("display", cur_p, node, trigger, _state_changes(before_vars, before_entities), display_note)
 		_push_event("leave", cur_p, node, trigger, _empty_changes(), display_note)
 
+		# R19-2:切到目标流程入口(jump 不返回 / call 已压栈)
+		if cross_target != null:
+			flow = cross_target["flow"]
+			cur_p = []
+			id = String(cross_target["node_id"])
+			var ek := String(cross_target["entry_key"])
+			trigger = { "choice_key": "entry:%s" % (ek if ek != "" else id) }
+			enter_changes = _empty_changes()
+			continue
+
+		# R19-2:显式返回 —— 弹栈后从调用点的出边继续
+		if do_return:
+			var resumed := _pop_frame(return_value)
+			if resumed.is_empty():
+				_cur_path = cur_p
+				choices = []
+				ended = true
+				return
+			var nxt := _advance_from(resumed["path"], resumed["node"], true)
+			if nxt.is_empty():
+				return
+			id = String(nxt["id"])
+			trigger = nxt["trigger"]
+			enter_changes = nxt["changes"]
+			cur_p = nxt["path"]
+			continue
+
 		if nested_starts != null and nested_path != null:
 			cur_p = nested_path
 			if nested_starts.size() == 1:
@@ -393,16 +592,40 @@ func _visit(
 			})
 			return
 
-		var res := _outgoing_choices(cur_p, node)
+		var nxt2 := _advance_from(cur_p, node, _AUTO_ADVANCE.has(node.get("type", "")))
+		if nxt2.is_empty():
+			return
+		id = String(nxt2["id"])
+		trigger = nxt2["trigger"]
+		enter_changes = nxt2["changes"]
+		cur_p = nxt2["path"]
+	choices = []
+	ended = true
+
+
+## 从 node 的出边继续行进。
+## 无出边时:R19-2 调用栈非空 → 隐式返回并从调用点继续;栈空 → 演出结束。
+## 返回空字典表示本次行进到此为止(方法内已设置 choices / ended)。
+func _advance_from(path: Array, node: Dictionary, auto_advance: bool) -> Dictionary:
+	var cur_node := node
+	var cur_p: Array = path.duplicate()
+	var auto := auto_advance
+	for guard in range(MAX_CALL_DEPTH + 1):
+		var res := _outgoing_choices(cur_p, cur_node)
 		cur_p = res["path"]
 		var cs: Array = res["choices"]
-
 		if cs.size() == 0:
-			_cur_path = cur_p
-			choices = []
-			ended = true
-			return
-		if cs.size() == 1 and _AUTO_ADVANCE.has(node.get("type", "")):
+			var resumed := _pop_frame(null)
+			if resumed.is_empty():
+				_cur_path = cur_p
+				choices = []
+				ended = true
+				return {}
+			cur_node = resumed["node"]
+			cur_p = resumed["path"]
+			auto = true
+			continue
+		if cs.size() == 1 and auto:
 			var c0: Dictionary = cs[0]
 			var before_edge_vars := vars.duplicate(true)
 			var before_edge_entities := entity_props.duplicate(true)
@@ -410,15 +633,19 @@ func _visit(
 				_taken[c0["edge_id"]] = true
 			if c0.get("effect", "") != "":
 				_apply_instructions(c0["effect"])
-			id = c0["node_id"]
-			trigger = { "edge_id": c0.get("edge_id", ""), "choice_key": c0.get("choice_key", "") }
-			enter_changes = _state_changes(before_edge_vars, before_edge_entities)
-			continue
+			return {
+				"id": c0["node_id"],
+				"trigger": { "edge_id": c0.get("edge_id", ""), "choice_key": c0.get("choice_key", "") },
+				"changes": _state_changes(before_edge_vars, before_edge_entities),
+				"path": cur_p,
+			}
 		_cur_path = cur_p
 		choices = cs
-		return
+		return {}
+	_cur_path = cur_p
 	choices = []
 	ended = true
+	return {}
 
 
 ## ---------- 变量与实体属性 ----------

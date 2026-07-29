@@ -218,6 +218,29 @@ describe('FlowRuntime 检定与存档', () => {
 });
 
 describe('FlowRuntime 事件协议 v2', () => {
+  it('R19-2 跨流程调用:与 Godot 共用同一份夹具,断言逐条对应', () => {
+    const run = new FlowRuntime(structuredClone(runtimeV2Fixture) as never, 'caller');
+    run.start();
+    // 命名入口生效:走 k1 而不是默认起点 k0
+    expect(run.flow.id).toBe('callee');
+    expect(run.callStack).toHaveLength(1);
+    const texts = run.log.map((b) => b.text);
+    expect(texts).not.toContain('默认起点(不该走到)');
+    expect(texts).toContain('支线开场');
+    // 参数绑定:文本取字面量,数值走表达式
+    expect(run.vars.who).toBe('林晚');
+    expect(run.vars.bonus).toBe(5);
+    // k1 → k2(return bonus + 10 = 15)→ 弹栈回 c1 → c2
+    run.choose(0);
+    expect(run.vars.result).toBe(15);
+    expect(run.flow.id).toBe('caller');
+    expect(run.callStack).toHaveLength(0);
+    // 参数是局部作用域:返回后还原原值,原本不存在的被删除
+    expect(run.vars.who).toBe('原值');
+    expect('bonus' in run.vars).toBe(false);
+    expect(run.log[run.log.length - 1].text).toBe('回来了');
+  });
+
   it('与 Godot 共用同一份协议夹具和预期事件序列', () => {
     const run = new FlowRuntime(structuredClone(runtimeV2Fixture), 'protocol_test');
     run.start();

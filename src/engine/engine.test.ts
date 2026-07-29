@@ -183,4 +183,44 @@ describe('类型生成与 Schema', () => {
       expect(pkg).toHaveProperty(key);
     }
   });
+
+  it('R19-2 跨流程字段与命名入口进包;入口指向已删节点时被剔除', () => {
+    const p = baseProject();
+    const main = p.flows[0];
+    main.nodes.push({
+      id: 'callnode', type: 'call', position: { x: 0, y: 0 },
+      data: {
+        title: '调用支线', text: '',
+        targetFlow: 'sub_flow', targetEntry: 'go',
+        args: [{ name: 'who', expr: '林晚' }],
+        returnVar: 'result',
+      },
+    });
+    p.flows.push({
+      id: 'sub', name: '支线', technicalName: 'sub_flow',
+      entries: [
+        { key: 'go', nodeId: 's1', label: '正门', params: [{ name: 'who', type: 'string' }] },
+        { key: 'dangling', nodeId: '已删除的节点' },
+      ],
+      nodes: [{ id: 's1', type: 'return', position: { x: 0, y: 0 }, data: { title: '返回', text: '', returnExpr: '1' } }],
+      edges: [],
+    });
+
+    const pkg = JSON.parse(JSON.stringify(buildEnginePackage(p)));
+    const callNode = pkg.flows[0].nodes.find((n: { id: string }) => n.id === 'callnode');
+    expect(callNode.data).toMatchObject({
+      targetFlow: 'sub_flow',
+      targetEntry: 'go',
+      args: [{ name: 'who', expr: '林晚' }],
+      returnVar: 'result',
+    });
+    const subFlow = pkg.flows.find((f: { id: string }) => f.id === 'sub');
+    // 悬空入口被剔除,只留指向存在节点的那条
+    expect(subFlow.entries).toEqual([
+      { key: 'go', nodeId: 's1', label: '正门', params: [{ name: 'who', type: 'string' }] },
+    ]);
+    expect(subFlow.nodes[0].data.returnExpr).toBe('1');
+    // 入口 key 进入生成类型的字面量联合
+    expect(generateTypes(buildEnginePackage(p))).toContain("export type FlowEntryKey = 'go';");
+  });
 });
