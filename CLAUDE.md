@@ -44,9 +44,10 @@
   - **v0.10.0 附加批** ✅ — 全模块 Navigator(五模块统一)+ 文件夹归档 + 对话框统一 + 拖拽 / 多选 / 批量
   - **v0.11.0 附加批** ✅ — 长篇写作块(subheading / quote / list,无损往返)+ Excel .xlsx 与 Final Draft .fdx 双向互通(带 ImportPreview 预检)+ 配色表系统(zimg JSON 集成)+ 实体宽版编辑窗 + 文件夹 md 往返修复
 - 最近验证(2026-07-29,R19-1 提交时全门禁):`npx tsc -b` 通过、`npx vitest run` **58 文件 370 项通过**、`npm run build` 与 `npm run build:runtime` 通过、`cargo test --lib` 3 项通过、`node examples/engine-demo/demo.mjs` 演出输出正确
-- **性能基线**(`npx tsx bench.mjs`,151 场景 / 109 实体 / 15.9 万字 / JSON 743 KB):normalizeProject(clone) 13 ms · **auditProject 1052 ms**(全项目 simulateFlow 主要成本)· JSON.stringify 4 ms · structuredClone 6 ms。
-  - 对比 R16-4 基线(auditProject 879 ms)增长约 20%,是 R17 / R18 新增校验与结构的自然成本,仍在同数量级
-  - auditProject 是关键路径:若继续往体检里加全项目 flow 遍历,先评估分片或懒加载,不要直接叠加
+- **性能基线**(`npx tsx bench.mjs`,151 场景 / 109 实体 / 15.9 万字 / JSON 743 KB):normalizeProject(clone) 13 ms · **auditProject 冷 990 ms / 热 1 ms / 仅结构 2 ms** · JSON.stringify 3 ms · structuredClone 6 ms
+  - R19-P 起 `simulateFlow` 有内容哈希缓存(`src/pathCache.ts`),基准必须冷热分开看,否则量到的是缓存命中
+  - auditProject 的成本 99% 来自全项目 `simulateFlow`;体检面板已改为 `includePaths:false` 秒开 + 异步补齐
+  - 缓存键只含真正参与遍历的输入(流程 / 变量 / 实体 id、技术名、字段 label+value+type)。**新增会影响遍历的输入时必须同步扩键**,否则会错误命中 —— `src/pathCache.test.ts` 有 9 项守这条
 
 ### R10 执行顺序(已完成,历史记录)
 
