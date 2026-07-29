@@ -329,3 +329,23 @@ describe('R19-3 外部事件声明的规范化', () => {
     expect(p.externalEvents).toBeUndefined();
   });
 });
+
+describe('R19-4 回归测试的规范化', () => {
+  it('剔除无名 / 无目标流程的测试,规整种子与选择序列', () => {
+    const p = sampleProject();
+    p.flowTests = [
+      { id: '1', name: '  好测试  ', flowRef: '  main  ', seed: 1.9, choices: [0, -1, 2, 1.5 as never], assertions: [], updatedAt: 0 },
+      { id: '2', name: '', flowRef: 'main', seed: 1, choices: [], assertions: [], updatedAt: 0 },
+      { id: '3', name: '没目标', flowRef: '  ', seed: 1, choices: [], assertions: [], updatedAt: 0 },
+      { id: '4', name: '坏字段', flowRef: 'main', seed: NaN, choices: 'x' as never, assertions: 'y' as never, updatedAt: 0 },
+    ];
+    normalizeProject(p);
+    expect(p.flowTests!.map((t) => t.id)).toEqual(['1', '4']);
+    expect(p.flowTests![0]).toMatchObject({ name: '好测试', flowRef: 'main', seed: 1, choices: [0, 2] });
+    expect(p.flowTests![1]).toMatchObject({ seed: 0, choices: [], assertions: [] });
+
+    p.flowTests = [];
+    normalizeProject(p);
+    expect(p.flowTests).toBeUndefined();
+  });
+});

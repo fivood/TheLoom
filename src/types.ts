@@ -269,6 +269,49 @@ export interface ExternalEvent {
   returnType?: VariableType;
 }
 
+/* ---------- R19-4 场景化回归测试 ---------- */
+
+/** 断言的比较运算;非数值类型只支持 == / != */
+export type AssertOp = '==' | '!=' | '>' | '>=' | '<' | '<=';
+
+export type FlowTestAssertion =
+  /** 演出走到结束;可选指定最后停在哪个节点(技术名或 id) */
+  | { kind: 'ended'; node?: string }
+  /** 变量终值 */
+  | { kind: 'variable'; name: string; op: AssertOp; value: string }
+  /** 节点是否被访问(技术名或 id) */
+  | { kind: 'nodeVisited'; node: string; expect: boolean }
+  /** 外部事件是否被触发 */
+  | { kind: 'eventFired'; event: string; expect: boolean };
+
+/**
+ * R19-4 场景化回归测试:把一次确定性的演出固化下来,流程改动后可批量重跑。
+ * 种子固定 → 掷骰可复现;选择序列 + 事件响应让回放不需要人参与。
+ */
+export interface FlowTest {
+  id: ID;
+  name: string;
+  /** 目标流程:技术名或 id */
+  flowRef: string;
+  /** R19-2 命名入口 key;空 = 默认起点 */
+  entryKey?: string;
+  /** 固定随机种子,保证检定可复现 */
+  seed: number;
+  /** 覆盖项目变量初值;只列需要改的 */
+  initialVars?: { name: string; value: string }[];
+  /** 每次停下给选项时选第几个(下标) */
+  choices: number[];
+  /** R19-3 外部事件的模拟响应;按事件名匹配,同名可给多条按顺序消费 */
+  eventResponses?: { event: string; value?: string }[];
+  assertions: FlowTestAssertion[];
+  /**
+   * 上次运行时目标流程的内容哈希。
+   * 与当前不一致 = 流程被改过,测试结果可能已过时(界面标「受影响」)。
+   */
+  flowHash?: string;
+  updatedAt: number;
+}
+
 export interface Flow {
   id: ID;
   name: string;
@@ -875,6 +918,8 @@ export interface Project {
   variables: Variable[];
   /** R19-3 外部事件声明:流程用 event 节点请求宿主引擎做事,声明放这里统一管理 */
   externalEvents?: ExternalEvent[];
+  /** R19-4 场景化回归测试 */
+  flowTests?: FlowTest[];
   /** 实体字段模板:按类型预设字段名(字符串等价于文本类型),新建实体时自动填入 */
   /** R11 命名模板库(实体 / 流程节点);旧版 entityTemplates / nodeTemplates 加载时自动迁移进来 */
   templates?: ObjectTemplate[];

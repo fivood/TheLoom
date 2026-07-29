@@ -220,6 +220,31 @@ export function normalizeProject(p: Project): Project {
       }
     }
   }
+  // R19-4 回归测试:剔除无名 / 无目标流程的测试,规整种子与选择序列
+  if (p.flowTests !== undefined) {
+    if (!Array.isArray(p.flowTests)) {
+      delete p.flowTests;
+    } else {
+      const kept = p.flowTests.filter((t) => {
+        if (!t || typeof t.name !== 'string' || typeof t.flowRef !== 'string') return false;
+        return t.name.trim() !== '' && t.flowRef.trim() !== '';
+      });
+      for (const t of kept) {
+        t.name = t.name.trim();
+        t.flowRef = t.flowRef.trim();
+        if (!Number.isFinite(t.seed)) t.seed = 0;
+        t.seed = Math.trunc(t.seed);
+        t.choices = Array.isArray(t.choices)
+          ? t.choices.filter((n) => Number.isInteger(n) && n >= 0)
+          : [];
+        if (!Array.isArray(t.assertions)) t.assertions = [];
+        if (t.initialVars !== undefined && !Array.isArray(t.initialVars)) delete t.initialVars;
+        if (t.eventResponses !== undefined && !Array.isArray(t.eventResponses)) delete t.eventResponses;
+      }
+      if (kept.length > 0) p.flowTests = kept;
+      else delete p.flowTests;
+    }
+  }
   // R19-3 外部事件声明:剔除空技术名与重名,清理参数与返回类型
   if (p.externalEvents !== undefined) {
     if (!Array.isArray(p.externalEvents)) {
