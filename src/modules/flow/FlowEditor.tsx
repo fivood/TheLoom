@@ -11,6 +11,7 @@ import { countSubNodes, resolveSub, sanitizeTechnicalName, walkFlowNodes } from 
 import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
 import PathTestPanel from '../../components/PathTestPanel';
+import { alignNodes, distributeNodes, type AlignHow } from '../../flowLayout';
 import FlowTestPanel from '../../components/FlowTestPanel';
 import { loadBreakpoints, toggleBreakpoint } from '../../playSaves';
 import type { EventWait, ExternalEvent, Flow, FlowEntry, FlowNodeData, FlowNodeType, FlowParam, SubFlow } from '../../types';
@@ -124,6 +125,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
       data, label: edgeDisplayLabel(data), ...EDGE_STYLE,
     };
   }));
+  const selectedCount = nodes.filter((n) => n.selected).length;
   const { screenToFlowPosition } = useReactFlow();
   const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -305,6 +307,29 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     return n;
   };
 
+  /** R19-5 对齐:几何在 flowLayout.ts(纯函数,可单测),这里只负责取选区与写回 */
+  const alignSelection = (how: AlignHow) => {
+    const picked = latest.current.nodes.filter((n) => n.selected);
+    const moves = alignNodes(
+      picked.map((n) => ({ id: n.id, position: n.position, width: n.measured?.width, height: n.measured?.height })),
+      how,
+    );
+    if (moves.size === 0) return;
+    dirty.current = true;
+    setNodes((ns) => ns.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n)));
+  };
+
+  /** R19-5 等距分布 */
+  const distributeSelection = (axis: 'x' | 'y') => {
+    const picked = latest.current.nodes.filter((n) => n.selected);
+    const moves = distributeNodes(picked.map((n) => ({ id: n.id, position: n.position })), axis);
+    if (moves.size === 0) return;
+    dirty.current = true;
+    setNodes((ns) => ns.map((n) => (moves.has(n.id)
+      ? { ...n, position: { ...n.position, [axis]: moves.get(n.id)! } }
+      : n)));
+  };
+
   const enterSub = (nodeId: string) => {
     writeBack();
     navigate([...path, nodeId]);
@@ -342,6 +367,22 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
               </button>
             ))}
+          {selectedCount >= 2 && (
+            <>
+              <button title="左对齐" onClick={() => alignSelection('left')}>⇤</button>
+              <button title="水平居中对齐" onClick={() => alignSelection('centerX')}>⇹</button>
+              <button title="右对齐" onClick={() => alignSelection('right')}>⇥</button>
+              <button title="顶对齐" onClick={() => alignSelection('top')}>⤒</button>
+              <button title="垂直居中对齐" onClick={() => alignSelection('centerY')}>⇳</button>
+              <button title="底对齐" onClick={() => alignSelection('bottom')}>⤓</button>
+              {selectedCount >= 3 && (
+                <>
+                  <button title="水平等距分布" onClick={() => distributeSelection('x')}>⇿</button>
+                  <button title="垂直等距分布" onClick={() => distributeSelection('y')}>⇕</button>
+                </>
+              )}
+            </>
+          )}
           <button
             title="复制选中节点(Ctrl+C)。可跨流程、跨子流程层级粘贴"
             onClick={copySelection}
