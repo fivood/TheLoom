@@ -22,6 +22,19 @@ export function generateTypes(pkg: EnginePackage): string {
     .map(([k]) => k);
   // R19-2:入口 key 在流程间可以重名,去重后再生成字面量联合
   const entryKeys = [...new Set(pkg.flows.flatMap((f) => (f.entries ?? []).map((e) => e.key)))];
+  // R19-3:事件名 + 每个事件的载荷类型,让宿主的事件处理拿到编译期检查
+  const events = pkg.externalEvents ?? [];
+
+  const ident = (name: string) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : `'${name}'`);
+  const eventPayloadLines = events.length === 0
+    ? '  // 项目未声明任何外部事件'
+    : events.map((e) => {
+      const doc = e.description ? `  /** ${e.description.replace(/\*\//g, '* /')} */\n` : '';
+      const body = (e.params ?? []).length === 0
+        ? 'Record<string, never>'
+        : `{ ${(e.params ?? []).map((prm) => `${ident(prm.name)}: ${varTsType(prm.type)}`).join('; ')} }`;
+      return `${doc}  ${ident(e.name)}: ${body};`;
+    }).join('\n');
 
   const varLines = pkg.variables.map((v) => {
     const doc = v.description ? `  /** ${v.description.replace(/\*\//g, '* /')} */\n` : '';
@@ -49,6 +62,8 @@ export type NodeTechnicalName = ${literalUnion(nodeTechs)};
 export type VariableName = ${literalUnion(pkg.variables.map((v) => v.name))};
 /** R19-2 流程入口 key(jump / call 与宿主引擎的稳定寻址目标) */
 export type FlowEntryKey = ${literalUnion(entryKeys)};
+/** R19-3 外部事件名(宿主按它分发) */
+export type ExternalEventName = ${literalUnion(events.map((e) => e.name))};
 
 /** 全局变量表(初始值见包内 variables) */
 export interface EngineVariables {
@@ -128,6 +143,22 @@ export interface EngineEdge {
 }
 
 export interface EngineSub { nodes: EngineNode[]; edges: EngineEdge[] }
+
+/** R19-3 每个外部事件的实参载荷(由声明的参数生成) */
+export interface ExternalEventPayloads {
+${eventPayloadLines}
+}
+
+/** R19-3 交给宿主的外部事件调用 */
+export interface ExternalEventCall<K extends ExternalEventName = ExternalEventName> {
+  name: K;
+  args: K extends keyof ExternalEventPayloads ? ExternalEventPayloads[K] : Record<string, RuntimeValue>;
+  wait: 'continue' | 'ack' | 'value';
+  flowId: string;
+  nodeId: string;
+  path: string[];
+  nodeTechnicalName?: NodeTechnicalName;
+}
 
 export interface EngineParam {
   name: VariableName | string;

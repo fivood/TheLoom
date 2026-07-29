@@ -74,6 +74,31 @@ export const ENGINE_PACKAGE_SCHEMA = {
         },
       },
     },
+    externalEvents: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string' },
+          label: { type: 'string' },
+          description: { type: 'string' },
+          returnType: { type: 'string', enum: ['boolean', 'number', 'string'] },
+          params: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['name', 'type'],
+              properties: {
+                name: { type: 'string' },
+                type: { type: 'string', enum: ['boolean', 'number', 'string'] },
+                default: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
     flows: {
       type: 'array',
       items: {
@@ -212,6 +237,17 @@ export const ENGINE_PACKAGE_SCHEMA = {
             },
             returnVar: { type: 'string' },
             returnExpr: { type: 'string' },
+            eventName: { type: 'string' },
+            eventArgs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['name', 'expr'],
+                properties: { name: { type: 'string' }, expr: { type: 'string' } },
+              },
+            },
+            eventWait: { type: 'string', enum: ['continue', 'ack', 'value'] },
+            eventResultVar: { type: 'string' },
           },
         },
       },

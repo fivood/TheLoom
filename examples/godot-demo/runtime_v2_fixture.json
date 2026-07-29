@@ -15,6 +15,11 @@
       "name": "result",
       "type": "number",
       "value": "0"
+    },
+    {
+      "name": "score",
+      "type": "number",
+      "value": "0"
     }
   ],
   "entities": [
@@ -175,6 +180,112 @@
           "target": "k2"
         }
       ]
+    },
+    {
+      "id": "evflow",
+      "name": "事件流程",
+      "technicalName": "evflow",
+      "nodes": [
+        {
+          "id": "x1",
+          "type": "event",
+          "data": {
+            "title": "播动画",
+            "text": "",
+            "eventName": "play_anim",
+            "eventArgs": [
+              {
+                "name": "clip",
+                "expr": "开门"
+              },
+              {
+                "name": "speed",
+                "expr": "1 + 1"
+              }
+            ]
+          }
+        },
+        {
+          "id": "x2",
+          "type": "event",
+          "data": {
+            "title": "启动谜题",
+            "text": "",
+            "eventName": "solve_puzzle",
+            "eventWait": "value",
+            "eventResultVar": "score"
+          }
+        },
+        {
+          "id": "x3",
+          "type": "condition",
+          "data": {
+            "title": "判定",
+            "text": "score > 5"
+          }
+        },
+        {
+          "id": "x4",
+          "type": "dialogue",
+          "data": {
+            "title": "",
+            "text": "解开了"
+          }
+        },
+        {
+          "id": "x5",
+          "type": "dialogue",
+          "data": {
+            "title": "",
+            "text": "没解开"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "x-1",
+          "source": "x1",
+          "target": "x2"
+        },
+        {
+          "id": "x-2",
+          "source": "x2",
+          "target": "x3"
+        },
+        {
+          "id": "x-3",
+          "source": "x3",
+          "target": "x4",
+          "sourceHandle": "true"
+        },
+        {
+          "id": "x-4",
+          "source": "x3",
+          "target": "x5",
+          "sourceHandle": "false"
+        }
+      ]
+    }
+  ],
+  "externalEvents": [
+    {
+      "name": "play_anim",
+      "label": "播动画",
+      "params": [
+        {
+          "name": "clip",
+          "type": "string"
+        },
+        {
+          "name": "speed",
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "name": "solve_puzzle",
+      "label": "解谜",
+      "returnType": "number"
     }
   ]
 }

@@ -223,4 +223,47 @@ describe('类型生成与 Schema', () => {
     // 入口 key 进入生成类型的字面量联合
     expect(generateTypes(buildEnginePackage(p))).toContain("export type FlowEntryKey = 'go';");
   });
+
+  it('R19-3 外部事件声明与节点字段进包;typegen 产出事件名与载荷类型', () => {
+    const p = baseProject();
+    p.externalEvents = [
+      { id: 'ev1', name: 'play_anim', label: '播动画', description: '让引擎播一段动画',
+        params: [{ name: 'clip', type: 'string' }, { name: 'speed', type: 'number' }] },
+      { id: 'ev2', name: 'solve_puzzle', returnType: 'number' },
+    ];
+    p.flows[0].nodes.push({
+      id: 'evnode', type: 'event', position: { x: 0, y: 0 },
+      data: {
+        title: '播动画', text: '',
+        eventName: 'play_anim',
+        eventArgs: [{ name: 'clip', expr: '开门' }],
+        eventWait: 'ack',
+        eventResultVar: 'ignored',
+        eventSimValue: '只在编辑器里用',
+      },
+    });
+
+    const pkg = JSON.parse(JSON.stringify(buildEnginePackage(p)));
+    expect(pkg.externalEvents).toEqual([
+      { name: 'play_anim', label: '播动画', description: '让引擎播一段动画',
+        params: [{ name: 'clip', type: 'string' }, { name: 'speed', type: 'number' }] },
+      { name: 'solve_puzzle', returnType: 'number' },
+    ]);
+    const evNode = pkg.flows[0].nodes.find((n: { id: string }) => n.id === 'evnode');
+    expect(evNode.data).toMatchObject({
+      eventName: 'play_anim',
+      eventArgs: [{ name: 'clip', expr: '开门' }],
+      eventWait: 'ack',
+      eventResultVar: 'ignored',
+    });
+    // 模拟返回值只服务编辑器演出,不应进包
+    expect(evNode.data.eventSimValue).toBeUndefined();
+    // 声明变化能被增量导出感知
+    expect(pkg.manifest.externalEvents).toBeTruthy();
+
+    const dts = generateTypes(buildEnginePackage(p));
+    expect(dts).toContain("export type ExternalEventName = 'play_anim' | 'solve_puzzle';");
+    expect(dts).toContain('play_anim: { clip: string; speed: number };');
+    expect(dts).toContain('solve_puzzle: Record<string, never>;');
+  });
 });

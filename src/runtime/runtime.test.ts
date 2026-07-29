@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entity, Flow, FlowEdge, FlowNode, Project, Variable } from '../types';
 import { buildEnginePackage } from '../engine/package';
-import { FlowRuntime } from './player';
+import { FlowRuntime, type VarValue } from './player';
 import runtimeV2Fixture from '../../examples/godot-demo/runtime_v2_fixture.json';
 
 let seq = 0;
@@ -342,6 +342,29 @@ describe('FlowRuntime · R19-3 外部事件', () => {
 });
 
 describe('FlowRuntime 事件协议 v2', () => {
+  it('R19-3 外部事件:与 Godot 共用同一份夹具,断言逐条对应', () => {
+    const calls: { name: string; args: Record<string, VarValue> }[] = [];
+    const run = new FlowRuntime(structuredClone(runtimeV2Fixture) as never, 'evflow', {
+      onExternalEvent: (c) => calls.push({ name: c.name, args: c.args }),
+    });
+    run.start();
+    // x1 是 continue:发出即继续;x2 是 value:挂起
+    expect(calls.length).toBeGreaterThanOrEqual(1);
+    expect(calls[0].name).toBe('play_anim');
+    expect(calls[0].args.clip).toBe('开门');
+    expect(calls[0].args.speed).toBe(2);
+    expect(run.pendingExternal).not.toBeNull();
+    expect(run.pendingExternal!.call.name).toBe('solve_puzzle');
+    expect(run.choices).toHaveLength(0);
+    expect(run.ended).toBe(false);
+    // 宿主回值 8 → score=8 → 条件为真 → 走「解开了」
+    run.resolveExternal(8);
+    expect(run.vars.score).toBe(8);
+    expect(run.pendingExternal).toBeNull();
+    expect(run.log[run.log.length - 1].text).toBe('解开了');
+    expect(run.resolveExternal(1)).toBe(false);
+  });
+
   it('R19-2 跨流程调用:与 Godot 共用同一份夹具,断言逐条对应', () => {
     const run = new FlowRuntime(structuredClone(runtimeV2Fixture) as never, 'caller');
     run.start();
@@ -366,7 +389,7 @@ describe('FlowRuntime 事件协议 v2', () => {
   });
 
   it('与 Godot 共用同一份协议夹具和预期事件序列', () => {
-    const run = new FlowRuntime(structuredClone(runtimeV2Fixture), 'protocol_test');
+    const run = new FlowRuntime(structuredClone(runtimeV2Fixture) as never, 'protocol_test');
     run.start();
     expect(run.events.map((event) => `${event.nodeId}:${event.event}`)).toEqual([
       'set:enter', 'set:display', 'set:leave',

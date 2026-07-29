@@ -55,8 +55,33 @@ func _initialize() -> void:
 	var last_beat: Dictionary = x.log[x.log.size() - 1]
 	check.call("继续走调用点出边", last_beat["text"], "回来了")
 
+	# ---------- R19-3 外部事件:与 TypeScript 运行库同一夹具、同一断言 ----------
+	var e = Runtime.new(pkg, "evflow")
+	var seen_calls: Array = []
+	e.external_event_requested.connect(func(c): seen_calls.append(c))
+	e.start()
+	# x1 是 continue:发出即继续,不挂起;x2 是 value:挂起
+	check.call("continue 事件已发出", seen_calls.size() >= 1, true)
+	var first_call: Dictionary = seen_calls[0] if seen_calls.size() > 0 else {}
+	check.call("事件名", first_call.get("name", ""), "play_anim")
+	var first_args: Dictionary = first_call.get("args", {})
+	check.call("文本参数字面量", first_args.get("clip"), "开门")
+	check.call("数值参数表达式", first_args.get("speed"), 2)
+	check.call("停在 value 事件上", e.pending_external.is_empty(), false)
+	var pend_call: Dictionary = e.pending_external.get("call", {})
+	check.call("挂起的事件名", pend_call.get("name", ""), "solve_puzzle")
+	check.call("挂起时没有选项", e.choices.size(), 0)
+	check.call("挂起时未结束", e.ended, false)
+	# 宿主回值 8 → score=8 → 条件为真 → 走「解开了」
+	e.resolve_external(8)
+	check.call("回值写入变量", e.vars.get("score"), 8)
+	check.call("挂起已清除", e.pending_external.is_empty(), true)
+	var ev_last: Dictionary = e.log[e.log.size() - 1]
+	check.call("走真分支", ev_last["text"], "解开了")
+	check.call("重复 resolve 安全", e.resolve_external(1), false)
+
 	if fails.is_empty():
-		print("R19-2 Godot 跨流程调用:全部断言通过")
+		print("R19-2 / R19-3 Godot:全部断言通过")
 		quit(0)
 	else:
 		for f in fails:

@@ -18,17 +18,19 @@ class_name TheLoomRuntime
 
 signal beat_added(beat: Dictionary)
 signal event_emitted(event: Dictionary)
+## R19-3:宿主在这里执行引擎侧动作(播动画 / 切场景 / 启动谜题)
+signal external_event_requested(call: Dictionary)
 
 const RUNTIME_PROTOCOL_VERSION := 2
 const _NODE_LABEL := {
 	"dialogue": "对白", "fragment": "剧情片段", "hub": "汇聚点",
 	"condition": "条件分支", "instruction": "指令",
 	"jump": "跳转", "exit": "出口", "check": "检定",
-	"call": "调用", "return": "返回",
+	"call": "调用", "return": "返回", "event": "外部事件",
 }
 const _ANNOTATION := ["note", "zone"]
 ## R19-2:call 返回后也自动继续
-const _AUTO_ADVANCE := ["hub", "instruction", "condition", "exit", "check", "call"]
+const _AUTO_ADVANCE := ["hub", "instruction", "condition", "exit", "check", "call", "event"]
 ## R19-2 调用栈深度上限:超过按无限递归处理
 const MAX_CALL_DEPTH := 32
 
@@ -38,6 +40,10 @@ var root_flow: Dictionary
 var flow: Dictionary
 ## R19-2 调用栈:栈顶是最近一次 call 的返回点
 var call_stack: Array = []         # Array[Dictionary]
+## R19-3:非空表示演出正停在一个外部事件上,等宿主 resolve_external
+var pending_external: Dictionary = {}
+## R19-3 重入保护:_visit 循环内时,resolve_external 只记状态,由循环自己继续
+var _walking: bool = false
 var protocol_version: int = RUNTIME_PROTOCOL_VERSION
 var source_protocol_version: int = 1
 var seed_val: int = 0
@@ -92,6 +98,7 @@ func start(start_node_id: String = "", seed_override: int = -1) -> void:
 	_cur_path.clear()
 	flow = root_flow
 	call_stack.clear()
+	pending_external = {}
 	_seen.clear()
 	_taken.clear()
 	_checks.clear()
@@ -228,6 +235,48 @@ func _pop_frame(return_value) -> Dictionary:
 	if node == null:
 		return {}
 	return { "node": node, "path": path.duplicate() }
+
+
+## ---------- R19-3 外部事件 ----------
+
+## 按技术名找事件声明;找不到返回空字典
+func _find_external_event(name: String) -> Dictionary:
+	if name == "":
+		return {}
+	for e in project.get("externalEvents", []):
+		if String(e.get("name", "")) == name:
+			return e
+	return {}
+
+## 宿主完成外部事件后调用,演出从事件节点的出边继续。
+## value 仅在 wait='value' 且节点配了接收变量时写入。
+## 返回 false 表示当前并没有挂起的事件(重复调用是安全的)。
+func resolve_external(value = null) -> bool:
+	if pending_external.is_empty():
+		return false
+	var pending := pending_external
+	pending_external = {}
+	var rv := String(pending.get("result_var", ""))
+	if rv != "" and value != null:
+		vars[rv] = _norm_num(value) if typeof(value) == TYPE_FLOAT else value
+	# 宿主在信号处理里同步调用:交回正在跑的 _visit 循环继续,避免重入
+	if _walking:
+		return true
+	var f := _find_flow(String(pending.get("flow_id", "")))
+	if f.is_empty():
+		ended = true
+		return true
+	flow = f
+	var path: Array = pending.get("path", [])
+	var node = _find_node(_container(path), String(pending.get("node_id", "")))
+	if node == null:
+		ended = true
+		return true
+	var nxt := _advance_from(path, node, true)
+	if nxt.is_empty():
+		return true
+	_visit(nxt["path"], String(nxt["id"]), nxt["trigger"], nxt["changes"])
+	return true
 
 
 ## ---------- 内部辅助 ----------
@@ -404,6 +453,18 @@ func _visit(
 	initial_trigger: Dictionary = {},
 	initial_changes: Dictionary = {},
 ) -> void:
+	var outer := _walking
+	_walking = true
+	_visit_inner(path, node_id, initial_trigger, initial_changes)
+	_walking = outer
+
+
+func _visit_inner(
+	path: Array,
+	node_id: String,
+	initial_trigger: Dictionary = {},
+	initial_changes: Dictionary = {},
+) -> void:
 	var cur_p: Array = path.duplicate()
 	var id: String = node_id
 	var trigger := initial_trigger.duplicate(true)
@@ -428,6 +489,8 @@ func _visit(
 		# R19-2:本节点是否要切流程 / 弹栈返回
 		var cross_target = null
 		var do_return := false
+		# R19-3:非空表示本节点要挂起等宿主
+		var suspend: Dictionary = {}
 		var return_value = null
 
 		match node.get("type", ""):
@@ -509,6 +572,80 @@ func _visit(
 							"text": data.get("text", ""), "note": note,
 						})
 						cross_target = { "flow": target, "node_id": String(entry["node_id"]), "entry_key": entry_key }
+			"event":
+				var ev_name := String(data.get("eventName", "")).strip_edges()
+				var decl := _find_external_event(ev_name)
+				if ev_name == "" or decl.is_empty():
+					var skip := "未选择要请求的事件,已跳过"
+					if ev_name != "":
+						skip = "事件「%s」未在项目中声明,已跳过" % ev_name
+					display_note = skip
+					_push_beat({
+						"kind": "event", "title": data.get("title", "外部事件"),
+						"text": data.get("text", ""), "note": skip,
+					})
+				else:
+					var wait := String(data.get("eventWait", "continue"))
+					if wait == "":
+						wait = "continue"
+					# 实参按声明求值:文本取字面量,布尔与数值走表达式(与 R19-2 传参同口径)
+					var by_name: Dictionary = {}
+					for a in data.get("eventArgs", []):
+						by_name[String(a.get("name", ""))] = String(a.get("expr", ""))
+					var ev_args: Dictionary = {}
+					var arg_parts: Array = []
+					for prm in decl.get("params", []):
+						var pname := String(prm.get("name", ""))
+						var ptype := String(prm.get("type", "string"))
+						var expr := String(by_name.get(pname, ""))
+						var val
+						if expr.strip_edges() != "":
+							if ptype == "boolean":
+								var b = _eval_condition(expr)
+								val = false if b == null else b
+							elif ptype == "number":
+								val = _eval_number(expr)
+							else:
+								val = expr
+						else:
+							val = _coerce_var(ptype, String(prm.get("default", "")))
+						ev_args[pname] = val
+						arg_parts.append("%s=%s" % [pname, str(val)])
+					var call_info := {
+						"name": ev_name,
+						"args": ev_args,
+						"wait": wait,
+						"flowId": flow.get("id", ""),
+						"nodeId": node.get("id", ""),
+						"path": cur_p.duplicate(),
+					}
+					if String(data.get("technicalName", "")) != "":
+						call_info["nodeTechnicalName"] = data["technicalName"]
+					var wait_label := "立即继续"
+					if wait == "ack":
+						wait_label = "等待宿主确认"
+					elif wait == "value":
+						wait_label = "等待宿主返回值"
+					var arg_text := ", ".join(arg_parts)
+					var ev_label := String(decl.get("label", ""))
+					if ev_label == "":
+						ev_label = ev_name
+					var enote := "⚡ %s%s · %s" % [ev_label, "(%s)" % arg_text if arg_text != "" else "", wait_label]
+					display_note = enote
+					var etitle := String(data.get("title", ""))
+					if etitle == "":
+						etitle = ev_label
+					_push_beat({ "kind": "event", "title": etitle, "text": data.get("text", ""), "note": enote })
+					if wait == "continue":
+						external_event_requested.emit(call_info)
+					else:
+						suspend = {
+							"call": call_info,
+							"result_var": String(data.get("eventResultVar", "")) if wait == "value" else "",
+							"flow_id": flow.get("id", ""),
+							"path": cur_p.duplicate(),
+							"node_id": node.get("id", ""),
+						}
 			"return":
 				var ret_expr := String(data.get("returnExpr", "")).strip_edges()
 				if ret_expr != "":
@@ -551,6 +688,16 @@ func _visit(
 		_push_event("leave", cur_p, node, trigger, _empty_changes(), display_note)
 
 		# R19-2:切到目标流程入口(jump 不返回 / call 已压栈)
+		# R19-3:挂起等宿主。先置 pending_external 再通知,宿主可在信号处理里
+		# 同步调用 resolve_external;返回后若仍挂着就停下等异步 resolve。
+		if not suspend.is_empty():
+			pending_external = suspend
+			external_event_requested.emit(suspend["call"])
+			if not pending_external.is_empty():
+				_cur_path = cur_p
+				choices = []
+				return
+
 		if cross_target != null:
 			flow = cross_target["flow"]
 			cur_p = []

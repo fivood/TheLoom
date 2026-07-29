@@ -168,3 +168,72 @@ interface RuntimeFrame {
 | `src/simulate.ts`(路径遍历) | **局部建模**:带目标的 jump 与 return 终止本地路径,call 假设会返回。因为 auditProject 会对每个流程各跑一次,跟进会重复计数并让成本随调用图爆炸 |
 
 前三者必须逐条同步;`simulate.ts` 的差异是有意为之,代价(检测不到"被调流程永不返回")留给 R19-4 场景化回归测试。
+
+## R19-3 外部事件
+
+流程可以声明式地请求宿主引擎做一件事(播动画、切场景、启动谜题),但**不直接执行引擎代码**。
+
+### 声明
+
+事件声明在项目层(引擎包顶层 `externalEvents`),节点只引用技术名:
+
+```json
+{
+  "externalEvents": [
+    { "name": "play_anim", "label": "播动画",
+      "params": [{ "name": "clip", "type": "string" }, { "name": "speed", "type": "number" }] },
+    { "name": "solve_puzzle", "label": "解谜", "returnType": "number" }
+  ]
+}
+```
+
+`event` 节点的 `data`:
+
+| 字段 | 含义 |
+|---|---|
+| `eventName` | 引用 `externalEvents[].name` |
+| `eventArgs` | `[{ name, expr }]`,按声明的 `params` 逐个求值 |
+| `eventWait` | `continue` 立即继续 / `ack` 等宿主确认 / `value` 等宿主回值;缺省 `continue` |
+| `eventResultVar` | 仅 `value`:回值写入的变量名 |
+
+`eventSimValue` 是编辑器本机试跑用的模拟返回值,**刻意不导出**。
+
+### 运行时契约
+
+宿主拿到的调用:
+
+```ts
+interface ExternalEventCall {
+  name: string;
+  args: Record<string, VarValue>;   // 已求值,不是表达式
+  wait: 'continue' | 'ack' | 'value';
+  flowId: string; nodeId: string; path: string[];
+  nodeTechnicalName?: string;
+}
+```
+
+- `continue`:发出即继续,不等宿主。
+- `ack` / `value`:演出**挂起**在 `pendingExternal`,宿主完成后调用 `resolveExternal(value?)`(Godot 为 `resolve_external(value)`),从事件节点的出边继续。
+- 运行库**先置 `pendingExternal` 再通知宿主**,所以宿主可以在回调 / 信号处理里同步调用 `resolveExternal`(适合能立即完成的动作);内部有 `walking` 重入保护,同步解决只记状态,由正在跑的行进循环继续,不会递归重入。
+- `pendingExternal` **进快照** —— 否则在事件处存档、读回来会永久卡住。
+- 事件未在项目中声明时降级为一条带提示的 beat,不中断演出。
+- 实参求值与 R19-2 传参同口径:`string` 取字面量,`boolean` / `number` 走表达式。
+
+### 类型生成
+
+`generateTypes` 为宿主产出:
+
+```ts
+export type ExternalEventName = 'play_anim' | 'solve_puzzle';
+export interface ExternalEventPayloads {
+  play_anim: { clip: string; speed: number };
+  solve_puzzle: Record<string, never>;
+}
+export interface ExternalEventCall<K extends ExternalEventName = ExternalEventName> { … }
+```
+
+宿主的事件分发因此有编译期检查。
+
+### 路径遍历
+
+`simulate.ts` 把外部事件当直通节点(照常走出边),`value` 模式的回值未知、不改变量。这与 R19-2 的局部建模是同一取舍:路径报告只回答结构问题,运行期真值留给 R19-4 的场景化回归测试。
