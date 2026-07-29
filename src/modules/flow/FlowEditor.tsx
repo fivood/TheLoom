@@ -12,6 +12,8 @@ import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
 import PathTestPanel from '../../components/PathTestPanel';
 import { alignNodes, distributeNodes, type AlignHow } from '../../flowLayout';
+import { encapsulateSelection } from '../../flowEncapsulate';
+import type { FlowNode as FlowNodeShape } from '../../types';
 import FlowTestPanel from '../../components/FlowTestPanel';
 import { loadBreakpoints, toggleBreakpoint } from '../../playSaves';
 import type { EventWait, ExternalEvent, Flow, FlowEntry, FlowNodeData, FlowNodeType, FlowParam, SubFlow } from '../../types';
@@ -330,6 +332,68 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
       : n)));
   };
 
+  /**
+   * R19-5 封装为剧情片段:重接逻辑在 flowEncapsulate.ts(纯函数,可单测)。
+   * 这里负责问名字、把画布状态喂进去、把结果写回。
+   */
+  const encapsulate = async () => {
+    const picked = latest.current.nodes.filter((n) => n.selected);
+    if (picked.length === 0) { await alertDialog('先在画布上选中要封装的节点。'); return; }
+    const title = await promptText({
+      message: '新剧情片段的标题',
+      placeholder: '如:雨夜追逐',
+      confirmText: '封装',
+    });
+    if (title === null) return;
+
+    const asFlowNodes: FlowNodeShape[] = latest.current.nodes.map((n) => ({
+      id: n.id,
+      type: (n.type ?? 'fragment') as FlowNodeType,
+      position: { x: n.position.x, y: n.position.y },
+      data: n.data,
+    }));
+    const asFlowEdges = latest.current.edges.map((e) => {
+      const d = (e.data ?? {}) as Partial<EdgeData>;
+      return {
+        id: e.id, source: e.source, target: e.target,
+        sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
+        label: d.label || undefined,
+        condition: d.condition || undefined,
+        effect: d.effect || undefined,
+        once: d.once || undefined,
+        fallback: d.fallback || undefined,
+        choiceId: d.choiceId || undefined,
+      };
+    });
+
+    const r = encapsulateSelection({
+      nodes: asFlowNodes,
+      edges: asFlowEdges,
+      selectedIds: picked.map((n) => n.id),
+      newId: uid,
+      title,
+    });
+    if (!r.ok) { await alertDialog(r.reason ?? '无法封装'); return; }
+
+    dirty.current = true;
+    setNodes(r.nodes.map((n) => ({
+      id: n.id, type: n.type, position: n.position, data: n.data,
+      selected: n.id === r.fragmentId,
+      dragHandle: n.type === 'zone' ? '.zone-head' : undefined,
+    })));
+    setEdges(r.edges.map((e) => {
+      const data: EdgeData = {
+        label: e.label ?? '', condition: e.condition ?? '', effect: e.effect ?? '',
+        once: e.once === true, fallback: e.fallback === true, choiceId: e.choiceId,
+      };
+      return {
+        id: e.id, source: e.source, target: e.target,
+        sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
+        data, label: edgeDisplayLabel(data), ...EDGE_STYLE,
+      };
+    }));
+  };
+
   const enterSub = (nodeId: string) => {
     writeBack();
     navigate([...path, nodeId]);
@@ -367,6 +431,12 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
               </button>
             ))}
+          {selectedCount >= 1 && (
+            <button
+              title="把选中节点封装成一个剧情片段:内部连线跟着搬进去,进出选区的连线自动改接"
+              onClick={encapsulate}
+            >▦ 封装</button>
+          )}
           {selectedCount >= 2 && (
             <>
               <button title="左对齐" onClick={() => alignSelection('left')}>⇤</button>
