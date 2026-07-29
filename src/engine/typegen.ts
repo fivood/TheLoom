@@ -32,6 +32,7 @@ export function generateTypes(pkg: EnginePackage): string {
  * 项目:${pkg.meta.projectName}
  * 导出时间:${new Date(pkg.meta.exportedAt).toISOString()}
  * schemaVersion:${pkg.schemaVersion}
+ * runtimeProtocolVersion:${pkg.runtimeProtocolVersion}
  */
 
 /** 流程技术名 */
@@ -48,6 +49,41 @@ export type VariableName = ${literalUnion(pkg.variables.map((v) => v.name))};
 /** 全局变量表(初始值见包内 variables) */
 export interface EngineVariables {
 ${varLines.join('\n')}
+}
+
+export type RuntimeValue = boolean | number | string;
+
+export interface RuntimeChanges {
+  variables: { name: string; before: RuntimeValue | null; after: RuntimeValue | null }[];
+  entities: {
+    entityTechnicalName: string;
+    field: string;
+    before: RuntimeValue | null;
+    after: RuntimeValue | null;
+  }[];
+}
+
+export interface RuntimeEventV2 {
+  protocolVersion: 2;
+  sourceProtocolVersion: number;
+  event: 'enter' | 'display' | 'leave';
+  flowId: string;
+  flowTechnicalName?: FlowTechnicalName;
+  nodeId: string;
+  nodeTechnicalName?: NodeTechnicalName;
+  path: string[];
+  nodeType: EngineNode['type'];
+  kind: string;
+  title: string;
+  text: string;
+  speakerId?: string;
+  speakerName?: string;
+  note?: string;
+  fields: { label: string; value: string; type?: string }[];
+  assetIds: string[];
+  edgeId?: string;
+  choiceKey?: string;
+  changes: RuntimeChanges;
 }
 
 /* ---------- 包结构 ---------- */
@@ -84,6 +120,7 @@ export interface EngineEdge {
   effect?: string;
   once?: boolean;
   fallback?: boolean;
+  choiceId?: string;
 }
 
 export interface EngineSub { nodes: EngineNode[]; edges: EngineEdge[] }
@@ -137,6 +174,7 @@ export interface EngineIndex {
 export interface EnginePackage {
   schema: 'theloom-package';
   schemaVersion: string;
+  runtimeProtocolVersion: 2;
   meta: { projectName: string; exportedAt: number; generator: string };
   rules: { includeLayout: boolean; includeAnnotations: boolean; entities: 'all' | 'referenced'; assets: 'all' | 'referenced' };
   variables: EngineVariable[];

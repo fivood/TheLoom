@@ -16,7 +16,8 @@ import { FlowRuntime } from '../../runtime-dist/theloom-runtime.js';
 /** 内置示例:雨夜检定小场景(等价于应用导出的 theloom-package.json 片段) */
 const SAMPLE = {
   schema: 'theloom-package',
-  schemaVersion: '1.0.0',
+  schemaVersion: '1.1.0',
+  runtimeProtocolVersion: 2,
   meta: { projectName: '示例', exportedAt: 0, generator: 'demo' },
   variables: [{ name: 'courage', type: 'number', value: '1' }],
   entities: [

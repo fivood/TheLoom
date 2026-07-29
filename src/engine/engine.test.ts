@@ -41,7 +41,7 @@ function baseProject(): Project {
         },
       ],
       edges: [
-        { id: 'ed1', source: 'n1', target: 'frag', label: '继续' },
+        { id: 'ed1', source: 'n1', target: 'frag', label: '继续', choiceId: 'choice-continue' },
         { id: 'ed2', source: 'n1', target: 'note1' },
       ],
     },
@@ -72,9 +72,11 @@ describe('buildEnginePackage', () => {
   it('默认规则:剥注释与布局,索引齐全,附件限定导出范围', () => {
     const pkg = buildEnginePackage(baseProject());
     expect(pkg.schema).toBe('theloom-package');
+    expect(pkg.runtimeProtocolVersion).toBe(2);
     const f1 = pkg.flows.find((f) => f.id === 'f1')!;
     expect(f1.nodes.map((n) => n.id)).toEqual(['n1', 'frag']);
     expect(f1.edges.map((e) => e.id)).toEqual(['ed1']); // 指向注释的边同步剥除
+    expect(f1.edges[0].choiceId).toBe('choice-continue');
     expect(f1.nodes[0].position).toBeUndefined();
 
     expect(pkg.index.technicalNames.act1).toEqual({ kind: 'flow', id: 'f1' });
@@ -164,6 +166,8 @@ describe('类型生成与 Schema', () => {
     expect(dts).toContain("'opening' | 'sub_line'");
     expect(dts).toContain('trust: number;');
     expect(dts).toContain('/** 信任度 */');
+    expect(dts).toContain('runtimeProtocolVersion: 2;');
+    expect(dts).toContain('export interface RuntimeEventV2');
   });
 
   it('无技术名时联合类型为 never', () => {

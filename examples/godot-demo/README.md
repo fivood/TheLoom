@@ -34,6 +34,7 @@ _runtime = TheLoomRuntime.new(pkg, "第一章")     # 用中文名或技术名
 var run := TheLoomRuntime.new(package_dict, "flow_technical_name_or_id")
 run.seed_val = 42                          # 可选:固定随机种子
 run.beat_added.connect(_on_beat)           # 每条演出记录会触发信号
+run.event_emitted.connect(_on_event)       # v2 节点生命周期与状态变化
 run.start()                                # 开始;有多起点时会先出现选项
 while not run.ended and run.choices.size() > 0:
     run.choose(0)                          # 按下标选一个;通常来自玩家 UI
@@ -43,8 +44,11 @@ while not run.ended and run.choices.size() > 0:
 
 | 属性 | 类型 | 说明 |
 |---|---|---|
-| `choices` | `Array[Dictionary]` | 当前可选项;每项 `{label, node_id, edge_id, effect, once}` |
+| `protocol_version` | `int` | 当前运行时事件协议版本,固定为 `2` |
+| `source_protocol_version` | `int` | 引擎包声明的协议版本;旧包缺省为 `1` |
+| `choices` | `Array[Dictionary]` | 当前可选项;每项 `{label, choice_key, node_id, edge_id, effect, once}` |
 | `log` | `Array[Dictionary]` | 演出记录;每条 `{kind, title, text, speaker_name, note}` |
+| `events` | `Array[Dictionary]` | v2 事件记录;每个节点依次产生 `enter / display / leave` |
 | `vars` | `Dictionary` | 变量实时状态 |
 | `entity_props` | `Dictionary` | 实体属性(按技术名 → 字段名 → 值) |
 | `ended` | `bool` | 是否终止(无出边或走到 exit 顶层) |
@@ -53,6 +57,9 @@ while not run.ended and run.choices.size() > 0:
 **信号**
 
 - `beat_added(beat: Dictionary)`:每产生一条演出记录时触发(顺序等价于往 `log` 追加)
+- `event_emitted(event: Dictionary)`:每次节点生命周期事件触发;包含流程与节点定位、子流程路径、说话人、自定义字段、附件资源、触发边 / 稳定选项键，以及变量和实体属性变化
+
+`beat_added` 与 `log` 继续保持 v1 用法。v2 包在顶层声明 `runtimeProtocolVersion: 2`;旧包没有该字段时仍可加载，`source_protocol_version` 为 `1`，缺失的附件和自定义字段按空数组补齐。
 
 ## 支持的脚本语法
 
@@ -80,6 +87,12 @@ Godot runtime 内置一个**极简条件 / 指令求值器**,覆盖 TheLoom 项�
 - 无出边逐层回溯 + exit 命名引脚
 - fragment 默认引脚 + fallback 遮蔽
 - 一次性选项 once + 条件边过滤
+
+可用 Godot 的无界面模式执行 v2 契约验收：
+
+```bash
+godot --headless --path examples/godot-demo --script runtime_v2_test.gd
+```
 
 ## 授权
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Entity, Flow, FlowEdge, FlowNode, Project, Variable } from '../types';
 import { buildEnginePackage } from '../engine/package';
 import { FlowRuntime } from './player';
+import runtimeV2Fixture from '../../examples/godot-demo/runtime_v2_fixture.json';
 
 let seq = 0;
 const node = (id: string, type: FlowNode['type'], data: Partial<FlowNode['data']> = {}): FlowNode => ({
@@ -213,5 +214,118 @@ describe('FlowRuntime 检定与存档', () => {
     run.start();
     expect(seen[0]).toBe('check');
     expect(seen.slice(-1)[0]).toBe('dialogue');
+  });
+});
+
+describe('FlowRuntime 事件协议 v2', () => {
+  it('与 Godot 共用同一份协议夹具和预期事件序列', () => {
+    const run = new FlowRuntime(structuredClone(runtimeV2Fixture), 'protocol_test');
+    run.start();
+    expect(run.events.map((event) => `${event.nodeId}:${event.event}`)).toEqual([
+      'set:enter', 'set:display', 'set:leave',
+      'say:enter', 'say:display', 'say:leave',
+    ]);
+    expect(run.events[1].changes).toEqual({
+      variables: [{ name: 'n', before: 0, after: 1 }],
+      entities: [{ entityTechnicalName: 'detective', field: 'trust', before: 5, after: 7 }],
+    });
+    expect(run.events[3]).toMatchObject({
+      edgeId: 'next',
+      choiceKey: 'choice-next',
+      changes: { variables: [{ name: 'n', before: 1, after: 3 }], entities: [] },
+    });
+  });
+
+  it('输出节点生命周期、稳定选项键、附件、自定义字段与状态变化', () => {
+    const sem: Entity = {
+      id: 'e1', kind: 'character', name: '林晚', color: '#333', emoji: '', summary: '', notes: '',
+      technicalName: 'linwan',
+      fields: [{ id: 'f1', label: 'trust', value: '5' }],
+      createdAt: 0,
+    };
+    const p = project([{
+      id: 'f1', name: '事件', technicalName: 'events',
+      nodes: [
+        node('set', 'instruction', {
+          text: 'n = 1; linwan.trust += 2',
+          technicalName: 'set_state',
+          fields: [{ id: 'custom-1', label: '演出提示', value: '低声', type: 'text' }],
+        }),
+        node('say', 'dialogue', { text: '收到', speakerId: 'e1', technicalName: 'reply' }),
+      ],
+      edges: [{
+        ...edge('set', 'say'),
+        id: 'edge-next',
+        choiceId: 'choice-next',
+        effect: 'n += 2',
+      }],
+    }], [numVar('n', '0')], [sem]);
+    p.assets.push({
+      id: 'asset-voice', name: '对白', kind: 'audio', mime: 'audio/wav', size: 1,
+      tags: [], source: '', notes: '', createdAt: 0,
+    });
+    (p.attachments ??= {}).set = ['asset-voice'];
+
+    const received: string[] = [];
+    const run = new FlowRuntime(enginePkg(p), 'events', {
+      onEvent: (event) => received.push(`${event.nodeId}:${event.event}`),
+    });
+    run.start();
+
+    expect(run.protocolVersion).toBe(2);
+    expect(run.sourceProtocolVersion).toBe(2);
+    expect(received).toEqual([
+      'set:enter', 'set:display', 'set:leave',
+      'say:enter', 'say:display', 'say:leave',
+    ]);
+    const setDisplay = run.events.find((event) => event.nodeId === 'set' && event.event === 'display')!;
+    expect(setDisplay).toMatchObject({
+      protocolVersion: 2,
+      flowId: 'f1',
+      flowTechnicalName: 'events',
+      nodeTechnicalName: 'set_state',
+      path: [],
+      nodeType: 'instruction',
+      assetIds: ['asset-voice'],
+    });
+    expect(setDisplay.fields).toEqual([{ label: '演出提示', value: '低声', type: 'text' }]);
+    expect(setDisplay.changes.variables).toEqual([{ name: 'n', before: 0, after: 1 }]);
+    expect(setDisplay.changes.entities).toEqual([{
+      entityTechnicalName: 'linwan', field: 'trust', before: 5, after: 7,
+    }]);
+
+    const sayEnter = run.events.find((event) => event.nodeId === 'say' && event.event === 'enter')!;
+    expect(sayEnter).toMatchObject({
+      edgeId: 'edge-next',
+      choiceKey: 'choice-next',
+      speakerId: 'e1',
+      speakerName: '林晚',
+    });
+    expect(sayEnter.changes.variables).toEqual([{ name: 'n', before: 1, after: 3 }]);
+    expect(run.log.map((beat) => beat.kind)).toEqual(['instruction', 'dialogue']);
+  });
+
+  it('旧包缺少协议声明时按 v1 数据源确定性升级,多起点也有稳定键', () => {
+    const p = project([{
+      id: 'f1', name: '旧包',
+      nodes: [node('a', 'dialogue'), node('b', 'dialogue')],
+      edges: [],
+    }]);
+    const pkg = enginePkg(p);
+    delete pkg.runtimeProtocolVersion;
+    delete pkg.attachments;
+    const run = new FlowRuntime(pkg, 'f1');
+    run.start();
+    expect(run.sourceProtocolVersion).toBe(1);
+    expect(run.choices.map((choice) => choice.choiceKey)).toEqual(['start:a', 'start:b']);
+    run.choose(1);
+    expect(run.events[0]).toMatchObject({
+      protocolVersion: 2,
+      sourceProtocolVersion: 1,
+      nodeId: 'b',
+      choiceKey: 'start:b',
+      fields: [],
+      assetIds: [],
+    });
   });
 });

@@ -46,6 +46,7 @@ export interface RtEdge {
   effect?: string;
   once?: boolean;
   fallback?: boolean;
+  choiceId?: string;
 }
 
 export interface RtSub { nodes: RtNode[]; edges: RtEdge[] }
@@ -67,12 +68,16 @@ export interface RtEntity {
 
 /** 运行库的输入:引擎包或应用内项目的公共子集 */
 export interface RtProject {
+  runtimeProtocolVersion?: number;
   flows: RtFlow[];
   variables?: RtVariable[];
   entities?: RtEntity[];
+  attachments?: Record<string, string[]>;
 }
 
 /* ---------- 输出类型 ---------- */
+
+export const RUNTIME_PROTOCOL_VERSION = 2 as const;
 
 export interface RuntimeBeat {
   kind: string;
@@ -85,11 +90,47 @@ export interface RuntimeBeat {
 
 export interface RuntimeChoice {
   label: string;
+  choiceKey: string;
   /** null = 起点选择之外不会出现;正常为目标节点 id */
   nodeId: string | null;
   edgeId?: string;
   effect?: string;
   once?: boolean;
+}
+
+export interface RuntimeValueChange {
+  name: string;
+  before: VarValue | null;
+  after: VarValue | null;
+}
+
+export interface RuntimeEntityChange {
+  entityTechnicalName: string;
+  field: string;
+  before: VarValue | null;
+  after: VarValue | null;
+}
+
+export interface RuntimeChanges {
+  variables: RuntimeValueChange[];
+  entities: RuntimeEntityChange[];
+}
+
+export interface RuntimeEvent extends RuntimeBeat {
+  protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
+  sourceProtocolVersion: number;
+  event: 'enter' | 'display' | 'leave';
+  flowId: string;
+  flowTechnicalName?: string;
+  nodeId: string;
+  nodeTechnicalName?: string;
+  path: string[];
+  nodeType: string;
+  fields: { label: string; value: string; type?: string }[];
+  assetIds: string[];
+  edgeId?: string;
+  choiceKey?: string;
+  changes: RuntimeChanges;
 }
 
 /** 完整运行态快照:引擎存档用;restore 后掷骰序列不漂移 */
@@ -105,6 +146,7 @@ export interface RuntimeSnapshot {
   choices: RuntimeChoice[];
   ended: boolean;
   log: RuntimeBeat[];
+  events?: RuntimeEvent[];
 }
 
 export interface FlowRuntimeOptions {
@@ -112,6 +154,8 @@ export interface FlowRuntimeOptions {
   seed?: number;
   /** 每产生一条演出记录时回调(引擎接管展示) */
   onBeat?: (beat: RuntimeBeat) => void;
+  /** v2 节点生命周期事件;旧包也会按确定性默认值补齐 */
+  onEvent?: (event: RuntimeEvent) => void;
 }
 
 /** 画布组织类节点,不参与叙事 */
@@ -141,9 +185,44 @@ function resolveSub(root: RtSub, path: string[]): RtSub | null {
   return cur;
 }
 
+function stateChanges(
+  beforeVars: Record<string, VarValue>,
+  beforeEntities: Record<string, Record<string, VarValue>>,
+  afterVars: Record<string, VarValue>,
+  afterEntities: Record<string, Record<string, VarValue>>,
+): RuntimeChanges {
+  const variables: RuntimeValueChange[] = [];
+  const entities: RuntimeEntityChange[] = [];
+  for (const name of new Set([...Object.keys(beforeVars), ...Object.keys(afterVars)])) {
+    if (beforeVars[name] !== afterVars[name]) {
+      variables.push({ name, before: beforeVars[name] ?? null, after: afterVars[name] ?? null });
+    }
+  }
+  for (const entityTechnicalName of new Set([...Object.keys(beforeEntities), ...Object.keys(afterEntities)])) {
+    const before = beforeEntities[entityTechnicalName] ?? {};
+    const after = afterEntities[entityTechnicalName] ?? {};
+    for (const field of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      if (before[field] !== after[field]) {
+        entities.push({
+          entityTechnicalName,
+          field,
+          before: before[field] ?? null,
+          after: after[field] ?? null,
+        });
+      }
+    }
+  }
+  return { variables, entities };
+}
+
+const EMPTY_CHANGES = (): RuntimeChanges => ({ variables: [], entities: [] });
+
 export class FlowRuntime {
+  readonly protocolVersion = RUNTIME_PROTOCOL_VERSION;
+  readonly sourceProtocolVersion: number;
   readonly flow: RtFlow;
   readonly log: RuntimeBeat[] = [];
+  readonly events: RuntimeEvent[] = [];
   choices: RuntimeChoice[] = [];
   ended = false;
   vars: Record<string, VarValue> = {};
@@ -165,6 +244,9 @@ export class FlowRuntime {
   constructor(project: RtProject, flowRef: string, options: FlowRuntimeOptions = {}) {
     this.project = project;
     this.options = options;
+    this.sourceProtocolVersion = Number.isInteger(project.runtimeProtocolVersion) && project.runtimeProtocolVersion! > 0
+      ? project.runtimeProtocolVersion!
+      : 1;
     const flow = project.flows.find((f) => f.id === flowRef || (f.technicalName && f.technicalName === flowRef));
     if (!flow) throw new Error(`流程不存在:${flowRef}`);
     this.flow = flow;
@@ -186,6 +268,7 @@ export class FlowRuntime {
     this.rng = mulberry32(this.seed);
     this.rolls = 0;
     this.log.length = 0;
+    this.events.length = 0;
     this.choices = [];
     this.ended = false;
     this.curPath = [];
@@ -199,22 +282,36 @@ export class FlowRuntime {
     for (const v of this.project.variables ?? []) this.vars[v.name] = coerceVar(v.type, v.value);
 
     if (startNodeId && this.flow.nodes.some((n) => n.id === startNodeId)) {
-      this.visit([], startNodeId);
+      this.visit([], startNodeId, { choiceKey: `start:${startNodeId}` });
       return;
     }
     const starts = startNodes(this.flow);
     if (starts.length === 0) { this.ended = true; return; }
-    if (starts.length === 1) { this.visit([], starts[0].id); return; }
-    this.choices = starts.map((s) => ({ label: s.data.title || NODE_LABEL[s.type] || s.type, nodeId: s.id }));
+    if (starts.length === 1) {
+      this.visit([], starts[0].id, { choiceKey: `start:${starts[0].id}` });
+      return;
+    }
+    this.choices = starts.map((s) => ({
+      label: s.data.title || NODE_LABEL[s.type] || s.type,
+      choiceKey: `start:${s.id}`,
+      nodeId: s.id,
+    }));
   }
 
   /** 选择当前选项(按下标) */
   choose(index: number) {
     const c = this.choices[index];
     if (!c || !c.nodeId || this.ended) return;
+    const beforeVars = structuredClone(this.vars);
+    const beforeEntities = structuredClone(this.entityProps);
     if (c.edgeId && c.once) this.taken.add(c.edgeId);
     if (c.effect) applyInstructions(c.effect, this.vars, this.ctx());
-    this.visit(this.curPath, c.nodeId);
+    this.visit(
+      this.curPath,
+      c.nodeId,
+      { edgeId: c.edgeId, choiceKey: c.choiceKey },
+      stateChanges(beforeVars, beforeEntities, this.vars, this.entityProps),
+    );
   }
 
   /* ---------- 存档 ---------- */
@@ -232,6 +329,7 @@ export class FlowRuntime {
       choices: this.choices,
       ended: this.ended,
       log: this.log,
+      events: this.events,
     });
   }
 
@@ -249,10 +347,15 @@ export class FlowRuntime {
     for (const [k, v] of s.checks) this.checks.set(k, v);
     this.entityProps = s.entityProps;
     this.curPath = s.curPath;
-    this.choices = s.choices;
+    this.choices = s.choices.map((choice) => ({
+      ...choice,
+      choiceKey: choice.choiceKey ?? (choice.edgeId ? `edge:${choice.edgeId}` : `start:${choice.nodeId ?? 'none'}`),
+    }));
     this.ended = s.ended;
     this.log.length = 0;
     this.log.push(...s.log);
+    this.events.length = 0;
+    this.events.push(...(s.events ?? []));
   }
 
   /* ---------- 内部 ---------- */
@@ -271,6 +374,43 @@ export class FlowRuntime {
   private pushBeat(beat: RuntimeBeat) {
     this.log.push(beat);
     this.options.onBeat?.(beat);
+  }
+
+  private pushEvent(
+    event: RuntimeEvent['event'],
+    path: string[],
+    node: RtNode,
+    trigger: { edgeId?: string; choiceKey?: string },
+    changes: RuntimeChanges,
+    note?: string,
+  ) {
+    const speaker = node.data.speakerId ? this.entityById.get(node.data.speakerId) : undefined;
+    const out: RuntimeEvent = {
+      protocolVersion: RUNTIME_PROTOCOL_VERSION,
+      sourceProtocolVersion: this.sourceProtocolVersion,
+      event,
+      flowId: this.flow.id,
+      nodeId: node.id,
+      path: [...path],
+      nodeType: node.type,
+      kind: node.type,
+      title: node.data.title ?? '',
+      text: node.data.text ?? '',
+      fields: Array.isArray(node.data.fields)
+        ? structuredClone(node.data.fields as { label: string; value: string; type?: string }[])
+        : [],
+      assetIds: [...(this.project.attachments?.[node.id] ?? [])],
+      changes: structuredClone(changes),
+    };
+    if (this.flow.technicalName) out.flowTechnicalName = this.flow.technicalName;
+    if (node.data.technicalName) out.nodeTechnicalName = node.data.technicalName;
+    if (speaker?.id) out.speakerId = speaker.id;
+    if (speaker?.name) out.speakerName = speaker.name;
+    if (trigger.edgeId) out.edgeId = trigger.edgeId;
+    if (trigger.choiceKey) out.choiceKey = trigger.choiceKey;
+    if (note) out.note = note;
+    this.events.push(out);
+    this.options.onEvent?.(out);
   }
 
   /** 节点出边 → 选项;无出边逐层回溯;exit 走父层片段命名引脚 */
@@ -325,6 +465,7 @@ export class FlowRuntime {
               label: (typeof e.label === 'string' && e.label) || target?.data.title || (target ? NODE_LABEL[target.type] ?? '继续' : '继续'),
               nodeId: e.target,
               edgeId: e.id,
+              choiceKey: e.choiceId || `edge:${e.id}`,
               effect: e.effect,
               once: e.once,
             };
@@ -340,17 +481,30 @@ export class FlowRuntime {
   }
 
   /** 进入并展示一个节点,自动处理直通型节点 */
-  private visit(path: string[], nodeId: string) {
+  private visit(
+    path: string[],
+    nodeId: string,
+    initialTrigger: { edgeId?: string; choiceKey?: string } = {},
+    initialChanges: RuntimeChanges = EMPTY_CHANGES(),
+  ) {
     let curP = [...path];
     let id: string | null = nodeId;
+    let trigger = initialTrigger;
+    let enterChanges = initialChanges;
 
     for (let guard = 0; guard < 100 && id; guard++) {
       const c = this.container(curP);
       const node = c.nodes.find((n) => n.id === id);
       if (!node) break;
+      this.pushEvent('enter', curP, node, trigger, enterChanges);
       this.seen.add(id);
       const ctx = this.ctx();
       const speaker = node.data.speakerId ? this.entityById.get(node.data.speakerId) : undefined;
+      const beforeVars = structuredClone(this.vars);
+      const beforeEntities = structuredClone(this.entityProps);
+      let displayNote: string | undefined;
+      let nestedStarts: RtNode[] | null = null;
+      let nestedPath: string[] | null = null;
 
       switch (node.type) {
         case 'dialogue':
@@ -363,12 +517,8 @@ export class FlowRuntime {
           this.pushBeat({ kind: 'fragment', title: node.data.title || '剧情片段', text: node.data.text ?? '' });
           const sub = node.data.sub;
           if (sub && sub.nodes.length > 0) {
-            curP = [...curP, node.id];
-            const starts = startNodes(sub);
-            if (starts.length === 1) { id = starts[0].id; continue; }
-            this.curPath = curP;
-            this.choices = starts.map((s) => ({ label: s.data.title || NODE_LABEL[s.type] || s.type, nodeId: s.id }));
-            return;
+            nestedPath = [...curP, node.id];
+            nestedStarts = startNodes(sub);
           }
           break;
         }
@@ -381,6 +531,7 @@ export class FlowRuntime {
             kind: 'instruction', title: node.data.title || '指令', text: node.data.text ?? '',
             note: warnings.length ? warnings.join(';') : undefined,
           });
+          displayNote = warnings.length ? warnings.join(';') : undefined;
           break;
         }
         case 'condition': {
@@ -389,6 +540,7 @@ export class FlowRuntime {
             kind: 'condition', title: node.data.title || '条件分支', text: node.data.text ?? '',
             note: result === null ? '无法求值,请手动选择分支' : result ? '→ 真' : '→ 假',
           });
+          displayNote = result === null ? '无法求值,请手动选择分支' : result ? '→ 真' : '→ 假';
           break;
         }
         case 'jump':
@@ -418,8 +570,36 @@ export class FlowRuntime {
             text: node.data.text ?? '',
             note,
           });
+          displayNote = note;
           break;
         }
+      }
+
+      this.pushEvent(
+        'display',
+        curP,
+        node,
+        trigger,
+        stateChanges(beforeVars, beforeEntities, this.vars, this.entityProps),
+        displayNote,
+      );
+      this.pushEvent('leave', curP, node, trigger, EMPTY_CHANGES(), displayNote);
+
+      if (nestedStarts && nestedPath) {
+        curP = nestedPath;
+        if (nestedStarts.length === 1) {
+          id = nestedStarts[0].id;
+          trigger = { choiceKey: `start:${id}` };
+          enterChanges = EMPTY_CHANGES();
+          continue;
+        }
+        this.curPath = curP;
+        this.choices = nestedStarts.map((s) => ({
+          label: s.data.title || NODE_LABEL[s.type] || s.type,
+          choiceKey: `start:${s.id}`,
+          nodeId: s.id,
+        }));
+        return;
       }
 
       const { choices: cs, path: outP } = this.outgoingChoices(curP, node);
@@ -433,9 +613,13 @@ export class FlowRuntime {
       }
       if (cs.length === 1 && AUTO_ADVANCE.has(node.type)) {
         const c0 = cs[0];
+        const beforeEdgeVars = structuredClone(this.vars);
+        const beforeEdgeEntities = structuredClone(this.entityProps);
         if (c0.edgeId && c0.once) this.taken.add(c0.edgeId);
         if (c0.effect) applyInstructions(c0.effect, this.vars, this.ctx());
         id = c0.nodeId;
+        trigger = { edgeId: c0.edgeId, choiceKey: c0.choiceKey };
+        enterChanges = stateChanges(beforeEdgeVars, beforeEdgeEntities, this.vars, this.entityProps);
         continue;
       }
       this.curPath = curP;

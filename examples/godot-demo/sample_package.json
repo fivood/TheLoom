@@ -1,6 +1,7 @@
 {
   "schema": "theloom-package",
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
+  "runtimeProtocolVersion": 2,
   "meta": {
     "projectName": "老伦敦寻人记",
     "exportedAt": 0,

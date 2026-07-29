@@ -10,7 +10,8 @@ import type { Entity, FlowEdge, FlowNode, Project, SubFlow } from '../types';
 import { ANNOTATION_TYPES } from '../types';
 import { assetFileName } from '../assetFiles';
 
-export const ENGINE_SCHEMA_VERSION = '1.0.0';
+export const ENGINE_SCHEMA_VERSION = '1.1.0';
+export const ENGINE_RUNTIME_PROTOCOL_VERSION = 2 as const;
 
 /* ---------- 包类型 ---------- */
 
@@ -59,6 +60,7 @@ export interface EngineEdge {
   effect?: string;
   once?: boolean;
   fallback?: boolean;
+  choiceId?: string;
 }
 
 export interface EngineSub { nodes: EngineNode[]; edges: EngineEdge[] }
@@ -116,6 +118,7 @@ export interface EngineIndex {
 export interface EnginePackage {
   schema: 'theloom-package';
   schemaVersion: string;
+  runtimeProtocolVersion: typeof ENGINE_RUNTIME_PROTOCOL_VERSION;
   meta: {
     projectName: string;
     exportedAt: number;
@@ -137,6 +140,7 @@ export interface EnginePackage {
 export interface EngineDelta {
   schema: 'theloom-delta';
   schemaVersion: string;
+  runtimeProtocolVersion: typeof ENGINE_RUNTIME_PROTOCOL_VERSION;
   meta: { projectName: string; exportedAt: number; generator: string };
   changed: {
     variables?: EngineVariable[];
@@ -207,6 +211,7 @@ function cloneEdge(e: FlowEdge): EngineEdge {
   if (e.effect) out.effect = e.effect;
   if (e.once) out.once = true;
   if (e.fallback) out.fallback = true;
+  if (e.choiceId) out.choiceId = e.choiceId;
   return out;
 }
 
@@ -349,6 +354,7 @@ export function buildEnginePackage(project: Project, rules: EngineExportRules = 
   return {
     schema: 'theloom-package',
     schemaVersion: ENGINE_SCHEMA_VERSION,
+    runtimeProtocolVersion: ENGINE_RUNTIME_PROTOCOL_VERSION,
     meta: { projectName: project.name, exportedAt: Date.now(), generator: 'TheLoom' },
     rules: effective,
     variables,
@@ -390,6 +396,7 @@ export function buildEngineDelta(pkg: EnginePackage, prevManifest: Record<string
   return {
     schema: 'theloom-delta',
     schemaVersion: pkg.schemaVersion,
+    runtimeProtocolVersion: pkg.runtimeProtocolVersion,
     meta: { ...pkg.meta, exportedAt: Date.now() },
     changed: {
       variables: touched.has('variables') ? pkg.variables : undefined,

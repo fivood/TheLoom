@@ -2,17 +2,18 @@
  * 引擎包 JSON Schema(draft-07,随 schemaVersion 演进)。
  * 引擎侧可用任意 JSON Schema 校验器在导入前验证包结构。
  */
-import { ENGINE_SCHEMA_VERSION } from './package';
+import { ENGINE_RUNTIME_PROTOCOL_VERSION, ENGINE_SCHEMA_VERSION } from './package';
 
 export const ENGINE_PACKAGE_SCHEMA = {
   $schema: 'http://json-schema.org/draft-07/schema#',
   $id: `https://theloom.pages.dev/schema/theloom-package-${ENGINE_SCHEMA_VERSION}.json`,
   title: 'TheLoom Engine Package',
   type: 'object',
-  required: ['schema', 'schemaVersion', 'meta', 'variables', 'entities', 'flows', 'assets', 'index', 'manifest'],
+  required: ['schema', 'schemaVersion', 'runtimeProtocolVersion', 'meta', 'variables', 'entities', 'flows', 'assets', 'index', 'manifest'],
   properties: {
     schema: { const: 'theloom-package' },
     schemaVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$' },
+    runtimeProtocolVersion: { const: ENGINE_RUNTIME_PROTOCOL_VERSION },
     meta: {
       type: 'object',
       required: ['projectName', 'exportedAt', 'generator'],
@@ -192,6 +193,7 @@ export const ENGINE_PACKAGE_SCHEMA = {
         effect: { type: 'string' },
         once: { type: 'boolean' },
         fallback: { type: 'boolean' },
+        choiceId: { type: 'string' },
       },
     },
     sub: {
@@ -225,7 +227,10 @@ TheLoom 提供独立运行库(theloom-runtime,零依赖 ES Module),行为与编�
 import { FlowRuntime } from './theloom-runtime.js';
 
 const pkg = JSON.parse(fs.readFileSync('theloom-package.json', 'utf8'));
-const run = new FlowRuntime(pkg, '流程技术名或id', { seed: 42 });
+const run = new FlowRuntime(pkg, '流程技术名或id', {
+  seed: 42,
+  onEvent: (event) => console.log(event.event, event.nodeId, event.changes),
+});
 run.start();
 // run.log     → 演出记录(对白/指令/检定…)
 // run.choices → 当前选项
@@ -236,6 +241,7 @@ run.choose(0); // 选第 1 项
 
 ## 约定
 
+- 包内 \`runtimeProtocolVersion: 2\`;运行库通过 \`onEvent\` 输出节点 \`enter / display / leave\` 事件,包含流程 / 节点定位、附件、自定义字段、触发选项与状态变化。\`onBeat\` 和 \`log\` 保持 v1 兼容
 - 节点行进语义:单出边的汇聚点 / 指令 / 条件 / 出口 / 检定自动前进;无出边逐层回溯父流程;\`exit\` 走父层片段的命名引脚;\`fallback\` 边在有其他可用选项时被遮蔽;\`once\` 选项选过即隐藏
 - 条件 / 指令 / 检定技能值是 TheLoom 脚本源码(运行库内置解释器),包含 \`seen("节点技术名")\` 与 \`实体技术名.字段名\` 寻址
 - 检定:2d6 + 技能 ≥ 难度;\`checkRed\` 为真时只掷一次、结果沿用;RNG 为 mulberry32,同种子完全可复现

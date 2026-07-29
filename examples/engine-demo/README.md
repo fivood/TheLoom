@@ -19,9 +19,15 @@ node examples/engine-demo/demo.mjs 路径/theloom-package.json 流程技术名 4
 
 ```js
 import { FlowRuntime } from './theloom-runtime.js';
-const run = new FlowRuntime(pkg, '流程技术名或id', { seed: 42, onBeat: console.log });
+const run = new FlowRuntime(pkg, '流程技术名或id', {
+  seed: 42,
+  onBeat: console.log,
+  onEvent: (event) => console.log(event.event, event.nodeId, event.changes),
+});
 run.start();          // run.log 演出记录 / run.choices 当前选项 / run.ended
 run.choose(0);        // 选第 1 项
 const s = run.snapshot();  // 存档(掷骰进度一并保存)
 run.restore(s);            // 读档后续掷不漂移
 ```
+
+运行库声明 `protocolVersion = 2`。每个节点通过 `onEvent` 依次输出 `enter / display / leave`，事件包含流程与节点定位、子流程路径、自定义字段、附件资源 ID、触发边与稳定选项键，以及本步变量和实体属性变化。原有 `onBeat`、`log` 和 `choices` 保持兼容；旧包没有 `runtimeProtocolVersion` 时会按 v1 数据源确定性补齐。

@@ -17,7 +17,9 @@ class_name TheLoomRuntime
 ##   run.choose(0)                # 处于选择时按下标选一个
 
 signal beat_added(beat: Dictionary)
+signal event_emitted(event: Dictionary)
 
+const RUNTIME_PROTOCOL_VERSION := 2
 const _NODE_LABEL := {
 	"dialogue": "对白", "fragment": "剧情片段", "hub": "汇聚点",
 	"condition": "条件分支", "instruction": "指令",
@@ -28,11 +30,14 @@ const _AUTO_ADVANCE := ["hub", "instruction", "condition", "exit", "check"]
 
 var project: Dictionary
 var flow: Dictionary
+var protocol_version: int = RUNTIME_PROTOCOL_VERSION
+var source_protocol_version: int = 1
 var seed_val: int = 0
 var vars: Dictionary = {}
 var entity_props: Dictionary = {}
 var choices: Array = []            # Array[Dictionary]
 var log: Array = []                # Array[Dictionary]
+var events: Array = []             # Array[Dictionary]
 var ended: bool = false
 
 var _rng_state: int = 0
@@ -47,6 +52,9 @@ var _entity_by_id: Dictionary = {}
 
 func _init(pkg: Dictionary, flow_ref: String) -> void:
 	project = pkg
+	source_protocol_version = int(pkg.get("runtimeProtocolVersion", 1))
+	if source_protocol_version < 1:
+		source_protocol_version = 1
 	var found: Dictionary = {}
 	for f in _flows():
 		if f.get("id", "") == flow_ref or f.get("technicalName", "") == flow_ref:
@@ -69,6 +77,7 @@ func start(start_node_id: String = "", seed_override: int = -1) -> void:
 	_seed_rng(seed_val)
 	_rolls = 0
 	log.clear()
+	events.clear()
 	choices.clear()
 	ended = false
 	_cur_path.clear()
@@ -81,17 +90,19 @@ func start(start_node_id: String = "", seed_override: int = -1) -> void:
 		vars[v.get("name", "")] = _coerce_var(v.get("type", "string"), v.get("value", ""))
 
 	if start_node_id != "" and _find_node(flow, start_node_id) != null:
-		_visit([], start_node_id)
+		_visit([], start_node_id, { "choice_key": "start:%s" % start_node_id })
 		return
 	var starts := _start_nodes(flow)
 	if starts.is_empty():
 		ended = true
 		return
 	if starts.size() == 1:
-		_visit([], starts[0].get("id", ""))
+		var start_id: String = starts[0].get("id", "")
+		_visit([], start_id, { "choice_key": "start:%s" % start_id })
 		return
 	choices = starts.map(func(s): return {
 		"label": s.get("data", {}).get("title", "") if s.get("data", {}).get("title", "") != "" else _NODE_LABEL.get(s.get("type", ""), s.get("type", "")),
+		"choice_key": "start:%s" % s.get("id", ""),
 		"node_id": s.get("id", ""),
 	})
 
@@ -103,11 +114,18 @@ func choose(index: int) -> void:
 	var node_id := String(c.get("node_id", ""))
 	if node_id == "":
 		return
+	var before_vars := vars.duplicate(true)
+	var before_entities := entity_props.duplicate(true)
 	if c.get("edge_id", "") != "" and c.get("once", false):
 		_taken[c["edge_id"]] = true
 	if c.get("effect", "") != "":
 		_apply_instructions(c["effect"])
-	_visit(_cur_path.duplicate(), node_id)
+	_visit(
+		_cur_path.duplicate(),
+		node_id,
+		{ "edge_id": c.get("edge_id", ""), "choice_key": c.get("choice_key", "") },
+		_state_changes(before_vars, before_entities),
+	)
 
 
 ## ---------- 内部辅助 ----------
@@ -164,6 +182,48 @@ func _collect_tech_names(sub: Dictionary) -> void:
 func _push_beat(beat: Dictionary) -> void:
 	log.append(beat)
 	beat_added.emit(beat)
+
+func _push_event(
+	phase: String,
+	path: Array,
+	node: Dictionary,
+	trigger: Dictionary,
+	changes: Dictionary,
+	note: String = "",
+) -> void:
+	var data: Dictionary = node.get("data", {})
+	var speaker_id: String = data.get("speakerId", "")
+	var speaker = _entity_by_id.get(speaker_id, null) if speaker_id != "" else null
+	var event := {
+		"protocolVersion": RUNTIME_PROTOCOL_VERSION,
+		"sourceProtocolVersion": source_protocol_version,
+		"event": phase,
+		"flowId": flow.get("id", ""),
+		"nodeId": node.get("id", ""),
+		"path": path.duplicate(),
+		"nodeType": node.get("type", ""),
+		"kind": node.get("type", ""),
+		"title": data.get("title", ""),
+		"text": data.get("text", ""),
+		"fields": data.get("fields", []).duplicate(true),
+		"assetIds": project.get("attachments", {}).get(node.get("id", ""), []).duplicate(),
+		"changes": changes.duplicate(true),
+	}
+	if flow.get("technicalName", "") != "":
+		event["flowTechnicalName"] = flow["technicalName"]
+	if data.get("technicalName", "") != "":
+		event["nodeTechnicalName"] = data["technicalName"]
+	if speaker != null:
+		event["speakerId"] = speaker.get("id", "")
+		event["speakerName"] = speaker.get("name", "")
+	if trigger.get("edge_id", "") != "":
+		event["edgeId"] = trigger["edge_id"]
+	if trigger.get("choice_key", "") != "":
+		event["choiceKey"] = trigger["choice_key"]
+	if note != "":
+		event["note"] = note
+	events.append(event)
+	event_emitted.emit(event)
 
 ## 无出边逐层回溯 + exit 命名引脚 + 条件/检定分支过滤;返回可选项列表与新的路径
 func _outgoing_choices(path: Array, node: Dictionary) -> Dictionary:
@@ -223,6 +283,7 @@ func _outgoing_choices(path: Array, node: Dictionary) -> Dictionary:
 					"label": label,
 					"node_id": e.get("target", ""),
 					"edge_id": e.get("id", ""),
+					"choice_key": e.get("choiceId", "") if e.get("choiceId", "") != "" else "edge:%s" % e.get("id", ""),
 					"effect": e.get("effect", ""),
 					"once": e.get("once", false),
 				})
@@ -235,9 +296,16 @@ func _outgoing_choices(path: Array, node: Dictionary) -> Dictionary:
 	return { "path": cur_p, "choices": [] }
 
 ## 进入并展示一个节点,自动处理直通型节点(hub/instruction/condition/exit/check)
-func _visit(path: Array, node_id: String) -> void:
+func _visit(
+	path: Array,
+	node_id: String,
+	initial_trigger: Dictionary = {},
+	initial_changes: Dictionary = {},
+) -> void:
 	var cur_p: Array = path.duplicate()
 	var id: String = node_id
+	var trigger := initial_trigger.duplicate(true)
+	var enter_changes := initial_changes.duplicate(true) if not initial_changes.is_empty() else _empty_changes()
 	for guard in range(100):
 		if id == "":
 			break
@@ -245,10 +313,16 @@ func _visit(path: Array, node_id: String) -> void:
 		var node = _find_node(c, id)
 		if node == null:
 			break
+		_push_event("enter", cur_p, node, trigger, enter_changes)
 		_seen[id] = true
 		var data: Dictionary = node.get("data", {})
 		var speaker_id: String = data.get("speakerId", "")
 		var speaker = _entity_by_id.get(speaker_id, null) if speaker_id != "" else null
+		var before_vars := vars.duplicate(true)
+		var before_entities := entity_props.duplicate(true)
+		var display_note := ""
+		var nested_starts = null
+		var nested_path = null
 
 		match node.get("type", ""):
 			"dialogue":
@@ -261,30 +335,23 @@ func _visit(path: Array, node_id: String) -> void:
 				_push_beat({ "kind": "fragment", "title": data.get("title", "剧情片段"), "text": data.get("text", "") })
 				var sub_dict: Dictionary = data.get("sub", {})
 				if not sub_dict.is_empty() and sub_dict.get("nodes", []).size() > 0:
-					cur_p.append(node.get("id", ""))
-					var starts := _start_nodes(sub_dict)
-					if starts.size() == 1:
-						id = starts[0].get("id", "")
-						continue
-					_cur_path = cur_p
-					choices = starts.map(func(s): return {
-						"label": s.get("data", {}).get("title", "") if s.get("data", {}).get("title", "") != "" else _NODE_LABEL.get(s.get("type", ""), s.get("type", "")),
-						"node_id": s.get("id", ""),
-					})
-					return
+					nested_path = cur_p.duplicate()
+					nested_path.append(node.get("id", ""))
+					nested_starts = _start_nodes(sub_dict)
 			"hub":
 				if data.get("title", "") != "":
 					_push_beat({ "kind": "hub", "title": data["title"], "text": "" })
 			"instruction":
 				var warnings := _apply_instructions(data.get("text", ""))
+				display_note = ";".join(warnings) if warnings.size() > 0 else ""
 				_push_beat({
 					"kind": "instruction", "title": data.get("title", "指令"), "text": data.get("text", ""),
-					"note": ";".join(warnings) if warnings.size() > 0 else "",
+					"note": display_note,
 				})
 			"condition":
 				var result = _eval_condition(data.get("text", ""))
-				var note := "无法求值,请手动选择分支" if result == null else ("→ 真" if result else "→ 假")
-				_push_beat({ "kind": "condition", "title": data.get("title", "条件分支"), "text": data.get("text", ""), "note": note })
+				display_note = "无法求值,请手动选择分支" if result == null else ("→ 真" if result else "→ 假")
+				_push_beat({ "kind": "condition", "title": data.get("title", "条件分支"), "text": data.get("text", ""), "note": display_note })
 			"jump":
 				_push_beat({ "kind": "jump", "title": data.get("title", "跳转"), "text": data.get("text", "") })
 			"exit":
@@ -292,9 +359,8 @@ func _visit(path: Array, node_id: String) -> void:
 			"check":
 				var red: bool = data.get("checkRed", false) == true
 				var dc: int = int(data.get("checkDc", 10))
-				var note_c: String
 				if red and _checks.has(node.get("id", "")):
-					note_c = "红色检定只有一次机会 → 沿用先前结果:%s" % ("成功" if _checks[node.get("id", "")] else "失败")
+					display_note = "红色检定只有一次机会 → 沿用先前结果:%s" % ("成功" if _checks[node.get("id", "")] else "失败")
 				else:
 					var skill: int = _eval_number(data.get("checkExpr", ""))
 					var d1: int = _roll_d6()
@@ -302,12 +368,30 @@ func _visit(path: Array, node_id: String) -> void:
 					_rolls += 2
 					var passed: bool = d1 + d2 + skill >= dc
 					_checks[node.get("id", "")] = passed
-					note_c = "2d6 = %d+%d,技能 %d,合计 %d vs 难度 %d → %s" % [d1, d2, skill, d1 + d2 + skill, dc, "成功" if passed else "失败"]
+					display_note = "2d6 = %d+%d,技能 %d,合计 %d vs 难度 %d → %s" % [d1, d2, skill, d1 + d2 + skill, dc, "成功" if passed else "失败"]
 				_push_beat({
 					"kind": "check",
 					"title": "%s检定 · %s" % ["红色" if red else "白色", (data.get("title", "") if data.get("title", "") != "" else data.get("checkExpr", ""))],
-					"text": data.get("text", ""), "note": note_c,
+					"text": data.get("text", ""), "note": display_note,
 				})
+
+		_push_event("display", cur_p, node, trigger, _state_changes(before_vars, before_entities), display_note)
+		_push_event("leave", cur_p, node, trigger, _empty_changes(), display_note)
+
+		if nested_starts != null and nested_path != null:
+			cur_p = nested_path
+			if nested_starts.size() == 1:
+				id = nested_starts[0].get("id", "")
+				trigger = { "choice_key": "start:%s" % id }
+				enter_changes = _empty_changes()
+				continue
+			_cur_path = cur_p
+			choices = nested_starts.map(func(s): return {
+				"label": s.get("data", {}).get("title", "") if s.get("data", {}).get("title", "") != "" else _NODE_LABEL.get(s.get("type", ""), s.get("type", "")),
+				"choice_key": "start:%s" % s.get("id", ""),
+				"node_id": s.get("id", ""),
+			})
+			return
 
 		var res := _outgoing_choices(cur_p, node)
 		cur_p = res["path"]
@@ -320,11 +404,15 @@ func _visit(path: Array, node_id: String) -> void:
 			return
 		if cs.size() == 1 and _AUTO_ADVANCE.has(node.get("type", "")):
 			var c0: Dictionary = cs[0]
+			var before_edge_vars := vars.duplicate(true)
+			var before_edge_entities := entity_props.duplicate(true)
 			if c0.get("edge_id", "") != "" and c0.get("once", false):
 				_taken[c0["edge_id"]] = true
 			if c0.get("effect", "") != "":
 				_apply_instructions(c0["effect"])
 			id = c0["node_id"]
+			trigger = { "edge_id": c0.get("edge_id", ""), "choice_key": c0.get("choice_key", "") }
+			enter_changes = _state_changes(before_edge_vars, before_edge_entities)
 			continue
 		_cur_path = cur_p
 		choices = cs
@@ -334,6 +422,47 @@ func _visit(path: Array, node_id: String) -> void:
 
 
 ## ---------- 变量与实体属性 ----------
+
+func _empty_changes() -> Dictionary:
+	return { "variables": [], "entities": [] }
+
+func _state_changes(before_vars: Dictionary, before_entities: Dictionary) -> Dictionary:
+	var changed_vars: Array = []
+	var changed_entities: Array = []
+	var var_names: Dictionary = {}
+	for name in before_vars:
+		var_names[name] = true
+	for name in vars:
+		var_names[name] = true
+	for name in var_names:
+		var before = before_vars.get(name, null)
+		var after = vars.get(name, null)
+		if before != after:
+			changed_vars.append({ "name": name, "before": before, "after": after })
+	var entity_names: Dictionary = {}
+	for entity_name in before_entities:
+		entity_names[entity_name] = true
+	for entity_name in entity_props:
+		entity_names[entity_name] = true
+	for entity_name in entity_names:
+		var before_fields: Dictionary = before_entities.get(entity_name, {})
+		var after_fields: Dictionary = entity_props.get(entity_name, {})
+		var field_names: Dictionary = {}
+		for field in before_fields:
+			field_names[field] = true
+		for field in after_fields:
+			field_names[field] = true
+		for field in field_names:
+			var before = before_fields.get(field, null)
+			var after = after_fields.get(field, null)
+			if before != after:
+				changed_entities.append({
+					"entityTechnicalName": entity_name,
+					"field": field,
+					"before": before,
+					"after": after,
+				})
+	return { "variables": changed_vars, "entities": changed_entities }
 
 func _coerce_var(t: String, raw: String):
 	match t:

@@ -1,0 +1,71 @@
+{
+  "runtimeProtocolVersion": 2,
+  "variables": [
+    {
+      "name": "n",
+      "type": "number",
+      "value": "0"
+    }
+  ],
+  "entities": [
+    {
+      "id": "actor",
+      "name": "侦探",
+      "technicalName": "detective",
+      "fields": [
+        {
+          "label": "trust",
+          "value": "5"
+        }
+      ]
+    }
+  ],
+  "attachments": {
+    "set": [
+      "voice"
+    ]
+  },
+  "flows": [
+    {
+      "id": "flow",
+      "name": "协议测试",
+      "technicalName": "protocol_test",
+      "nodes": [
+        {
+          "id": "set",
+          "type": "instruction",
+          "data": {
+            "title": "改状态",
+            "text": "n = 1; detective.trust += 2",
+            "technicalName": "set_state",
+            "fields": [
+              {
+                "label": "演出提示",
+                "value": "低声",
+                "type": "text"
+              }
+            ]
+          }
+        },
+        {
+          "id": "say",
+          "type": "dialogue",
+          "data": {
+            "title": "",
+            "text": "收到",
+            "speakerId": "actor"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "next",
+          "source": "set",
+          "target": "say",
+          "choiceId": "choice-next",
+          "effect": "n += 2"
+        }
+      ]
+    }
+  ]
+}
