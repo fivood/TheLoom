@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLoom } from '../../store';
 import { resolveSub } from '../../util';
-import type { Entity, Flow, FlowEdge, FlowNode, FlowParam, SubFlow } from '../../types';
-import { ANNOTATION_TYPES, FLOW_NODE_LABEL } from '../../types';
+import type { Entity, EventWait, Flow, FlowEdge, FlowNode, FlowParam, SubFlow, VariableType } from '../../types';
+import { ANNOTATION_TYPES, EVENT_WAIT_LABEL, FLOW_NODE_LABEL } from '../../types';
 import { MAX_CALL_DEPTH } from '../../runtime/player';
 import { TYPE_COLORS } from './nodes';
 import Icon from '../../components/Icon';
@@ -42,8 +42,21 @@ interface PlayFrame {
   savedParams: { name: string; value: VarValue | null }[];
 }
 
+/** R19-3 演出里停在外部事件上的挂起态 */
+interface PendingEvent {
+  eventName: string;
+  label: string;
+  argText: string;
+  wait: EventWait;
+  resultVar?: string;
+  returnType?: VariableType;
+  path: string[];
+  nodeId: string;
+  flowId: string;
+}
+
 /** 单出边时自动前进的直通型节点(与运行库 AUTO_ADVANCE 保持一致) */
-const AUTO_ADVANCE_TYPES = ['hub', 'instruction', 'condition', 'exit', 'check', 'call'];
+const AUTO_ADVANCE_TYPES = ['hub', 'instruction', 'condition', 'exit', 'check', 'call', 'event'];
 
 function startNodes(sub: SubFlow): FlowNode[] {
   const hasIncoming = new Set(sub.edges.map((e) => e.target));
@@ -63,6 +76,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const project = useLoom((s) => s.project);
   const slotId = useLoom((s) => s.currentSlotId);
   const entities = project.entities;
+  const externalEvents = project.externalEvents ?? [];
 
   const [vars, setVars] = useState<Record<string, VarValue>>(() => {
     const v: Record<string, VarValue> = {};
@@ -100,6 +114,9 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   const [activeFlowName, setActiveFlowName] = useState(flow.name);
   /** R19-2 调用栈:栈顶是最近一次 call 的返回点 */
   const callStackRef = useRef<PlayFrame[]>([]);
+  /** R19-3:停在外部事件上时的挂起态(编辑器里由用户填模拟响应来放行) */
+  const [pendingEvent, setPendingEvent] = useState<PendingEvent | null>(null);
+  const [simInput, setSimInput] = useState('');
 
   /**
    * 技术名 → 节点 id 映射,递归遍历全部流程所有层级。
@@ -293,6 +310,9 @@ export default function Player({ flow, path, startNodeId, onClose }: {
       // 出边计算的落点节点:正常是本节点,弹栈返回后是调用点
       let node2: FlowNode = node;
       let autoAdvance = AUTO_ADVANCE_TYPES.includes(node.type);
+      // R19-3:非 null 表示停在外部事件上,等用户填模拟响应
+      let suspendEvent: PendingEvent | null = null;
+      let simPrefill = '';
 
       switch (node.type) {
         case 'dialogue':
@@ -372,6 +392,52 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           crossTarget = { flow: target, nodeId: entry.nodeId };
           break;
         }
+        case 'event': {
+          const evName = (node.data.eventName ?? '').trim();
+          const decl = externalEvents.find((e) => e.name === evName);
+          if (!evName || !decl) {
+            const why = evName ? `事件「${evName}」未在项目中声明,已跳过` : '未选择要请求的事件,已跳过';
+            pushBeat({ kind: 'event', title: node.data.title || '外部事件', text: node.data.text, note: why });
+            break;
+          }
+          const wait: EventWait = node.data.eventWait ?? 'continue';
+          const byName = new Map((node.data.eventArgs ?? []).map((a) => [a.name, a.expr]));
+          const argPairs: string[] = [];
+          for (const prm of decl.params ?? []) {
+            const expr = byName.get(prm.name);
+            let v: VarValue;
+            if (expr !== undefined && expr.trim()) {
+              if (prm.type === 'boolean') v = evalCondition(expr, nextVars, evalCtx) ?? false;
+              else if (prm.type === 'number') v = evalNumber(expr, nextVars, evalCtx);
+              else v = expr;
+            } else {
+              v = coerceVar(prm.type, prm.default ?? '');
+            }
+            argPairs.push(`${prm.name}=${String(v)}`);
+          }
+          const argText = argPairs.join(', ');
+          pushBeat({
+            kind: 'event',
+            title: node.data.title || decl.label || evName,
+            text: node.data.text,
+            note: `⚡ ${decl.label || evName}${argText ? `(${argText})` : ''} · ${EVENT_WAIT_LABEL[wait]}`,
+          });
+          if (wait !== 'continue') {
+            suspendEvent = {
+              eventName: evName,
+              label: decl.label || evName,
+              argText,
+              wait,
+              resultVar: wait === 'value' ? node.data.eventResultVar : undefined,
+              returnType: decl.returnType,
+              path: [...curP],
+              nodeId: node.id,
+              flowId: activeFlowRef.current.id,
+            };
+            simPrefill = node.data.eventSimValue ?? '';
+          }
+          break;
+        }
         case 'return': {
           const hasValue = typeof node.data.returnExpr === 'string' && node.data.returnExpr.trim() !== '';
           if (hasValue) returnValue = evalNumber(node.data.returnExpr, nextVars, evalCtx);
@@ -410,6 +476,16 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           });
           break;
         }
+      }
+
+      // R19-3:挂起等模拟响应 —— 既不结束也不给选项
+      if (suspendEvent) {
+        setCurPath(curP);
+        commitVars(nextVars);
+        setChoices([]);
+        setPendingEvent(suspendEvent);
+        setSimInput(simPrefill);
+        return;
       }
 
       // R19-2:切到目标流程入口
@@ -476,6 +552,39 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     setEnded(true);
   };
 
+  /**
+   * R19-3:用模拟响应放行,从事件节点的出边继续。
+   * 与运行库 resolveExternal 同语义 —— 只是值由编辑器里的输入提供。
+   */
+  const resolveEvent = () => {
+    const pending = pendingEvent;
+    if (!pending) return;
+    const vv = { ...varsRef.current };
+    if (pending.wait === 'value' && pending.resultVar) {
+      const t = pending.returnType ?? 'string';
+      vv[pending.resultVar] = t === 'boolean' ? simInput === 'true'
+        : t === 'number' ? (Number(simInput) || 0)
+        : simInput;
+    }
+    setPendingEvent(null);
+    setSimInput('');
+    const f = project.flows.find((x) => x.id === pending.flowId);
+    if (f) activeFlowRef.current = f;
+    const node = container(pending.path).nodes.find((n) => n.id === pending.nodeId);
+    if (!node) { commitVars(vv); setChoices([]); setEnded(true); return; }
+    const r = outgoingChoices(pending.path, node, vv);
+    if (r.choices.length === 1) {
+      const c0 = r.choices[0];
+      if (c0.edgeId && c0.once) takenEdges.current.add(c0.edgeId);
+      if (c0.effect) applyInstructions(c0.effect, vv, evalCtx);
+      if (c0.nodeId) { visit(r.path, c0.nodeId, vv); return; }
+    }
+    setCurPath(r.path);
+    commitVars(vv);
+    setChoices(r.choices);
+    if (r.choices.length === 0) setEnded(true);
+  };
+
   const choose = (c: Choice) => {
     if (!c.nodeId) return;
     if (c.edgeId && c.once) takenEdges.current.add(c.edgeId);
@@ -502,6 +611,8 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     activeFlowRef.current = flow;
     setActiveFlowName(flow.name);
     callStackRef.current = [];
+    setPendingEvent(null);
+    setSimInput('');
     entityPropsRef.current = buildEntityProps(entities);
     setPropsView(structuredClone(entityPropsRef.current));
     const initVars: Record<string, VarValue> = {};
@@ -638,7 +749,46 @@ export default function Player({ flow, path, startNodeId, onClose }: {
               <div className="beat-meta">— 演出结束 —</div>
             </div>
           )}
-          {!ended && choices.length > 0 && (
+          {pendingEvent && (
+            <div className="player-event" role="group" aria-label="等待宿主引擎响应">
+              <div className="player-event-head">
+                ⚡ {pendingEvent.label}
+                <span className="player-event-wait">{EVENT_WAIT_LABEL[pendingEvent.wait]}</span>
+              </div>
+              {pendingEvent.argText && (
+                <div className="player-event-args">{pendingEvent.argText}</div>
+              )}
+              <div className="hint" style={{ fontSize: 11 }}>
+                实际运行时由宿主引擎处理。这里填一个模拟响应,只影响本机试跑。
+              </div>
+              {pendingEvent.wait === 'value' && (
+                <div className="kv-row" style={{ alignItems: 'center', gap: 6, marginTop: 6 }}>
+                  <span style={{ fontSize: 12, minWidth: 72 }}>
+                    {pendingEvent.resultVar ? `→ ${pendingEvent.resultVar}` : '(不接收)'}
+                  </span>
+                  {pendingEvent.returnType === 'boolean' ? (
+                    <select value={simInput || 'false'} onChange={(e) => setSimInput(e.target.value)}>
+                      <option value="false">false</option>
+                      <option value="true">true</option>
+                    </select>
+                  ) : (
+                    <input
+                      style={{ flex: 1 }}
+                      value={simInput}
+                      autoFocus
+                      placeholder={pendingEvent.returnType === 'number' ? '数值' : '文本'}
+                      onChange={(e) => setSimInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') resolveEvent(); }}
+                    />
+                  )}
+                </div>
+              )}
+              <button className="primary" style={{ marginTop: 8 }} onClick={resolveEvent}>
+                {pendingEvent.wait === 'value' ? '返回该值并继续' : '宿主已完成,继续'}
+              </button>
+            </div>
+          )}
+          {!ended && !pendingEvent && choices.length > 0 && (
             <div className="player-choices">
               {choices.map((c, i) => (
                 <button

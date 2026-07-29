@@ -1676,6 +1676,18 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .player-subflow { font-weight: 500; font-size: 13px; color: var(--text-faint); }
 /* R19-P:体检面板路径分析尚未完成的提示 */
 .audit-pending { font-weight: 400; font-size: 12px; color: var(--text-faint); }
+/* R19-3:演出停在外部事件上时的模拟响应面板 */
+.player-event {
+  margin-top: 10px; padding: 12px 14px;
+  border: 1px dashed var(--border); border-radius: 8px;
+  background: var(--bg-panel);
+}
+.player-event-head { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.player-event-wait { font-weight: 400; font-size: 12px; color: var(--text-faint); }
+.player-event-args {
+  font-family: Consolas, monospace; font-size: 12px;
+  color: var(--text-faint); margin: 4px 0 6px;
+}
 .player-head .spacer { flex: 1; }
 .player-body { flex: 1; display: flex; min-height: 0; justify-content: center; }
 .player-log {

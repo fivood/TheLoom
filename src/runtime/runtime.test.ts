@@ -217,6 +217,130 @@ describe('FlowRuntime 检定与存档', () => {
   });
 });
 
+describe('FlowRuntime · R19-3 外部事件', () => {
+  const evProject = (nodes: FlowNode[], edges: FlowEdge[], vars: Variable[] = []) => {
+    const p = project([{ id: 'f', name: '事件', technicalName: 'ev', nodes, edges }], vars);
+    p.externalEvents = [
+      { id: 'e1', name: 'play_anim', label: '播动画', params: [{ name: 'clip', type: 'string' }, { name: 'speed', type: 'number' }] },
+      { id: 'e2', name: 'solve_puzzle', label: '解谜', returnType: 'number' },
+    ];
+    return p;
+  };
+
+  it('continue:发出即继续,实参按声明求值(文本字面量 / 数值表达式)', () => {
+    const p = evProject(
+      [
+        node('a', 'event', {
+          eventName: 'play_anim',
+          eventArgs: [{ name: 'clip', expr: '开门' }, { name: 'speed', expr: '1 + 1' }],
+        }),
+        node('b', 'dialogue', { text: '继续' }),
+      ],
+      [edge('a', 'b')],
+    );
+    const calls: unknown[] = [];
+    const run = new FlowRuntime(enginePkg(p), 'ev', { onExternalEvent: (c) => calls.push(c) });
+    run.start();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      name: 'play_anim', wait: 'continue', flowId: 'f', nodeId: 'a',
+      args: { clip: '开门', speed: 2 },
+    });
+    expect(run.pendingExternal).toBeNull();
+    expect(run.log[run.log.length - 1].text).toBe('继续');
+  });
+
+  it('ack:演出挂起,resolveExternal 后才继续', () => {
+    const p = evProject(
+      [node('a', 'event', { eventName: 'play_anim', eventWait: 'ack' }), node('b', 'dialogue', { text: '播完了' })],
+      [edge('a', 'b')],
+    );
+    const run = new FlowRuntime(enginePkg(p), 'ev');
+    run.start();
+    expect(run.pendingExternal?.call.wait).toBe('ack');
+    expect(run.ended).toBe(false);
+    expect(run.choices).toEqual([]);
+    expect(run.log.some((b) => b.text === '播完了')).toBe(false);
+    expect(run.resolveExternal()).toBe(true);
+    expect(run.pendingExternal).toBeNull();
+    expect(run.log[run.log.length - 1].text).toBe('播完了');
+    // 重复 resolve 是安全的
+    expect(run.resolveExternal()).toBe(false);
+  });
+
+  it('value:回值写入指定变量并可被后续条件使用', () => {
+    const p = evProject(
+      [
+        node('a', 'event', { eventName: 'solve_puzzle', eventWait: 'value', eventResultVar: 'score' }),
+        node('c', 'condition', { text: 'score > 5' }),
+        node('win', 'dialogue', { text: '解开了' }),
+        node('lose', 'dialogue', { text: '没解开' }),
+      ],
+      [edge('a', 'c'), edge('c', 'win', { sourceHandle: 'true' }), edge('c', 'lose', { sourceHandle: 'false' })],
+      [numVar('score', '0')],
+    );
+    const run = new FlowRuntime(enginePkg(p), 'ev');
+    run.start();
+    expect(run.pendingExternal?.resultVar).toBe('score');
+    run.resolveExternal(9);
+    expect(run.vars.score).toBe(9);
+    expect(run.log[run.log.length - 1].text).toBe('解开了');
+  });
+
+  it('宿主可在回调里同步 resolve,不会重入也不会卡住', () => {
+    const p = evProject(
+      [
+        node('a', 'event', { eventName: 'solve_puzzle', eventWait: 'value', eventResultVar: 'score' }),
+        node('b', 'dialogue', { text: '走完了' }),
+      ],
+      [edge('a', 'b')],
+      [numVar('score', '0')],
+    );
+    const run = new FlowRuntime(enginePkg(p), 'ev', {
+      onExternalEvent: () => { run.resolveExternal(3); },
+    });
+    run.start();
+    expect(run.pendingExternal).toBeNull();
+    expect(run.vars.score).toBe(3);
+    expect(run.log[run.log.length - 1].text).toBe('走完了');
+  });
+
+  it('未声明的事件跳过并给出提示,不中断演出', () => {
+    const p = evProject(
+      [node('a', 'event', { eventName: '没声明的', eventWait: 'ack' }), node('b', 'dialogue', { text: '照常继续' })],
+      [edge('a', 'b')],
+    );
+    const run = new FlowRuntime(enginePkg(p), 'ev');
+    run.start();
+    expect(run.pendingExternal).toBeNull();
+    expect(run.log[0].note).toContain('未在项目中声明');
+    expect(run.log[run.log.length - 1].text).toBe('照常继续');
+  });
+
+  it('挂起态进快照:在事件处存档,读回来仍然挂着并能继续', () => {
+    const p = evProject(
+      [
+        node('a', 'event', { eventName: 'solve_puzzle', eventWait: 'value', eventResultVar: 'score' }),
+        node('b', 'dialogue', { text: '收尾' }),
+      ],
+      [edge('a', 'b')],
+      [numVar('score', '0')],
+    );
+    const pkg = enginePkg(p);
+    const run = new FlowRuntime(pkg, 'ev');
+    run.start();
+    const snap = JSON.parse(JSON.stringify(run.snapshot()));
+    expect(snap.pendingExternal.call.name).toBe('solve_puzzle');
+
+    const restored = new FlowRuntime(pkg, 'ev');
+    restored.restore(snap);
+    expect(restored.pendingExternal?.call.name).toBe('solve_puzzle');
+    restored.resolveExternal(7);
+    expect(restored.vars.score).toBe(7);
+    expect(restored.log[restored.log.length - 1].text).toBe('收尾');
+  });
+});
+
 describe('FlowRuntime 事件协议 v2', () => {
   it('R19-2 跨流程调用:与 Godot 共用同一份夹具,断言逐条对应', () => {
     const run = new FlowRuntime(structuredClone(runtimeV2Fixture) as never, 'caller');

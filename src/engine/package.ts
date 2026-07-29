@@ -47,6 +47,11 @@ export interface EngineNodeData {
   args?: { name: string; expr: string }[];
   returnVar?: string;
   returnExpr?: string;
+  /** R19-3 外部事件(eventSimValue 是编辑器本机试跑用的,不进包) */
+  eventName?: string;
+  eventArgs?: { name: string; expr: string }[];
+  eventWait?: 'continue' | 'ack' | 'value';
+  eventResultVar?: string;
 }
 
 export interface EngineNode {
@@ -108,6 +113,17 @@ export interface EngineAsset {
   fileName?: string;
 }
 
+export interface EngineEventParam { name: string; type: string; default?: string }
+
+/** R19-3 外部事件声明:宿主按 name 分发,params 决定载荷结构 */
+export interface EngineExternalEvent {
+  name: string;
+  label?: string;
+  description?: string;
+  params?: EngineEventParam[];
+  returnType?: string;
+}
+
 export interface EngineVariable {
   name: string;
   type: string;
@@ -137,6 +153,8 @@ export interface EnginePackage {
   };
   rules: Required<Pick<EngineExportRules, 'includeLayout' | 'includeAnnotations' | 'entities' | 'assets'>>;
   variables: EngineVariable[];
+  /** R19-3 外部事件声明;没有事件时省略 */
+  externalEvents?: EngineExternalEvent[];
   entities: EngineEntity[];
   flows: EngineFlow[];
   assets: EngineAsset[];
@@ -195,6 +213,13 @@ function cloneNode(n: FlowNode, rules: EngineExportRules): EngineNode {
   }
   if (n.data.returnVar) data.returnVar = n.data.returnVar;
   if (n.data.returnExpr) data.returnExpr = n.data.returnExpr;
+  // R19-3 外部事件;eventSimValue 只服务编辑器演出,刻意不导出
+  if (n.data.eventName) data.eventName = n.data.eventName;
+  if (Array.isArray(n.data.eventArgs) && n.data.eventArgs.length > 0) {
+    data.eventArgs = n.data.eventArgs.map((a) => ({ name: a.name, expr: a.expr }));
+  }
+  if (n.data.eventWait && n.data.eventWait !== 'continue') data.eventWait = n.data.eventWait;
+  if (n.data.eventResultVar) data.eventResultVar = n.data.eventResultVar;
   if (Array.isArray(n.data.fields) && n.data.fields.length > 0) {
     data.fields = n.data.fields.map((f) => {
       const out: { label: string; value: string; type?: string } = { label: f.label, value: f.value };
@@ -386,6 +411,23 @@ export function buildEnginePackage(project: Project, rules: EngineExportRules = 
   for (const a of assets) manifest[`asset:${a.id}`] = contentHash(a);
   if (variables.length > 0) manifest['variables'] = contentHash(variables);
 
+  // R19-3:外部事件声明整表一个哈希键,增量导出时能感知到声明变化
+  const externalEvents = (project.externalEvents ?? []).map((e) => {
+    const out: EngineExternalEvent = { name: e.name };
+    if (e.label) out.label = e.label;
+    if (e.description) out.description = e.description;
+    if (e.params && e.params.length > 0) {
+      out.params = e.params.map((prm) => {
+        const param: EngineEventParam = { name: prm.name, type: prm.type };
+        if (prm.default) param.default = prm.default;
+        return param;
+      });
+    }
+    if (e.returnType) out.returnType = e.returnType;
+    return out;
+  });
+  if (externalEvents.length > 0) manifest['externalEvents'] = contentHash(externalEvents);
+
   return {
     schema: 'theloom-package',
     schemaVersion: ENGINE_SCHEMA_VERSION,
@@ -393,6 +435,7 @@ export function buildEnginePackage(project: Project, rules: EngineExportRules = 
     meta: { projectName: project.name, exportedAt: Date.now(), generator: 'TheLoom' },
     rules: effective,
     variables,
+    ...(externalEvents.length > 0 ? { externalEvents } : {}),
     entities: engineEntities,
     flows,
     assets,

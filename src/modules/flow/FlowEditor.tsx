@@ -32,6 +32,9 @@ import { RichTextInput } from '../../components/RichText';
 
 type LoomNode = Node<FlowNodeData>;
 
+/** 稳定的空数组:避免 selector 每次返回新引用触发无限重渲染 */
+const NO_EVENTS: ExternalEvent[] = [];
+
 const EDGE_STYLE = {
   markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
 } as const;
@@ -71,8 +74,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   const projectForSpecs = useLoom((s) => s.project);
   /** R19-2:跨流程节点的目标下拉需要全部流程 */
   const allFlows = useLoom((s) => s.project.flows);
-  /** R19-3:外部事件节点的事件下拉 */
-  const externalEvents = useLoom((s) => s.project.externalEvents ?? []);
+  /**
+   * R19-3:外部事件节点的事件下拉。
+   * 注意不要在 selector 里写 `?? []` —— 每次都返回新数组引用会让 zustand
+   * 判定状态变化,导致无限重渲染(CLAUDE.md 记过这个坑)。
+   */
+  const externalEventsRaw = useLoom((s) => s.project.externalEvents);
+  const externalEvents = externalEventsRaw ?? NO_EVENTS;
   const documents = useLoom((s) => s.project.documents);
   // 被文档块共享的叙事单元 id:节点 inspector 显示双向同步提示
   const docUnitIds = useMemo(() => {

@@ -3,6 +3,9 @@ import { uid, useLoom } from '../../store';
 import { confirmDialog } from '../../dialog';
 import type { ExternalEvent, VariableType } from '../../types';
 
+/** 稳定的空数组:selector 里返回 `?? []` 会因新引用触发无限重渲染 */
+const NO_EVENTS: ExternalEvent[] = [];
+
 const TYPE_LABEL: Record<VariableType, string> = {
   boolean: '布尔',
   number: '数值',
@@ -12,7 +15,8 @@ const TYPE_LABEL: Record<VariableType, string> = {
 export default function Variables() {
   const [tab, setTab] = useState<'vars' | 'events'>('vars');
   const variables = useLoom((s) => s.project.variables);
-  const events = useLoom((s) => s.project.externalEvents ?? []);
+  const eventsRaw = useLoom((s) => s.project.externalEvents);
+  const events = eventsRaw ?? NO_EVENTS;
   const { addVariable, updateVariable, removeVariable, renameScriptIdentifier } = useLoom();
   /** 名称输入聚焦时的原名,blur 时做脚本重命名联动 */
   const focusName = useRef<string | undefined>(undefined);
@@ -103,7 +107,8 @@ export default function Variables() {
  * 放在变量模块下 —— 两者都是项目级声明,不值得再占一个顶层 tab。
  */
 function ExternalEvents({ onBack }: { onBack: () => void }) {
-  const events = useLoom((s) => s.project.externalEvents ?? []);
+  const eventsRaw = useLoom((s) => s.project.externalEvents);
+  const events = eventsRaw ?? NO_EVENTS;
   const update = useLoom((s) => s.update);
 
   const patch = (fn: (list: ExternalEvent[]) => ExternalEvent[]) => {

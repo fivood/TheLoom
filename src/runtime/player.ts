@@ -36,6 +36,11 @@ export interface RtNodeData {
   args?: { name: string; expr: string }[];
   returnVar?: string;
   returnExpr?: string;
+  /** R19-3 外部事件 */
+  eventName?: string;
+  eventArgs?: { name: string; expr: string }[];
+  eventWait?: 'continue' | 'ack' | 'value';
+  eventResultVar?: string;
   [key: string]: unknown;
 }
 
@@ -78,12 +83,23 @@ export interface RtEntity {
 }
 
 /** 运行库的输入:引擎包或应用内项目的公共子集 */
+export interface RtEventParam { name: string; type: string; default?: string }
+export interface RtExternalEvent {
+  name: string;
+  label?: string;
+  description?: string;
+  params?: RtEventParam[];
+  returnType?: string;
+}
+
 export interface RtProject {
   runtimeProtocolVersion?: number;
   flows: RtFlow[];
   variables?: RtVariable[];
   entities?: RtEntity[];
   attachments?: Record<string, string[]>;
+  /** R19-3 外部事件声明 */
+  externalEvents?: RtExternalEvent[];
 }
 
 /* ---------- 输出类型 ---------- */
@@ -161,6 +177,38 @@ export interface RuntimeFrame {
   savedParams: { name: string; value: VarValue | null }[];
 }
 
+/**
+ * R19-3 交给宿主的外部事件调用。
+ * 运行库只负责「说清楚要什么」,具体怎么做由宿主引擎决定。
+ */
+export interface ExternalEventCall {
+  /** 事件技术名 */
+  name: string;
+  /** 已求值的实参(不是表达式) */
+  args: Record<string, VarValue>;
+  wait: 'continue' | 'ack' | 'value';
+  /** 发起该事件的节点定位,便于宿主做日志与断点 */
+  flowId: string;
+  nodeId: string;
+  path: string[];
+  nodeTechnicalName?: string;
+}
+
+/**
+ * R19-3 挂起态:等待模式为 ack / value 时,演出停在这里,
+ * 直到宿主调用 `resolveExternal()`。它必须进快照,否则存档在事件处
+ * 读回来会卡住。
+ */
+export interface PendingExternal {
+  call: ExternalEventCall;
+  /** 回值写入的变量名 */
+  resultVar?: string;
+  /** 恢复点:事件节点自身,解决后从它的出边继续 */
+  flowId: string;
+  path: string[];
+  nodeId: string;
+}
+
 /** 完整运行态快照:引擎存档用;restore 后掷骰序列不漂移 */
 export interface RuntimeSnapshot {
   seed: number;
@@ -179,6 +227,8 @@ export interface RuntimeSnapshot {
   flowId?: string;
   /** R19-2:调用栈;旧存档缺失时按空栈恢复 */
   callStack?: RuntimeFrame[];
+  /** R19-3:停在外部事件上时的挂起态;旧存档缺失即未挂起 */
+  pendingExternal?: PendingExternal | null;
 }
 
 export interface FlowRuntimeOptions {
@@ -188,17 +238,24 @@ export interface FlowRuntimeOptions {
   onBeat?: (beat: RuntimeBeat) => void;
   /** v2 节点生命周期事件;旧包也会按确定性默认值补齐 */
   onEvent?: (event: RuntimeEvent) => void;
+  /**
+   * R19-3 外部事件:宿主在这里执行引擎侧动作。
+   * wait='continue' 时返回值被忽略,演出不停;
+   * wait='ack' / 'value' 时演出会挂起,宿主完成后调用 `resolveExternal()`。
+   * 宿主也可以在回调里同步调用 resolveExternal(适合能立即完成的动作)。
+   */
+  onExternalEvent?: (call: ExternalEventCall) => void;
 }
 
 /** 画布组织类节点,不参与叙事 */
 const ANNOTATION = new Set(['note', 'zone']);
 /** 单出边时自动前进的直通型节点(R19-2:call 返回后也自动继续) */
-const AUTO_ADVANCE = new Set(['hub', 'instruction', 'condition', 'exit', 'check', 'call']);
+const AUTO_ADVANCE = new Set(['hub', 'instruction', 'condition', 'exit', 'check', 'call', 'event']);
 
 const NODE_LABEL: Record<string, string> = {
   dialogue: '对白', fragment: '剧情片段', hub: '汇聚点', condition: '条件分支',
   instruction: '指令', jump: '跳转', exit: '出口', check: '检定',
-  call: '调用', return: '返回',
+  call: '调用', return: '返回', event: '外部事件',
 };
 
 function startNodes(sub: RtSub): RtNode[] {
@@ -262,6 +319,10 @@ export class FlowRuntime {
   flow: RtFlow;
   /** R19-2 调用栈:栈顶是最近一次 call 的返回点 */
   callStack: RuntimeFrame[] = [];
+  /** R19-3:非 null 表示演出正停在一个外部事件上,等宿主 resolveExternal */
+  pendingExternal: PendingExternal | null = null;
+  /** R19-3 重入保护:visit 循环内时,resolveExternal 只记状态,由循环自己继续 */
+  private walking = false;
   readonly log: RuntimeBeat[] = [];
   readonly events: RuntimeEvent[] = [];
   choices: RuntimeChoice[] = [];
@@ -377,6 +438,7 @@ export class FlowRuntime {
     this.curPath = [];
     this.flow = this.rootFlow;
     this.callStack = [];
+    this.pendingExternal = null;
     this.seen.clear();
     this.taken.clear();
     this.checks.clear();
@@ -446,6 +508,7 @@ export class FlowRuntime {
       events: this.events,
       flowId: this.flow.id,
       callStack: this.callStack,
+      pendingExternal: this.pendingExternal,
     });
   }
 
@@ -466,6 +529,7 @@ export class FlowRuntime {
     // R19-2:旧存档没有 flowId / callStack,按入口流程 + 空栈恢复
     this.flow = (s.flowId && this.project.flows.find((f) => f.id === s.flowId)) || this.rootFlow;
     this.callStack = s.callStack ?? [];
+    this.pendingExternal = s.pendingExternal ?? null;
     this.choices = s.choices.map((choice) => ({
       ...choice,
       choiceKey: choice.choiceKey ?? (choice.edgeId ? `edge:${choice.edgeId}` : `start:${choice.nodeId ?? 'none'}`),
@@ -664,8 +728,46 @@ export class FlowRuntime {
     return null;
   }
 
+  /**
+   * R19-3:宿主完成外部事件后调用,演出从事件节点的出边继续。
+   * `value` 仅在 wait='value' 且节点配了接收变量时写入。
+   * 返回 false 表示当前并没有挂起的事件(重复调用是安全的)。
+   */
+  resolveExternal(value?: VarValue): boolean {
+    const pending = this.pendingExternal;
+    if (!pending) return false;
+    this.pendingExternal = null;
+    if (pending.resultVar && value !== undefined) this.vars[pending.resultVar] = value;
+    // 宿主在 onExternalEvent 里同步调用:交回正在跑的 visit 循环继续,避免重入
+    if (this.walking) return true;
+    const flow = this.project.flows.find((f) => f.id === pending.flowId);
+    if (!flow) { this.ended = true; return true; }
+    this.flow = flow;
+    const node = this.container(pending.path).nodes.find((n) => n.id === pending.nodeId);
+    if (!node) { this.ended = true; return true; }
+    const next = this.advanceFrom(pending.path, node, true);
+    if (!next || !next.id) return true;
+    this.visit(next.path, next.id, next.trigger, next.changes);
+    return true;
+  }
+
   /** 进入并展示一个节点,自动处理直通型节点 */
   private visit(
+    path: string[],
+    nodeId: string,
+    initialTrigger: { edgeId?: string; choiceKey?: string } = {},
+    initialChanges: RuntimeChanges = EMPTY_CHANGES(),
+  ) {
+    const outerWalking = this.walking;
+    this.walking = true;
+    try {
+      this.visitInner(path, nodeId, initialTrigger, initialChanges);
+    } finally {
+      this.walking = outerWalking;
+    }
+  }
+
+  private visitInner(
     path: string[],
     nodeId: string,
     initialTrigger: { edgeId?: string; choiceKey?: string } = {},
@@ -693,6 +795,8 @@ export class FlowRuntime {
       let crossTarget: { flow: RtFlow; nodeId: string } | null = null;
       let doReturn = false;
       let returnValue: VarValue | null = null;
+      // R19-3:非 null 表示本节点要挂起等宿主
+      let suspend: PendingExternal | null = null;
 
       switch (node.type) {
         case 'dialogue':
@@ -774,6 +878,50 @@ export class FlowRuntime {
           crossTarget = { flow: target, nodeId: entry.nodeId };
           break;
         }
+        case 'event': {
+          const evName = (node.data.eventName ?? '').trim();
+          const decl = (this.project.externalEvents ?? []).find((e) => e.name === evName);
+          if (!evName || !decl) {
+            const why = evName ? `事件「${evName}」未在项目中声明,已跳过` : '未选择要请求的事件,已跳过';
+            this.pushBeat({ kind: 'event', title: node.data.title || '外部事件', text: node.data.text ?? '', note: why });
+            displayNote = why;
+            break;
+          }
+          const wait = (node.data.eventWait as PendingExternal['call']['wait'] | undefined) ?? 'continue';
+          // 实参按声明求值:文本取字面量,布尔与数值走表达式(与 R19-2 传参同口径)
+          const byName = new Map((node.data.eventArgs ?? []).map((a) => [a.name, a.expr]));
+          const args: Record<string, VarValue> = {};
+          for (const prm of decl.params ?? []) {
+            const expr = byName.get(prm.name);
+            if (expr !== undefined && expr.trim()) {
+              if (prm.type === 'boolean') args[prm.name] = evalCondition(expr, this.vars, ctx) ?? false;
+              else if (prm.type === 'number') args[prm.name] = evalNumber(expr, this.vars, ctx);
+              else args[prm.name] = expr;
+            } else {
+              args[prm.name] = coerceVar(prm.type, prm.default ?? '');
+            }
+          }
+          const call: ExternalEventCall = {
+            name: evName, args, wait,
+            flowId: this.flow.id, nodeId: node.id, path: [...curP],
+          };
+          if (node.data.technicalName) call.nodeTechnicalName = node.data.technicalName;
+          const argText = Object.entries(args).map(([k, v]) => `${k}=${String(v)}`).join(', ');
+          const note = `⚡ ${decl.label || evName}${argText ? `(${argText})` : ''} · ${
+            wait === 'continue' ? '立即继续' : wait === 'ack' ? '等待宿主确认' : '等待宿主返回值'}`;
+          this.pushBeat({ kind: 'event', title: node.data.title || decl.label || evName, text: node.data.text ?? '', note });
+          displayNote = note;
+          if (wait === 'continue') {
+            this.options.onExternalEvent?.(call);
+          } else {
+            suspend = {
+              call,
+              resultVar: wait === 'value' ? node.data.eventResultVar : undefined,
+              flowId: this.flow.id, path: [...curP], nodeId: node.id,
+            };
+          }
+          break;
+        }
         case 'return': {
           const hasValue = typeof node.data.returnExpr === 'string' && node.data.returnExpr.trim() !== '';
           if (hasValue) returnValue = evalNumber(node.data.returnExpr, this.vars, ctx);
@@ -827,6 +975,19 @@ export class FlowRuntime {
         displayNote,
       );
       this.pushEvent('leave', curP, node, trigger, EMPTY_CHANGES(), displayNote);
+
+      // R19-3:挂起等宿主。先置 pendingExternal 再通知,这样宿主可以在回调里
+      // 同步调用 resolveExternal(能立即完成的动作);回调返回后若仍挂着,
+      // 就停下来等异步 resolve —— 此时既不结束也不给选项。
+      if (suspend) {
+        this.pendingExternal = suspend;
+        this.options.onExternalEvent?.(suspend.call);
+        if (this.pendingExternal) {
+          this.curPath = curP;
+          this.choices = [];
+          return;
+        }
+      }
 
       // R19-2:切到目标流程入口(jump 不返回 / call 已压栈)
       if (crossTarget) {
