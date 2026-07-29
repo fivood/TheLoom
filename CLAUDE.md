@@ -20,11 +20,11 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.35.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.35.0` + 已提交待发布的 **R19-1 运行时事件协议 v2**;R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
+- 已发布版本:`v0.36.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.36.0`(R19 引擎运行时闭环全五批);R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
-- 已交付的能力(截至 v0.35.0):
-  - **R19-1 运行时事件协议 v2**(已提交,待发版)— 引擎包 schema `1.1.0` + 顶层 `runtimeProtocolVersion: 2`;TS 与 Godot 运行库对每个叙事节点依次产生 `enter / display / leave`,带流程 / 节点定位、子流程 path 栈、自定义字段、附件 assetIds、说话人、触发边与稳定 `choiceKey`;入边 effect 归目标节点 `enter.changes`、指令节点归 `display.changes`,变量与实体属性都给前后值;v1 beat / log / onBeat 全保留,旧包旧存档缺字段确定性补齐;两端共用 `examples/godot-demo/runtime_v2_fixture.json` 对拍。协议见 `docs/R19_RUNTIME_PROTOCOL_V2.md`
+- 已交付的能力(截至 v0.36.0):
+  - **v0.36.0 R19 引擎运行时闭环** ✅ — **R19-2 跨流程调用**(命名入口 + jump / call / return,参数是真局部作用域进入绑定返回还原,返回值写入调用方变量,32 层递归保护,调用栈进快照);**R19-3 外部事件**(项目级声明 + event 节点,三种等待模式,同步运行库靠「先置 pendingExternal 再通知宿主 + walking 重入保护」实现挂起/恢复,挂起态进快照,演出可填模拟响应);**R19-4 场景化回归测试**(`src/flowTest.ts` 纯逻辑运行器,演出录制成「入口+种子+选择序列+事件响应」,断言结局/变量/节点访问/事件触发,节点与连线覆盖率,流程内容哈希标「受影响」);**R19-5 编辑效率**(安全重命名跟上 targetFlow 与 eventName、复制粘贴跨流程、六向对齐与等距分布、选区封装为片段);**R19-P 体检性能**(路径缓存 + 懒加载)。R19-1 运行时事件协议 v2 — 引擎包 schema `1.1.0` + 顶层 `runtimeProtocolVersion: 2`;TS 与 Godot 运行库对每个叙事节点依次产生 `enter / display / leave`,带流程 / 节点定位、子流程 path 栈、自定义字段、附件 assetIds、说话人、触发边与稳定 `choiceKey`;入边 effect 归目标节点 `enter.changes`、指令节点归 `display.changes`,变量与实体属性都给前后值;v1 beat / log / onBeat 全保留,旧包旧存档缺字段确定性补齐;两端共用 `examples/godot-demo/runtime_v2_fixture.json` 对拍。协议见 `docs/R19_RUNTIME_PROTOCOL_V2.md`
   - **v0.35.0 R18 小说生产闭环** ✅ — 场景按正文块拆分 / 同章合并(迁移批注 / 快照 / 流程 / 大纲 / 时间线 / 弧线 / 伏笔 / 附件 / 修订任务引用);DOCX 成稿导出(投稿稿 + 编辑审阅稿两套预设,正式 OOXML 样式,下载前重解析自检);写作进度工作台(全书 / 卷 / 章 / 场景四级目标 + 今日新增 + 七日趋势,删字不倒扣、撤销与导入不制造虚假新增);修订任务(快照差异冻结 + 逐项接受 / 保留 / 待议,只存结论不覆盖正文)+ 本地中文校对
   - **v0.34.0 R17 场景权威主轴与创作工作区** ✅ — 文档文件夹显式标记卷 / 章 / 小节(不再靠名字猜),错误嵌套进体检;场景成为大纲行与时间线事件共同引用的权威对象,改名移动自动同步,删除前展示跨模块影响;顶栏「返回上一位置」+「最近访问」;小说 / 互动叙事 / 通用三套工作区排序
   - 以下为 R0-R9 历史交付(R10-R16 的细节见下方路线图表与各「最近变更」小节):
@@ -43,7 +43,7 @@
   - **v0.9.0 R0 工程安全基线** ✅ — 测试框架、恢复面板、损坏隔离、诊断导出、大项目性能兜底、桌面项目文件原子替换
   - **v0.10.0 附加批** ✅ — 全模块 Navigator(五模块统一)+ 文件夹归档 + 对话框统一 + 拖拽 / 多选 / 批量
   - **v0.11.0 附加批** ✅ — 长篇写作块(subheading / quote / list,无损往返)+ Excel .xlsx 与 Final Draft .fdx 双向互通(带 ImportPreview 预检)+ 配色表系统(zimg JSON 集成)+ 实体宽版编辑窗 + 文件夹 md 往返修复
-- 最近验证(2026-07-29,R19-1 提交时全门禁):`npx tsc -b` 通过、`npx vitest run` **58 文件 370 项通过**、`npm run build` 与 `npm run build:runtime` 通过、`cargo test --lib` 3 项通过、`node examples/engine-demo/demo.mjs` 演出输出正确
+- 最近验证(2026-07-29,v0.36.0 发版全门禁):`npx tsc -b` 通过、`npx vitest run` **63 文件 443 项通过**、`npm run build` 与 `npm run build:runtime` 通过、`cargo test --lib` 3 项通过、`node examples/engine-demo/demo.mjs` 演出输出正确、Godot 4.6.2-stable 与 4.8-dev1 用同一份协议夹具对拍通过
 - **性能基线**(`npx tsx bench.mjs`,151 场景 / 109 实体 / 15.9 万字 / JSON 743 KB):normalizeProject(clone) 13 ms · **auditProject 冷 990 ms / 热 1 ms / 仅结构 2 ms** · JSON.stringify 3 ms · structuredClone 6 ms
   - R19-P 起 `simulateFlow` 有内容哈希缓存(`src/pathCache.ts`),基准必须冷热分开看,否则量到的是缓存命中
   - auditProject 的成本 99% 来自全项目 `simulateFlow`;体检面板已改为 `includePaths:false` 秒开 + 异步补齐
