@@ -158,6 +158,18 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 所有原生 `prompt` / `confirm` / `alert` 已替换为 `src/dialog.ts` 的应用内弹窗;新增交互需要输入 / 确认时一律用 `promptText` / `confirmDialog` / `alertDialog`,不要再引入原生对话框
 - `NavigatorTree` 支持拖拽(对象 → 文件夹移动、文件夹重父 / 重排、对象在同级重排)、Ctrl/Shift 多选与批量归档;五个模块(流程 / 实体 / 资源 / 文档 / 资料)共用同一组件,FlowEditor 已不再自带树
 - 所有项目数据修改必须经过 store 的 `commit`,保证撤销栈、恢复点与持久化正常;不要直接修改 zustand state
+- **zustand selector 必须返回稳定引用** —— 这是本项目反复踩中的头号陷阱,后果是无限重渲染并触发崩溃边界:
+  ```ts
+  // ✗ 每次都是新数组 / 新对象 → zustand 判定状态变化 → 无限循环
+  const events = useLoom((s) => s.project.externalEvents ?? []);
+  const done  = useLoom((s) => s.project.documents.filter((d) => d.status === 'done'));
+  // ✓ selector 只选原值,派生放到外面(必要时用模块级常量兜底 + useMemo 派生)
+  const NO_EVENTS: ExternalEvent[] = [];            // 模块级,引用恒定
+  const events = useLoom((s) => s.project.externalEvents) ?? NO_EVENTS;
+  const docs   = useLoom((s) => s.project.documents);
+  const done   = useMemo(() => docs.filter((d) => d.status === 'done'), [docs]);
+  ```
+  `?? []`、`.filter()`、`.map()`、对象字面量在 selector 里一律禁止。**类型检查与单元测试都发现不了这类问题**(R19-3b 时 406 项测试全绿但流程编辑器一打开就崩),只有浏览器实测能挡住 —— 改动 selector 后务必到浏览器点一遍受影响模块
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
