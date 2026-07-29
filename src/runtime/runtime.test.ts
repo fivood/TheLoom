@@ -305,6 +305,166 @@ describe('FlowRuntime 事件协议 v2', () => {
     expect(run.log.map((beat) => beat.kind)).toEqual(['instruction', 'dialogue']);
   });
 
+  it('R19-2 call:进入被调流程,走到尽头隐式返回调用点并继续', () => {
+    const p = project([
+      {
+        id: 'main', name: '主线', technicalName: 'main',
+        nodes: [
+          node('m1', 'dialogue', { text: '出发' }),
+          node('m2', 'call', { targetFlow: 'sideq' }),
+          node('m3', 'dialogue', { text: '回来了' }),
+        ],
+        edges: [edge('m1', 'm2'), edge('m2', 'm3')],
+      },
+      {
+        id: 'side', name: '支线', technicalName: 'sideq',
+        nodes: [node('s1', 'dialogue', { text: 'A' }), node('s2', 'dialogue', { text: 'B' })],
+        edges: [edge('s1', 's2')],
+      },
+    ]);
+    const run = new FlowRuntime(enginePkg(p), 'main');
+    run.start();
+    run.choose(0);                       // m1 → m2(call)自动进入 side,停在 s1
+    expect(run.flow.id).toBe('side');
+    expect(run.callStack).toHaveLength(1);
+    expect(run.log.map((b) => b.text)).toEqual(['出发', '', 'A']);
+    // s2 无出边 = 被调流程结束 → 隐式返回 → 继续走 m3
+    run.choose(0);
+    expect(run.flow.id).toBe('main');
+    expect(run.callStack).toHaveLength(0);
+    expect(run.log.map((b) => b.text)).toEqual(['出发', '', 'A', 'B', '回来了']);
+    expect(run.ended).toBe(true);
+  });
+
+  it('R19-2 return:显式返回并把返回值写入调用方变量', () => {
+    const p = project([
+      {
+        id: 'main', name: '主线', technicalName: 'main',
+        nodes: [
+          node('m1', 'call', { targetFlow: 'calc', returnVar: 'score' }),
+          node('m2', 'dialogue', { text: '结束' }),
+        ],
+        edges: [edge('m1', 'm2')],
+      },
+      {
+        id: 'calc', name: '计算', technicalName: 'calc',
+        nodes: [node('c1', 'return', { returnExpr: '7 + 5' })],
+        edges: [],
+      },
+    ], [numVar('score', '0')]);
+    const run = new FlowRuntime(enginePkg(p), 'main');
+    run.start();
+    expect(run.vars.score).toBe(12);
+    expect(run.flow.id).toBe('main');
+    expect(run.log[run.log.length - 1].text).toBe('结束');
+  });
+
+  it('R19-2 命名入口 + 参数:实参绑定为局部变量,返回后还原原值', () => {
+    const p = project([
+      {
+        id: 'main', name: '主线', technicalName: 'main',
+        nodes: [
+          node('m1', 'call', {
+            targetFlow: 'greet', targetEntry: 'polite',
+            args: [{ name: 'who', expr: '林晚' }, { name: 'times', expr: '2 + 1' }],
+          }),
+          node('m2', 'dialogue', { text: '收尾' }),
+        ],
+        edges: [edge('m1', 'm2')],
+      },
+      {
+        id: 'greet', name: '寒暄', technicalName: 'greet',
+        entries: [{
+          key: 'polite', nodeId: 'g1',
+          params: [{ name: 'who', type: 'string' }, { name: 'times', type: 'number' }],
+        }],
+        nodes: [node('g0', 'dialogue', { text: '默认起点' }), node('g1', 'return')],
+        edges: [],
+      },
+    ], [{ id: 'who', name: 'who', type: 'string', value: '原值', description: '' }]);
+    const run = new FlowRuntime(enginePkg(p), 'main');
+    run.start();
+    // 命名入口生效:走 g1 而不是默认起点 g0
+    expect(run.log.some((b) => b.text === '默认起点')).toBe(false);
+    // 返回后参数变量还原为调用前的值,times 原本不存在则删除
+    expect(run.vars.who).toBe('原值');
+    expect('times' in run.vars).toBe(false);
+    expect(run.log[run.log.length - 1].text).toBe('收尾');
+  });
+
+  it('R19-2 jump:切流程且不压栈,目标走完即结束', () => {
+    const p = project([
+      {
+        id: 'main', name: '主线', technicalName: 'main',
+        nodes: [node('m1', 'jump', { targetFlow: 'ending' }), node('m2', 'dialogue', { text: '不该到这' })],
+        edges: [edge('m1', 'm2')],
+      },
+      { id: 'ending', name: '结局', technicalName: 'ending', nodes: [node('e1', 'dialogue', { text: '完' })], edges: [] },
+    ]);
+    const run = new FlowRuntime(enginePkg(p), 'main');
+    run.start();
+    expect(run.flow.id).toBe('ending');
+    expect(run.callStack).toHaveLength(0);
+    expect(run.log.map((b) => b.text)).toEqual(['', '完']);
+    run.choose(0);
+    expect(run.ended).toBe(true);
+    expect(run.log.some((b) => b.text === '不该到这')).toBe(false);
+  });
+
+  it('R19-2 目标缺失与无限递归都就地停下,不抛错也不爆栈', () => {
+    const missing = project([{
+      id: 'main', name: '主线', technicalName: 'main',
+      nodes: [node('m1', 'call', { targetFlow: '不存在的流程' }), node('m2', 'dialogue', { text: '继续' })],
+      edges: [edge('m1', 'm2')],
+    }]);
+    const r1 = new FlowRuntime(enginePkg(missing), 'main');
+    r1.start();
+    expect(r1.log[0].note).toContain('目标流程不存在');
+    expect(r1.log[r1.log.length - 1].text).toBe('继续');   // 降级为装饰性节点,继续走出边
+
+    const recursive = project([{
+      id: 'main', name: '递归', technicalName: 'main',
+      nodes: [node('m1', 'call', { targetFlow: 'main' })],
+      edges: [],
+    }]);
+    const r2 = new FlowRuntime(enginePkg(recursive), 'main');
+    r2.start();
+    expect(r2.callStack.length).toBeLessThanOrEqual(32);
+    expect(r2.log.some((b) => (b.note ?? '').includes('调用深度'))).toBe(true);
+  });
+
+  it('R19-2 存档:调用栈与当前流程进快照,读档后从被调流程继续', () => {
+    const p = project([
+      {
+        id: 'main', name: '主线', technicalName: 'main',
+        nodes: [node('m1', 'call', { targetFlow: 'side' }), node('m2', 'dialogue', { text: '回来' })],
+        edges: [edge('m1', 'm2')],
+      },
+      {
+        id: 'side', name: '支线', technicalName: 'side',
+        nodes: [node('s1', 'dialogue', { text: 'A' }), node('s2', 'dialogue', { text: 'B' })],
+        edges: [edge('s1', 's2')],
+      },
+    ]);
+    const pkg = enginePkg(p);
+    const run = new FlowRuntime(pkg, 'main');
+    run.start();
+    expect(run.flow.id).toBe('side');
+    const snap = JSON.parse(JSON.stringify(run.snapshot()));
+    expect(snap.flowId).toBe('side');
+    expect(snap.callStack).toHaveLength(1);
+
+    const restored = new FlowRuntime(pkg, 'main');
+    restored.restore(snap);
+    expect(restored.flow.id).toBe('side');
+    expect(restored.callStack).toHaveLength(1);
+    // s1 → s2,s2 无出边 → 隐式返回 → m2;调用栈从存档里恢复才可能回到 main
+    restored.choose(0);
+    expect(restored.log.map((b) => b.text)).toEqual(['', 'A', 'B', '回来']);
+    expect(restored.flow.id).toBe('main');
+    expect(restored.callStack).toHaveLength(0);
+  });
+
   it('旧包缺少协议声明时按 v1 数据源确定性升级,多起点也有稳定键', () => {
     const p = project([{
       id: 'f1', name: '旧包',

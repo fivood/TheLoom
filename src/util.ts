@@ -226,6 +226,39 @@ export function normalizeProject(p: Project): Project {
       const d = p.documents.find((x) => x.id === f.documentId);
       if (d && (!d.linkedFlowId || !flowIds.has(d.linkedFlowId))) d.linkedFlowId = f.id;
     }
+    // R19-2 命名入口:剔除空 key / 指向已删节点的入口,同 key 保留第一条;参数去空名与非法类型
+    if (f.entries !== undefined) {
+      if (!Array.isArray(f.entries)) {
+        delete f.entries;
+      } else {
+        const topIds = new Set(f.nodes.map((n) => n.id));
+        const seenKeys = new Set<string>();
+        const kept = f.entries.filter((e) => {
+          if (!e || typeof e.key !== 'string') return false;
+          const key = e.key.trim();
+          if (!key || seenKeys.has(key) || !topIds.has(e.nodeId)) return false;
+          seenKeys.add(key);
+          e.key = key;
+          return true;
+        });
+        for (const e of kept) {
+          if (e.params === undefined) continue;
+          if (!Array.isArray(e.params)) { delete e.params; continue; }
+          const seenNames = new Set<string>();
+          e.params = e.params.filter((param) => {
+            const name = typeof param?.name === 'string' ? param.name.trim() : '';
+            if (!name || seenNames.has(name)) return false;
+            seenNames.add(name);
+            param.name = name;
+            if (param.type !== 'boolean' && param.type !== 'number' && param.type !== 'string') param.type = 'string';
+            return true;
+          });
+          if (e.params.length === 0) delete e.params;
+        }
+        if (kept.length > 0) f.entries = kept;
+        else delete f.entries;
+      }
+    }
   }
   for (const d of p.documents) {
     if (!d.linkedFlowId) continue;

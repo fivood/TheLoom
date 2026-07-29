@@ -41,6 +41,12 @@ export interface EngineNodeData {
   color?: string;
   w?: number;
   h?: number;
+  /** R19-2 跨流程调用:jump / call 的目标与实参,return 的返回值 */
+  targetFlow?: string;
+  targetEntry?: string;
+  args?: { name: string; expr: string }[];
+  returnVar?: string;
+  returnExpr?: string;
 }
 
 export interface EngineNode {
@@ -65,10 +71,15 @@ export interface EngineEdge {
 
 export interface EngineSub { nodes: EngineNode[]; edges: EngineEdge[] }
 
+export interface EngineParam { name: string; type: string; default?: string }
+export interface EngineEntry { key: string; nodeId: string; label?: string; params?: EngineParam[] }
+
 export interface EngineFlow extends EngineSub {
   id: string;
   name: string;
   technicalName?: string;
+  /** R19-2 命名入口:宿主引擎与其他流程按 key 稳定寻址 */
+  entries?: EngineEntry[];
 }
 
 export interface EngineEntity {
@@ -176,6 +187,14 @@ function cloneNode(n: FlowNode, rules: EngineExportRules): EngineNode {
   if (n.data.checkExpr) data.checkExpr = n.data.checkExpr;
   if (typeof n.data.checkDc === 'number') data.checkDc = n.data.checkDc;
   if (n.data.checkRed === true) data.checkRed = true;
+  // R19-2 跨流程调用
+  if (n.data.targetFlow) data.targetFlow = n.data.targetFlow;
+  if (n.data.targetEntry) data.targetEntry = n.data.targetEntry;
+  if (Array.isArray(n.data.args) && n.data.args.length > 0) {
+    data.args = n.data.args.map((a) => ({ name: a.name, expr: a.expr }));
+  }
+  if (n.data.returnVar) data.returnVar = n.data.returnVar;
+  if (n.data.returnExpr) data.returnExpr = n.data.returnExpr;
   if (Array.isArray(n.data.fields) && n.data.fields.length > 0) {
     data.fields = n.data.fields.map((f) => {
       const out: { label: string; value: string; type?: string } = { label: f.label, value: f.value };
@@ -253,6 +272,22 @@ export function buildEnginePackage(project: Project, rules: EngineExportRules = 
       const sub = cloneSub(f, effective);
       const out: EngineFlow = { id: f.id, name: f.name, nodes: sub.nodes, edges: sub.edges };
       if (f.technicalName) out.technicalName = f.technicalName;
+      // R19-2:只导出仍指向存在节点的入口,避免引擎拿到悬空 key
+      const liveEntries = (f.entries ?? []).filter((e) => sub.nodes.some((n) => n.id === e.nodeId));
+      if (liveEntries.length > 0) {
+        out.entries = liveEntries.map((e) => {
+          const entry: EngineEntry = { key: e.key, nodeId: e.nodeId };
+          if (e.label) entry.label = e.label;
+          if (e.params && e.params.length > 0) {
+            entry.params = e.params.map((p) => {
+              const param: EngineParam = { name: p.name, type: p.type };
+              if (p.default) param.default = p.default;
+              return param;
+            });
+          }
+          return entry;
+        });
+      }
       return out;
     });
 

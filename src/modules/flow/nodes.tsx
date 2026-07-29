@@ -14,6 +14,8 @@ export const TYPE_COLORS: Record<FlowNodeType, string> = {
   condition: 'var(--node-condition)',
   instruction: 'var(--node-instruction)',
   jump: 'var(--node-jump)',
+  call: 'var(--node-call)',
+  return: 'var(--node-return)',
   exit: 'var(--node-exit)',
   check: 'var(--node-check)',
   note: 'var(--node-note)',

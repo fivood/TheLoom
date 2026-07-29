@@ -104,7 +104,9 @@ export type FlowNodeType =
   | 'hub'         // 汇聚点
   | 'condition'   // 条件分支
   | 'instruction' // 指令(设置变量等)
-  | 'jump'        // 跳转
+  | 'jump'        // 跳转(R19-2 起可跨流程,不返回)
+  | 'call'        // 调用(R19-2:进入目标流程入口,结束后回到调用点)
+  | 'return'      // 返回(R19-2:结束当前被调流程,可带返回值)
   | 'exit'        // 出口(子流程 → 父层的命名引脚)
   | 'check'       // 检定(2d6 + 技能 vs 难度;白可重试,红仅一次)
   | 'note'        // 画布注释(不参与演出与导出)
@@ -117,6 +119,8 @@ export const FLOW_NODE_LABEL: Record<FlowNodeType, string> = {
   condition: '条件分支',
   instruction: '指令',
   jump: '跳转',
+  call: '调用',
+  return: '返回',
   exit: '出口',
   check: '检定',
   note: '注释',
@@ -148,6 +152,16 @@ export interface FlowNodeData {
   checkRed?: boolean;
   /** 技术名:用于 seen("xxx") / unseen("xxx") 在脚本中引用本节点 */
   technicalName?: string;
+  /** 仅跳转 / 调用节点(R19-2):目标流程技术名或 id;空 = 本流程内跳转,按出边继续 */
+  targetFlow?: string;
+  /** 仅跳转 / 调用节点(R19-2):目标流程的命名入口 key;空 = 目标流程默认起点 */
+  targetEntry?: string;
+  /** 仅跳转 / 调用节点(R19-2):实参表达式,按名绑定到目标入口参数 */
+  args?: { name: string; expr: string }[];
+  /** 仅调用节点(R19-2):被调流程返回后,把返回值写入该变量 */
+  returnVar?: string;
+  /** 仅返回节点(R19-2):返回值表达式;空 = 不带返回值 */
+  returnExpr?: string;
   /** 引用的叙事单元 id:与文档块共享同一份内容(对白 / 片段 / 条件 / 指令等) */
   unitId?: ID;
   /** 模板驱动的自定义字段(与实体同构,便于跨对象复用) */
@@ -181,6 +195,32 @@ export interface FlowEdge {
   choiceId?: ID;
 }
 
+/**
+ * R19-2 流程入口参数:调用方按名传实参,进入时绑定为同名变量。
+ * type 复用 VariableType 词汇表,避免出现第二套类型名。
+ */
+export interface FlowParam {
+  name: string;
+  type: VariableType;
+  /** 调用方未传该参数时使用;空字符串按类型取零值 */
+  default?: string;
+}
+
+/**
+ * R19-2 流程命名入口:让 jump / call 与宿主引擎按稳定 key 寻址,
+ * 而不是依赖节点 id 或"第一个无入边节点"这种会被编辑打乱的约定。
+ */
+export interface FlowEntry {
+  /** 流程内唯一的稳定标识,技术名格式 */
+  key: string;
+  /** 入口节点 id */
+  nodeId: ID;
+  /** 可选显示名 */
+  label?: string;
+  /** 参数声明;调用时按名绑定,返回时还原原值(局部作用域) */
+  params?: FlowParam[];
+}
+
 export interface Flow {
   id: ID;
   name: string;
@@ -193,6 +233,8 @@ export interface Flow {
   folderId?: ID;
   /** Navigator 树内手动排序序号;空 = 按默认排序 */
   order?: number;
+  /** R19-2 命名入口;空 = 只能从默认起点(无入边节点)进入 */
+  entries?: FlowEntry[];
   nodes: FlowNode[];
   edges: FlowEdge[];
 }
