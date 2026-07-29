@@ -11,6 +11,7 @@ import { countSubNodes, resolveSub, sanitizeTechnicalName, walkFlowNodes } from 
 import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
 import PathTestPanel from '../../components/PathTestPanel';
+import FlowTestPanel from '../../components/FlowTestPanel';
 import { loadBreakpoints, toggleBreakpoint } from '../../playSaves';
 import type { EventWait, ExternalEvent, Flow, FlowEntry, FlowNodeData, FlowNodeType, FlowParam, SubFlow } from '../../types';
 import { ANNOTATION_TYPES, EVENT_WAIT_LABEL, FLOW_NODE_LABEL } from '../../types';
@@ -81,6 +82,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
    */
   const externalEventsRaw = useLoom((s) => s.project.externalEvents);
   const externalEvents = externalEventsRaw ?? NO_EVENTS;
+  /** R19-4:回归测试数量;同样只选原值,派生放外面 */
+  const flowTestCount = useLoom((s) => s.project.flowTests?.length ?? 0);
   const documents = useLoom((s) => s.project.documents);
   // 被文档块共享的叙事单元 id:节点 inspector 显示双向同步提示
   const docUnitIds = useMemo(() => {
@@ -90,6 +93,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   }, [documents]);
   const [playing, setPlaying] = useState(false);
   const [pathTesting, setPathTesting] = useState(false);
+  const [flowTesting, setFlowTesting] = useState(false);
   const [editingEntries, setEditingEntries] = useState(false);
   const [editingTpl, setEditingTpl] = useState<FlowNodeType | null>(null);
   const slotId = useLoom((s) => s.currentSlotId);
@@ -253,6 +257,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
               </button>
             ))}
+          <button
+            title="场景化回归测试:把演出录下来固化成断言,流程改动后批量重跑"
+            onClick={() => { writeBack(); setFlowTesting(true); }}
+          >⛿ 回归{flowTestCount > 0 ? `(${flowTestCount})` : ''}</button>
           {path.length === 0 && (
             <button
               title="管理本流程的命名入口:其他流程的跳转 / 调用与宿主引擎按 key 稳定寻址"
@@ -371,6 +379,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
           onClose={() => setPlaying(false)}
         />
       )}
+
+      {flowTesting && <FlowTestPanel onClose={() => setFlowTesting(false)} />}
 
       {editingEntries && (
         <FlowEntriesModal

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLoom } from '../../store';
+import { uid, useLoom } from '../../store';
+import { alertDialog, promptText } from '../../dialog';
+import { flowFingerprint } from '../../flowTest';
 import { resolveSub } from '../../util';
 import type { Entity, EventWait, Flow, FlowEdge, FlowNode, FlowParam, SubFlow, VariableType } from '../../types';
 import { ANNOTATION_TYPES, EVENT_WAIT_LABEL, FLOW_NODE_LABEL } from '../../types';
@@ -117,6 +119,14 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   /** R19-3:停在外部事件上时的挂起态(编辑器里由用户填模拟响应来放行) */
   const [pendingEvent, setPendingEvent] = useState<PendingEvent | null>(null);
   const [simInput, setSimInput] = useState('');
+  /**
+   * R19-4 录制:把这次演出的选择下标与事件响应记下来,
+   * 「存为回归测试」时连同种子一起固化,之后可无人值守回放。
+   */
+  const recordedChoices = useRef<number[]>([]);
+  const recordedEvents = useRef<{ event: string; value?: string }[]>([]);
+  /** 最后进入的节点 id:存为测试时作为「结束于此」断言的目标 */
+  const lastNodeIdRef = useRef<string | undefined>(undefined);
 
   /**
    * 技术名 → 节点 id 映射,递归遍历全部流程所有层级。
@@ -301,6 +311,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
       const node = c.nodes.find((n) => n.id === id);
       if (!node) break;
       seenRef.current.add(id);
+      lastNodeIdRef.current = id;
 
       const speaker = entities.find((e) => e.id === node.data.speakerId);
       // R19-2:本节点是否要切流程 / 弹栈返回
@@ -566,6 +577,10 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         : t === 'number' ? (Number(simInput) || 0)
         : simInput;
     }
+    recordedEvents.current.push({
+      event: pending.eventName,
+      value: pending.wait === 'value' ? simInput : undefined,
+    });
     setPendingEvent(null);
     setSimInput('');
     const f = project.flows.find((x) => x.id === pending.flowId);
@@ -585,8 +600,39 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     if (r.choices.length === 0) setEnded(true);
   };
 
-  const choose = (c: Choice) => {
+  /**
+   * R19-4:把当前这次演出固化为回归测试。
+   * 断言默认给一条「演出结束于当前最后一个节点」—— 最常见的诉求是
+   * 「这条线以后还得能走到这个结局」,其余断言在测试面板里补。
+   */
+  const saveAsTest = async () => {
+    const name = await promptText({
+      message: '回归测试名称',
+      placeholder: `${flow.name} · ${new Date().toLocaleString('zh-CN')}`,
+      confirmText: '保存',
+    });
+    if (name === null) return;
+    const lastBeatNode = lastNodeIdRef.current;
+    useLoom.getState().update((p) => {
+      p.flowTests ??= [];
+      p.flowTests.push({
+        id: uid(),
+        name: name.trim() || `${flow.name} 回归`,
+        flowRef: flow.technicalName || flow.id,
+        seed,
+        choices: [...recordedChoices.current],
+        eventResponses: recordedEvents.current.length > 0 ? [...recordedEvents.current] : undefined,
+        assertions: ended && lastBeatNode ? [{ kind: 'ended', node: lastBeatNode }] : [],
+        flowHash: flowFingerprint(p.flows.find((f) => f.id === flow.id) ?? flow),
+        updatedAt: Date.now(),
+      });
+    });
+    await alertDialog(`已保存为回归测试「${name.trim() || `${flow.name} 回归`}」。到流程工具栏的「回归」里运行与补断言。`);
+  };
+
+  const choose = (c: Choice, index: number) => {
     if (!c.nodeId) return;
+    recordedChoices.current.push(index);
     if (c.edgeId && c.once) takenEdges.current.add(c.edgeId);
     let vv = vars;
     if (c.effect) {
@@ -611,6 +657,8 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     activeFlowRef.current = flow;
     setActiveFlowName(flow.name);
     callStackRef.current = [];
+    recordedChoices.current = [];
+    recordedEvents.current = [];
     setPendingEvent(null);
     setSimInput('');
     entityPropsRef.current = buildEntityProps(entities);
@@ -717,6 +765,10 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             <button className="ghost icon-btn" onClick={dropSave} title="删除本流程的演出存档">🗑</button>
           </>
         )}
+        <button
+          onClick={saveAsTest}
+          title="把这次演出固化成回归测试:记下种子、选择序列与事件响应,之后流程一改就能重跑"
+        >⛿ 存为测试</button>
         <button onClick={() => begin(seed)} title="用当前种子重新开始:检定结果可复现">⟲ 同种子重开</button>
         <button onClick={() => begin()} title="换一个随机种子重新开始">⟲ 重新开始</button>
         <button onClick={onClose}>✕ 退出演出</button>
@@ -794,7 +846,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
                 <button
                   key={i}
                   className={choices.length > 1 ? 'choice' : 'choice single'}
-                  onClick={() => choose(c)}
+                  onClick={() => choose(c, i)}
                 >
                   {choices.length > 1 ? `${i + 1}. ${c.label}` : `${c.label} →`}
                   {c.once && <span className="choice-once" title="一次性选项">①</span>}
