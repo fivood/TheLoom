@@ -16,7 +16,11 @@ import {
   serializeBaseline, type BaselineSource,
 } from '../engine/baseline';
 import { runExportGate, type ExportGateReport } from '../engine/gate';
+import { buildBundleFiles, type BundleResult } from '../engine/bundle';
+import { RUNTIME_AVAILABLE, RUNTIME_SOURCE } from '../engine/runtimeSource';
+import { loadAssetBlob } from '../assetFiles';
 import { makeZip } from '../interop/zip';
+import { formatSize } from '../util';
 
 /** 未保存为命名配置时用的临时配置 */
 const DRAFT_ID = '__draft__';
@@ -61,6 +65,8 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
   const [baseline, setBaseline] = useState<EngineBaselineFile | null>(null);
   const [baselineSource, setBaselineSource] = useState<BaselineSource>('none');
   const [gateReport, setGateReport] = useState<ExportGateReport | null>(null);
+  /** 上次导出的打包结果:告诉用户实际带走了多少原文件 */
+  const [lastBundle, setLastBundle] = useState<BundleResult | null>(null);
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
@@ -113,6 +119,16 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
   const patchGate = (p: Partial<NonNullable<EngineExportConfig['gate']>>) =>
     patch({ gate: { ...DEFAULT_ENGINE_EXPORT_GATE, ...(draft.gate ?? {}), ...p } });
   const gate = { ...DEFAULT_ENGINE_EXPORT_GATE, ...(draft.gate ?? {}) };
+
+  const bundle = draft.bundle ?? {};
+  const patchBundle = (p: Partial<NonNullable<EngineExportConfig['bundle']>>) =>
+    patch({ bundle: { ...bundle, ...p } });
+  const selfContained = bundle.assetFiles === true && bundle.runtime === true;
+  /** 会随包带走的资源原文件总量,给用户一个体积预期 */
+  const bundledAssetBytes = useMemo(
+    () => (bundle.assetFiles ? pkg.assets.reduce((sum, a) => sum + (a.fileName ? a.size : 0), 0) : 0),
+    [bundle.assetFiles, pkg.assets],
+  );
 
   /* ---------- 配置管理 ---------- */
 
@@ -240,13 +256,32 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
     setBusy(true);
     try {
       if (!await passGate()) return;
-      const zip = await makeZip([
+      const baseFiles = [
         { name: 'theloom-package.json', content: JSON.stringify(pkg, null, 2) },
         { name: 'theloom-package.schema.json', content: JSON.stringify(ENGINE_PACKAGE_SCHEMA, null, 2) },
         { name: 'theloom-types.d.ts', content: generateTypes(pkg) },
-        { name: 'README.md', content: engineReadme(project.name) },
-      ]);
+        { name: 'README.md', content: engineReadme(project.name, bundle) },
+      ];
+      const result: BundleResult = await buildBundleFiles(pkg, baseFiles, {
+        bundle,
+        runtimeSource: RUNTIME_SOURCE,
+        readAssetBytes: async (asset) => {
+          const blob = await loadAssetBlob(folder, { hash: asset.hash, ext: asset.ext, mime: asset.mime });
+          return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+        },
+      });
+      // 原文件取不到就如实说,不能让用户以为自包含包是完整的
+      if (result.missingAssets.length > 0) {
+        const names = result.missingAssets.slice(0, 8).map((m) => `· ${m.name}(${m.reason})`).join('\n');
+        const more = result.missingAssets.length > 8 ? `\n…还有 ${result.missingAssets.length - 8} 个` : '';
+        if (!await confirmDialog({
+          message: `${result.missingAssets.length} 个资源的原文件没能打进包:\n\n${names}${more}\n\n包内会缺这些字节。仍然导出?`,
+          confirmText: '仍然导出',
+        })) return;
+      }
+      const zip = await makeZip(result.files);
       download(zip, `${project.name || 'theloom'}-引擎包.zip`);
+      setLastBundle(result);
       await rememberBaseline();
     } finally {
       setBusy(false);
@@ -392,6 +427,54 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
               />
               <span>保留注释 / 分区节点</span>
             </label>
+          </div>
+
+          <div className="field">
+            <label>打包内容{selfContained ? ' · 自包含' : ''}</label>
+            <label className="engine-flow-row">
+              <input
+                type="checkbox"
+                checked={bundle.assetFiles === true}
+                onChange={(e) => patchBundle({ assetFiles: e.target.checked })}
+              />
+              <span>
+                资源原文件随包(assets/)
+                {bundle.assetFiles && bundledAssetBytes > 0 && (
+                  <span className="hint"> 约 {formatSize(bundledAssetBytes)}</span>
+                )}
+              </span>
+            </label>
+            <label className="engine-flow-row" title={RUNTIME_AVAILABLE ? undefined : '当前构建没有运行库产物,先跑 npm run build:runtime'}>
+              <input
+                type="checkbox"
+                checked={bundle.runtime === true && RUNTIME_AVAILABLE}
+                disabled={!RUNTIME_AVAILABLE}
+                onChange={(e) => patchBundle({ runtime: e.target.checked })}
+              />
+              <span>
+                运行库随包(theloom-runtime.js)
+                {!RUNTIME_AVAILABLE && <span className="hint"> 当前构建不可用</span>}
+              </span>
+            </label>
+            <label className="engine-flow-row">
+              <input
+                type="checkbox"
+                checked={bundle.checksums === true}
+                onChange={(e) => patchBundle({ checksums: e.target.checked })}
+              />
+              <span>校验清单与授权来源表(checksums.json / LICENSES.md)</span>
+            </label>
+            <div className="hint" style={{ marginTop: 4 }}>
+              {selfContained
+                ? '自包含:复制到没有 TheLoom 项目文件夹的机器也能加载、演出并读取附件。'
+                : '仅数据包:资源原文件与运行库需要另外提供。'}
+            </div>
+            {lastBundle && (
+              <div className="hint" style={{ marginTop: 4 }}>
+                上次导出带走 {lastBundle.assetCount} 个原文件({formatSize(lastBundle.assetBytes)})
+                {lastBundle.missingAssets.length > 0 ? `,${lastBundle.missingAssets.length} 个缺失` : ''}
+              </div>
+            )}
           </div>
 
           <div className="field">

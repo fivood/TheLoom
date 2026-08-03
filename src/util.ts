@@ -279,6 +279,15 @@ export function normalizeProject(p: Project): Project {
             }
           }
         }
+        if (c.bundle !== undefined) {
+          if (typeof c.bundle !== 'object' || c.bundle === null) {
+            delete c.bundle;
+          } else {
+            for (const key of ['assetFiles', 'runtime', 'checksums'] as const) {
+              if (c.bundle[key] !== undefined && typeof c.bundle[key] !== 'boolean') delete c.bundle[key];
+            }
+          }
+        }
         if (!Number.isFinite(c.createdAt)) c.createdAt = Date.now();
         if (!Number.isFinite(c.updatedAt)) c.updatedAt = c.createdAt;
       }

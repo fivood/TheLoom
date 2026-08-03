@@ -341,6 +341,19 @@ export const DEFAULT_ENGINE_EXPORT_GATE: EngineExportGate = {
 };
 
 /**
+ * R20-2 自包含引擎包:除数据外还随包带哪些东西。
+ * 全关 = 仅数据包(R9 行为);全开 = 可在没有 TheLoom 项目文件夹的机器上直接跑。
+ */
+export interface EngineBundle {
+  /** 被引用资源的原文件字节打进包 assets/ */
+  assetFiles?: boolean;
+  /** 零依赖运行库 theloom-runtime.js 打进包 */
+  runtime?: boolean;
+  /** SHA-256 校验清单与资源授权来源表 */
+  checksums?: boolean;
+}
+
+/**
  * R20-1 命名导出配置:一组可复用的引擎包导出规则。
  * 随项目保存(参与撤销栈、文件夹往返与云协作),
  * 增量基线按 config id 绑定但存在项目文件夹 / 本机,不进 project.json。
@@ -359,6 +372,8 @@ export interface EngineExportConfig {
   /** 资源范围:全部 / 仅被导出对象挂接 */
   assets?: 'all' | 'referenced';
   gate?: EngineExportGate;
+  /** R20-2 打包内容:原文件 / 运行库 / 校验清单是否随包 */
+  bundle?: EngineBundle;
   createdAt: number;
   updatedAt: number;
 }

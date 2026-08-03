@@ -20,10 +20,11 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.37.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.37.0`(R20-1 导出配置与基线);R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
+- 已发布版本:`v0.38.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.38.0`(R20-2 自包含引擎包);R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
-- 已交付的能力(截至 v0.37.0):
+- 已交付的能力(截至 v0.38.0):
+  - **v0.38.0 R20-2 自包含引擎包** ✅ — 打包内容三项(资源原文件 / 运行库 / 校验清单+授权表)随命名配置保存;原文件按内容寻址写入包内 `assets/` 且同字节只写一次,取不到时逐个列出不静默;运行库经 vite 虚拟模块内嵌(`npm run build` 已串 `build:runtime`),产物缺失时禁用选项;`checksums.json` 覆盖除自身外全部文件;`examples/engine-demo/selfcontained.mjs` 脱机验收(校验 → 包内运行库演出 → 附件字节哈希对拍),非零退出码可接 CI
   - **v0.37.0 R20-1 导出配置与基线** ✅ — `EngineExportConfig` 命名配置进项目(流程选择 + 四项规则 + 闸门开关,normalizeProject 清洗);`flowIds` 缺省=全部 / 显式数组=精确(空数组不回落为全部);增量基线按 configId 绑定,桌面写 `engine/baseline-{configId}.json`(Rust 三命令 + 名称白名单)、网页回落 localStorage,支持基线 JSON 导入导出与 R9 旧键升级;`src/engine/gate.ts` 导出前闸门统一跑脚本 / 高级体检 / 路径 / 回归测试,**判定范围取自构建出的包**(范围外流程与文档脚本不阻断),阻断拒绝导出、仅警告需确认、关掉的项列为「未检查」
   - **v0.36.0 R19 引擎运行时闭环** ✅ — **R19-2 跨流程调用**(命名入口 + jump / call / return,参数是真局部作用域进入绑定返回还原,返回值写入调用方变量,32 层递归保护,调用栈进快照);**R19-3 外部事件**(项目级声明 + event 节点,三种等待模式,同步运行库靠「先置 pendingExternal 再通知宿主 + walking 重入保护」实现挂起/恢复,挂起态进快照,演出可填模拟响应);**R19-4 场景化回归测试**(`src/flowTest.ts` 纯逻辑运行器,演出录制成「入口+种子+选择序列+事件响应」,断言结局/变量/节点访问/事件触发,节点与连线覆盖率,流程内容哈希标「受影响」);**R19-5 编辑效率**(安全重命名跟上 targetFlow 与 eventName、复制粘贴跨流程、六向对齐与等距分布、选区封装为片段);**R19-P 体检性能**(路径缓存 + 懒加载)。R19-1 运行时事件协议 v2 — 引擎包 schema `1.1.0` + 顶层 `runtimeProtocolVersion: 2`;TS 与 Godot 运行库对每个叙事节点依次产生 `enter / display / leave`,带流程 / 节点定位、子流程 path 栈、自定义字段、附件 assetIds、说话人、触发边与稳定 `choiceKey`;入边 effect 归目标节点 `enter.changes`、指令节点归 `display.changes`,变量与实体属性都给前后值;v1 beat / log / onBeat 全保留,旧包旧存档缺字段确定性补齐;两端共用 `examples/godot-demo/runtime_v2_fixture.json` 对拍。协议见 `docs/R19_RUNTIME_PROTOCOL_V2.md`
   - **v0.35.0 R18 小说生产闭环** ✅ — 场景按正文块拆分 / 同章合并(迁移批注 / 快照 / 流程 / 大纲 / 时间线 / 弧线 / 伏笔 / 附件 / 修订任务引用);DOCX 成稿导出(投稿稿 + 编辑审阅稿两套预设,正式 OOXML 样式,下载前重解析自检);写作进度工作台(全书 / 卷 / 章 / 场景四级目标 + 今日新增 + 七日趋势,删字不倒扣、撤销与导入不制造虚假新增);修订任务(快照差异冻结 + 逐项接受 / 保留 / 待议,只存结论不覆盖正文)+ 本地中文校对
@@ -98,7 +99,7 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 | ~~R14~~ | ~~v0.30.0~~ | ~~地图与工作区增强~~ | ~~地图图层 / 四种形状 / 跨模块总览 / 网页分屏~~ | ✅ 已完成 | M |
 | ~~R15~~ | ~~v0.31.0~~ | ~~引擎接入 · Godot~~ | ~~Godot 4 GDScript runtime + 示例工程~~ | ✅ Godot 已完成;Unity / Unreal 可选,未排期 | M |
 | R16 | v0.32.0 / v0.33.0 | **稳定性** | 存储管理、使用指南、自动快照、应急恢复、无障碍首批、性能基线、升级迁移测试 | 🔶 R16-1~R16-5 已交付;**v1.0.0 尚未发布**,留待多轮真实项目测试后 | L |
-| R17-R20 | v0.34.0+ | **两条主工作流收束** | 详见 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` | 🔶 R17 / R18 / R19 已发布;R20-1 已完成,R20-2→R20-4 待开发 | L |
+| R17-R20 | v0.34.0+ | **两条主工作流收束** | 详见 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` | 🔶 R17 / R18 / R19 已发布;R20-1 / R20-2 已完成,R20-3→R20-4 待开发 | L |
 
 ### 关于 AI / 知识库集成的设计准则
 
@@ -174,6 +175,21 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R20-2 · v0.38.0)
+
+自包含引擎包:
+
+- `types.ts` 增 `EngineBundle`(`assetFiles` / `runtime` / `checksums`)挂在 `EngineExportConfig.bundle`;`normalizeProject` 同步清洗布尔非法值
+- 新增 `src/engine/bundle.ts`(纯逻辑):`buildBundleFiles(pkg, baseFiles, { bundle, readAssetBytes, runtimeSource })` → `{ files, missingAssets, assetCount, assetBytes }`。**读字节是注入的 `AssetByteReader`**,所以核心逻辑在 node 环境可测(vitest 没有 IndexedDB);UI 层传基于 `loadAssetBlob` 的实现
+  - 原文件按 `fileName` 去重(内容寻址天然同字节同名),取不到时记 `missingAssets` 并区分「从未保存原文件」/「原文件丢失」
+  - `checksums.json` 最后生成,覆盖此前所有文件但**不含自身**;`licensesMarkdown` 汇总授权来源并点名未标注的
+- 运行库内嵌:`vite.config.ts` 加 `runtimeSourcePlugin` 提供虚拟模块 `virtual:theloom-runtime-source`(读 `runtime-dist/theloom-runtime.js`),`src/engine/runtimeSource.ts` 导出 `RUNTIME_SOURCE` / `RUNTIME_AVAILABLE`,类型声明在 `src/virtual-modules.d.ts`。**`npm run build` 已改为先 `build:runtime`**;产物缺失时插件 warn + 界面禁用「运行库随包」
+- `engineReadme(projectName, bundle)` 按实际打包内容生成说明,自包含时加显著标注并附校验命令
+- `examples/engine-demo/selfcontained.mjs` 脱机验收:只读传入目录 → 按 `checksums.json` 逐文件校验 → 用**包内**运行库演到结束 → 按 `fileName` 读附件字节与 `hash` 对拍 → 列挂接关系;失败非零退出码
+- 测试:`engine/bundle.test.ts` 6 项(全关只有数据包 / 同字节只写一次+无 hash 老资源报告 / 读不到报丢失 / 运行库空不写空文件 / 校验清单不含自身且用 "abc" 标准向量验证真 SHA-256 / 授权表点名未标注);合计 vitest 458 项 + cargo 4 项通过
+- 已实测:界面导出的 zip 解压后 7 文件校验全过、对白演出跑通、16044 字节音频附件读出且哈希一致;生产构建产物里确认内嵌了运行库源码
+- 注意:`buildBundleFiles` 不碰 IO,新增打包内容时保持这个边界;`checksums.json` 必须最后 push(它要哈希前面所有文件)
 
 ## 最近变更(R20-1 · v0.37.0)
 

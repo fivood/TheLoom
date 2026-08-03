@@ -280,17 +280,34 @@ export const ENGINE_PACKAGE_SCHEMA = {
 } as const;
 
 /** 打进导出 zip 的使用说明 */
-export function engineReadme(projectName: string): string {
+export function engineReadme(
+  projectName: string,
+  bundle: { assetFiles?: boolean; runtime?: boolean; checksums?: boolean } = {},
+): string {
+  const extras = [
+    bundle.assetFiles
+      ? '- `assets/` —— 被引用资源的**原文件字节**,文件名即 `assets[].fileName`,可直接读取播放'
+      : '',
+    bundle.runtime
+      ? '- `theloom-runtime.js` —— 零依赖运行库(ES Module),`import { FlowRuntime } from \'./theloom-runtime.js\'` 即可用'
+      : '',
+    bundle.checksums
+      ? '- `LICENSES.md` —— 资源授权与来源表\n- `checksums.json` —— 全部文件的 SHA-256(清单自身不在表内)'
+      : '',
+  ].filter(Boolean).join('\n');
+
+  const selfContained = bundle.assetFiles && bundle.runtime;
+
   return `# TheLoom 引擎包 · ${projectName}
 
 本压缩包由 TheLoom 叙事织机导出,供游戏引擎 / 自研运行时消费。
-
+${selfContained ? '\n本包为**自包含包**:数据、资源原文件与运行库齐全,复制到任意机器都能直接加载运行,不需要 TheLoom 项目文件夹。\n' : ''}
 ## 内容
 
 - \`theloom-package.json\` —— 完整数据包:变量、实体、流程(含嵌套子流程)、资源清单、附件挂接、索引、内容哈希清单
 - \`theloom-package.schema.json\` —— 包结构的 JSON Schema(draft-07),导入前可校验
 - \`theloom-types.d.ts\` —— TypeScript 类型定义,变量名与各类技术名均为字面量联合类型
-
+${extras ? `${extras}\n` : ''}
 ## 运行对白流程
 
 TheLoom 提供独立运行库(theloom-runtime,零依赖 ES Module),行为与编辑器内演出完全一致:
@@ -317,7 +334,19 @@ run.choose(0); // 选第 1 项
 - 节点行进语义:单出边的汇聚点 / 指令 / 条件 / 出口 / 检定自动前进;无出边逐层回溯父流程;\`exit\` 走父层片段的命名引脚;\`fallback\` 边在有其他可用选项时被遮蔽;\`once\` 选项选过即隐藏
 - 条件 / 指令 / 检定技能值是 TheLoom 脚本源码(运行库内置解释器),包含 \`seen("节点技术名")\` 与 \`实体技术名.字段名\` 寻址
 - 检定:2d6 + 技能 ≥ 难度;\`checkRed\` 为真时只掷一次、结果沿用;RNG 为 mulberry32,同种子完全可复现
-- 资源原文件不在包内:\`assets[].fileName\` 指向项目文件夹 \`assets/\` 下按内容哈希命名的文件,\`hash\` 为其 SHA-256
+- ${bundle.assetFiles
+    ? '资源原文件在包内 `assets/` 下,`assets[].fileName` 即文件名,`hash` 为其 SHA-256(可用来校验)'
+    : '资源原文件不在包内:`assets[].fileName` 指向项目文件夹 `assets/` 下按内容哈希命名的文件,`hash` 为其 SHA-256'}
 - \`manifest\` 为对象内容哈希(kind:id → hash),配合增量包(theloom-delta)做部分更新
-`;
+${bundle.checksums ? `
+## 校验
+
+\`checksums.json\` 列出包内每个文件的 SHA-256(它自己除外)。校验示例:
+
+\`\`\`bash
+node -e "const c=require('./checksums.json'),h=require('crypto'),f=require('fs');\\
+for(const [n,x] of Object.entries(c.files)){const a=h.createHash('sha256').update(f.readFileSync(n)).digest('hex');\\
+if(a!==x)throw new Error(n+' 校验失败');}console.log('全部文件校验通过')"
+\`\`\`
+` : ''}`;
 }
