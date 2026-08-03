@@ -6,7 +6,7 @@
  * - 引用索引:技术名表、节点定位表、说话人反查、资源挂接反查
  * - 内容哈希清单:FNV-1a 64 位,支持与上次导出对比、产出增量包
  */
-import type { Entity, FlowEdge, FlowNode, Project, SubFlow } from '../types';
+import type { EngineExportConfig, Entity, FlowEdge, FlowNode, Project, SubFlow } from '../types';
 import { ANNOTATION_TYPES } from '../types';
 import { assetFileName } from '../assetFiles';
 
@@ -16,7 +16,11 @@ export const ENGINE_RUNTIME_PROTOCOL_VERSION = 2 as const;
 /* ---------- 包类型 ---------- */
 
 export interface EngineExportRules {
-  /** 要导出的流程 id;缺省 / 空数组 = 全部 */
+  /**
+   * 要导出的流程 id。缺省 = 全部(之后新建的流程自动纳入);
+   * 给定数组 = 精确这些流程,空数组即一个都不导 —— 不回落为「全部」,
+   * 否则配置里的流程被删光时导出范围会静默变大。
+   */
   flowIds?: string[];
   /** 保留画布布局(position / 尺寸 / 颜色);默认剥除 */
   includeLayout?: boolean;
@@ -165,6 +169,20 @@ export interface EnginePackage {
   manifest: Record<string, string>;
 }
 
+/**
+ * 增量基线文件(R20-1):按导出配置记录上次导出的内容哈希清单。
+ * 存项目文件夹 engine/baseline-{configId}.json 或本机,见 engine/baseline.ts。
+ */
+export interface EngineBaselineFile {
+  schema: 'theloom-engine-baseline';
+  configId: string;
+  configName: string;
+  /** 产出这份基线的包 schemaVersion,跨版本时可提示重新全量导出 */
+  schemaVersion: string;
+  exportedAt: number;
+  manifest: Record<string, string>;
+}
+
 /** 增量包:相对上一份 manifest 的变化 */
 export interface EngineDelta {
   schema: 'theloom-delta';
@@ -283,6 +301,17 @@ function walkEngineNodes(sub: EngineSub, fn: (n: EngineNode, path: string[]) => 
   }
 }
 
+/** R20-1:命名导出配置 → 构建规则(缺省项在 buildEnginePackage 里回落) */
+export function rulesFromConfig(config: EngineExportConfig): EngineExportRules {
+  return {
+    flowIds: config.flowIds,
+    includeLayout: config.includeLayout,
+    includeAnnotations: config.includeAnnotations,
+    entities: config.entities,
+    assets: config.assets,
+  };
+}
+
 export function buildEnginePackage(project: Project, rules: EngineExportRules = {}): EnginePackage {
   const effective: EnginePackage['rules'] = {
     includeLayout: rules.includeLayout ?? false,
@@ -290,7 +319,7 @@ export function buildEnginePackage(project: Project, rules: EngineExportRules = 
     entities: rules.entities ?? 'all',
     assets: rules.assets ?? 'all',
   };
-  const wanted = rules.flowIds && rules.flowIds.length > 0 ? new Set(rules.flowIds) : null;
+  const wanted = rules.flowIds ? new Set(rules.flowIds) : null;
   const flows: EngineFlow[] = project.flows
     .filter((f) => !wanted || wanted.has(f.id))
     .map((f) => {

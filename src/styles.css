@@ -1930,6 +1930,25 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .engine-flow-row input[type='checkbox'] { width: auto; margin: 0; }
 .engine-flow-row .hint { font-size: 11px; }
+
+/* 导出前闸门结果(R20-1) */
+.engine-gate-list {
+  margin-top: 6px;
+  max-height: 190px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 8px;
+  display: flex; flex-direction: column;
+}
+.engine-gate-row {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 4px 8px; font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.engine-gate-row:last-child { border-bottom: none; }
+.engine-gate-row[title] { cursor: pointer; }
+.engine-gate-row:hover { background: var(--bg-hover); }
+.engine-gate-row.bad .tag { color: var(--danger); border-color: var(--danger); }
+.engine-gate-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.hint.gate-bad { color: var(--danger); font-weight: 600; }
 .asset-thumb-empty { display: flex; align-items: center; justify-content: center; height: 100%; }
 .asset-meta { padding: 8px 10px; }
 .asset-name {

@@ -245,6 +245,47 @@ export function normalizeProject(p: Project): Project {
       else delete p.flowTests;
     }
   }
+  // R20-1 引擎导出配置:剔除无名 / 重复 id,清洗流程引用、枚举与闸门开关
+  if (p.engineExportConfigs !== undefined) {
+    if (!Array.isArray(p.engineExportConfigs)) {
+      delete p.engineExportConfigs;
+    } else {
+      const flowIdSet = new Set(p.flows.map((f) => f.id));
+      const seenConfigIds = new Set<string>();
+      const keptConfigs = p.engineExportConfigs.filter((c) => {
+        if (!c || typeof c.id !== 'string' || !c.id || seenConfigIds.has(c.id)) return false;
+        if (typeof c.name !== 'string' || c.name.trim() === '') return false;
+        seenConfigIds.add(c.id);
+        c.name = c.name.trim();
+        return true;
+      });
+      for (const c of keptConfigs) {
+        // 显式选流程时剔除已删除的流程;不回落为「全部」——那会让导出范围静默变大
+        if (c.flowIds !== undefined) {
+          if (!Array.isArray(c.flowIds)) delete c.flowIds;
+          else c.flowIds = [...new Set(c.flowIds.filter((id) => typeof id === 'string' && flowIdSet.has(id)))];
+        }
+        if (c.entities !== undefined && c.entities !== 'all' && c.entities !== 'referenced') delete c.entities;
+        if (c.assets !== undefined && c.assets !== 'all' && c.assets !== 'referenced') delete c.assets;
+        for (const key of ['includeLayout', 'includeAnnotations'] as const) {
+          if (c[key] !== undefined && typeof c[key] !== 'boolean') delete c[key];
+        }
+        if (c.gate !== undefined) {
+          if (typeof c.gate !== 'object' || c.gate === null) {
+            delete c.gate;
+          } else {
+            for (const key of ['script', 'audit', 'paths', 'tests', 'blockOnWarnings'] as const) {
+              if (c.gate[key] !== undefined && typeof c.gate[key] !== 'boolean') delete c.gate[key];
+            }
+          }
+        }
+        if (!Number.isFinite(c.createdAt)) c.createdAt = Date.now();
+        if (!Number.isFinite(c.updatedAt)) c.updatedAt = c.createdAt;
+      }
+      if (keptConfigs.length > 0) p.engineExportConfigs = keptConfigs;
+      else delete p.engineExportConfigs;
+    }
+  }
   // R19-3 外部事件声明:剔除空技术名与重名,清理参数与返回类型
   if (p.externalEvents !== undefined) {
     if (!Array.isArray(p.externalEvents)) {

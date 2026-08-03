@@ -324,6 +324,58 @@ fn delete_asset_files(dir: String, names: Vec<String>) -> Result<(), String> {
     Ok(())
 }
 
+/* ---------- 引擎导出基线(R20-1):engine/baseline-*.json,随项目文件夹走 ---------- */
+
+/// 基线文件名白名单:baseline- 前缀 + .json 后缀,杜绝路径穿越
+fn valid_engine_name(name: &str) -> bool {
+    name.starts_with("baseline-")
+        && name.ends_with(".json")
+        && name.len() <= 120
+        && !name.contains("..")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
+}
+
+fn engine_path(dir: &str, name: &str) -> Result<PathBuf, String> {
+    if !valid_engine_name(name) {
+        return Err(format!("非法基线文件名:{name}"));
+    }
+    Ok(PathBuf::from(dir).join("engine").join(name))
+}
+
+/// 读取增量基线;文件不存在返回 None(首次导出不算错误)
+#[tauri::command]
+fn read_engine_file(dir: String, name: String) -> Result<Option<String>, String> {
+    let path = engine_path(&dir, &name)?;
+    if !path.is_file() {
+        return Ok(None);
+    }
+    fs::read_to_string(&path)
+        .map(Some)
+        .map_err(|e| format!("{name}: {e}"))
+}
+
+/// 写入增量基线(与资源原文件不同:同名必须覆盖,基线每次导出都会更新)
+#[tauri::command]
+fn write_engine_file(dir: String, name: String, content: String) -> Result<(), String> {
+    let path = engine_path(&dir, &name)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    replace_file(&path, content.as_bytes()).map_err(|e| format!("{name}: {e}"))
+}
+
+/// 删除增量基线(删除导出配置时清理)
+#[tauri::command]
+fn delete_engine_file(dir: String, name: String) -> Result<(), String> {
+    let path = engine_path(&dir, &name)?;
+    if path.is_file() {
+        fs::remove_file(&path).map_err(|e| format!("{name}: {e}"))?;
+    }
+    Ok(())
+}
+
 fn read_md_dir(dir: &Path) -> Result<Vec<MdFile>, String> {
     let mut out = Vec::new();
     if dir.is_dir() {
@@ -681,6 +733,51 @@ mod tests {
     }
 
     #[test]
+    fn engine_baseline_commands_roundtrip_and_guard() {
+        let dir = std::env::temp_dir().join(format!("theloom-engine-test-{}", std::process::id()));
+        let dir_s = dir.to_string_lossy().to_string();
+        fs::create_dir_all(&dir).unwrap();
+
+        // 首次读取不算错误,返回 None
+        assert_eq!(
+            read_engine_file(dir_s.clone(), "baseline-cfg1.json".into()).unwrap(),
+            None
+        );
+
+        write_engine_file(dir_s.clone(), "baseline-cfg1.json".into(), "{\"a\":1}".into()).unwrap();
+        assert_eq!(
+            read_engine_file(dir_s.clone(), "baseline-cfg1.json".into()).unwrap(),
+            Some("{\"a\":1}".to_string())
+        );
+        // 与资源原文件不同:同名必须覆盖(基线每次导出都更新)
+        write_engine_file(dir_s.clone(), "baseline-cfg1.json".into(), "{\"a\":2}".into()).unwrap();
+        assert_eq!(
+            read_engine_file(dir_s.clone(), "baseline-cfg1.json".into()).unwrap(),
+            Some("{\"a\":2}".to_string())
+        );
+
+        // 名称白名单:路径穿越 / 非 baseline- 前缀 / 非 .json 一律拒绝
+        assert!(read_engine_file(dir_s.clone(), "../project.json".into()).is_err());
+        assert!(write_engine_file(dir_s.clone(), "project.json".into(), "x".into()).is_err());
+        assert!(write_engine_file(dir_s.clone(), "baseline-x.txt".into(), "x".into()).is_err());
+        assert!(delete_engine_file(dir_s.clone(), "baseline-a/../../b.json".into()).is_err());
+
+        // engine/ 不属于 save_project_dir 的受管删除目录,基线不会被常规保存流程清掉
+        assert!(save_project_dir(dir_s.clone(), vec![], vec!["engine/baseline-cfg1.json".into()]).is_err());
+        assert!(dir.join("engine/baseline-cfg1.json").is_file());
+
+        delete_engine_file(dir_s.clone(), "baseline-cfg1.json".into()).unwrap();
+        assert_eq!(
+            read_engine_file(dir_s.clone(), "baseline-cfg1.json".into()).unwrap(),
+            None
+        );
+        // 删除不存在的文件不报错
+        delete_engine_file(dir_s.clone(), "baseline-cfg1.json".into()).unwrap();
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn llm_proxy_url_guard() {
         assert!(validate_llm_url("https://api.openai.com/v1/chat/completions").is_ok());
         assert!(validate_llm_url("http://127.0.0.1:11434/api/chat").is_ok());
@@ -739,6 +836,9 @@ pub fn run() {
             read_asset_file,
             write_asset_file,
             delete_asset_files,
+            read_engine_file,
+            write_engine_file,
+            delete_engine_file,
             set_llm_secret,
             has_llm_secret,
             delete_llm_secret,

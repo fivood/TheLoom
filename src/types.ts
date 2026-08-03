@@ -312,6 +312,57 @@ export interface FlowTest {
   updatedAt: number;
 }
 
+/* ---------- 引擎导出配置(R20-1) ---------- */
+
+/**
+ * 导出前闸门:哪些检查不通过就拒绝导出。
+ * 只统计导出范围内的问题 —— 没被选中的流程有问题不该拦住本次交付。
+ */
+export interface EngineExportGate {
+  /** 脚本错误(条件 / 指令 / 检定表达式解析或类型错误) */
+  script?: boolean;
+  /** 高级体检错误(跨模块无效引用、悬挂附件、类型不一致等) */
+  audit?: boolean;
+  /** 路径测试问题(不可达、卡死、死循环) */
+  paths?: boolean;
+  /** 回归测试失败(R19-4 场景化测试) */
+  tests?: boolean;
+  /** 警告也一并阻断;默认只报告不阻断 */
+  blockOnWarnings?: boolean;
+}
+
+/** 闸门默认值:新建配置时四项全开、警告只报告 */
+export const DEFAULT_ENGINE_EXPORT_GATE: EngineExportGate = {
+  script: true,
+  audit: true,
+  paths: true,
+  tests: true,
+  blockOnWarnings: false,
+};
+
+/**
+ * R20-1 命名导出配置:一组可复用的引擎包导出规则。
+ * 随项目保存(参与撤销栈、文件夹往返与云协作),
+ * 增量基线按 config id 绑定但存在项目文件夹 / 本机,不进 project.json。
+ */
+export interface EngineExportConfig {
+  id: ID;
+  name: string;
+  /** 导出的流程 id;空 / 缺省 = 全部流程(之后新建的流程自动纳入) */
+  flowIds?: ID[];
+  /** 保留画布布局(position / 尺寸 / 颜色) */
+  includeLayout?: boolean;
+  /** 保留注释 / 分区节点 */
+  includeAnnotations?: boolean;
+  /** 实体范围:全部 / 仅被导出流程引用 */
+  entities?: 'all' | 'referenced';
+  /** 资源范围:全部 / 仅被导出对象挂接 */
+  assets?: 'all' | 'referenced';
+  gate?: EngineExportGate;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Flow {
   id: ID;
   name: string;
@@ -920,6 +971,8 @@ export interface Project {
   externalEvents?: ExternalEvent[];
   /** R19-4 场景化回归测试 */
   flowTests?: FlowTest[];
+  /** R20-1 命名引擎导出配置;增量基线按 config id 绑定,存项目文件夹 / 本机 */
+  engineExportConfigs?: EngineExportConfig[];
   /** 实体字段模板:按类型预设字段名(字符串等价于文本类型),新建实体时自动填入 */
   /** R11 命名模板库(实体 / 流程节点);旧版 entityTemplates / nodeTemplates 加载时自动迁移进来 */
   templates?: ObjectTemplate[];

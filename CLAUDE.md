@@ -20,10 +20,11 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.36.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.36.0`(R19 引擎运行时闭环全五批);R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
+- 已发布版本:`v0.37.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.37.0`(R20-1 导出配置与基线);R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
-- 已交付的能力(截至 v0.36.0):
+- 已交付的能力(截至 v0.37.0):
+  - **v0.37.0 R20-1 导出配置与基线** ✅ — `EngineExportConfig` 命名配置进项目(流程选择 + 四项规则 + 闸门开关,normalizeProject 清洗);`flowIds` 缺省=全部 / 显式数组=精确(空数组不回落为全部);增量基线按 configId 绑定,桌面写 `engine/baseline-{configId}.json`(Rust 三命令 + 名称白名单)、网页回落 localStorage,支持基线 JSON 导入导出与 R9 旧键升级;`src/engine/gate.ts` 导出前闸门统一跑脚本 / 高级体检 / 路径 / 回归测试,**判定范围取自构建出的包**(范围外流程与文档脚本不阻断),阻断拒绝导出、仅警告需确认、关掉的项列为「未检查」
   - **v0.36.0 R19 引擎运行时闭环** ✅ — **R19-2 跨流程调用**(命名入口 + jump / call / return,参数是真局部作用域进入绑定返回还原,返回值写入调用方变量,32 层递归保护,调用栈进快照);**R19-3 外部事件**(项目级声明 + event 节点,三种等待模式,同步运行库靠「先置 pendingExternal 再通知宿主 + walking 重入保护」实现挂起/恢复,挂起态进快照,演出可填模拟响应);**R19-4 场景化回归测试**(`src/flowTest.ts` 纯逻辑运行器,演出录制成「入口+种子+选择序列+事件响应」,断言结局/变量/节点访问/事件触发,节点与连线覆盖率,流程内容哈希标「受影响」);**R19-5 编辑效率**(安全重命名跟上 targetFlow 与 eventName、复制粘贴跨流程、六向对齐与等距分布、选区封装为片段);**R19-P 体检性能**(路径缓存 + 懒加载)。R19-1 运行时事件协议 v2 — 引擎包 schema `1.1.0` + 顶层 `runtimeProtocolVersion: 2`;TS 与 Godot 运行库对每个叙事节点依次产生 `enter / display / leave`,带流程 / 节点定位、子流程 path 栈、自定义字段、附件 assetIds、说话人、触发边与稳定 `choiceKey`;入边 effect 归目标节点 `enter.changes`、指令节点归 `display.changes`,变量与实体属性都给前后值;v1 beat / log / onBeat 全保留,旧包旧存档缺字段确定性补齐;两端共用 `examples/godot-demo/runtime_v2_fixture.json` 对拍。协议见 `docs/R19_RUNTIME_PROTOCOL_V2.md`
   - **v0.35.0 R18 小说生产闭环** ✅ — 场景按正文块拆分 / 同章合并(迁移批注 / 快照 / 流程 / 大纲 / 时间线 / 弧线 / 伏笔 / 附件 / 修订任务引用);DOCX 成稿导出(投稿稿 + 编辑审阅稿两套预设,正式 OOXML 样式,下载前重解析自检);写作进度工作台(全书 / 卷 / 章 / 场景四级目标 + 今日新增 + 七日趋势,删字不倒扣、撤销与导入不制造虚假新增);修订任务(快照差异冻结 + 逐项接受 / 保留 / 待议,只存结论不覆盖正文)+ 本地中文校对
   - **v0.34.0 R17 场景权威主轴与创作工作区** ✅ — 文档文件夹显式标记卷 / 章 / 小节(不再靠名字猜),错误嵌套进体检;场景成为大纲行与时间线事件共同引用的权威对象,改名移动自动同步,删除前展示跨模块影响;顶栏「返回上一位置」+「最近访问」;小说 / 互动叙事 / 通用三套工作区排序
@@ -97,7 +98,7 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 | ~~R14~~ | ~~v0.30.0~~ | ~~地图与工作区增强~~ | ~~地图图层 / 四种形状 / 跨模块总览 / 网页分屏~~ | ✅ 已完成 | M |
 | ~~R15~~ | ~~v0.31.0~~ | ~~引擎接入 · Godot~~ | ~~Godot 4 GDScript runtime + 示例工程~~ | ✅ Godot 已完成;Unity / Unreal 可选,未排期 | M |
 | R16 | v0.32.0 / v0.33.0 | **稳定性** | 存储管理、使用指南、自动快照、应急恢复、无障碍首批、性能基线、升级迁移测试 | 🔶 R16-1~R16-5 已交付;**v1.0.0 尚未发布**,留待多轮真实项目测试后 | L |
-| R17-R19 | v0.34.0+ | **两条主工作流收束** | 详见 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` | 🔶 R17 / R18 已发布,R19-1 已提交待发版 | L |
+| R17-R20 | v0.34.0+ | **两条主工作流收束** | 详见 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` | 🔶 R17 / R18 / R19 已发布;R20-1 已完成,R20-2→R20-4 待开发 | L |
 
 ### 关于 AI / 知识库集成的设计准则
 
@@ -173,6 +174,21 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R20-1 · v0.37.0)
+
+导出配置与基线:
+
+- `types.ts` 新增 `EngineExportConfig`(命名配置:`flowIds` / 四项规则 / `gate`)与 `EngineExportGate` + `DEFAULT_ENGINE_EXPORT_GATE`;`Project.engineExportConfigs` 随项目走(撤销栈 / 文件夹往返 / 云协作)。CRUD 直接走 `update((p) => …)`,与 flowTests / externalEvents 同惯例,不加 store action
+- `normalizeProject` 清洗:重复 id / 空名剔除、枚举与布尔非法值删除、`flowIds` 只剔失效流程。**选中的流程全被删时保留空数组**,不回落为「全部」——否则导出范围会静默变大
+- `EngineExportRules.flowIds` 语义随之收紧:缺省 = 全部;给定数组 = 精确这些(空数组即不导)。`buildEnginePackage` 里判断改为 `rules.flowIds ? new Set(...) : null`
+- 新增 `src/engine/baseline.ts`:基线按 configId 绑定,双后端 —— 桌面 `engine/baseline-{configId}.json`(Rust `read_engine_file` / `write_engine_file` / `delete_engine_file`,名称白名单 `baseline-*.json`),网页 localStorage `theloom-engine-baseline-{slotId}-{configId}`;绑定文件夹时两边都写。`parseBaseline` 防御外部 JSON;R9 旧键 `theloom-engine-manifest-{slotId}` 作为 legacy 源读一次,首次保存后删除
+- **`engine/` 不进 `MANAGED_DIRS`** —— 基线由独立命令读写,不参与 `save_project_dir` 的差量删除(Rust 测试守这条)。与资源原文件不同,基线同名必须覆盖
+- 新增 `src/engine/gate.ts`:`runExportGate(project, config)` 统一跑脚本 / 高级体检 / 路径 / 回归测试。**判定范围取自 `buildEnginePackage` 的产物**(`packageScope` 收集包内 flow / node / entity / asset id),范围外对象与 `tab === 'documents'` 的问题一律不算 —— 保证「闸门查的」与「导出的」是同一批对象;`gate.paths` 关时 `includePaths: false`,省掉 auditProject 的主要开销
+- `EngineExportModal` 重写:配置下拉(套用 / 保存 / 另存 / 重命名 / 删除,dirty 提示)、闸门面板(阻断可点击 nav 跳转、未检查项列出)、基线来源与时间、基线 JSON 导入导出;导出流程为「闸门 → 阻断拒绝 / 仅警告确认 → 打包 → 写基线」
+- 测试:`engine/exportConfig.test.ts` 9 项(配置规范化 / 流程被删不回落 / flowIds 语义 / 基线文件名白名单 / 基线 JSON 往返与拒收 / 范围外脚本错误不阻断 / 关检查项 / 回归测试范围过滤 / 警告升级阻断)+ Rust `engine_baseline_commands_roundtrip_and_guard`;合计 vitest 452 项 + cargo 4 项通过
+- 已实测(浏览器):闸门抓到 2 个阻断(脚本错误 + 分支缺口)并拦住导出;取消勾选坏流程后放行;改规则清空旧闸门结果;配置存入项目并跨会话恢复;导出建立基线 → 改流程内容 → 差异显示 ~1 变更;深色主题下闸门行可读;控制台零错误
+- 注意:闸门是**显式动作**不是实时计算(auditProject 冷 ~990ms),不要放进 useMemo;新增会影响导出内容的规则时,同步 `rulesFromConfig`、normalize 清洗与 `packageScope`
 
 ## 最近变更(R9 · v0.23.0)
 
