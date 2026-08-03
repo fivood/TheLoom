@@ -1,13 +1,14 @@
 {
   "name": "theloom",
   "private": true,
-  "version": "0.38.0",
+  "version": "0.39.0",
   "type": "module",
   "description": "叙事织机 TheLoom — 叙事设计工具:流程编辑、实体库、头脑风暴、罗琳式大纲、资料卡片",
   "scripts": {
     "dev": "vite",
     "build": "npm run build:runtime && tsc -b && vite build",
     "build:runtime": "vite build --config vite.runtime.config.ts",
+    "build:cli": "vite build --config vite.cli.config.ts",
     "test": "vitest run --testTimeout=20000 --hookTimeout=20000",
     "test:watch": "vitest",
     "preview": "vite preview",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^26.1.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

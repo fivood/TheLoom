@@ -26,4 +26,6 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # 无界面导出 CLI 与应用共用核心逻辑,单独构建一次防止它悄悄坏掉
+      - run: npm run build:cli
       - run: cargo test --manifest-path src-tauri/Cargo.toml --lib

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 runtime-dist/
+cli-dist/
 *.tsbuildinfo
 src-tauri/target/
 src-tauri/gen/schemas/

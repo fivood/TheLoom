@@ -30,6 +30,12 @@ export interface EngineExportRules {
   entities?: 'all' | 'referenced';
   /** 资源范围:全部 / 仅被导出对象挂接;默认全部 */
   assets?: 'all' | 'referenced';
+  /**
+   * 覆盖包内 meta.exportedAt。缺省用当前时间。
+   * CLI 目录同步传项目 updatedAt:项目内容没变时输出字节完全相同,
+   * 同步才能真的「只写变化的文件」,不会让引擎反复重新导入。
+   */
+  exportedAt?: number;
 }
 
 export interface EngineNodeData {
@@ -461,7 +467,11 @@ export function buildEnginePackage(project: Project, rules: EngineExportRules = 
     schema: 'theloom-package',
     schemaVersion: ENGINE_SCHEMA_VERSION,
     runtimeProtocolVersion: ENGINE_RUNTIME_PROTOCOL_VERSION,
-    meta: { projectName: project.name, exportedAt: Date.now(), generator: 'TheLoom' },
+    meta: {
+      projectName: project.name,
+      exportedAt: rules.exportedAt ?? Date.now(),
+      generator: 'TheLoom',
+    },
     rules: effective,
     variables,
     ...(externalEvents.length > 0 ? { externalEvents } : {}),
