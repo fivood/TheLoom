@@ -671,13 +671,15 @@ func _visit_inner(
 				if red and _checks.has(node.get("id", "")):
 					display_note = "红色检定只有一次机会 → 沿用先前结果:%s" % ("成功" if _checks[node.get("id", "")] else "失败")
 				else:
-					var skill: int = _eval_number(data.get("checkExpr", ""))
+					# skill 不标注 int:技能表达式可能算出小数(如 trust / 2),
+					# 截断会让检定结果与 TS 分岔;note 用 %s 保持与 TS 模板字面量同样的数字形态
+					var skill = _eval_number(data.get("checkExpr", ""))
 					var d1: int = _roll_d6()
 					var d2: int = _roll_d6()
 					_rolls += 2
 					var passed: bool = d1 + d2 + skill >= dc
 					_checks[node.get("id", "")] = passed
-					display_note = "2d6 = %d+%d,技能 %d,合计 %d vs 难度 %d → %s" % [d1, d2, skill, d1 + d2 + skill, dc, "成功" if passed else "失败"]
+					display_note = "2d6 = %d+%d,技能 %s,合计 %s vs 难度 %d → %s" % [d1, d2, skill, _norm_num(d1 + d2 + skill), dc, "成功" if passed else "失败"]
 				_push_beat({
 					"kind": "check",
 					"title": "%s检定 · %s" % ["红色" if red else "白色", (data.get("title", "") if data.get("title", "") != "" else data.get("checkExpr", ""))],
@@ -915,7 +917,11 @@ func _eval_condition(src: String):
 	# 非布尔结果按 JS 真值转换
 	return _truthy(r)
 
-func _eval_number(src) -> int:
+## 数值表达式求值。**不截断小数** —— TS 的 evalNumber 返回 JS number,
+## `10 / 4` 是 2.5;这里若截成 2,检定技能值、call 的 number 实参和
+## return 的返回值都会与 TS 分岔(负的小数尤其明显:int() 向零截断而不是向下取整)。
+## 无小数部分的结果仍归一为 int,保证与 TS 序列化后的形态一致。
+func _eval_number(src):
 	if src == null:
 		return 0
 	var s := String(src).strip_edges()
@@ -924,7 +930,7 @@ func _eval_number(src) -> int:
 	if s.is_valid_int():
 		return int(s)
 	if s.is_valid_float():
-		return int(float(s))
+		return _norm_num(float(s))
 	var tokens := _tokenize(s)
 	var parser := _Parser.new(tokens, self)
 	var r = parser.parse_expr()
@@ -933,7 +939,7 @@ func _eval_number(src) -> int:
 	if typeof(r) == TYPE_INT:
 		return r
 	if typeof(r) == TYPE_FLOAT:
-		return int(r)
+		return _norm_num(r)
 	return 0
 
 func _apply_instructions(src: String) -> Array:
@@ -1018,6 +1024,18 @@ func _to_num(v) -> float:
 		TYPE_STRING: return float(v) if String(v).is_valid_float() else 0.0
 		_: return 0.0
 
+## seen("节点技术名"):该节点是否已被访问过。
+## 技术名先经 _tech_to_id 解析成节点 id 再查 _seen —— 与 TS 侧
+## `seen: (tn) => seenRef.has(techToId.get(tn) ?? '__none__')` 同口径,
+## 技术名不存在时恒为 false(而不是误判成访问过)。
+func _seen_tech(tech_name: String) -> bool:
+	if tech_name == "":
+		return false
+	var id = _tech_to_id.get(tech_name, "")
+	if String(id) == "":
+		return false
+	return _seen.has(id)
+
 func _truthy(v) -> bool:
 	match typeof(v):
 		TYPE_NIL: return false
@@ -1077,6 +1095,13 @@ func _tokenize(src: String) -> Array:
 				out.append({ "kind": "ident", "value": word })
 			i = j3
 			continue
+		# 三字符运算符(严格相等要先于 == 匹配,否则 === 会被切成 == 加 =)
+		if i + 2 < n:
+			var three := src.substr(i, 3)
+			if three == "===" or three == "!==":
+				out.append({ "kind": "op", "value": three })
+				i += 3
+				continue
 		# 双字符运算符
 		if i + 1 < n:
 			var two := src.substr(i, 2)
@@ -1085,7 +1110,7 @@ func _tokenize(src: String) -> Array:
 				i += 2
 				continue
 		# 单字符
-		if "><+-*/!(),".find(ch) >= 0:
+		if "><+-*/%!(),?:".find(ch) >= 0:
 			out.append({ "kind": "op", "value": ch })
 			i += 1
 			continue
@@ -1137,14 +1162,30 @@ class _Parser:
 		has_error = true
 		return null
 
-	func parse_expr(): return _or()
+	func parse_expr(): return _ternary()
 
+	## 三元:test ? then : alt。与 TS 一样右结合,且只求值被选中的那一支
+	func _ternary():
+		var test = _or()
+		if has_error: return null
+		if not _consume("op", "?"):
+			return test
+		var then_val = _ternary()
+		if has_error: return null
+		if not _consume("op", ":"):
+			return _fail()
+		var alt_val = _ternary()
+		if has_error: return null
+		return then_val if rt._truthy(test) else alt_val
+
+	## && / || 返回的是**操作数本身**而不是布尔,与 TS(JS 语义)一致:
+	## `名字 || "无名氏"` 要得到字符串,写成布尔就丢了值
 	func _or():
 		var left = _and()
 		while _consume("op", "||"):
 			var right = _and()
 			if has_error: return null
-			left = rt._truthy(left) or rt._truthy(right)
+			left = left if rt._truthy(left) else right
 		return left
 
 	func _and():
@@ -1152,39 +1193,50 @@ class _Parser:
 		while _consume("op", "&&"):
 			var right = _cmp()
 			if has_error: return null
-			left = rt._truthy(left) and rt._truthy(right)
+			left = right if rt._truthy(left) else left
 		return left
 
 	func _cmp():
 		var left = _add()
 		var t = _peek()
-		if t != null and t.get("kind", "") == "op" and t.get("value", "") in ["==", "!=", ">", "<", ">=", "<="]:
+		if t != null and t.get("kind", "") == "op" and t.get("value", "") in ["==", "!=", "===", "!==", ">", "<", ">=", "<="]:
 			pos += 1
 			var right = _add()
 			if has_error: return null
 			match t["value"]:
 				"==": return _loose_eq(left, right)
 				"!=": return not _loose_eq(left, right)
+				"===": return _strict_eq(left, right)
+				"!==": return not _strict_eq(left, right)
 				">":  return rt._to_num(left) > rt._to_num(right)
 				"<":  return rt._to_num(left) < rt._to_num(right)
 				">=": return rt._to_num(left) >= rt._to_num(right)
 				"<=": return rt._to_num(left) <= rt._to_num(right)
 		return left
 
+	## 宽松相等,口径与 TS looseEq 完全一致:
+	## 同类型直接比;异类型一律转数值比(布尔也参与,true == 1 为真)
 	func _loose_eq(a, b) -> bool:
+		if _same_kind(a, b):
+			return _strict_eq(a, b)
+		return rt._to_num(a) == rt._to_num(b)
+
+	## 严格相等:类型不同直接 false(对应 TS 的 ===)
+	func _strict_eq(a, b) -> bool:
+		if not _same_kind(a, b): return false
+		if typeof(a) == TYPE_INT or typeof(a) == TYPE_FLOAT:
+			return rt._to_num(a) == rt._to_num(b)
+		return a == b
+
+	## TS 的 typeof 只分 boolean / number / string,
+	## 所以 GDScript 的 INT 与 FLOAT 在这里算同一类
+	func _same_kind(a, b) -> bool:
 		var ta := typeof(a)
 		var tb := typeof(b)
-		# 数字互比:先都转 float
-		if (ta == TYPE_INT or ta == TYPE_FLOAT) and (tb == TYPE_INT or tb == TYPE_FLOAT):
-			return rt._to_num(a) == rt._to_num(b)
-		# 数字与字符串宽松比较(仿 JS ==)
-		if (ta == TYPE_INT or ta == TYPE_FLOAT) and tb == TYPE_STRING:
-			return rt._to_num(a) == rt._to_num(b)
-		if (tb == TYPE_INT or tb == TYPE_FLOAT) and ta == TYPE_STRING:
-			return rt._to_num(a) == rt._to_num(b)
-		# 同类型直接比(bool/string/null)
-		if ta == tb: return a == b
-		return false
+		var a_num := ta == TYPE_INT or ta == TYPE_FLOAT
+		var b_num := tb == TYPE_INT or tb == TYPE_FLOAT
+		if a_num or b_num: return a_num and b_num
+		return ta == tb
 
 	func _add():
 		var left = _mul()
@@ -1199,9 +1251,9 @@ class _Parser:
 			if op == "+" and (typeof(left) == TYPE_STRING or typeof(right) == TYPE_STRING):
 				left = str(left) + str(right)
 			elif op == "+":
-				left = rt._to_num(left) + rt._to_num(right)
+				left = rt._norm_num(rt._to_num(left) + rt._to_num(right))
 			else:
-				left = rt._to_num(left) - rt._to_num(right)
+				left = rt._norm_num(rt._to_num(left) - rt._to_num(right))
 		return left
 
 	func _mul():
@@ -1210,15 +1262,20 @@ class _Parser:
 			var t = _peek()
 			if t == null or t.get("kind", "") != "op": break
 			var op = t.get("value", "")
-			if op != "*" and op != "/": break
+			if op != "*" and op != "/" and op != "%": break
 			pos += 1
 			var right = _unary()
 			if has_error: return null
 			if op == "*":
-				left = rt._to_num(left) * rt._to_num(right)
-			else:
+				left = rt._norm_num(rt._to_num(left) * rt._to_num(right))
+			elif op == "/":
+				# 除零回 0(与 TS 一致:不抛错、不产生 inf)
+				# 不用 := —— rt 是无类型 Variant,推断不出返回类型会让整个脚本编译失败
 				var d = rt._to_num(right)
-				left = 0 if d == 0 else rt._to_num(left) / d
+				left = 0 if d == 0 else rt._norm_num(rt._to_num(left) / d)
+			else:
+				var m = rt._to_num(right)
+				left = 0 if m == 0 else rt._norm_num(fmod(rt._to_num(left), m))
 		return left
 
 	func _unary():
@@ -1248,6 +1305,17 @@ class _Parser:
 		if t.get("kind", "") == "ident":
 			pos += 1
 			var name = String(t["value"])
+			# seen("技术名") / unseen("技术名"):走过判断
+			if (name == "seen" or name == "unseen") and _peek() != null \
+					and _peek().get("kind", "") == "op" and _peek().get("value", "") == "(":
+				pos += 1
+				var arg = null
+				if not (_peek() != null and _peek().get("kind", "") == "op" and _peek().get("value", "") == ")"):
+					arg = parse_expr()
+					if has_error: return null
+				if not _consume("op", ")"): return _fail()
+				var hit: bool = rt._seen_tech(String(arg) if arg != null else "")
+				return hit if name == "seen" else not hit
 			# entity.field 寻址
 			if name.find(".") >= 0:
 				var parts := name.split(".", false, 1)

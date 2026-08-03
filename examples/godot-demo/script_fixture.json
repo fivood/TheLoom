@@ -1,0 +1,97 @@
+{
+  "_comment": "脚本语义对拍夹具(R20-4)。TS 侧 src/engine/scriptConformance.test.ts 与 Godot 侧 script_conformance_test.gd 跑同一批用例,逐条比对。expect 为 null 表示「应当无法求值」。",
+  "vars": {
+    "trust": 5,
+    "gold": 0,
+    "flag": true,
+    "off": false,
+    "name": "林晚",
+    "empty": ""
+  },
+  "entityProps": {
+    "linwan": { "trust": 5, "title": "记录员" },
+    "valen": { "trust": 2, "title": "" }
+  },
+  "seenTech": ["opening"],
+  "conditions": [
+    { "src": "trust > 3", "expect": true },
+    { "src": "trust >= 5 && gold == 0", "expect": true },
+    { "src": "trust < 3 || flag", "expect": true },
+    { "src": "!off", "expect": true },
+    { "src": "!(trust > 3)", "expect": false },
+    { "src": "trust == 5", "expect": true },
+    { "src": "trust == '5'", "expect": true },
+    { "src": "trust === '5'", "expect": false },
+    { "src": "trust !== '5'", "expect": true },
+    { "src": "flag == 1", "expect": true },
+    { "src": "flag === 1", "expect": false },
+    { "src": "name == '林晚'", "expect": true },
+    { "src": "empty", "expect": false },
+    { "src": "linwan.trust > valen.trust", "expect": true },
+    { "src": "linwan.title == '记录员'", "expect": true },
+    { "src": "seen('opening')", "expect": true },
+    { "src": "unseen('opening')", "expect": false },
+    { "src": "seen('从未去过')", "expect": false },
+    { "src": "unseen('从未去过')", "expect": true },
+    { "src": "seen('opening') && trust > 3", "expect": true },
+    { "src": "trust > 3 ? true : false", "expect": true },
+    { "src": "trust < 3 ? true : false", "expect": false },
+    { "src": "(trust + 1) * 2 == 12", "expect": true },
+    { "src": "trust % 2 == 1", "expect": true },
+    { "src": "trust / 0 == 0", "expect": true },
+    { "src": "trust % 0 == 0", "expect": true },
+    { "src": "-trust < 0", "expect": true },
+    { "src": "2 + 3 * 4 == 14", "expect": true },
+    { "src": "(2 + 3) * 4 == 20", "expect": true }
+  ],
+  "numbers": [
+    { "src": "trust", "expect": 5 },
+    { "src": "trust + 2", "expect": 7 },
+    { "src": "trust * 2 - 3", "expect": 7 },
+    { "src": "linwan.trust + valen.trust", "expect": 7 },
+    { "src": "10 / 4", "expect": 2.5 },
+    { "src": "10 / 0", "expect": 0 },
+    { "src": "7 % 3", "expect": 1 },
+    { "src": "0 - 5 / 2", "expect": -2.5 },
+    { "src": "trust > 3 ? 10 : 20", "expect": 10 },
+    { "src": "", "expect": 0 }
+  ],
+  "instructions": [
+    {
+      "src": "gold = 10",
+      "vars": { "gold": 10 }
+    },
+    {
+      "src": "gold += 5; trust -= 1",
+      "vars": { "gold": 5, "trust": 4 }
+    },
+    {
+      "src": "gold = trust * 2",
+      "vars": { "gold": 10 }
+    },
+    {
+      "src": "gold = trust > 3 ? 100 : 1",
+      "vars": { "gold": 100 }
+    },
+    {
+      "src": "linwan.trust += 3",
+      "entityProps": { "linwan": { "trust": 8 } }
+    },
+    {
+      "src": "name = name + '·织'",
+      "vars": { "name": "林晚·织" }
+    },
+    {
+      "src": "gold = seen('opening') ? 1 : 0",
+      "vars": { "gold": 1 }
+    },
+    {
+      "src": "gold = 7 % 4",
+      "vars": { "gold": 3 }
+    },
+    {
+      "src": "gold = 10 / 4",
+      "vars": { "gold": 2.5 }
+    }
+  ]
+}

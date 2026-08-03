@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    C# 运行库的语义对拍。核心 .cs 不依赖 UnityEngine,所以能在纯 .NET 下
+    编译并跑与 TS / Godot 完全相同的夹具 —— 没装 Unity 也能验证语义。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>TheLoomConformance</AssemblyName>
+    <RootNamespace>TheLoom.Conformance</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../TheLoom/*.cs" />
+  </ItemGroup>
+
+</Project>

@@ -63,20 +63,23 @@ while not run.ended and run.choices.size() > 0:
 
 ## 支持的脚本语法
 
-Godot runtime 内置一个**极简条件 / 指令求值器**,覆盖 TheLoom 项目里最常用的脚本子集:
+Godot runtime 的条件 / 指令求值器与 TS 端语义**完全一致**(R20-4 补齐):
 
-- **条件**:`== != > < >= <=`、`&& || !`、括号、字面量(数字 / 布尔 / 字符串)、变量名、实体`.`字段
+- **条件**:`== != === !== > < >= <=`、`&& || !`、三元 `? :`、括号、字面量(数字 / 布尔 / 字符串)、变量名、实体`.`字段
+- **`seen("节点技术名")` / `unseen(...)`**:走过判断,技术名解析成节点 id 后查已访问集合
 - **指令**:分号分隔的赋值,支持 `= += -= *= /=`;右侧支持完整表达式
+- **算术**:`+ - * / %`;`+` 任一侧为字符串时拼接;除零与模零回 0
+- **短路求值返回操作数**:`名字 || "无名氏"` 得到的是字符串而不是布尔
 - **变量**:项目里声明的全局变量按其类型(boolean / number / string)自动初始化
 - **实体属性**:按技术名寻址(如 `linwan.trust`);数字型字段自动数值化
 
-**不支持**(TS 端 R6 AST 有,GDScript 极简版没有):
+语义由三端共用夹具 `script_fixture.json` 保证,任何一端改动都要跑对拍:
 
-- `seen("节点技术名") / unseen(...)` 走过判断 —— 需要在导出前静态展开
-- 三元运算符 `? :`
-- 复杂表达式嵌套(极简 parser 尽力而为,失败时回退到"无法求值 → 保留分支")
+```bash
+godot --headless --path examples/godot-demo --script script_conformance_test.gd
+```
 
-如果需要完整脚本,可用 TS 端 `runtime-dist/theloom-runtime.js`(见 `examples/engine-demo/`)。
+详见 [docs/ENGINE_PARITY.md](../../docs/ENGINE_PARITY.md)。
 
 ## 与其他运行库的一致性
 

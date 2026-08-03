@@ -20,10 +20,11 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.39.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.39.0`(R20-3 CLI 与目录同步);R12 已暂缓;R15-Unity / Unreal 可选;v1.0.0 留待多轮测试后
+- 已发布版本:`v0.40.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.40.0`(R20-4 官方引擎适配,**R20 全批收官**);R12 已暂缓;Unreal 可选;v1.0.0 留待多轮测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
-- 已交付的能力(截至 v0.39.0):
+- 已交付的能力(截至 v0.40.0):
+  - **v0.40.0 R20-4 官方引擎适配** ✅ — Godot 求值器补齐 `seen()/unseen()` / 三元 / `===`/`!==` / `%`,`&&`/`||` 返回操作数,宽松相等同 TS 口径;修掉 `_eval_number` 取整导致的两端分岔;新增 Unity 最小运行库(3 个 .cs,不依赖 UnityEngine / Newtonsoft,纯 .NET 可测);三端共用 `script_fixture.json`(49 条)+ 端到端同包同种子一致性;约定见 `docs/ENGINE_PARITY.md`
   - **v0.39.0 R20-3 CLI 与目录同步** ✅ — `npm run build:cli` → `cli-dist/theloom-cli.mjs`(单文件 ES Module,零第三方运行时依赖);项目读取复用 `projectFromFolderFiles` 不另写解析;目录同步逐文件比 SHA-256 只写变化的,**包内 exportedAt 取项目 updatedAt** 保证输出确定;`--clean` 按 `.theloom-sync.json` 删陈旧文件;退出码 2/3/4/5/6 分流;`--json` / `--watch`;文档见 `docs/CLI.md`
   - **v0.38.0 R20-2 自包含引擎包** ✅ — 打包内容三项(资源原文件 / 运行库 / 校验清单+授权表)随命名配置保存;原文件按内容寻址写入包内 `assets/` 且同字节只写一次,取不到时逐个列出不静默;运行库经 vite 虚拟模块内嵌(`npm run build` 已串 `build:runtime`),产物缺失时禁用选项;`checksums.json` 覆盖除自身外全部文件;`examples/engine-demo/selfcontained.mjs` 脱机验收(校验 → 包内运行库演出 → 附件字节哈希对拍),非零退出码可接 CI
   - **v0.37.0 R20-1 导出配置与基线** ✅ — `EngineExportConfig` 命名配置进项目(流程选择 + 四项规则 + 闸门开关,normalizeProject 清洗);`flowIds` 缺省=全部 / 显式数组=精确(空数组不回落为全部);增量基线按 configId 绑定,桌面写 `engine/baseline-{configId}.json`(Rust 三命令 + 名称白名单)、网页回落 localStorage,支持基线 JSON 导入导出与 R9 旧键升级;`src/engine/gate.ts` 导出前闸门统一跑脚本 / 高级体检 / 路径 / 回归测试,**判定范围取自构建出的包**(范围外流程与文档脚本不阻断),阻断拒绝导出、仅警告需确认、关掉的项列为「未检查」
@@ -100,7 +101,7 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 | ~~R14~~ | ~~v0.30.0~~ | ~~地图与工作区增强~~ | ~~地图图层 / 四种形状 / 跨模块总览 / 网页分屏~~ | ✅ 已完成 | M |
 | ~~R15~~ | ~~v0.31.0~~ | ~~引擎接入 · Godot~~ | ~~Godot 4 GDScript runtime + 示例工程~~ | ✅ Godot 已完成;Unity / Unreal 可选,未排期 | M |
 | R16 | v0.32.0 / v0.33.0 | **稳定性** | 存储管理、使用指南、自动快照、应急恢复、无障碍首批、性能基线、升级迁移测试 | 🔶 R16-1~R16-5 已交付;**v1.0.0 尚未发布**,留待多轮真实项目测试后 | L |
-| R17-R20 | v0.34.0+ | **两条主工作流收束** | 详见 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` | 🔶 R17 / R18 / R19 已发布;R20-1→R20-3 已完成,R20-4 待开发 | L |
+| R17-R20 | v0.34.0+ | **两条主工作流收束** | 详见 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` | ✅ R17→R20 全部完成;下一批 R21 本地化与配音 | L |
 
 ### 关于 AI / 知识库集成的设计准则
 
@@ -176,6 +177,18 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R20-4 · v0.40.0)
+
+官方引擎适配(R20 收官):
+
+- **Godot 求值器补齐**(`examples/godot-demo/theloom_runtime.gd`):`seen()/unseen()`(经 `_seen_tech` 走 `_tech_to_id` → `_seen`,技术名不存在恒 false)、三元 `? :`(右结合、只求值选中支)、`===`/`!==`、`%`;tokenizer 加三字符运算符与 `? : %`;`&&`/`||` 改为**返回操作数**;`_loose_eq` 重写为「同类型直接比、异类型转数值比」对齐 TS `looseEq`(`true == 1` 现在为真)
+- **修掉真实分岔**:`_eval_number` 原本 `-> int`,`10 / 4` 得 2 而 TS 得 2.5;负小数向零截断更会改变检定成败。现在不截断,`_norm_num` 只把无小数部分的值归一为 int。检定处 `var skill` 也去掉了 int 标注,note 用 `%s` 格式化
+- **新增 `src/engine/scriptConformance.test.ts` + `examples/godot-demo/script_conformance_test.gd` + C# 运行器**,三端跑同一份 `examples/godot-demo/script_fixture.json`(49 条:条件 / 数值 / 指令)
+- **新增 Unity 最小运行库** `examples/unity-demo/TheLoom/`(`TheLoomJson.cs` 极简 JSON、`TheLoomScript.cs` 求值器、`TheLoomRuntime.cs` 运行库)。**刻意不依赖 UnityEngine** —— 既能拖进 Assets,也能用 `examples/unity-demo/conformance` 这个 net8.0 项目在纯 .NET 下编译测试(本机没装 Unity 也验证得了)。缺口:R19-2 跨流程调用栈、协议 v2 事件,README 与 `docs/ENGINE_PARITY.md` 已标注
+- **新增 `docs/ENGINE_PARITY.md`**:四个实现的能力对照、语义清单、三端复跑命令、改动纪律(改语义先加夹具用例,三端全绿才算完)
+- 已实测:三端脚本对拍各 49 条通过;**负向验证**(故意改错两条期望)三端都能报不一致;端到端 `sample_package.json` / `demo_rain_night` / 种子 42 在 TS / Godot / C# 产出完全相同的 31 条 beats、两条检定记录与全部变量终值;Godot 4.6.2-stable 与 4.8-dev1 都通过;vitest 519 项
+- 注意:GDScript 里 **`var x := rt.method()` 会因 rt 无类型而推断失败,导致整个脚本编译不过**(连带 preload 它的测试都挂);涉及 Variant 返回值一律用 `var x =`。SceneTree 脚本入口是 `_initialize()` 不是 `_init()`
 
 ## 最近变更(R20-3 · v0.39.0)
 
