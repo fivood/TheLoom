@@ -32,6 +32,12 @@ interface SceneSpec {
   title: string;
   from: number;   // 1 起,含
   to: number;     // 含
+  /**
+   * 从场景里排除的行段(闭区间)。
+   * 作为公开示例略去的段落写在这里 —— 原稿 source.md 始终保持完整,
+   * 不在源文件上做删改。
+   */
+  skip?: [number, number][];
   /** 场景元数据 */
   pov: string;
   location: string;
@@ -66,7 +72,9 @@ const SCENES: SceneSpec[] = [
     pov: '塞梅尔维斯', location: '堤岸夹层通道', time: '17:55', tension: 5 },
   { chapter: '第四章 · 第四下钟声', title: '第四下钟声', from: 789, to: 820,
     pov: '塞梅尔维斯', location: '收容室墙缝', time: '18:00 整点报时', tension: 5 },
+  // 885-906 是吸血段落,作为公开示例略去;原稿在 source.md 里完整保留
   { chapter: '第四章 · 第四下钟声', title: '感谢我的仁慈吧', from: 821, to: 953,
+    skip: [[885, 906]],
     pov: '塞梅尔维斯', location: '收容室', time: '18:05', tension: 4 },
 ];
 
@@ -303,7 +311,11 @@ function build(): Project {
   const docByTitle = new Map<string, Document>();
   let sceneOrder = 0;
   for (const scene of SCENES) {
-    const raw = lines.slice(scene.from - 1, scene.to).join('\n');
+    const skipped = (line: number) => (scene.skip ?? []).some(([a, b]) => line >= a && line <= b);
+    const raw = lines
+      .slice(scene.from - 1, scene.to)
+      .filter((_, i) => !skipped(scene.from + i))
+      .join('\n');
     const blocks: DocBlock[] = [];
     for (const para of raw.split(/\n\s*\n/)) {
       const block = paragraphToBlock(para, uid);

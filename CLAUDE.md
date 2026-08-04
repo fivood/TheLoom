@@ -184,7 +184,8 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 《老伦敦寻人记》正式示例:
 
 - `examples/old-london/`:`source.md`(作者原稿,一字未改)+ `build.mts`(按行号场景表切分正文、叠加实体 / 伏笔 / 弧线 / 时间线 / 解谜流程)→ `project/` 文件夹格式项目;`verify.mts` 小说通道验收;`trace.mts` 打印流程实际走向
-- **生成器不硬编码正文**:场景表用 `{ chapter, title, from, to, pov, location, time, tension }` 描述,正文按行号从 source.md 取。段落自动分类:`〔发件人…〕` → subheading、`*短信*` → quote、引号段按特征归说话人 → dialogue、其余 → action
+- **生成器不硬编码正文**:场景表用 `{ chapter, title, from, to, skip?, pov, location, time, tension }` 描述,正文按行号从 source.md 取。段落自动分类:`〔发件人…〕` → subheading、`*短信*` → quote、引号段按特征归说话人 → dialogue、其余 → action
+- **`skip` 行段**:作为公开示例略去的段落(末章吸血描写)写在场景表里,**source.md 原稿始终完整**,不在源文件上删改;要恢复只需去掉 skip 重新生成
 - 解谜数值的取舍(问 2 条线索恰好通关)**是被路径测试逼出来的** —— 第一版 battery 初值 100、最多消耗 50,`battery > 20` 恒真,「电量耗尽」结局不可达,闸门直接报了出来。改成初值 60 后三个结局都可达且互相制衡
 - 回归测试的 choices 序列必须照 `trace.mts` 的实际输出写:**hub 的选项随 once 消耗会重新编号**,凭空猜下标必然对不上(第一次写就错了两条)
 - 端到端全通:闸门 0 阻断 / 自包含包 7 文件校验 + 脱机演出 / 编译三格式 / DOCX 两预设重解析自检 / 体检 0 问题 / JSON 往返无损 / 三端(TS + Godot 4.6.2 + C#)同种子逐字一致 / 浏览器连续稿 1.36 万字树序与规划各视图正常
