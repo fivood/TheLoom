@@ -20,10 +20,11 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.40.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.40.0`(R20-4 官方引擎适配,**R20 全批收官**);R12 已暂缓;Unreal 可选;v1.0.0 留待多轮测试后
+- 已发布版本:`v0.41.0`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.41.0`(R22 正式示例);**路线图 R17→R22 除 R21 外全部完成**,R21(本地化与配音)经用户决定暂缓;Unreal 可选;v1.0.0 留待多轮真实项目测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
-- 已交付的能力(截至 v0.40.0):
+- 已交付的能力(截至 v0.41.0):
+  - **v0.41.0 R22 《老伦敦寻人记》正式示例** ✅ — `examples/old-london/`:原稿 `source.md` + `build.mts` 生成器 → 文件夹格式项目(1 卷 4 章 12 场景 1.2 万字 / 15 实体 / 5 伏笔 / 5 弧线 / 7 时间线事件 / 25 节点解谜流程 / 4 结局 / 3 回归测试);`verify.mts` 跑小说通道验收,`trace.mts` 核对流程走向;端到端串起闸门 → 自包含包 → 脱机验收 → 编译 / DOCX → 三端一致
   - **v0.40.0 R20-4 官方引擎适配** ✅ — Godot 求值器补齐 `seen()/unseen()` / 三元 / `===`/`!==` / `%`,`&&`/`||` 返回操作数,宽松相等同 TS 口径;修掉 `_eval_number` 取整导致的两端分岔;新增 Unity 最小运行库(3 个 .cs,不依赖 UnityEngine / Newtonsoft,纯 .NET 可测);三端共用 `script_fixture.json`(49 条)+ 端到端同包同种子一致性;约定见 `docs/ENGINE_PARITY.md`
   - **v0.39.0 R20-3 CLI 与目录同步** ✅ — `npm run build:cli` → `cli-dist/theloom-cli.mjs`(单文件 ES Module,零第三方运行时依赖);项目读取复用 `projectFromFolderFiles` 不另写解析;目录同步逐文件比 SHA-256 只写变化的,**包内 exportedAt 取项目 updatedAt** 保证输出确定;`--clean` 按 `.theloom-sync.json` 删陈旧文件;退出码 2/3/4/5/6 分流;`--json` / `--watch`;文档见 `docs/CLI.md`
   - **v0.38.0 R20-2 自包含引擎包** ✅ — 打包内容三项(资源原文件 / 运行库 / 校验清单+授权表)随命名配置保存;原文件按内容寻址写入包内 `assets/` 且同字节只写一次,取不到时逐个列出不静默;运行库经 vite 虚拟模块内嵌(`npm run build` 已串 `build:runtime`),产物缺失时禁用选项;`checksums.json` 覆盖除自身外全部文件;`examples/engine-demo/selfcontained.mjs` 脱机验收(校验 → 包内运行库演出 → 附件字节哈希对拍),非零退出码可接 CI
@@ -177,6 +178,18 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(R22 · v0.41.0)
+
+《老伦敦寻人记》正式示例:
+
+- `examples/old-london/`:`source.md`(作者原稿,一字未改)+ `build.mts`(按行号场景表切分正文、叠加实体 / 伏笔 / 弧线 / 时间线 / 解谜流程)→ `project/` 文件夹格式项目;`verify.mts` 小说通道验收;`trace.mts` 打印流程实际走向
+- **生成器不硬编码正文**:场景表用 `{ chapter, title, from, to, pov, location, time, tension }` 描述,正文按行号从 source.md 取。段落自动分类:`〔发件人…〕` → subheading、`*短信*` → quote、引号段按特征归说话人 → dialogue、其余 → action
+- 解谜数值的取舍(问 2 条线索恰好通关)**是被路径测试逼出来的** —— 第一版 battery 初值 100、最多消耗 50,`battery > 20` 恒真,「电量耗尽」结局不可达,闸门直接报了出来。改成初值 60 后三个结局都可达且互相制衡
+- 回归测试的 choices 序列必须照 `trace.mts` 的实际输出写:**hub 的选项随 once 消耗会重新编号**,凭空猜下标必然对不上(第一次写就错了两条)
+- 端到端全通:闸门 0 阻断 / 自包含包 7 文件校验 + 脱机演出 / 编译三格式 / DOCX 两预设重解析自检 / 体检 0 问题 / JSON 往返无损 / 三端(TS + Godot 4.6.2 + C#)同种子逐字一致 / 浏览器连续稿 1.36 万字树序与规划各视图正常
+- **无头浏览器环境限制**:流程画布的连线不渲染(节点正常),应用自带示例同样如此 —— 该环境不合成帧(截图也一直超时),不是产品缺陷。边的有效性靠路径测试与三端运行库保证
+- 注意:`examples/old-london/dist/` 与 `examples/godot-demo/old_london_package.json` 是生成产物,已 gitignore
 
 ## 最近变更(R20-4 · v0.40.0)
 

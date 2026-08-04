@@ -1,0 +1,2957 @@
+{
+  "version": 1,
+  "name": "老伦敦寻人记",
+  "workspacePreset": "novel",
+  "flows": [
+    {
+      "id": "ol00007z",
+      "name": "寻人:从短信到第四下钟声",
+      "technicalName": "old_london_case",
+      "documentId": "ol00001x",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "dialogue",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "data": {
+            "title": "遮阳篷下",
+            "text": "手心突然传来了毫无预兆的震动。",
+            "speakerId": "ol00000a",
+            "technicalName": "opening",
+            "unitId": "l9juymjefvus"
+          }
+        },
+        {
+          "id": "read_sms",
+          "type": "instruction",
+          "position": {
+            "x": 220,
+            "y": 0
+          },
+          "data": {
+            "title": "读第一条短信",
+            "text": "clue_delay = true; battery -= 5",
+            "unitId": "e7t1cdakfvus"
+          }
+        },
+        {
+          "id": "ask_hub",
+          "type": "hub",
+          "position": {
+            "x": 440,
+            "y": 0
+          },
+          "data": {
+            "title": "要问她什么?",
+            "text": ""
+          }
+        },
+        {
+          "id": "ask_room",
+          "type": "instruction",
+          "position": {
+            "x": 660,
+            "y": -160
+          },
+          "data": {
+            "title": "问房间大小与声音",
+            "text": "clue_water = true; clues += 1; battery -= 15",
+            "unitId": "u4foz8s3fvus"
+          }
+        },
+        {
+          "id": "ask_bell",
+          "type": "instruction",
+          "position": {
+            "x": 660,
+            "y": 0
+          },
+          "data": {
+            "title": "问整点前后的响动",
+            "text": "clue_bell = true; clues += 1; battery -= 15",
+            "unitId": "pnidxc2qfvus"
+          }
+        },
+        {
+          "id": "ask_train",
+          "type": "instruction",
+          "position": {
+            "x": 660,
+            "y": 160
+          },
+          "data": {
+            "title": "问振动的间隔",
+            "text": "clue_train = true; clues += 1; battery -= 15",
+            "unitId": "ro4hsj5ofvus"
+          }
+        },
+        {
+          "id": "stop_asking",
+          "type": "dialogue",
+          "position": {
+            "x": 660,
+            "y": 320
+          },
+          "data": {
+            "title": "省点电",
+            "text": "保留电量,等我消息。",
+            "speakerId": "ol00000a",
+            "unitId": "pm7tzgrgfvus"
+          }
+        },
+        {
+          "id": "battery_check",
+          "type": "condition",
+          "position": {
+            "x": 880,
+            "y": 0
+          },
+          "data": {
+            "title": "还有电吗",
+            "text": "battery > 20",
+            "unitId": "glhacvi1fvus"
+          }
+        },
+        {
+          "id": "end_battery",
+          "type": "dialogue",
+          "position": {
+            "x": 1100,
+            "y": 200
+          },
+          "data": {
+            "title": "结局 · 薛定谔的血食怪",
+            "text": "屏幕再没有亮起。她要靠救援队一间间扫描,至少一周。",
+            "technicalName": "ending_battery",
+            "unitId": "f2zp8ng2fvus"
+          }
+        },
+        {
+          "id": "to_whitehall",
+          "type": "dialogue",
+          "position": {
+            "x": 1100,
+            "y": 0
+          },
+          "data": {
+            "title": "白厅七号",
+            "text": "那扇没有门牌的木门虚掩着。",
+            "speakerId": "ol00000a",
+            "unitId": "jxmfolc3fvus"
+          }
+        },
+        {
+          "id": "persuade",
+          "type": "check",
+          "position": {
+            "x": 1320,
+            "y": 0
+          },
+          "data": {
+            "title": "说服范肖先生",
+            "text": "您提供的软盘存在严重缺陷……",
+            "checkExpr": "3",
+            "checkDc": 8,
+            "checkRed": false
+          }
+        },
+        {
+          "id": "got_floppy",
+          "type": "instruction",
+          "position": {
+            "x": 1540,
+            "y": -100
+          },
+          "data": {
+            "title": "取得软盘",
+            "text": "has_floppy = true",
+            "unitId": "tuk3cnxufvus"
+          }
+        },
+        {
+          "id": "no_floppy",
+          "type": "dialogue",
+          "position": {
+            "x": 1540,
+            "y": 120
+          },
+          "data": {
+            "title": "空手而归",
+            "text": "这行的要求不能透露供货商情报。",
+            "speakerId": "ol00000l",
+            "unitId": "54dllwrcfvus"
+          }
+        },
+        {
+          "id": "archive",
+          "type": "instruction",
+          "position": {
+            "x": 1760,
+            "y": 0
+          },
+          "data": {
+            "title": "技术档案室",
+            "text": "got_intel = true",
+            "unitId": "c6tn65bpfvus"
+          }
+        },
+        {
+          "id": "descend",
+          "type": "dialogue",
+          "position": {
+            "x": 1980,
+            "y": 0
+          },
+          "data": {
+            "title": "游客止步",
+            "text": "她掏出便携手电,钻进空气污浊的狭长通道。",
+            "speakerId": "ol00000a",
+            "unitId": "gpoi3hjrfvus"
+          }
+        },
+        {
+          "id": "locate",
+          "type": "condition",
+          "position": {
+            "x": 2200,
+            "y": 0
+          },
+          "data": {
+            "title": "线索够不够锁定裂缝",
+            "text": "clues >= 2",
+            "unitId": "v9e4ezryfvus"
+          }
+        },
+        {
+          "id": "end_lost",
+          "type": "dialogue",
+          "position": {
+            "x": 2420,
+            "y": 220
+          },
+          "data": {
+            "title": "结局 · 摸错了墙",
+            "text": "通道有几百米长,她在错误的一段来回摸索,直到整点过去。",
+            "technicalName": "ending_lost",
+            "unitId": "ynfu3bwafvus"
+          }
+        },
+        {
+          "id": "smell_blood",
+          "type": "dialogue",
+          "position": {
+            "x": 2420,
+            "y": -60
+          },
+          "data": {
+            "title": "血",
+            "text": "血腥味从那道窄缝里涌进来,只有淡淡的一抹。",
+            "speakerId": "ol00000a",
+            "technicalName": "found_crack",
+            "unitId": "6p9sha2mfvus"
+          }
+        },
+        {
+          "id": "send_position",
+          "type": "instruction",
+          "position": {
+            "x": 2640,
+            "y": -60
+          },
+          "data": {
+            "title": "发送定位",
+            "text": "position_sent = true",
+            "unitId": "3deyfr23fvus"
+          }
+        },
+        {
+          "id": "window_hub",
+          "type": "hub",
+          "position": {
+            "x": 2860,
+            "y": -60
+          },
+          "data": {
+            "title": "还有五分钟到整点",
+            "text": ""
+          }
+        },
+        {
+          "id": "wait_window",
+          "type": "check",
+          "position": {
+            "x": 3080,
+            "y": -60
+          },
+          "data": {
+            "title": "等第四下钟声与列车交会",
+            "text": "上下两条线的横向振动造成了墙体错位,钟声带来纵向震动。",
+            "checkExpr": "clues",
+            "checkDc": 6,
+            "checkRed": true
+          }
+        },
+        {
+          "id": "end_missed",
+          "type": "dialogue",
+          "position": {
+            "x": 3300,
+            "y": 160
+          },
+          "data": {
+            "title": "结局 · 错过的共振",
+            "text": "裂缝只张开一毫米就合上了。下一个整点还有五十九分钟。",
+            "technicalName": "ending_missed",
+            "unitId": "swg0ftwofvus"
+          }
+        },
+        {
+          "id": "mist",
+          "type": "fragment",
+          "position": {
+            "x": 3300,
+            "y": -60
+          },
+          "data": {
+            "title": "雾化穿越",
+            "text": "彻底失去重量的一瞬,世界在感知层面上变成另一种质地。",
+            "sub": {
+              "nodes": [
+                {
+                  "id": "mist_in",
+                  "type": "dialogue",
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "data": {
+                    "title": "第五下钟声",
+                    "text": "她化成了黑雾。",
+                    "unitId": "qpd9h9zwfvus"
+                  }
+                },
+                {
+                  "id": "mist_out",
+                  "type": "exit",
+                  "position": {
+                    "x": 220,
+                    "y": 0
+                  },
+                  "data": {
+                    "title": "墙的另一侧",
+                    "text": ""
+                  }
+                }
+              ],
+              "edges": [
+                {
+                  "id": "e-mist_in-mist_out",
+                  "source": "mist_in",
+                  "target": "mist_out"
+                }
+              ]
+            },
+            "unitId": "ez3gckrufvus"
+          }
+        },
+        {
+          "id": "reunion",
+          "type": "dialogue",
+          "position": {
+            "x": 3520,
+            "y": -60
+          },
+          "data": {
+            "title": "感谢我的仁慈吧",
+            "text": "一双手从身后伸过来环住了她的腰。",
+            "speakerId": "ol00000g",
+            "technicalName": "reunion",
+            "unitId": "sa83e493fvus"
+          }
+        },
+        {
+          "id": "true_end",
+          "type": "dialogue",
+          "position": {
+            "x": 3740,
+            "y": -60
+          },
+          "data": {
+            "title": "结局 A · 晚饭:待定",
+            "text": "你来推荐——不许趁机灌酒,也不能是英国菜。",
+            "speakerId": "ol00000a",
+            "technicalName": "ending_true",
+            "unitId": "926bf5qvfvus"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e-start-read_sms",
+          "source": "start",
+          "target": "read_sms"
+        },
+        {
+          "id": "e-read_sms-ask_hub",
+          "source": "read_sms",
+          "target": "ask_hub"
+        },
+        {
+          "id": "e-ask_hub-ask_room",
+          "source": "ask_hub",
+          "target": "ask_room",
+          "label": "问房间大小、听到什么",
+          "once": true
+        },
+        {
+          "id": "e-ask_hub-ask_bell",
+          "source": "ask_hub",
+          "target": "ask_bell",
+          "label": "问整点前后有没有异响",
+          "once": true
+        },
+        {
+          "id": "e-ask_hub-ask_train",
+          "source": "ask_hub",
+          "target": "ask_train",
+          "label": "问振动的间隔",
+          "once": true
+        },
+        {
+          "id": "e-ask_hub-stop_asking",
+          "source": "ask_hub",
+          "target": "stop_asking",
+          "label": "不再追问,替她省电"
+        },
+        {
+          "id": "e-ask_room-ask_hub",
+          "source": "ask_room",
+          "target": "ask_hub"
+        },
+        {
+          "id": "e-ask_bell-ask_hub",
+          "source": "ask_bell",
+          "target": "ask_hub"
+        },
+        {
+          "id": "e-ask_train-ask_hub",
+          "source": "ask_train",
+          "target": "ask_hub"
+        },
+        {
+          "id": "e-stop_asking-battery_check",
+          "source": "stop_asking",
+          "target": "battery_check"
+        },
+        {
+          "id": "e-battery_check-to_whitehall",
+          "source": "battery_check",
+          "target": "to_whitehall",
+          "sourceHandle": "true"
+        },
+        {
+          "id": "e-battery_check-end_battery",
+          "source": "battery_check",
+          "target": "end_battery",
+          "sourceHandle": "false"
+        },
+        {
+          "id": "e-to_whitehall-persuade",
+          "source": "to_whitehall",
+          "target": "persuade"
+        },
+        {
+          "id": "e-persuade-got_floppy",
+          "source": "persuade",
+          "target": "got_floppy",
+          "sourceHandle": "success"
+        },
+        {
+          "id": "e-persuade-no_floppy",
+          "source": "persuade",
+          "target": "no_floppy",
+          "sourceHandle": "fail"
+        },
+        {
+          "id": "e-got_floppy-archive",
+          "source": "got_floppy",
+          "target": "archive"
+        },
+        {
+          "id": "e-no_floppy-archive",
+          "source": "no_floppy",
+          "target": "archive"
+        },
+        {
+          "id": "e-archive-descend",
+          "source": "archive",
+          "target": "descend"
+        },
+        {
+          "id": "e-descend-locate",
+          "source": "descend",
+          "target": "locate"
+        },
+        {
+          "id": "e-locate-smell_blood",
+          "source": "locate",
+          "target": "smell_blood",
+          "sourceHandle": "true"
+        },
+        {
+          "id": "e-locate-end_lost",
+          "source": "locate",
+          "target": "end_lost",
+          "sourceHandle": "false"
+        },
+        {
+          "id": "e-smell_blood-send_position",
+          "source": "smell_blood",
+          "target": "send_position"
+        },
+        {
+          "id": "e-send_position-window_hub",
+          "source": "send_position",
+          "target": "window_hub"
+        },
+        {
+          "id": "e-window_hub-wait_window",
+          "source": "window_hub",
+          "target": "wait_window",
+          "label": "守住裂缝,等整点"
+        },
+        {
+          "id": "e-wait_window-mist",
+          "source": "wait_window",
+          "target": "mist",
+          "sourceHandle": "success"
+        },
+        {
+          "id": "e-wait_window-end_missed",
+          "source": "wait_window",
+          "target": "end_missed",
+          "sourceHandle": "fail"
+        },
+        {
+          "id": "e-mist-reunion",
+          "source": "mist",
+          "target": "reunion"
+        },
+        {
+          "id": "e-reunion-true_end",
+          "source": "reunion",
+          "target": "true_end"
+        }
+      ]
+    }
+  ],
+  "entities": [],
+  "brainstormNotes": [],
+  "brainstormEdges": [],
+  "outlineColumns": [],
+  "outlineRows": [],
+  "timelineTracks": [
+    {
+      "id": "ol00008k",
+      "name": "寻人当日",
+      "color": "#565550"
+    }
+  ],
+  "timelinePoints": [
+    {
+      "id": "ol00008l",
+      "label": "16:09 发信"
+    },
+    {
+      "id": "ol00008m",
+      "label": "16:15 收到"
+    },
+    {
+      "id": "ol00008n",
+      "label": "16:27 第二封"
+    },
+    {
+      "id": "ol00008o",
+      "label": "16:32 收到"
+    },
+    {
+      "id": "ol00008p",
+      "label": "17:00 大本钟报时"
+    },
+    {
+      "id": "ol00008q",
+      "label": "17:02 五下响动"
+    },
+    {
+      "id": "ol00008r",
+      "label": "17:40 技术档案室"
+    },
+    {
+      "id": "ol00008s",
+      "label": "18:00 整点共振"
+    }
+  ],
+  "timelineEvents": [
+    {
+      "id": "ol00008t",
+      "trackId": "ol00008k",
+      "pointId": "ol00008l",
+      "title": "瓦伦缇娜发出求救",
+      "text": "我需要你的帮助,亲爱的塞梅尔维斯",
+      "entityIds": [
+        "ol00000g"
+      ],
+      "documentIds": [
+        "ol00001x"
+      ]
+    },
+    {
+      "id": "ol00008u",
+      "trackId": "ol00008k",
+      "pointId": "ol00008m",
+      "title": "塞梅尔维斯收到",
+      "text": "延迟六分钟 —— 第一个线索",
+      "entityIds": [
+        "ol00000a"
+      ],
+      "documentIds": [
+        "ol00001x"
+      ]
+    },
+    {
+      "id": "ol00008v",
+      "trackId": "ol00008k",
+      "pointId": "ol00008o",
+      "title": "确认信号屏蔽",
+      "text": "五到六分钟的延迟在市中心不正常",
+      "entityIds": [
+        "ol00000a"
+      ],
+      "documentIds": [
+        "ol00002i"
+      ]
+    },
+    {
+      "id": "ol00008w",
+      "trackId": "ol00008k",
+      "pointId": "ol00008p",
+      "title": "大本钟五点报时",
+      "text": "距离求救已近一小时",
+      "entityIds": [],
+      "documentIds": [
+        "ol00003n"
+      ]
+    },
+    {
+      "id": "ol00008x",
+      "trackId": "ol00008k",
+      "pointId": "ol00008q",
+      "title": "墙壁五下响动",
+      "text": "整点钟声传导 —— 她离市政区不远",
+      "entityIds": [
+        "ol00000g"
+      ],
+      "documentIds": [
+        "ol000056"
+      ]
+    },
+    {
+      "id": "ol00008y",
+      "trackId": "ol00008k",
+      "pointId": "ol00008r",
+      "title": "查到软盘编号",
+      "text": "堤岸工程时期的夹层收容室",
+      "entityIds": [
+        "ol00000n"
+      ],
+      "documentIds": [
+        "ol00005v"
+      ]
+    },
+    {
+      "id": "ol00008z",
+      "trackId": "ol00008k",
+      "pointId": "ol00008s",
+      "title": "第四下钟声",
+      "text": "钟声与列车交会形成共振高峰",
+      "entityIds": [
+        "ol00000a",
+        "ol00000g"
+      ],
+      "documentIds": [
+        "ol00006z"
+      ]
+    }
+  ],
+  "maps": [],
+  "researchCards": [],
+  "researchCategories": [],
+  "variables": [
+    {
+      "id": "ol000001",
+      "name": "battery",
+      "type": "number",
+      "value": "60",
+      "description": "瓦伦缇娜手机剩余电量;每次通信都在消耗"
+    },
+    {
+      "id": "ol000002",
+      "name": "clue_delay",
+      "type": "boolean",
+      "value": "false",
+      "description": "察觉到收发消息有五到六分钟延迟"
+    },
+    {
+      "id": "ol000003",
+      "name": "clue_water",
+      "type": "boolean",
+      "value": "false",
+      "description": "问出了水流声 → 地下水道附近"
+    },
+    {
+      "id": "ol000004",
+      "name": "clue_bell",
+      "type": "boolean",
+      "value": "false",
+      "description": "问出了整点五下响动 → 大本钟传导"
+    },
+    {
+      "id": "ol000005",
+      "name": "clue_train",
+      "type": "boolean",
+      "value": "false",
+      "description": "问出了几分钟一次的振动 → 铁路夹层"
+    },
+    {
+      "id": "ol000006",
+      "name": "has_floppy",
+      "type": "boolean",
+      "value": "false",
+      "description": "从范肖先生处取得传送软盘"
+    },
+    {
+      "id": "ol000007",
+      "name": "got_intel",
+      "type": "boolean",
+      "value": "false",
+      "description": "技术档案室查到了收容室的历史与入口"
+    },
+    {
+      "id": "ol000008",
+      "name": "position_sent",
+      "type": "boolean",
+      "value": "false",
+      "description": "已用通讯器发送定位,救援小队在路上"
+    },
+    {
+      "id": "ol000009",
+      "name": "clues",
+      "type": "number",
+      "value": "0",
+      "description": "已掌握的定位线索数;决定能否锁定裂缝"
+    }
+  ],
+  "assets": [],
+  "documents": [],
+  "documentCategories": [
+    "正文"
+  ],
+  "attachments": {},
+  "folders": [
+    {
+      "id": "ol00000y",
+      "name": "老伦敦寻人记",
+      "module": "document",
+      "documentRole": "volume",
+      "order": 0
+    },
+    {
+      "id": "ol00000z",
+      "name": "第一章 · 雨季与一条短信",
+      "module": "document",
+      "parentId": "ol00000y",
+      "documentRole": "chapter",
+      "order": 0
+    },
+    {
+      "id": "ol000010",
+      "name": "第二章 · 白厅七号",
+      "module": "document",
+      "parentId": "ol00000y",
+      "documentRole": "chapter",
+      "order": 1
+    },
+    {
+      "id": "ol000011",
+      "name": "第三章 · 编号 LSCC-TPT-LDN-ERR",
+      "module": "document",
+      "parentId": "ol00000y",
+      "documentRole": "chapter",
+      "order": 2
+    },
+    {
+      "id": "ol000012",
+      "name": "第四章 · 第四下钟声",
+      "module": "document",
+      "parentId": "ol00000y",
+      "documentRole": "chapter",
+      "order": 3
+    }
+  ],
+  "foreshadows": [
+    {
+      "id": "ol000080",
+      "title": "难吃的巧克力",
+      "note": "开头咬一口就包回口袋,结尾换成\"晚饭:待定\"的邀约。",
+      "plants": [
+        {
+          "id": "ol000081",
+          "docId": "ol00001f"
+        }
+      ],
+      "payoffs": [
+        {
+          "id": "ol000082",
+          "docId": "ol00007y"
+        }
+      ],
+      "createdAt": 1779711925000
+    },
+    {
+      "id": "ol000083",
+      "title": "通讯录里唯一的联系人",
+      "note": "她从没用它联系过谁,而第一条消息正是求救。",
+      "plants": [
+        {
+          "id": "ol000084",
+          "docId": "ol00001f"
+        }
+      ],
+      "payoffs": [
+        {
+          "id": "ol000085",
+          "docId": "ol00001x"
+        }
+      ],
+      "createdAt": 1779711925000
+    },
+    {
+      "id": "ol000086",
+      "title": "宴会上被灌酒",
+      "note": "上次行动的检讨书,兑现在结尾\"不许趁机灌酒\"。",
+      "plants": [
+        {
+          "id": "ol000087",
+          "docId": "ol00001x"
+        }
+      ],
+      "payoffs": [
+        {
+          "id": "ol000088",
+          "docId": "ol00007y"
+        }
+      ],
+      "createdAt": 1779711925000
+    },
+    {
+      "id": "ol000089",
+      "title": "瓦伦缇娜教过的雾化",
+      "note": "不经意的指点,成了穿墙的唯一手段。",
+      "plants": [
+        {
+          "id": "ol00008a",
+          "docId": "ol00003e"
+        }
+      ],
+      "payoffs": [
+        {
+          "id": "ol00008b",
+          "docId": "ol00006z"
+        }
+      ],
+      "createdAt": 1779711925000
+    },
+    {
+      "id": "ol00008c",
+      "title": "装死骗过她一次",
+      "note": "最初就被这个人装死骗过 —— 这次\"受困\"同样是半个谎。",
+      "plants": [
+        {
+          "id": "ol00008d",
+          "docId": "ol00003e"
+        }
+      ],
+      "payoffs": [
+        {
+          "id": "ol00008e",
+          "docId": "ol00007y"
+        }
+      ],
+      "createdAt": 1779711925000
+    }
+  ],
+  "arcs": [
+    {
+      "id": "ol00008f",
+      "entityId": "ol00000a",
+      "title": "拒绝承认在等消息",
+      "note": "每天带着那台手机,理由全是借口。",
+      "docId": "ol00001f",
+      "order": 0
+    },
+    {
+      "id": "ol00008g",
+      "entityId": "ol00000a",
+      "title": "调查员本能接管情绪",
+      "note": "假设她真的遇到麻烦,开始推理延迟。",
+      "docId": "ol00002i",
+      "order": 1
+    },
+    {
+      "id": "ol00008h",
+      "entityId": "ol00000a",
+      "title": "为她走进雨里",
+      "note": "不走官方流程,不等一周。",
+      "docId": "ol00005v",
+      "order": 2
+    },
+    {
+      "id": "ol00008i",
+      "entityId": "ol00000a",
+      "title": "闻到血的那一刻",
+      "note": "本能先于意识接管了呼吸。",
+      "docId": "ol00006q",
+      "order": 3
+    },
+    {
+      "id": "ol00008j",
+      "entityId": "ol00000a",
+      "title": "松开攥着的手指",
+      "note": "发现被骗,却先确认了脉搏是真的。",
+      "docId": "ol00007y",
+      "order": 4
+    }
+  ],
+  "engineExportConfigs": [
+    {
+      "id": "ol000090",
+      "name": "Godot 自包含包",
+      "entities": "referenced",
+      "assets": "referenced",
+      "bundle": {
+        "assetFiles": true,
+        "runtime": true,
+        "checksums": true
+      },
+      "gate": {
+        "script": true,
+        "audit": true,
+        "paths": true,
+        "tests": true,
+        "blockOnWarnings": false
+      },
+      "createdAt": 1779711925000,
+      "updatedAt": 1779711925000
+    }
+  ],
+  "flowTests": [
+    {
+      "id": "ol000091",
+      "name": "真结局 · 问两条线索后穿墙",
+      "flowRef": "old_london_case",
+      "seed": 7,
+      "choices": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "assertions": [
+        {
+          "kind": "nodeVisited",
+          "node": "ending_true",
+          "expect": true
+        },
+        {
+          "kind": "nodeVisited",
+          "node": "found_crack",
+          "expect": true
+        },
+        {
+          "kind": "variable",
+          "name": "position_sent",
+          "op": "==",
+          "value": "true"
+        },
+        {
+          "kind": "variable",
+          "name": "clues",
+          "op": "==",
+          "value": "2"
+        }
+      ],
+      "updatedAt": 1779711925000
+    },
+    {
+      "id": "ol000092",
+      "name": "失败 · 一条线索都不问就下地",
+      "flowRef": "old_london_case",
+      "seed": 7,
+      "choices": [
+        0,
+        3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "assertions": [
+        {
+          "kind": "nodeVisited",
+          "node": "ending_lost",
+          "expect": true
+        },
+        {
+          "kind": "nodeVisited",
+          "node": "ending_true",
+          "expect": false
+        },
+        {
+          "kind": "variable",
+          "name": "clues",
+          "op": "==",
+          "value": "0"
+        }
+      ],
+      "updatedAt": 1779711925000
+    },
+    {
+      "id": "ol000093",
+      "name": "失败 · 追问到电量耗尽",
+      "flowRef": "old_london_case",
+      "seed": 7,
+      "choices": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "assertions": [
+        {
+          "kind": "nodeVisited",
+          "node": "ending_battery",
+          "expect": true
+        },
+        {
+          "kind": "nodeVisited",
+          "node": "ending_true",
+          "expect": false
+        },
+        {
+          "kind": "variable",
+          "name": "clues",
+          "op": "==",
+          "value": "3"
+        }
+      ],
+      "updatedAt": 1779711925000
+    }
+  ],
+  "updatedAt": 1779711925000,
+  "palettes": [],
+  "savedQueries": [],
+  "templates": [],
+  "relations": [],
+  "annotations": [],
+  "docSnapshots": [],
+  "revisionTasks": [],
+  "proofreadingIgnores": [],
+  "units": [
+    {
+      "id": "tue6sq04fvur",
+      "kind": "line",
+      "title": "",
+      "text": "伦敦的雨季长得就像圣洛夫基金会迟迟走不到尽头的走廊，每段都是白色地狱拼图里最寻常的一块，分不清到底走了多久，又在官僚主义的迷宫里拐了几个弯。连续的十几天阴雨倒是能让天气预报板块编辑偷懒，“伦敦的女士们先生们，好消息，您的行头无需更换，今日依旧有雨”。",
+      "createdAt": 1785768472323,
+      "updatedAt": 1785768472323
+    },
+    {
+      "id": "3j5lqrrjfvur",
+      "kind": "line",
+      "title": "",
+      "text": "空气里有明显的烂泥土味，嗅觉灵敏的血食怪访客在这种日子里感受到这城市的唯一优点大概就是天黑得特别早，以及不常被传说中能蒸发她们的日光打扰了。",
+      "createdAt": 1785768472323,
+      "updatedAt": 1785768472323
+    },
+    {
+      "id": "z7c6jpz9fvur",
+      "kind": "line",
+      "title": "",
+      "text": "受到临时传唤回到总部的塞梅尔维斯，刚从配给处领到升级后的通讯器，准备继续享受她那随时可能被打断的短暂休假。",
+      "createdAt": 1785768472323,
+      "updatedAt": 1785768472323
+    },
+    {
+      "id": "ru3rmv2jfvus",
+      "kind": "line",
+      "title": "",
+      "text": "在最后一次“暴雨”让世界跨越了千禧年后，人类的电子设备发明也跳到了相应的科技路线上。基金会依照某款据说能砸核桃的手机规格改造了员工们的通讯设备。作为高级调查员，塞梅尔维斯领到的是最新款，完美兼具抗摔、长续航的优点，可在危机时刻充当板砖的工业结晶。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "jal4n1isfvus",
+      "kind": "line",
+      "title": "",
+      "text": "不过她没和任何人提起，自己兜里还揣着几个月前瓦伦缇娜硬塞给她的一款德产直板手机。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "lnzoi3wkfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她从来没有用它联系过谁，每天带在身边，是觉得重量尚可，加之内部德国电路结构的严谨设计适合记录一些备忘，绝对不是为了随时查看某人会不会发来骚扰短信。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gm495y61fvus",
+      "kind": "line",
+      "title": "",
+      "text": "她不想见到那个人，她的完美假期和“瓦伦缇娜”这个名字在科学及神秘学上永远互斥。即使她们的任务轨迹经常重合，也只能证明有人是天生的麻烦吸引体，和她们之间的缘分一点关系也没有。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "lv3pf9f7fvus",
+      "kind": "line",
+      "title": "",
+      "text": "就算那个名字是手机通讯录里预先录入的唯一联系人。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "cko2f3byfvus",
+      "kind": "line",
+      "title": "",
+      "text": "一想到瓦伦缇娜，塞梅尔维斯的胃里就涌起一股烦躁。她掏出刚才在茶水间顺来的巧克力，狠狠咬了一口。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "alty1i7ifvus",
+      "kind": "line",
+      "title": "",
+      "text": "这个没见过的新牌子在口中融化，味蕾传来的可怕口感差点让她转身直奔意见箱。英国人的食物平等地折磨所有人，这东西甜得发腻，像是在糖浆和色拉油里埋了十几年。后勤部采购员肯定没考虑过劣质代可可脂对血液的毁灭性打击，除非他们故意要让员工们变得不受嗜血生物欢迎，好替基金会省下一笔安保费。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3mdkdulyfvus",
+      "kind": "line",
+      "title": "",
+      "text": "都怪瓦伦缇娜时不时送来高级甜点，她的品味也变得越来越刁钻。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "j8q054sgfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯叹口气，把剩了大半的巧克力重新包好放回口袋，裹紧了斗篷，走出基金会大楼。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3rlfpo1sfvus",
+      "kind": "line",
+      "title": "",
+      "text": "虽然还没具体的休假安排，但眼下的雨却越发密集了，塞梅尔维斯只得先在一间咖啡馆的遮阳篷下驻足。比较讽刺的是虽然遮阳篷的由来正如其名，但通常避雨的人更需要它。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "nkf1ljhgfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她正犹豫是不是该进去喝一杯提神饮品，顺便把嘴里那股挥之不去的怪巧克力味漱干净。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ifo8rblafvus",
+      "kind": "line",
+      "title": "",
+      "text": "试着舔净牙上的甜腻时，塞梅尔维斯脑海中突然浮现起上次行动时被那个老血食怪强行喂酒的画面。工作中被迫饮酒不说，闹得全宴会厅的人都以为她们是那种关系，虽说事件最后被瓦伦缇娜代为解决了，明面上功劳也算给她了，但私底下她在基金会这边的检讨没少写。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "2dcfsjjffvus",
+      "kind": "line",
+      "title": "",
+      "text": "当时混杂着高级葡萄酒和血液芬芳的回忆，隔着空旷的街道和雨帘，从另一个时空再一次绕上她的舌尖。仿佛那件事就发生在昨天，或者就在此刻。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gpcbdllvfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯咬了咬牙，吞咽了一口，发誓再见到瓦伦缇娜，一定要让她和兜里剩下那半块巧克力一样惨。她掏出和巧克力装在一起的那台手机，瞪着毫无动静的黑白屏幕，心底的无名火快能把路面积水煮到沸腾了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "94pp4cjvfvus",
+      "kind": "line",
+      "title": "",
+      "text": "自己到底在期待什么，真的以为这台机器亮起的第一句话会是肉麻的调情？难道不能是瓦伦缇娜根本忘了这回事，又或者她给每一个看上的漂亮姑娘都送了部一模一样的手机，早就成了新兴通讯行业巨头最尊贵的批发商客户，这时候正在哪里逍遥快活着吗？",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "emc4tq5rfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“随便吧。”塞梅尔维斯对着空气说道。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "p642lwh0fvus",
+      "kind": "line",
+      "title": "",
+      "text": "话音还没被雨水吞没，手心突然传来了毫无预兆的震动。塞梅尔维斯手指一抖，差点把手机扔进眼前的积水坑里。她心脏像被拧了一把，稳了半天心神，才按下了查看键。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "k6bbqtztfvus",
+      "kind": "line",
+      "title": "",
+      "text": "这就是她收到的来自瓦伦缇娜的第一条消息。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "yc549f4dfvus",
+      "kind": "line",
+      "title": "",
+      "text": "一句看起来不像玩笑的请求，外加一串算不上正经的ASCII字符玫瑰，意料之外的内容让塞梅尔维斯不知该做何回应。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "94c1kyvnfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她原本打了句“堂堂瓦伦缇娜也有做不到的事吗”，想了想删掉了，重新输了一条“现在没空”，又删掉了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "j9tl0zjcfvus",
+      "kind": "line",
+      "title": "",
+      "text": "最后塞梅尔维斯敲出两个符号，按下了发送。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "9ohl3szpfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她盯着讯息传送的像素信封动画播完，直到绿色的电子屏幕熄灭。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "xg5nrxgtfvus",
+      "kind": "line",
+      "title": "",
+      "text": "五分钟过去，没有消息。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "wx1so8vcfvus",
+      "kind": "line",
+      "title": "",
+      "text": "这个时间都够她喝完一杯咖啡的。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "edbg96ibfvus",
+      "kind": "line",
+      "title": "",
+      "text": "十分钟过去了——她可以吃完一顿晚饭，至少是一份罗马生菜和甘蓝叶组成的沙拉。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "uxbln5slfvus",
+      "kind": "line",
+      "title": "",
+      "text": "瓦伦缇娜是在耍她么？她似乎都能想象到对方看到回信时那副得意的样子：“呵呵，我就知道你会随身带着这台手机，毕竟你都舍不得脱下我送的衣服。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "lflzbbn3fvus",
+      "kind": "line",
+      "title": "",
+      "text": "时间一分一秒流逝，塞梅尔维斯的假期还没开始就被瓦伦缇娜浪费了十五分钟。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "7wvc3lhsfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“嗡嗡”两下震动，手机终于有了反应。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3ytdaz59fvus",
+      "kind": "line",
+      "title": "",
+      "text": "说什么来着，她的完美假期与瓦伦缇娜共存，不可能。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "mug2apt8fvus",
+      "kind": "line",
+      "title": "",
+      "text": "虽然塞梅尔维斯不想听到瓦伦缇娜轻浮的嗓音，但比起用拇指在硬键盘上艰难地选字，直接通话更符合她的效率哲学。她选中了那个唯一的联系人，按下呼叫键。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "85lkgutqfvus",
+      "kind": "line",
+      "title": "",
+      "text": "听筒里传来轻微的电流噪音，她都想好接通后要说什么了，“你终于因为非法走私文物被关进苏格兰场的地下室了？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "2b8tshg8fvus",
+      "kind": "line",
+      "title": "",
+      "text": "十几秒后，里面却传来了毫无感情的机械女声：“您拨打的号码暂时无法接通——”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "vzed6vt2fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“怎么回事……明明能收发讯息？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "a3lltqfffvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯挂断电话，皱起眉头，点进了短信的详情。手机显示瓦伦缇娜第一条消息的发送时间是“16:09”，接收时间是“16:15”，她两分钟后回复了那个冷酷的问号，而对方刚刚第二条长篇大论发送于“16:27”，她却在“16:32”才收到。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "wr8az33hfvus",
+      "kind": "line",
+      "title": "",
+      "text": "消息互传长达五到六分钟的延迟，这在基础设施完善的伦敦市中心显然不正常。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "iwbf9rutfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯暂且假设瓦伦缇娜遇到了真的麻烦。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "j6a1dp5nfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她再一次按下发送键。或许是调查员的天赋作怪，塞梅尔维斯的大脑很快接管了情绪。瓦伦缇娜提到的“盒子”很可能是一间隔绝了神秘术的屋子，或许还有电磁屏蔽效应，手机无法稳定通讯，在某个时机捕捉到微弱的信号端后，才能把发信箱里的短信成功吐出来。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ax8duov1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "如果瓦伦缇娜不在伦敦，自己行动的路费绝对要找她报销。前提是她能坚持到那个时候。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "7dlbeua1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "又一个难熬的十分钟过去了，往月亮上发消息都没这么费劲。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "zai5fn5lfvus",
+      "kind": "line",
+      "title": "",
+      "text": "嗡嗡。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "n8mttdktfvus",
+      "kind": "line",
+      "title": "",
+      "text": "为什么她前脚刚来伦敦，瓦伦缇娜也出现在伦敦？她真要质问那张软盘为什么不把老血食怪送到北极去。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "owdrgc8sfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“这个局面看起来是有人自作自受，还有这一长串和你年龄一样长的名字是你的择友标准吗？”如果瓦伦缇娜在她面前，她一定会如此狠狠挖苦一番。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "jddgw7iwfvus",
+      "kind": "line",
+      "title": "",
+      "text": "抛下个人感情后，塞梅尔维斯又反复看了两遍信息，思索了一会儿。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "yabf70ztfvus",
+      "kind": "line",
+      "title": "",
+      "text": "从瓦伦缇娜的描述来看，她接触到的很可能是写着传送术式的基金会软盘，怎么从基金会流出到收藏家手中的暂且不提，按理说传送目的地附近会有用于牵引传送的神秘术波形，以及足够支撑传送的能量。也就是终点一定是能发动神秘术的地方。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "cbx7qa12fvus",
+      "kind": "line",
+      "title": "",
+      "text": "但瓦伦缇娜说那是隔绝神秘术的密闭空间……要么那张软盘本身就有故障，要么它其实是一张用在神秘学道具上的，通往基金会某个物品收容所的门票。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "yv67l488fvus",
+      "kind": "line",
+      "title": "",
+      "text": "那它又是怎么触发的生命体传送？难道血食怪从各种意义上都不算活着了？若不是传送软盘是一次性使用的即抛产品，把瓦伦缇娜送走的那张软盘不可能再用，塞梅尔维斯还真想试试物品传送术对自己是否生效。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "dbx0wof2fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“不行，关到一起了谁救我们？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "g6bxs4agfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她立即否定了自己的突发奇想，快速敲出回信。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "c1q8orl6fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯发完消息，便拉低帽檐走进雨里。白厅离基金会总部不算远，不过她不想在雨天挑战伦敦的地面交通，尤其是接近下班的时间。她快步走向最近的地铁站。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "lx6bb345fvus",
+      "kind": "line",
+      "title": "",
+      "text": "深色的身影赶在车门关闭瞬间飘进了车厢，乘客们侧目望向帽檐还在滴水的塞梅尔维斯，被她锐利的红色眸子扫过，纷纷避开了视线。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "g641u5twfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她靠在扶手旁，盯着车窗外漆黑的隧道残影，车轮和铁轨摩擦产生了规律的震动，缺失润滑油的老车厢在晃动中咯吱咯吱响，闹得她头疼。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "p3s5cse4fvus",
+      "kind": "line",
+      "title": "",
+      "text": "口袋里的手机终于又有了反应。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "kbdxy9xffvus",
+      "kind": "line",
+      "title": "",
+      "text": "水流声……据塞梅尔维斯所知，通常基金会的收容仓库会建在地下或者杳无人迹的场所。如果能听到水流，是地下水道的可能性比山间清泉大得多。她还有个小发现，这次消息的发送时间和她的接收时间只间隔了一分钟。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "5qtbbb94fvus",
+      "kind": "line",
+      "title": "",
+      "text": "和她猜测的一样，很快就收到了回信。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "m918boo1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯被这几个符号呛得咳了好几下，她极力控制着面部表情别扭曲得太奇怪。让老血食怪自由发挥本就是一件错误决定，她后悔没直接要求对方发送“这是测试用文字”了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "yxognat1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯迅速做起计算。十几平米的落脚点，预估一个高度的话，连瓦伦缇娜这级别的血食怪都看不清天花板，意味着至少头顶有四米以上的空间，符合基金会收容室的最低要求。对于每天都要摄入大量卡路里的人类来说，在这里被关禁闭，除了密闭恐惧患者可能会当场发疯以外，缺水缺氧才是最严峻的问题。好消息是瓦伦缇娜不算人，她可以自主降低新陈代谢至冰点，足够她在这个盒子里像根树枝一样躺半个月；坏消息是手机可降低不了掉电速度，若是在自己找到正确位置前就断了联系，瓦伦缇娜真要变成薛定谔的血食怪了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "z5xgkf2afvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯没有设想过老血食怪遇到生命危险的情况，毕竟最初就被这个人装死骗过，她现在绝不接受瓦伦缇娜悄无声息的死去。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ri8vtn3qfvus",
+      "kind": "line",
+      "title": "",
+      "text": "地铁在威斯敏斯特站刚停稳，门仅张开一条缝的时候，塞梅尔维斯就已侧身溜出门外。她从下班的人群之间轻巧地穿过，直接从步行楼梯三步并作一步来到地面，大概在路人眼中没人比她更急着回家了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "vxu4bif7fvus",
+      "kind": "line",
+      "title": "",
+      "text": "天色渐暗，大本钟傍晚五点准时响起，原本悠扬回荡的钟声都被雨吞了尾音。塞梅尔维斯抬头望向不远的大钟，距离瓦伦缇娜发来求救已经快一小时。雨没有要停的迹象，泰晤士河方向吹来一阵潮湿的风，波纹推着积水落进了下水道。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "7016m7ylfvus",
+      "kind": "line",
+      "title": "",
+      "text": "白厅七号是一栋维多利亚时期留下的建筑，深褐色的砖墙吸饱了雨水，反射出街灯的黄光，那扇没有门牌的木门虚掩着。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "znqqx57hfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯刚要抬手敲门，兜里又传来了震动。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "26j3a7v4fvus",
+      "kind": "line",
+      "title": "",
+      "text": "接收时间，17:02。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "vonfbz66fvus",
+      "kind": "line",
+      "title": "",
+      "text": "为了给她省电，塞梅尔维斯没有回复，但她已有初步判断。瓦伦缇娜附近一定有人居住。留给她们的时间远比看上去少，瓦伦缇娜就像铁轨上慢悠悠散步的山羊，根本没在意身后驶来的列车。塞梅尔维斯重重地叹了口气。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "k10p7kenfvus",
+      "kind": "line",
+      "title": "",
+      "text": "正对着大门的前厅里坐着一名戴着金属框眼镜，穿着红色马甲的接待员，脖子上挂着一枚手写体身份铭牌，是普通到一眼就被记混的诸如“菲尔”“比尔”“威尔”之类的名字。他正盯着一台显示器，用两根食指一下一下敲击键盘，似乎还没适应新世纪的人类科技。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "no4ycl0vfvus",
+      "kind": "line",
+      "title": "",
+      "text": "\"女士，下午好，有预约么？\"  见有人来访，这位威尔比尔菲尔接待员停下了效率低下的敲打姿势。",
+      "speakerId": "ol00000k",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gq9i0c4efvus",
+      "kind": "line",
+      "title": "",
+      "text": "\"没有。我是来替瓦伦缇娜女士取东西的，一小时前她来拜访您这的一位收藏家，临走时落下了一张软盘和手提包，麻烦您帮我找一下。那位先生的名字叫——\"塞梅尔维斯掏出手机看了眼消息，“费—瑟斯顿霍……？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "h3xknn2tfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“费瑟斯顿霍……噢！您是指范肖先生吧，这个名字对您这样的外国人来说发音或许很别扭，但读音其实很简单。”接待员扶了扶镜框，大概是听出了她的口音。",
+      "speakerId": "ol00000k",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "j0n42f55fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“……”塞梅尔维斯一时语塞，不止是总部难吃的巧克力有罪了，英国人的名字发音也是个陷阱，就和瓦伦缇娜把自己丢进那个生死不明的盒子，又把她强行拉进这场事件一样可恶。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "a8upwlwkfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“瓦伦缇娜女士确实和范肖先生在楼上。”",
+      "speakerId": "ol00000l",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "hcrze8xifvus",
+      "kind": "line",
+      "title": "",
+      "text": "“什么？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "dly28eibfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯脑海中飞速闪过一个念头，瓦伦缇娜是故意假装受困，骗自己来这里见她。但无法伪造的短信发送延迟让她打消了这个怀疑。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "0iuts4zqfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我在这坐了一下午，瓦伦缇娜女士来了以后就没离开过。”接待员说。",
+      "speakerId": "ol00000k",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3ej5ls1nfvus",
+      "kind": "line",
+      "title": "",
+      "text": "这么说的话，瓦伦缇娜消失的情报，楼上并没有同步给其他人。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "obuee0j1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“那我直接上去找她，可以吧？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "eymi3j1tfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“正常来说没有预约是不行的，但……您是塞梅尔维斯小姐？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "c8xlu5y9fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯愣了一下，为什么一个交易所的接待员都知道这个名字，瓦伦缇娜到底灌输给他们多少错误的认知？总不能上次她们在巴黎发生的事都传到伦敦来了吧，那绝对是天大的误会，她们根本不是那种关系。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "my12ye25fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“你听说过我？”塞梅尔维斯佯装镇定，甩了甩斗篷和帽子上的水。前厅特地加铺了几块吸水地毯，应该不介意她的无礼举动。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "bx986jqufvus",
+      "kind": "line",
+      "title": "",
+      "text": "“瓦伦缇娜女士是我们的贵宾，她不止一次提到您，吩咐不管您是因为基金会的任务来调查还是单纯感兴趣来参观，都应该按对她的级别接待您。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gunz2x02fvus",
+      "kind": "line",
+      "title": "",
+      "text": "承认自己的身份，也就是承认了她对瓦伦缇娜的特殊性，可要是否认的话，连楼梯都上不去。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gxmysocffvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯只得掏出基金会的身份证明，在情况明了前先采取不打草惊蛇的方式。“是，我是塞梅尔维斯，今天是来找她的。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "k02qgfuufvus",
+      "kind": "line",
+      "title": "",
+      "text": "“好的，请您在这签个名。”接待员递来一个访客登记簿。",
+      "speakerId": "ol00000k",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "tiox75abfvus",
+      "kind": "line",
+      "title": "",
+      "text": "不管写过多少次这串复杂的基金会代号，一笔完成度有多高，塞梅尔维斯依旧觉得签名是在浪费生命，不过跟“Featherstonhaugh”一比似乎又没那么可悲。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "clhvak9cfvus",
+      "kind": "line",
+      "title": "",
+      "text": "也只有在签名的时候她才会感叹自己为何不用那个简短的名字。为什么不呢？因为只要瓦伦缇娜撩开她的头发，在她耳边低语时念着她的本名：“贝拉……”下一秒发生的事就不言而喻了。要是“暴雨”能把她的记忆回溯，她不介意去淋一次雨。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3fgb60zrfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯重重地在末尾的“s”旁边戳了个点，撂下笔，迅速迈开步子上了楼梯。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "b3102yh3fvus",
+      "kind": "line",
+      "title": "",
+      "text": "找到瓦伦缇娜曾经存在的证据比她想象中要简单，她原以为要敲遍所有房门来着。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "lisaw0gvfvus",
+      "kind": "line",
+      "title": "",
+      "text": "一名秃头老绅士在一间排满书柜的休息室来回踱步，挠着他后脑勺上仅存的几缕白发，符合陷入麻烦的当事人基础症状。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "e5ybr4rgfvus",
+      "kind": "line",
+      "title": "",
+      "text": "重点是塞梅尔维斯一眼就瞥见了沙发上的手提包，上次见到瓦伦缇娜时她正是背着这款。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "vli2cae1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "她敲了敲没锁的屋门，向那可怜的老头打了个招呼。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "v1lri4rifvus",
+      "kind": "line",
+      "title": "",
+      "text": "“范肖先生。”",
+      "speakerId": "ol00000l",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "l7insfjhfvus",
+      "kind": "line",
+      "title": "",
+      "text": "显然秃头绅士没有预料到无预约的访客突然在背后说话，“哎哟”一声脚下一滑，一屁股栽在沙发上。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "e01bsphyfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“你……你……”他盯着塞梅尔维斯的红色瞳孔，“血……”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "4mkmg8s8fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我对您的血没兴趣。”塞梅尔维斯说道，“我猜，既然楼下的接待员先生都知道我是谁，您要听到瓦伦缇娜这名字，想必也该清楚我来的目的吧。”",
+      "speakerId": "ol00000a",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "iso2nsz9fvus",
+      "kind": "line",
+      "title": "",
+      "text": "如果说上一秒他还是踩到陷阱的大鹅在蹬腿，听到那个名字以后就彻底变成了菜板上躺平的食材。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "h8nqerk0fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“……瓦伦缇娜女士……消失了……”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "6kq3e3azfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯目光从手提包扫到了书桌的那张软盘上。“我知道，就是在她拿起这东西以后发生的事。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "c6zn3434fvus",
+      "kind": "line",
+      "title": "",
+      "text": "他忽然活了过来，像是看见眼前女性的脸上写着：危机处理专家。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "hvfkj227fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“对、对，您是塞梅尔维斯小姐吧，瓦伦缇娜女士经常提到的那位优秀的调查员，您能证明她消失与我无关吗？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "fycz10myfvus",
+      "kind": "line",
+      "title": "",
+      "text": "看来血食怪圈子对他的威胁比基金会来调查非法藏品的处罚更严峻。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "mkr8yslbfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“首先得看您是否愿意配合。”塞梅尔维斯指着软盘问他：“请问这东西哪来的？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "zjg88tftfvus",
+      "kind": "line",
+      "title": "",
+      "text": "五英寸黑色软盘，上面印着基金会和拉普拉斯的徽记，盘身空白标签处有一个手写的编号，从命名方式看是用于空间传送的。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "c56unti4fvus",
+      "kind": "line",
+      "title": "",
+      "text": "这绝对是非正常途径流出的基金会财产，无论是监守自盗还是意外失窃，只要在总部查一查记录，就能知道它究竟记载着什么传送术式。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "neessao3fvus",
+      "kind": "line",
+      "title": "",
+      "text": "秃头范肖犹豫了，似乎在权衡说实话的代价，以及塞梅尔维斯究竟是站在谁的角度问的这句话。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "trvo83h2fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我还在放假，并不是来查案子的，这次是受雇于瓦伦缇娜。”塞梅尔维斯察觉到他额头皱纹里夹住的疑惑，“不知道软盘的来历，就没法知道瓦伦缇娜的下落，您也不希望她在这失踪的消息传开吧？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "fj1ezgypfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“……这行的要求不能透露供货商情报，请恕我无法说明，塞梅尔维斯小姐。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "qumajccofvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯用鼻子轻轻哼了一声，缓缓踱步到地毯中央，她能感受到属于瓦伦缇娜残留的神秘术波动，就像周身有一圈淡淡的雾气，是她永远也忘不掉的酒红色。瓦伦缇娜就是在这里触发了软盘的传送术。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "mhs9jq8nfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她的靴子迈出确切的一步，踩在那个高跟鞋压痕上。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "g9kpm77sfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“范肖先生，您瞧，现在的情况是——您提供的软盘存在严重缺陷，它不仅‘吞噬’了瓦伦缇娜女士，还在这间书房里留下了一串足以让基金会追踪到这次非法所得的信号。噢，基金会的问题在瓦伦缇娜女士的族人面前似乎都不值一提了。瓦伦缇娜女士属于是替您‘试了毒’，结果呢，她正在那个隔绝了一切的地方思考如何处置这张软盘……”塞梅尔维斯留出一秒的停顿，“……的原主。”",
+      "speakerId": "ol00000l",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "rsgrubbwfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她指向范肖，秃头绅士脑门的亮光骤然暗了好几度。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "x9jgjso6fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“这件事跟我真的没关系，送这张软盘的人说它能处理一些非生物危险品，没说它能把一个神秘学家传送走啊。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "spmkv0agfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我可以不问它的来历，但您应该知道传送软盘只有一次使用机会，之后就是废品一张。而那次机会，已经被瓦伦缇娜女士‘替你’用掉了。”塞梅尔维斯拿起了软盘什么都没感觉到，在接触它前，其实并不确定自己说的这点。“所以，我可以将它作为瓦伦缇娜的交易物带走吧？金额嘛，张软盘就权当是您支付给她的‘试用保险’。如果您觉得这个价格不够公道，我非常乐意为您当场拟定一份法律风险告知书，当然是以瓦伦缇娜女士的名义。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "zjiphcx9fvus",
+      "kind": "line",
+      "title": "",
+      "text": "范肖“呃”了一声，张着嘴说不出话来。十几秒后，他重重拍了拍自己的额头两下，“……塞梅尔维斯小姐，只要别让瓦伦缇娜女士投诉，软盘随你处置，现在它是你的了。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "tv4qbu8mfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“谢谢您的配合，我一定在瓦伦缇娜女士面前替您美言几句。”塞梅尔维斯拿起瓦伦缇娜的手提包，把软盘塞了进去便转身离开。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "7mhp20u8fvus",
+      "kind": "line",
+      "title": "",
+      "text": "她为什么明明在休假，还是要赶时间呢？",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "905hy7ctfvus",
+      "kind": "line",
+      "title": "",
+      "text": "楼下的接待员看见她一人下来，没多过问原因，只是提醒道：“塞梅尔维斯小姐，外边还在下雨，伞架有免费提供给客人的雨伞，您可以拿一把。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "smhkfwixfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“谢谢，不必了。”塞梅尔维斯礼貌性地笑了笑，推开门走进雨中，仅仅是为了借助冰冷雨水让人冷静的效果。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "yrtn4fswfvus",
+      "kind": "line",
+      "title": "",
+      "text": "因为在她停止回复后，瓦伦缇娜有半小时没发来消息。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "v2e4czm7fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯一边往地铁走，一边掏出基金会新发的通讯器，这台设备同样提前录入了默认的联系人和各部门的电话。她点选着名单，一瞬间竟然寄望能看见瓦伦缇娜的名字，不过在切到技术档案室电话时，这个小插曲就被她翻了页。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "84azhgdyfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她拨通了电话，对面很快就有人接听了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "6fqhhotmfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“塞梅尔维斯，申请查询一张软盘的术式作用，编号是LSCC-TPT-LDN-ERR。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ivb0viokfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“好的，塞梅尔维斯调查员，请稍等。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "90o8kglkfvus",
+      "kind": "line",
+      "title": "",
+      "text": "在对方沉默的时刻，塞梅尔维斯又看了一眼她的专属手机，信息依旧停留在最后那条短信上。她想发点什么，按进编辑菜单，拇指悬空在按键上停了几秒，还是把手机熄了屏。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "6urhoznbfvus",
+      "kind": "line",
+      "title": "",
+      "text": "听筒那边传来了回复：“……为您查询好了，这个编号是第六次暴雨前生产的传送软盘，它指向伦敦地下，设计上是专门运送需要单独隔离的神秘学物品的，目前已停止使用，末尾的ERR代表错误的意思。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "29l54thffvus",
+      "kind": "line",
+      "title": "",
+      "text": "“能查到具体位置吗？不久前有名神秘学家触发了传送术式，被送到了那个密闭空间，那里切断了任何神秘术，她没法自己出来。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "uvr0vgfufvus",
+      "kind": "line",
+      "title": "",
+      "text": "对面又是一阵沉默，最后的声音是椅子在地面上移动了几寸，似乎离开了电话去了别处。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "omvmurevfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯有些不耐烦地用手指敲着属于瓦伦缇娜的手提包，道德和理智拦住了她检查包里装着什么的念头。雨滴落在真皮表面，画出了一道道水痕。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "38sh2dgjfvus",
+      "kind": "line",
+      "title": "",
+      "text": "我可不负责给你的包挡雨。她心里想着，却还是把它收到了自己天鹅绒斗篷里。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "zr0pcrp1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“塞梅尔维斯调查员，您还在吗？”接线员终于回来了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "j8cwilc8fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我在，现在是什么情况？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "0l9w6r9pfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“这个问题很特殊。那张软盘的作用是传送非生物，需要一个终端来强化术式效果，按理说不可能有神秘学家能在徒手接触下启动它——除非这位神秘学家非常强大，而且被识别为非……非人……莫非您说的神秘学家是——”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "cswvaqqtfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“是。基金会和重塑之手的老熟人，瓦伦缇娜。”塞梅尔维斯轻轻笑了一声，只有老血食怪能干出这样匪夷所思的事，也只有她会带来躲不掉的麻烦。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ge0h9uamfvus",
+      "kind": "line",
+      "title": "",
+      "text": "通讯器那头静了几秒，键盘声重新密集起来。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "xw9j9phpfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“调查员，这个收容室是堤岸工程时期的遗存，维多利亚堤岸填河造陆时建在了铁路隧道和下水道主管之间的夹层里。它的原始设计图纸在二战轰炸后的归档严重不全，一部分工程文件至今没有电子化。”键盘声停了一下，“而且目前原区域线下方的朱比利线在建延长线……”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "wr5wawb6fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“所以呢？”塞梅尔维斯耐着性子听完了历史遗留问题，这种长篇大论往往意味接下来要说的只有一件事：抱歉，我们没办法立刻解决。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "5vtq2hrkfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“抱歉……瓦伦缇娜女士具体被软盘传到了哪个房间，需要一间间从外部扫描确认，墙体在浇筑时就混入了抑制神秘术的符文，最后可能会采用暴力拆除的方式，这一切都需要结合建筑结构制定方案。瓦伦缇娜女士在里面只能等待救援。搜索需要至少一周……或者更久。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "alnks7zrfvus",
+      "kind": "line",
+      "title": "",
+      "text": "七天。对老血食怪来说时间不算长，但意味着塞梅尔维斯脑子里有七天会不得安宁。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "cqplye3yfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我能不能去现场缩小范围？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ycu6p90mfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“如果您确认了具体位置，可以开启通讯器的定位发送功能，我们会根据信号地点派人前往。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "w86gxdbvfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“请告诉我离白厅七号最近的地下入口。”塞梅尔维斯看了眼大道尽头的钟楼。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "b7y24sy7fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“……您稍等。”接线员敲了几下键盘，“最近的在区域线查令十字站，从白厅步行几分钟就到。站台最西端有一扇维修通道的铁门，铁门后面的螺旋台阶通到堤岸工程时期的原始夹层。需要替您联系地铁管理拿钥匙吗？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "yfke6ldxfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“不必了，谢谢，等我发送位置消息吧。”塞梅尔维斯挂断了通讯，她赶时间，不想再走什么官方流程了。没有什么门能拦住血食怪，除非是被没收了神秘术的那一个。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "sppjamrwfvus",
+      "kind": "line",
+      "title": "",
+      "text": "从瓦伦缇娜提到能感受到大本钟造成的震动这一点来看，她一定离市政区域不太远，也不会被关在更深的水道之下。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "r63cp9fdfvus",
+      "kind": "line",
+      "title": "",
+      "text": "这条讯息发送以后，塞梅尔维斯就往查令十字站跑去，如果能和瓦伦缇娜对上列车引起的振动时间，说不定可以估算出房间的大致位置。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "n5oxyqrnfvus",
+      "kind": "line",
+      "title": "",
+      "text": "但是直到她穿过挂着“游客止步”标识的铁栅栏往漆黑的隧道深处前进时，仍然没有收到瓦伦缇娜的回信。要么连信号都彻底屏蔽，要么她手机完全没电了，两件事都意味着从现在起她得靠自己缩小范围。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "rmarx71vfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯站在完全的黑暗里，让瞳孔扩张到极限。血食怪的夜视在黑暗中看到的也只是更多的黑暗。没有光子就没有视觉，瞳孔只是在扩大虚无。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "0u6q0524fvus",
+      "kind": "line",
+      "title": "",
+      "text": "她掏出了便携手电，不知不觉已经钻进了一个空气污浊的狭长通道，这里保留着施工后的痕迹，漂浮的尘埃或许都来自上个世纪。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "1x8eyku3fvus",
+      "kind": "line",
+      "title": "",
+      "text": "瓦伦缇娜可真能给她加难度，那她可要加价了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "49h0com3fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯伸出手扶住右侧墙壁，左手举起手电往前走，从地图上来看是往南。墙面是潮湿的，没有砖缝。通道宽度不是固定的直线，有时需要侧身通过，有时伸直手臂也碰不到另一侧，她猜测施工时就把承重桩包进了墙体。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "tcpuzk5dfvus",
+      "kind": "line",
+      "title": "",
+      "text": "瓦伦缇娜说的水流声她没听到，因为地下水道正好被收容室隔在更左边。虽然她从车站走出的距离还不算太远，但右侧明显能感受到几分钟传来一次的振动，那是从头顶传来的减速后列车碾过铁轨的动静。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "kmljckd4fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯摸墙默数了几下，一趟列车驶过大概会在当前位置造成四秒的强震。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "r1sl4h0jfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她又向前走了一百多米，渐渐发现墙体表面开始有裂缝出现。如果瓦伦缇娜能依靠这种物理间断发出讯息，就说明她在某个出现缝隙的墙体另一侧。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "sb3dk5r5fvus",
+      "kind": "line",
+      "title": "",
+      "text": "但具体呢？她总不能寄望于自己和瓦伦缇娜真的有来自血液连接上的心电感应吧。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "mesnu189fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯的手机这时突然震了一下。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ml4aco1wfvus",
+      "kind": "line",
+      "title": "",
+      "text": "在这种漆黑寂静的空间里，她的手抖得不比上次轻。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "nznyk78wfvus",
+      "kind": "line",
+      "title": "",
+      "text": "发送时间是五分钟前。她不知道瓦伦缇娜为什么没有回复更早的那条消息，而是发来一个没头没尾的单词。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gbw8n49ifvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯盯着屏幕上的字，大脑空白了几秒。然后身体先于脑子做出了反应——她的舌尖抵住了犬齿，鼻腔扩张，在吸进下一口气时放慢了速度。血食怪的本能在没有经过意识批准的情况下接管了呼吸系统。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "o7bsxmt9fvus",
+      "kind": "line",
+      "title": "",
+      "text": "头顶传来了列车引起的震动。这次更为强烈，频率也比刚才更高。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "fnx3fuekfvus",
+      "kind": "line",
+      "title": "",
+      "text": "是来自两个方向的列车在上下行交会了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ntgh9494fvus",
+      "kind": "line",
+      "title": "",
+      "text": "裂缝在她眼前张开了一毫米。血腥味从那道窄缝里涌进来，只有淡淡的一抹，若不是她对这股血液来源有着本能的记忆，她会把它当成铁轨润滑油的金属味忽略掉。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "m5i67gbkfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯小跑起来，她离答案很近了，血液的气息顺着她前方某个缝隙飘进了通道，源头的墙后就是瓦伦缇娜所在。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "zsq6bru2fvus",
+      "kind": "line",
+      "title": "",
+      "text": "几秒后，列车完全驶过，裂隙合上时掐断了血腥味，但塞梅尔维斯已经找到了那条划开半面墙体的裂痕。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "h46ib5ihfvus",
+      "kind": "line",
+      "title": "",
+      "text": "如果这条裂缝能让气味传出，说明它的宽度足以让一名血食怪雾化通过。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "0dynwxa1fvus",
+      "kind": "line",
+      "title": "",
+      "text": "她看了看表，还有五分钟大本钟就会整点报时。缝隙的产生一定是因为地铁隧道常年运行的结果，当年的工程没有预料到人们还会继续再工事更下方开凿线路。上下两条线的横向振动造成了墙体错位，来自大本钟的低频钟声通过地面传导了一个纵向的震动，如果列车在整点有一个交会，一定会形成共振高峰。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "95nqpuwwfvus",
+      "kind": "line",
+      "title": "",
+      "text": "那时她或许可以钻过去。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "rnpa5h4wfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯拿出基金会的通讯设备，按下了定位发送，又点开了给瓦伦缇娜的回复，最后一句话是“等我”。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "oh2j4b27fvus",
+      "kind": "line",
+      "title": "",
+      "text": "然后是她所等待的漫长五分钟，表的指针就像被黏住了一样。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "f7373m8pfvus",
+      "kind": "line",
+      "title": "",
+      "text": "第一下钟声从头顶斜上方传来，穿透了泥土、混凝土、维多利亚时期的碎砖和煤渣，在夹层通道里激起了一阵嗡鸣。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3kr8dmgafvus",
+      "kind": "line",
+      "title": "",
+      "text": "远处是渐渐加速的列车出站轮轨摩擦声，她应该庆幸英国人没在交通守时上欺骗外来游客。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "r6omplrgfvus",
+      "kind": "line",
+      "title": "",
+      "text": "第四下钟声带来的震动和列车交会段在墙体内部撞到了一起，塞梅尔维斯摸着的那道缝隙猛然张开，虽然只有两毫米，但她看到了缝隙对面的黑暗，闻到了瓦伦缇娜的血和香水的混合气味。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "x5bmyddwfvus",
+      "kind": "line",
+      "title": "",
+      "text": "第五下钟声时她化成了黑雾，雾化的感觉她已经熟悉了，正如瓦伦缇娜不经意指点过她的那样，就是彻底失去重量的一瞬，然后世界在感知层面上变成另一种质地。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "8184l23dfvus",
+      "kind": "line",
+      "title": "",
+      "text": "第六下钟声还没结束，她已经重新凝聚在墙的另一侧。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "6voxmwm3fvus",
+      "kind": "line",
+      "title": "",
+      "text": "这里是绝对的黑暗，时间紧迫的关系，塞梅尔维斯只来得及把自己带过来了，她终于感受到瓦伦缇娜这期间面对的是怎样的环境。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "9px1576rfvus",
+      "kind": "line",
+      "title": "",
+      "text": "气味确实是从黑暗里传来的，血的甜味和瓦伦缇娜皮肤的味道，以及她常用的香氛尾调，在这空间里均匀沉淀着。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "732yilrcfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯摸着墙壁转了一圈，她本担心突然一脚踢到什么而做足了心理准备，却连个石子都没碰到。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ztuopz16fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“瓦伦缇娜……？”她的声音有点失控。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "56yh299sfvus",
+      "kind": "line",
+      "title": "",
+      "text": "空气里有一声以为是幻听的笑，随后一双手从身后伸过来环住了她的腰。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "jpu5gg6sfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“感谢我的仁慈吧，塞梅尔维斯，还想多逗逗你的。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "1t50y05vfvus",
+      "kind": "line",
+      "title": "",
+      "text": "这让人想握紧拳头揍出去的语调塞梅尔维斯再熟悉不过了。瓦伦缇娜一点事也没有，甚至是从雾形态回复成实体的，也就是说她能使用神秘术，把她困在这里的术阵已经失效了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "1xsoxn61fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“你……”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "o3bab5ipfvus",
+      "kind": "line",
+      "title": "",
+      "text": "瓦伦缇娜冰冷的脸贴上了她的后颈。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3597or0gfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我只是想看你自愿来找我而已。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "33kzfr0hfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯胃里的焦灼感——从收到第一条短信前就开始累积的，被难吃巧克力和雨中奔走反复加码后在刚闻到血腥味达到顶峰又突然失去目标的那股感觉，在瓦伦缇娜说完这句话后转为了肾上腺素传导到四肢。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ybdfrrbmfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她用后背把瓦伦缇娜往墙上撞。那面本就受损的墙体掉下来几块松动的混凝土碎屑——力度或许真能省去救援小队几道拆墙的工序。塞梅尔维斯转身揪住她的衣领，“你这个……”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "6qumjjcjfvus",
+      "kind": "line",
+      "title": "",
+      "text": "她在各个语种的词汇记忆里寻找最狠的骂人话语。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "4wqfqcz7fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“混蛋。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "5zwgmcepfvus",
+      "kind": "line",
+      "title": "",
+      "text": "老血食怪自愿挨打，但老血食怪也会还击。瓦伦缇娜的膝盖在黑暗中准确找到了塞梅尔维斯裙下双腿间的空隙，外侧卡住她大腿一推，右手扶着她的腰往自己身上带。塞梅尔维斯的重心一下转移了，脚下一个踉跄，撞进瓦伦缇娜肩窝。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "q67jzsj0fvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯第二次被搂住只挣扎了两次就放弃了。她的呼吸还没有平缓，贴着瓦伦缇娜的颈侧进气，又从锁骨窝反弹回自己脸上。至少瓦伦缇娜没有死在一个不见天日的盒子里。就算她撒了谎，隔着衣领，隔着皮肤的脉搏也是真的。塞梅尔维斯在她的脉搏声里把攥着她后背衣料的手指一根接一根松开了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "1rns6cthfvus",
+      "kind": "line",
+      "title": "",
+      "text": "纯粹的黑暗能放大所有视觉之外的感官。头顶又有一列地铁经过，震动从墙面传进瓦伦缇娜的后背，再从瓦伦缇娜的胸口传进塞梅尔维斯的前胸，像一颗不在任何人体内、但她们都能听见的心跳。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "l9iv7q61fvus",
+      "kind": "line",
+      "title": "",
+      "text": "瓦伦缇娜的手指托住了她的下颌，拇指压着她的嘴角，低头吻了上去。贴合的角度偏了一点点，塞梅尔维斯不知道为什么要配合调整位置，让瓦伦缇娜能吸住她的下唇再从缝隙里探进舌尖。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "vkyyn0j3fvus",
+      "kind": "line",
+      "title": "",
+      "text": "她没有醉，也没被灌酒，但她的理智不再处理这件事，两人的舌头在黑暗中碰在一起。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "z0eezi3dfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我渴了。”瓦伦缇娜在充分舔过塞梅尔维斯的唾液后说了另一句讨打的话。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "53fud95ifvus",
+      "kind": "line",
+      "title": "",
+      "text": "“……你活该。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "avuzphjzfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我的意思是……”瓦伦缇娜的手移到了塞梅尔维斯领口，找到了领巾的结，把那条被雨水泡过后，已经半干不湿贴在脖子上的白缎领巾轻轻一拉，“你可以满足我的额外任务，当然，我会加钱。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "uvjmpt98fvus",
+      "kind": "line",
+      "title": "",
+      "text": "没等调查员接受任务，獠牙就刺进了皮肤。塞梅尔维斯一整天的紧绷感忽然彻底放下，痛觉信号还没来得及传导，伤口就被舌面覆上了。血食怪的唾液含有促进血管扩张和麻痹的成分，那瞬间让塞梅尔维斯感觉是自己在主动把血液往外送。她靠在瓦伦缇娜胸口，身体随着对方吞咽的次数渐渐松弛，二人一起沿着墙壁往下滑，最后面对面坐到了地上。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "krc0eibwfvus",
+      "kind": "line",
+      "title": "",
+      "text": "瓦伦缇娜松开了嘴，舌尖在伤口处压了几秒止血，把塞梅尔维斯扳进怀里。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "827cvzkofvus",
+      "kind": "line",
+      "title": "",
+      "text": "献完血的头晕和判断力失常是常有的现象，塞梅尔维斯没制止瓦伦缇娜的手在身上不安分地游走。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ba7rdf8vfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“你的手机呢？就算没电了，也该在这屋里的某处吧。”她的理智恢复后想起这个刚才进来就觉得奇怪的问题。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ona64cm0fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“在隔壁。我特地挑了个墙缝最大的屋子等你。这里的墙早就被震得七零八落了，那些裂缝不够大的房间，就算能雾化，血食怪也没法从外侧进入。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "sgjrgc3zfvus",
+      "kind": "line",
+      "title": "",
+      "text": "沉默。然后是一声深呼吸，音量刚好够在密闭空间里被听见。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gptox432fvus",
+      "kind": "line",
+      "title": "",
+      "text": "头顶又过了一班地铁。晚高峰在慢慢过去，这次震动的强度比之前弱了一截，墙面只微微抖了一下，连灰尘都没掉。两个人靠着墙坐在完全的黑暗里，刚才那阵从愤怒到吻到吸血到滑坐在地上的连锁反应终于停稳了。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "iroj3vygfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“恭喜塞梅尔维斯调查员，你成功完成了任务。想要什么报酬？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "rxlqczvifvus",
+      "kind": "line",
+      "title": "",
+      "text": "“我的额外报酬里应该包含一顿晚饭。”塞梅尔维斯按住了那只正在解她胸前口子的手，“我发送位置了，救援小队很快就来，在那之前你能不能老实点。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "fv7weo66fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“意思是在那之后可以？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "kjxymhkkfvus",
+      "kind": "line",
+      "title": "",
+      "text": "“现在说的是晚饭的事。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "m5jswfx7fvus",
+      "kind": "line",
+      "title": "",
+      "text": "“好吧亲爱的，想吃什么？”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "4t277caifvus",
+      "kind": "line",
+      "title": "",
+      "text": "“你来推荐——不许趁机灌酒，也不能是英国菜。”",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "tx7i9q8bfvus",
+      "kind": "line",
+      "title": "",
+      "text": "塞梅尔维斯往瓦伦缇娜身上重重一靠，闭上了眼。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "wtx8h42wfvus",
+      "kind": "line",
+      "title": "",
+      "text": "END",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "l9juymjefvus",
+      "kind": "line",
+      "title": "遮阳篷下",
+      "text": "手心突然传来了毫无预兆的震动。",
+      "speakerId": "ol00000a",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "e7t1cdakfvus",
+      "kind": "instruction",
+      "title": "",
+      "text": "clue_delay = true; battery -= 5",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "u4foz8s3fvus",
+      "kind": "instruction",
+      "title": "",
+      "text": "clue_water = true; clues += 1; battery -= 15",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "pnidxc2qfvus",
+      "kind": "instruction",
+      "title": "",
+      "text": "clue_bell = true; clues += 1; battery -= 15",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ro4hsj5ofvus",
+      "kind": "instruction",
+      "title": "",
+      "text": "clue_train = true; clues += 1; battery -= 15",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "pm7tzgrgfvus",
+      "kind": "line",
+      "title": "省点电",
+      "text": "保留电量,等我消息。",
+      "speakerId": "ol00000a",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "glhacvi1fvus",
+      "kind": "condition",
+      "title": "",
+      "text": "battery > 20",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "f2zp8ng2fvus",
+      "kind": "line",
+      "title": "结局 · 薛定谔的血食怪",
+      "text": "屏幕再没有亮起。她要靠救援队一间间扫描,至少一周。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "jxmfolc3fvus",
+      "kind": "line",
+      "title": "白厅七号",
+      "text": "那扇没有门牌的木门虚掩着。",
+      "speakerId": "ol00000a",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "tuk3cnxufvus",
+      "kind": "instruction",
+      "title": "",
+      "text": "has_floppy = true",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "54dllwrcfvus",
+      "kind": "line",
+      "title": "空手而归",
+      "text": "这行的要求不能透露供货商情报。",
+      "speakerId": "ol00000l",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "c6tn65bpfvus",
+      "kind": "instruction",
+      "title": "",
+      "text": "got_intel = true",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "gpoi3hjrfvus",
+      "kind": "line",
+      "title": "游客止步",
+      "text": "她掏出便携手电,钻进空气污浊的狭长通道。",
+      "speakerId": "ol00000a",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "v9e4ezryfvus",
+      "kind": "condition",
+      "title": "",
+      "text": "clues >= 2",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ynfu3bwafvus",
+      "kind": "line",
+      "title": "结局 · 摸错了墙",
+      "text": "通道有几百米长,她在错误的一段来回摸索,直到整点过去。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "6p9sha2mfvus",
+      "kind": "line",
+      "title": "血",
+      "text": "血腥味从那道窄缝里涌进来,只有淡淡的一抹。",
+      "speakerId": "ol00000a",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "3deyfr23fvus",
+      "kind": "instruction",
+      "title": "",
+      "text": "position_sent = true",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "swg0ftwofvus",
+      "kind": "line",
+      "title": "结局 · 错过的共振",
+      "text": "裂缝只张开一毫米就合上了。下一个整点还有五十九分钟。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "ez3gckrufvus",
+      "kind": "scene",
+      "title": "雾化穿越",
+      "text": "彻底失去重量的一瞬,世界在感知层面上变成另一种质地。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "qpd9h9zwfvus",
+      "kind": "line",
+      "title": "第五下钟声",
+      "text": "她化成了黑雾。",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "sa83e493fvus",
+      "kind": "line",
+      "title": "感谢我的仁慈吧",
+      "text": "一双手从身后伸过来环住了她的腰。",
+      "speakerId": "ol00000g",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    },
+    {
+      "id": "926bf5qvfvus",
+      "kind": "line",
+      "title": "结局 A · 晚饭:待定",
+      "text": "你来推荐——不许趁机灌酒,也不能是英国菜。",
+      "speakerId": "ol00000a",
+      "createdAt": 1785768472324,
+      "updatedAt": 1785768472324
+    }
+  ]
+}
