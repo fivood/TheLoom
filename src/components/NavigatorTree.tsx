@@ -546,7 +546,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
           )}
         </div>
       </div>
-      <div className="items">
+      <div className="items" onDragOver={(e) => { if (dragRef.current) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } }}>
         {renderTree(null, 0, new Set())}
         {!favoritesOnly && items.length === 0 && folders.length === 0 && (
           <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部「＋ {createLabel}」新建,或「▤ 文件夹」建立分组</div>

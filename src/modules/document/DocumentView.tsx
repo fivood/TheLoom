@@ -375,7 +375,24 @@ export default function DocumentView() {
         emptyLabel="还没有场景"
       />}
 
-      <div className="pane-col">
+      <div className={`pane-col${focusMode ? ' doc-focus-pane' : ''}`}>
+        {focusMode ? (
+          <div className="doc-focus-toolbar">
+            {selected && (
+              <>
+                <input
+                  className="doc-focus-title"
+                  value={selected.name}
+                  onChange={(e) => patchDoc((d) => { d.name = e.target.value; })}
+                  placeholder="场景名称"
+                />
+                <span className="doc-focus-words">{documentWordCount(selected)}字</span>
+              </>
+            )}
+            <span style={{ flex: 1 }} />
+            <button className="ghost" onClick={() => setFocusMode(false)}>退出专注</button>
+          </div>
+        ) : (
         <div className="toolbar">
           <button className="btn-create" onClick={() => createDoc()}>＋ 新场景</button>
           <div className="doc-mode-switch">
@@ -386,10 +403,10 @@ export default function DocumentView() {
             </button>
           </div>
           <button
-            className={focusMode ? 'primary' : 'ghost'}
+            className="ghost"
             title="隐藏导航与属性栏，专注正文"
-            onClick={() => setFocusMode((value) => !value)}
-          >{focusMode ? '退出专注' : '专注'}</button>
+            onClick={() => setFocusMode(true)}
+          >专注</button>
           <button className="ghost" onClick={() => setStructureToolsOpen(true)}>长篇工具</button>
           <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
             <option value="all">全部分类</option>
@@ -431,8 +448,22 @@ export default function DocumentView() {
                 : 'Enter 新段，Shift+Enter 换行，空段首输入 / 切换块类型'}
           </span>
         </div>
+        )}
 
-        {mode === 'manuscript' ? (
+        {focusMode ? (
+          selected ? (
+            <div className="doc-editor doc-focus-editor">
+              <BlocksEditor
+                doc={selected}
+                variant="focus"
+                focusBlockId={focusBlockId}
+                onActiveChange={setActiveBlockId}
+              />
+            </div>
+          ) : (
+            <div className="empty-hint" style={{ margin: 'auto' }}>点击左侧场景后进入专注模式</div>
+          )
+        ) : mode === 'manuscript' ? (
           <Manuscript
             docs={manuscriptDocs}
             selectedId={selectedId}

@@ -36,7 +36,7 @@ export default function BlocksEditor({
   focusBlockId?: string | null;
   annotationCounts?: Map<string, number>;
   onActiveChange?: (blockId: string | null) => void;
-  variant?: 'writing' | 'structure';
+  variant?: 'writing' | 'structure' | 'focus';
 }) {
   const entities = useLoom((s) => s.project.entities);
   const flows = useLoom((s) => s.project.flows);
@@ -494,7 +494,7 @@ export default function BlocksEditor({
               }}
               onClick={() => setActiveBlockId(b.id)}
             >
-              <div className="doc-block-side">
+              {variant !== 'focus' && <div className="doc-block-side">
                 <button
                   className="doc-block-kind doc-kind-button"
                   type="button"
@@ -511,7 +511,7 @@ export default function BlocksEditor({
                   <button className="ghost icon-btn" title="下移 Alt+↓" onClick={() => moveBlock(b.id, 1)}>↓</button>
                   <button className="ghost icon-btn" title="删除块" onClick={() => removeBlock(b.id)}><Icon name="trash" size={12} /></button>
                 </div>
-              </div>
+              </div>}
               <div className="doc-block-main">
                 {variant === 'structure' && (b.type === 'paragraph' || b.type === 'action' || b.type === 'dialogue') && (
                   <div className="doc-flow-role-row">
@@ -553,7 +553,7 @@ export default function BlocksEditor({
         })}
       </div>
 
-      <div className="doc-insert-bar">
+      {variant !== 'focus' && <div className="doc-insert-bar">
         {COMMON_TYPES.map((type) => (
           <button key={type} className="ghost" onClick={() => insertBlock(type)}>
             ＋ {DOC_BLOCK_LABEL[type]}
@@ -572,7 +572,7 @@ export default function BlocksEditor({
             ))}
           </div>
         )}
-      </div>
+      </div>}
     </>
   );
 }

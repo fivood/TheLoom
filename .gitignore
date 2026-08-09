@@ -5,6 +5,7 @@ cli-dist/
 examples/unity-demo/conformance/bin/
 examples/unity-demo/conformance/obj/
 examples/old-london/dist/
+examples/paris-party/project/
 examples/godot-demo/old_london_package.json
 *.tsbuildinfo
 src-tauri/target/

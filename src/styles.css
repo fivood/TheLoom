@@ -2359,6 +2359,84 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .doc-blocks-writing .doc-block.paragraph .doc-block-main textarea { white-space: pre-wrap; }
 .doc-blocks-writing .doc-block-tools { flex-direction: row; }
 
+/* ---------- 专注模式(类 Obsidian) ---------- */
+.doc-focus-pane { background: var(--bg); }
+.doc-focus-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 24px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.doc-focus-title {
+  font-size: 18px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  min-width: 120px;
+  max-width: 400px;
+}
+.doc-focus-title:focus { outline: none; border-bottom: 1px solid var(--border-light); }
+.doc-focus-words { font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
+.doc-focus-editor { align-items: center; }
+.doc-blocks-focus {
+  max-width: 700px;
+  margin: 0 auto;
+  gap: 0;
+  padding: 32px 24px 120px;
+}
+.doc-blocks-focus .doc-writing-block {
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+.doc-blocks-focus .doc-writing-block.active {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.doc-blocks-focus .doc-writing-block:hover { background: transparent; }
+.doc-blocks-focus .doc-block-main { flex: 1; }
+.doc-blocks-focus .doc-block-main textarea,
+.doc-blocks-focus .doc-block-main .rich-text-input textarea {
+  resize: none;
+  font-size: 16px;
+  line-height: 2;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.doc-blocks-focus .doc-block-main textarea:focus,
+.doc-blocks-focus .doc-block-main .rich-text-input textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+.doc-blocks-focus .doc-block.paragraph .doc-block-main textarea { white-space: pre-wrap; }
+.doc-blocks-focus .rich-toolbar { display: none; }
+.doc-blocks-focus .doc-speaker-row input {
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.doc-blocks-focus .doc-speaker-row button { display: none; }
+.doc-blocks-focus .doc-subheading-row select { display: none; }
+.doc-blocks-focus .doc-subheading-row input {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.doc-blocks-focus .doc-slash-menu {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .doc-kind-button {
   border: 0;
   font-family: inherit;
@@ -2584,7 +2662,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   padding: 1px 3px;
   font-size: 10px;
 }
-.navigator-object-row { gap: 4px; }
+.navigator-object-row { gap: 4px; position: relative; }
 .navigator-favorite {
   flex: 0 0 auto;
   min-width: 22px;
