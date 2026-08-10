@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNav } from '../../search';
 import { useLoom } from '../../store';
 import type { Document, Folder, WritingCountMode } from '../../types';
-import { DOCUMENT_FOLDER_ROLE_LABEL } from '../../types';
+import { DOC_STATUS_LABEL, DOCUMENT_FOLDER_ROLE_LABEL } from '../../types';
 import { documentFolderAncestors, orderedDocumentFolders } from '../../documentStructure';
 import {
   countDocumentWriting, dailyStatValue, recentWritingSeries, writingDateKey,
@@ -31,8 +31,9 @@ function ProgressBar({ current, target }: { current: number; target?: number }) 
   );
 }
 
-function TargetInput({ value, onChange, label }: {
+function TargetInput({ value, aggregated, onChange, label }: {
   value?: number;
+  aggregated?: number;
   onChange: (value: number | undefined) => void;
   label: string;
 }) {
@@ -44,7 +45,7 @@ function TargetInput({ value, onChange, label }: {
       step={100}
       value={value ?? ''}
       aria-label={label}
-      placeholder="目标"
+      placeholder={aggregated ? `≈${aggregated}` : '目标'}
       onChange={(event) => {
         const next = Number(event.target.value);
         onChange(event.target.value && Number.isFinite(next) && next > 0 ? Math.floor(next) : undefined);
@@ -70,6 +71,12 @@ export default function WritingDashboard() {
     [project.documents, mode, bodyOnly],
   );
   const total = [...documentCounts.values()].reduce((sum, value) => sum + value, 0);
+  const doneTotal = useMemo(
+    () => project.documents
+      .filter((doc) => doc.status === 'done')
+      .reduce((sum, doc) => sum + (documentCounts.get(doc.id) ?? 0), 0),
+    [project.documents, documentCounts],
+  );
   const series = useMemo(
     () => recentWritingSeries(progress),
     [progress],
@@ -94,6 +101,57 @@ export default function WritingDashboard() {
     return result;
   }, [folders, project.documents, project.folders]);
 
+  const effectiveTargets = useMemo(() => {
+    const result = new Map<string, number>();
+    for (let i = folders.length - 1; i >= 0; i--) {
+      const folder = folders[i];
+      const manual = progress.folderTargets?.[folder.id];
+      if (manual) { result.set(folder.id, manual); continue; }
+      let sum = 0;
+      let hasChild = false;
+      for (const child of folders) {
+        if (child.parentId === folder.id) {
+          const t = result.get(child.id);
+          if (t !== undefined) { sum += t; hasChild = true; }
+        }
+      }
+      for (const doc of project.documents) {
+        if (doc.folderId === folder.id && doc.wordTarget) {
+          sum += doc.wordTarget;
+          hasChild = true;
+        }
+      }
+      if (hasChild) result.set(folder.id, sum);
+    }
+    return result;
+  }, [folders, progress.folderTargets, project.documents]);
+
+  const folderDoneWords = useMemo(() => {
+    const result = new Map<string, number>();
+    for (const folder of folders) {
+      const docs = folderDocuments.get(folder.id) ?? [];
+      result.set(folder.id, docs
+        .filter((doc) => doc.status === 'done')
+        .reduce((sum, doc) => sum + (documentCounts.get(doc.id) ?? 0), 0));
+    }
+    return result;
+  }, [folders, folderDocuments, documentCounts]);
+
+  const projectEffectiveTarget = useMemo(() => {
+    if (progress.projectTarget) return progress.projectTarget;
+    const topFolders = folders.filter((f) =>
+      !f.parentId || !folders.some((p) => p.id === f.parentId));
+    let sum = 0;
+    let has = false;
+    for (const f of topFolders) {
+      const t = effectiveTargets.get(f.id);
+      if (t !== undefined) { sum += t; has = true; }
+    }
+    return has ? sum : undefined;
+  }, [progress.projectTarget, folders, effectiveTargets]);
+
+  const projectAggregated = !progress.projectTarget ? projectEffectiveTarget : undefined;
+
   const currentRevision = Math.max(0, ...project.documents.map((document) => document.revision ?? 0));
   const revisionCount = currentRevision
     ? project.documents.filter((document) => document.revision === currentRevision).length
@@ -109,14 +167,15 @@ export default function WritingDashboard() {
   const allUnderTargetChapters = folders
     .filter((folder) => folder.documentRole === 'chapter')
     .map((folder) => {
-      const documents = folderDocuments.get(folder.id) ?? [];
-      const count = documents.reduce((sum, document) => sum + (documentCounts.get(document.id) ?? 0), 0);
-      const target = progress.folderTargets?.[folder.id];
-      return { folder, documents, count, target };
+      const done = folderDoneWords.get(folder.id) ?? 0;
+      const target = effectiveTargets.get(folder.id);
+      return { folder, done, target };
     })
-    .filter((item) => item.target && item.count < item.target)
-    .sort((a, b) => (a.count / (a.target ?? 1)) - (b.count / (b.target ?? 1)));
+    .filter((item) => item.target && item.done < item.target)
+    .sort((a, b) => (a.done / (a.target ?? 1)) - (b.done / (b.target ?? 1)));
   const underTargetChapters = allUnderTargetChapters.slice(0, 6);
+
+  const doneScenes = project.documents.filter((doc) => doc.status === 'done').length;
 
   const setProgress = (mutate: (state: NonNullable<typeof project.writingProgress>) => void) => {
     update((draft) => {
@@ -140,7 +199,7 @@ export default function WritingDashboard() {
       <div className="writing-dashboard-head">
         <div>
           <h2>写作进度</h2>
-          <p>目标、每日新增和修订待办都集中在这里。正文编辑会自动记录，撤销不会重复累计。</p>
+          <p>场景标记「完成」后计入进度。目标可逐级设定，也可由子级自动汇总。</p>
         </div>
         <div className="writing-count-controls">
           <label>
@@ -168,17 +227,19 @@ export default function WritingDashboard() {
 
       <div className="writing-summary-grid">
         <section className="writing-summary-card">
-          <span>全书进度</span>
-          <strong>{formatCount(total)} <small>{unit}</small></strong>
+          <span>完成进度</span>
+          <strong>{formatCount(doneTotal)} <small>{unit}</small></strong>
           <div className="writing-summary-target">
             <TargetInput
               value={progress.projectTarget}
+              aggregated={projectAggregated}
               label="全书目标"
               onChange={(value) => setProgress((state) => { state.projectTarget = value; })}
             />
-            <em>{progress.projectTarget ? `${progressPercent(total, progress.projectTarget)}%` : '—'}</em>
+            <em>{projectEffectiveTarget ? `${progressPercent(doneTotal, projectEffectiveTarget)}%` : '—'}</em>
           </div>
-          <ProgressBar current={total} target={progress.projectTarget} />
+          <ProgressBar current={doneTotal} target={projectEffectiveTarget} />
+          <small className="writing-summary-detail">{doneScenes} 个场景已完成 · 全书共 {formatCount(total)} {unit}</small>
         </section>
         <section className="writing-summary-card accent">
           <span>今日新增</span>
@@ -203,35 +264,49 @@ export default function WritingDashboard() {
           <div className="writing-panel-title">
             <div>
               <h3>目标树</h3>
-              <p>按全书、卷、章、场景逐级查看与设定</p>
+              <p>进度只计「完成」场景，目标未设时由子级汇总</p>
             </div>
             <span>{COUNT_MODE_LABEL[mode]}{bodyOnly ? ' · 仅正文' : ''}</span>
           </div>
           <div className="writing-target-tree">
             {folders.map((folder) => {
               const documents = folderDocuments.get(folder.id) ?? [];
-              const current = documents.reduce((sum, document) => sum + (documentCounts.get(document.id) ?? 0), 0);
-              const target = progress.folderTargets?.[folder.id];
-              const percent = progressPercent(current, target);
+              const done = folderDoneWords.get(folder.id) ?? 0;
+              const totalWords = documents.reduce((sum, doc) => sum + (documentCounts.get(doc.id) ?? 0), 0);
+              const manualTarget = progress.folderTargets?.[folder.id];
+              const effective = effectiveTargets.get(folder.id);
+              const aggregated = !manualTarget ? effective : undefined;
+              const percent = progressPercent(done, effective);
+              const doneCount = documents.filter((doc) => doc.status === 'done').length;
               return (
                 <div key={folder.id} className={`writing-target-group writing-target-${folder.documentRole}`}>
                   <div className="writing-target-row" style={{ paddingLeft: 14 + folderDepth(folder) * 18 }}>
                     <span className="writing-role">{DOCUMENT_FOLDER_ROLE_LABEL[folder.documentRole!]}</span>
                     <strong title={folder.name}>{folder.name}</strong>
-                    <span className="writing-target-count">{formatCount(current)}{target ? ` / ${formatCount(target)}` : ''}</span>
+                    <span className="writing-target-count">
+                      {formatCount(done)}{effective ? ` / ${formatCount(effective)}` : ''}
+                      <small title={`共 ${formatCount(totalWords)} ${unit}，${doneCount}/${documents.length} 场景完成`}>
+                        {' '}({doneCount}/{documents.length})
+                      </small>
+                    </span>
                     <TargetInput
-                      value={target}
+                      value={manualTarget}
+                      aggregated={aggregated}
                       label={`${folder.name}目标`}
                       onChange={(value) => setFolderTarget(folder.id, value)}
                     />
                     <span className="writing-target-percent">{percent === undefined ? '—' : `${percent}%`}</span>
                   </div>
-                  <ProgressBar current={current} target={target} />
+                  <ProgressBar current={done} target={effective} />
                   {folder.documentRole === 'chapter' && documents.map((document) => {
                     const count = documentCounts.get(document.id) ?? 0;
-                    const scenePercent = progressPercent(count, document.wordTarget);
+                    const isDone = document.status === 'done';
+                    const scenePercent = progressPercent(isDone ? count : 0, document.wordTarget);
                     return (
-                      <div key={document.id} className="writing-scene-row">
+                      <div key={document.id} className={`writing-scene-row${isDone ? ' scene-done' : ''}`}>
+                        <span className={`writing-scene-status status-${document.status ?? 'outline'}`} title={DOC_STATUS_LABEL[document.status ?? 'outline']}>
+                          {DOC_STATUS_LABEL[document.status ?? 'outline']}
+                        </span>
                         <button className="writing-scene-open" onClick={() => openDocument(document.id)}>
                           {document.name}
                         </button>
@@ -252,7 +327,7 @@ export default function WritingDashboard() {
               );
             })}
             {folders.length === 0 && (
-              <div className="empty-hint">先在场景导航中建立“卷”和“章”，这里就会生成四级目标树。</div>
+              <div className="empty-hint">先在场景导航中建立"卷"和"章"，这里就会生成四级目标树。</div>
             )}
           </div>
         </section>
@@ -320,10 +395,13 @@ export default function WritingDashboard() {
           {underTargetChapters.map((item) => (
             <button
               key={item.folder.id}
-              onClick={() => item.documents[0] && openDocument(item.documents[0].id)}
+              onClick={() => {
+                const docs = folderDocuments.get(item.folder.id);
+                if (docs?.[0]) openDocument(docs[0].id);
+              }}
             >
               <strong>{item.folder.name}</strong>
-              <small>{formatCount(item.count)} / {formatCount(item.target!)} · {progressPercent(item.count, item.target)}%</small>
+              <small>{formatCount(item.done)} / {formatCount(item.target!)} · {progressPercent(item.done, item.target)}%</small>
             </button>
           ))}
           {underTargetChapters.length === 0 && <p className="empty-hint">已设目标的章节均已达标</p>}

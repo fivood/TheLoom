@@ -290,7 +290,7 @@ export default function BlocksEditor({
           <RichTextInput
             value={b.text}
             onChange={(text) => patchBlock(b.id, { text })}
-            rows={Math.max(2, Math.min(12, b.text.split('\n').length + Math.ceil(b.text.length / 72)))}
+            rows={undefined}
             inputId={b.id}
             onFocus={() => setActiveBlockId(b.id)}
             onKeyDown={(e) => handleTextKey(e, b)}
@@ -433,7 +433,7 @@ export default function BlocksEditor({
       <textarea
         data-doc-input={b.id}
         className={b.type === 'quote' ? 'doc-quote' : undefined}
-        rows={b.type === 'heading' ? 1 : Math.max(2, b.text.split('\n').length)}
+        rows={b.type === 'heading' ? 1 : undefined}
         value={b.text}
         onFocus={() => setActiveBlockId(b.id)}
         onChange={(e) => patchBlock(b.id, { text: e.target.value })}

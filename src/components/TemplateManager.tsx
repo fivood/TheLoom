@@ -127,6 +127,8 @@ export default function TemplateManager({ onClose }: { onClose: () => void }) {
                         onChange={(e) => patchRow(i, { type: e.target.value === 'text' ? undefined : e.target.value as EntityFieldType })}
                       >
                         <option value="text">文本</option>
+                        <option value="number">数值</option>
+                        <option value="boolean">布尔</option>
                         <option value="entity">单实体</option>
                         <option value="entities">多实体</option>
                       </select>

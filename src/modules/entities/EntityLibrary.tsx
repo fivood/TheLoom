@@ -191,6 +191,17 @@ export default function EntityLibrary() {
 
   const [editingTemplate, setEditingTemplate] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  const fieldColumns = useMemo(() => {
+    const seen = new Map<string, EntityFieldType>();
+    for (const e of filtered) {
+      for (const f of e.fields) {
+        if (f.label && !seen.has(f.label)) seen.set(f.label, f.type ?? 'text');
+      }
+    }
+    return Array.from(seen, ([label, type]) => ({ label, type }));
+  }, [filtered]);
 
   const createEntity = () => {
     const kind = kindFilter === 'all' ? 'character' : kindFilter;
@@ -255,49 +266,172 @@ export default function EntityLibrary() {
             {KINDS.map((kind) => <option key={kind} value={kind}>{ENTITY_KIND_LABEL[kind]}</option>)}
           </select>
           <button className="ghost" title="按类型设置字段模板" onClick={() => setEditingTemplate(true)}>字段模板</button>
+          <button
+            className={`ghost${viewMode === 'table' ? ' active' : ''}`}
+            title={viewMode === 'cards' ? '切换到表格视图' : '切换到卡片视图'}
+            onClick={() => setViewMode(viewMode === 'cards' ? 'table' : 'cards')}
+          >{viewMode === 'cards' ? '☰ 表格' : '▦ 卡片'}</button>
           <input placeholder="搜索名称或简介…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
           <span className="hint">实体库中的角色可在流程编辑器里作为说话人引用</span>
         </div>
-        <div className="card-grid">
-          {filtered.map((e) => (
-            <div
-              key={e.id}
-              className={`info-card ${selectedId === e.id ? 'selected' : ''}`}
-              style={{ borderTopColor: e.color }}
-              onClick={() => setSelectedId(e.id)}
-              onDoubleClick={() => { setSelectedId(e.id); setExpandedId(e.id); }}
-              title="单击选中 · 双击展开编辑窗"
-            >
-              <div className="card-title">
-                <span className="entity-avatar" style={{ background: `${e.color}1a` }}>
-                  {e.avatar ? <img src={e.avatar} alt="" /> : <Icon name={KIND_ICON[e.kind]} size={18} />}
-                </span>
-                <span>
-                  {e.name}
-                  <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 400 }}>{ENTITY_KIND_LABEL[e.kind]}</div>
-                </span>
-              </div>
-              {e.summary && <div className="card-body">{e.summary}</div>}
-              {e.fields.length > 0 && (
-                <div className="card-tags">
-                  {e.fields.slice(0, 3).map((f) => {
-                    const ids = fieldRefIds(f.value, f.type);
-                    if (ids.length > 0) {
-                      const names = ids.map((id) => entities.find((x) => x.id === id)?.name ?? '?').join('、');
-                      return <span key={f.id} className="tag">{f.label} → {names}</span>;
-                    }
-                    return <span key={f.id} className="tag">{f.label}: {f.value}</span>;
-                  })}
+        {viewMode === 'cards' ? (
+          <div className="card-grid">
+            {filtered.map((e) => (
+              <div
+                key={e.id}
+                className={`info-card ${selectedId === e.id ? 'selected' : ''}`}
+                style={{ borderTopColor: e.color }}
+                onClick={() => setSelectedId(e.id)}
+                onDoubleClick={() => { setSelectedId(e.id); setExpandedId(e.id); }}
+                title="单击选中 · 双击展开编辑窗"
+              >
+                <div className="card-title">
+                  <span className="entity-avatar" style={{ background: `${e.color}1a` }}>
+                    {e.avatar ? <img src={e.avatar} alt="" /> : <Icon name={KIND_ICON[e.kind]} size={18} />}
+                  </span>
+                  <span>
+                    {e.name}
+                    <div style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 400 }}>{ENTITY_KIND_LABEL[e.kind]}</div>
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <div className="empty-hint" style={{ gridColumn: '1/-1' }}>
-              {entities.length === 0 ? '还没有实体。点击上方「＋ 新建实体」创建角色、地点或设定。' : '没有匹配的实体'}
-            </div>
-          )}
-        </div>
+                {e.summary && <div className="card-body">{e.summary}</div>}
+                {e.fields.length > 0 && (
+                  <div className="card-tags">
+                    {e.fields.slice(0, 3).map((f) => {
+                      const ids = fieldRefIds(f.value, f.type);
+                      if (ids.length > 0) {
+                        const names = ids.map((id) => entities.find((x) => x.id === id)?.name ?? '?').join('、');
+                        return <span key={f.id} className="tag">{f.label} → {names}</span>;
+                      }
+                      return <span key={f.id} className="tag">{f.label}: {f.value}</span>;
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="empty-hint" style={{ gridColumn: '1/-1' }}>
+                {entities.length === 0 ? '还没有实体。点击上方「＋ 新建实体」创建角色、地点或设定。' : '没有匹配的实体'}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="entity-table-wrap">
+            <table className="var-table entity-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 32 }}></th>
+                  <th style={{ minWidth: 100 }}>名称</th>
+                  <th style={{ width: 80 }}>类型</th>
+                  <th style={{ minWidth: 120 }}>简介</th>
+                  {fieldColumns.map((col) => (
+                    <th key={col.label} style={{ minWidth: 80 }}>{col.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((e) => (
+                  <tr
+                    key={e.id}
+                    className={selectedId === e.id ? 'selected' : ''}
+                    onClick={() => setSelectedId(e.id)}
+                    onDoubleClick={() => { setSelectedId(e.id); setExpandedId(e.id); }}
+                  >
+                    <td style={{ textAlign: 'center', padding: '4px 2px' }}>
+                      <span className="entity-avatar entity-avatar-sm" style={{ background: `${e.color}1a` }}>
+                        {e.avatar ? <img src={e.avatar} alt="" /> : <Icon name={KIND_ICON[e.kind]} size={14} />}
+                      </span>
+                    </td>
+                    <td>
+                      <input
+                        value={e.name}
+                        onChange={(ev) => updateEntity(e.id, { name: ev.target.value })}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={e.kind}
+                        onChange={(ev) => updateEntity(e.id, { kind: ev.target.value as EntityKind })}
+                      >
+                        {KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        value={e.summary}
+                        onChange={(ev) => updateEntity(e.id, { summary: ev.target.value })}
+                      />
+                    </td>
+                    {fieldColumns.map((col) => {
+                      const f = e.fields.find((x) => x.label === col.label);
+                      const val = f?.value ?? '';
+                      const fType = f?.type ?? col.type;
+                      const setVal = (v: string) => {
+                        if (f) {
+                          updateEntity(e.id, {
+                            fields: e.fields.map((x) => x.id === f.id ? { ...x, value: v } : x),
+                          });
+                        } else {
+                          updateEntity(e.id, {
+                            fields: [...e.fields, { id: uid(), label: col.label, value: v, type: col.type }],
+                          });
+                        }
+                      };
+                      if (fType === 'boolean') {
+                        return (
+                          <td key={col.label} style={{ textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={val === 'true'}
+                              onChange={(ev) => setVal(String(ev.target.checked))}
+                            />
+                          </td>
+                        );
+                      }
+                      if (fType === 'number') {
+                        return (
+                          <td key={col.label}>
+                            <input
+                              type="number"
+                              value={val}
+                              placeholder="0"
+                              onChange={(ev) => setVal(ev.target.value)}
+                            />
+                          </td>
+                        );
+                      }
+                      if (fType === 'entity' || fType === 'entities') {
+                        const names = fieldRefIds(val, fType)
+                          .map((id) => entities.find((x) => x.id === id)?.name ?? '?')
+                          .join('、');
+                        return (
+                          <td key={col.label} className="hint" title="在 inspector 中编辑引用字段">
+                            {names || '—'}
+                          </td>
+                        );
+                      }
+                      return (
+                        <td key={col.label}>
+                          <input
+                            value={val}
+                            onChange={(ev) => setVal(ev.target.value)}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={4 + fieldColumns.length} className="empty-hint" style={{ textAlign: 'center', padding: 24 }}>
+                      {entities.length === 0 ? '还没有实体。点击上方「＋ 新建实体」创建角色、地点或设定。' : '没有匹配的实体'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <Inspector>

@@ -64,14 +64,20 @@ export default function FieldListEditor({ fields, specs, onChange, refKindLabel 
                   <select
                     className="field-type"
                     value={type}
-                    onChange={(e) => patchField(f.id, { type: e.target.value as EntityFieldType, value: '' })}
+                    onChange={(e) => {
+                      const next = e.target.value as EntityFieldType;
+                      const resetValue = next === 'boolean' ? 'false' : '';
+                      patchField(f.id, { type: next, value: resetValue });
+                    }}
                     title="字段类型"
                   >
                     <option value="text">文本</option>
+                    <option value="number">数值</option>
+                    <option value="boolean">布尔</option>
                     <option value="entity">→ 单{refKindLabel}</option>
                     <option value="entities">→ 多{refKindLabel}</option>
                   </select>
-                  {type !== 'text' && (
+                  {(type === 'entity' || type === 'entities') && (
                     <select
                       className="field-filter"
                       value={f.filterKind ?? ''}
@@ -103,6 +109,24 @@ export default function FieldListEditor({ fields, specs, onChange, refKindLabel 
                 <input value={f.value} readOnly placeholder="值" />
               ) : type === 'text' ? (
                 <input value={f.value} placeholder="值" onChange={(e) => patchField(f.id, { value: e.target.value })} />
+              ) : type === 'number' ? (
+                <input
+                  type="number"
+                  value={f.value}
+                  placeholder="0"
+                  readOnly={spec?.readonly === true}
+                  onChange={(e) => patchField(f.id, { value: e.target.value })}
+                />
+              ) : type === 'boolean' ? (
+                <label className="field-bool">
+                  <input
+                    type="checkbox"
+                    checked={f.value === 'true'}
+                    disabled={spec?.readonly === true}
+                    onChange={(e) => patchField(f.id, { value: String(e.target.checked) })}
+                  />
+                  {f.value === 'true' ? '是' : '否'}
+                </label>
               ) : (
                 <EntityRefEditor
                   type={type}

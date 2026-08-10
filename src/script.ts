@@ -110,6 +110,10 @@ export function buildEntityProps(entities: EntityPropsSource[]): Record<string, 
         if (ref?.technicalName) props[f.label] = ref.technicalName;
       } else if (f.type === 'entities') {
         // 多引用字段非标量,不注入脚本
+      } else if (f.type === 'number') {
+        props[f.label] = Number(f.value) || 0;
+      } else if (f.type === 'boolean') {
+        props[f.label] = f.value === 'true';
       } else {
         props[f.label] = coerceScalar(f.value);
       }
@@ -167,6 +171,8 @@ export function buildScriptScope(p: Project): ScriptScope {
       if (!f.label) continue;
       if (f.type === 'entity') fields.set(f.label, 'text');
       else if (f.type === 'entities') continue;
+      else if (f.type === 'number') fields.set(f.label, 'number');
+      else if (f.type === 'boolean') fields.set(f.label, 'boolean');
       else fields.set(f.label, 'unknown');
     }
     entities.set(e.technicalName, fields);

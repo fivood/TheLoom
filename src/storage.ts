@@ -88,7 +88,13 @@ export function entityToMd(e: Entity, avatarPath?: string, idToName?: Map<string
       continue;
     }
     const type = f.type ?? 'text';
-    if (type === 'text') {
+    if (type === 'number') {
+      meta[f.label] = Number(f.value) || 0;
+      fieldTypes[f.label] = 'number';
+    } else if (type === 'boolean') {
+      meta[f.label] = f.value === 'true';
+      fieldTypes[f.label] = 'boolean';
+    } else if (type === 'text') {
       meta[f.label] = f.value;
     } else if (type === 'entity') {
       const nm = idToName?.get(f.value);
@@ -132,12 +138,15 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
       let filterKind: EntityKind | undefined;
       if (tSpec) {
         const [t, f] = tSpec.split(':');
-        if (t === 'entity' || t === 'entities') type = t;
+        if (t === 'entity' || t === 'entities' || t === 'number' || t === 'boolean') type = t;
         if (f && KINDS.includes(f as EntityKind)) filterKind = f as EntityKind;
       }
       let value: string;
-      if (Array.isArray(v)) {
-        // 多值:每项可能是 [[Name]] 或原样
+      if (type === 'number') {
+        value = String(Number(v) || 0);
+      } else if (type === 'boolean') {
+        value = v === true || v === 'true' ? 'true' : 'false';
+      } else if (Array.isArray(v)) {
         value = v.map((x) => parseWikiLink(String(x)) ?? String(x)).join(',');
         if (!type) type = 'entities';
       } else {
@@ -155,7 +164,7 @@ export function mdToEntity(filename: string, md: string, index: number, assets?:
     for (const raw of meta._conflict_fields as unknown[]) {
       const c = raw as Record<string, unknown>;
       if (typeof c.label !== 'string' || !c.label) continue;
-      const type = c.type === 'entity' || c.type === 'entities' ? c.type : undefined;
+      const type = c.type === 'entity' || c.type === 'entities' || c.type === 'number' || c.type === 'boolean' ? c.type as EntityFieldType : undefined;
       const filterKind = KINDS.includes(c.filterKind as EntityKind) ? (c.filterKind as EntityKind) : undefined;
       fields.push({ id: uid(), label: c.label, value: typeof c.value === 'string' ? c.value : String(c.value ?? ''), type, filterKind });
     }

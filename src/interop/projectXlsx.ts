@@ -313,7 +313,7 @@ export async function previewProjectXlsx(buf: ArrayBuffer | Uint8Array, project:
           label,
           value: cValue >= 0 ? (r[cValue] ?? '') : '',
         };
-        if (type === 'entity' || type === 'entities') field.type = type;
+        if (type === 'entity' || type === 'entities' || type === 'number' || type === 'boolean') field.type = type;
         if (filterKind && LABEL_TO_KIND[filterKind]) field.filterKind = LABEL_TO_KIND[filterKind];
         touchedEntities.add(ent);
         if (!buffer.has(ent)) buffer.set(ent, []);

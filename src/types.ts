@@ -12,15 +12,14 @@ export const ENTITY_KIND_LABEL: Record<EntityKind, string> = {
   concept: '设定',
 };
 
-export type EntityFieldType = 'text' | 'entity' | 'entities';
+export type EntityFieldType = 'text' | 'number' | 'boolean' | 'entity' | 'entities';
 
 export interface EntityField {
   id: ID;
   label: string;
   /**
-   * text 类型:自由文本;
-   * entity 类型:value 是单个实体 id;
-   * entities 类型:value 是逗号分隔的实体 id 列表
+   * text:自由文本; number:数值(存储为字符串); boolean:布尔('true'/'false');
+   * entity:单个实体 id; entities:逗号分隔的实体 id 列表
    */
   value: string;
   type?: EntityFieldType;
