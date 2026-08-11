@@ -6,7 +6,8 @@ export type IconName =
   | 'search' | 'undo' | 'redo' | 'folder' | 'refresh' | 'download' | 'upload' | 'reset'
   | 'play' | 'script' | 'pin' | 'image' | 'plus' | 'cloud'
   | 'user' | 'mappin' | 'key' | 'flag' | 'book' | 'doc' | 'tag' | 'trash' | 'film' | 'music'
-  | 'palette' | 'check';
+  | 'palette' | 'check'
+  | 'sun' | 'moon' | 'monitor' | 'split' | 'more' | 'help' | 'arrowLeft' | 'compare' | 'chevronDown' | 'chevronRight';
 
 /** 实体类型 → 图标 */
 export const KIND_ICON: Record<EntityKind, IconName> = {
@@ -206,6 +207,49 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="M5 12.5 10 17.5 19.5 7.5" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.4 5.4l1.4 1.4M17.2 17.2l1.4 1.4M18.6 5.4l-1.4 1.4M6.8 17.2l-1.4 1.4" />
+    </>
+  ),
+  moon: <path d="M20 13.5A8 8 0 0 1 10.5 4a8 8 0 1 0 9.5 9.5z" />,
+  monitor: (
+    <>
+      <rect x="3" y="4.5" width="18" height="12.5" rx="1.5" />
+      <path d="M9 20.5h6M12 17v3.5" />
+    </>
+  ),
+  split: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <path d="M12 4.5v15" />
+    </>
+  ),
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M9.5 9.6a2.6 2.6 0 1 1 3.5 2.4c-.7.3-1 .8-1 1.5v.3" />
+      <circle cx="12" cy="16.8" r="1.1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  arrowLeft: <path d="M19 12H5M11 6l-6 6 6 6" />,
+  compare: (
+    <>
+      <rect x="3.5" y="4.5" width="7.5" height="15" rx="1" />
+      <rect x="13" y="4.5" width="7.5" height="15" rx="1" />
+      <path d="M10.5 12H7M7 12l2-2M7 12l2 2M13.5 12h3M17 12l-2-2M17 12l-2 2" />
+    </>
+  ),
+  chevronDown: <path d="M6 9.5 12 15.5l6-6" />,
+  chevronRight: <path d="M9.5 6 15.5 12l-6 6" />,
 };
 
 export default function Icon({ name, size = 16, strokeWidth = 1.7, className, style }: {

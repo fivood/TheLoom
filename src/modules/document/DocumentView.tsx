@@ -772,7 +772,7 @@ export default function DocumentView() {
                       {new Date(s.createdAt).toLocaleString()}{s.revision ? ` · 第 ${s.revision} 稿` : ''}
                     </span>
                   </div>
-                  <button className="ghost icon-btn" title="与当前正文比较" onClick={() => setDiffOpen({ leftId: s.id })}>⇆</button>
+                  <button className="ghost icon-btn" title="与当前正文比较" aria-label="与当前正文比较" onClick={() => setDiffOpen({ leftId: s.id })}><Icon name="compare" /></button>
                   <button
                     className="ghost icon-btn"
                     title="恢复到这个版本(当前正文会被替换,可 Ctrl+Z 撤销)"

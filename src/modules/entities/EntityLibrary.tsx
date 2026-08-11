@@ -270,7 +270,7 @@ export default function EntityLibrary() {
             className={`ghost${viewMode === 'table' ? ' active' : ''}`}
             title={viewMode === 'cards' ? '切换到表格视图' : '切换到卡片视图'}
             onClick={() => setViewMode(viewMode === 'cards' ? 'table' : 'cards')}
-          >{viewMode === 'cards' ? '☰ 表格' : '▦ 卡片'}</button>
+          >{viewMode === 'cards' ? '表格' : '卡片'}</button>
           <input placeholder="搜索名称或简介…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
           <span className="hint">实体库中的角色可在流程编辑器里作为说话人引用</span>
         </div>

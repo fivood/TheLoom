@@ -7,6 +7,7 @@ import { suggestedDocumentChildRole } from '../documentStructure';
 import { setObjectFavorites } from '../batch';
 import BatchEditDialog from './BatchEditDialog';
 import PaneHandle from './PaneHandle';
+import Icon from './Icon';
 
 interface NavigatorItem {
   id: string;
@@ -387,7 +388,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
                 ref={(el) => { if (el) rowRects.current.set(folder.id, { top: el.getBoundingClientRect().top, height: el.getBoundingClientRect().height }); }}
               >
                 {isDrop && dropTarget?.position === 'before' && <span className="drop-line" />}
-                <span className="caret">{open ? '▾' : '▸'}</span>
+                <span className="caret"><Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} /></span>
                 {folder.documentRole && (
                   <span className={`navigator-folder-role role-${folder.documentRole}`}>
                     {DOCUMENT_FOLDER_ROLE_LABEL[folder.documentRole]}

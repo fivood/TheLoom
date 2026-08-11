@@ -435,7 +435,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             <button
               title="把选中节点封装成一个剧情片段:内部连线跟着搬进去,进出选区的连线自动改接"
               onClick={encapsulate}
-            >▦ 封装</button>
+            >封装</button>
           )}
           {selectedCount >= 2 && (
             <>

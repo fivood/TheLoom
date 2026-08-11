@@ -302,7 +302,7 @@ export default function App() {
               title="更多模块"
               onClick={() => setMoreModulesOpen((open) => !open)}
             >
-              <span className="sidebar-more-icon">•••</span>
+              <span className="sidebar-more-icon"><Icon name="more" /></span>
               <span>更多</span>
             </button>
             {moreModulesOpen && (
@@ -344,10 +344,10 @@ export default function App() {
             aria-label="返回上一个位置"
             disabled={navBackCount === 0}
             onClick={() => useNav.getState().back()}
-          >←</button>
+          ><Icon name="arrowLeft" /></button>
           <div className="nav-history-wrap">
-            <button className={`ghost ${recentOpen ? 'active' : ''}`} title="最近访问" onClick={() => setRecentOpen((open) => !open)}>
-              ◴ 最近
+            <button className={`ghost icon-btn ${recentOpen ? 'active' : ''}`} title="最近访问" aria-label="最近访问" onClick={() => setRecentOpen((open) => !open)}>
+              <Icon name="clock" />
             </button>
             {recentOpen && (
               <>
@@ -370,20 +370,22 @@ export default function App() {
               </>
             )}
           </div>
-          <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
-          <button className="ghost" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
-          <button className="ghost" title="使用指南 (F1)" aria-label="使用指南" onClick={() => setHelp(true)}>?</button>
+          <button className="ghost icon-btn" title="全局搜索 (Ctrl+K)" aria-label="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /></button>
+          <button className="ghost icon-btn" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" aria-label="项目总览" onClick={() => setOverview(true)}><Icon name="grid" /></button>
+          <button className="ghost icon-btn" title="使用指南 (F1)" aria-label="使用指南" onClick={() => setHelp(true)}><Icon name="help" /></button>
           <button
-            className={`ghost ${secondaryTab ? 'active' : ''}`}
-            title="分屏:主副两个模块并列显示 (Ctrl+\\)"
+            className={`ghost icon-btn ${secondaryTab ? 'active' : ''}`}
+            title="分屏:主副两个模块并列显示 (Ctrl+\)"
+            aria-label="分屏"
             onClick={() => setSecondaryTab((cur) => cur ? null : (tab === 'documents' ? 'flow' : 'documents'))}
-          >⇆ 分屏</button>
+          ><Icon name="split" /></button>
           <button
-            className={`ghost ${aiAssistant ? 'active' : ''}`}
+            className={`ghost icon-btn ${aiAssistant ? 'active' : ''}`}
             title="打开只读 AI 助手"
+            aria-label="AI 助手"
             onClick={() => setAiAssistant((open) => !open)}
           >
-            <Icon name="bulb" size={14} /> 助手
+            <Icon name="bulb" />
           </button>
           <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}><Icon name="undo" /></button>
           <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}><Icon name="redo" /></button>
@@ -433,8 +435,8 @@ export default function App() {
             {checkingUpdate ? '检查中…' : `v${__APP_VERSION__}`}
           </button>
           <div className="tools-wrap">
-            <button className="ghost" onClick={() => setToolsOpen((o) => !o)} title="工具:文件 / 体检 / 历史 / 协作 / 导出">
-              <Icon name="script" size={14} /> 工具 ▾
+            <button className="ghost icon-btn" onClick={() => setToolsOpen((o) => !o)} title="工具:文件 / 体检 / 历史 / 协作 / 导出" aria-label="工具菜单">
+              <Icon name="script" />
             </button>
             {toolsOpen && (
               <>
@@ -446,7 +448,7 @@ export default function App() {
                         title="下载 Windows 安装包(自动跳转最新版本,大陆网络可直连);桌面版支持绑定本地文件夹与 Obsidian 互通"
                         onClick={() => { setToolsOpen(false); window.open('/api/download/latest', '_blank'); }}
                       >
-                        <Icon name="download" size={14} /> 下载桌面版(Windows)
+                        <Icon name="download" size={14} /> 下载桌面版
                       </button>
                       <div className="tools-sep" />
                     </>
@@ -493,13 +495,13 @@ export default function App() {
                     title="多份材料(正文/设定/笔记/AI记录)→ 生成计划 → 审阅 → 完整预检 → 事务式导入整个小说项目"
                     onClick={() => { setToolsOpen(false); setProjectImport(true); }}
                   >
-                    <Icon name="archive" size={14} /> 完整项目导入(小说)
+                    <Icon name="archive" size={14} /> 完整项目导入
                   </button>
                   <button
                     title="粘贴长文或读入 md / txt,AI 抽取实体 / 场景 / 时间线,预检确认后写入"
                     onClick={() => { setToolsOpen(false); setAiExtract(true); }}
                   >
-                    <Icon name="bulb" size={14} /> AI 抽取(长文 → 骨架)
+                    <Icon name="bulb" size={14} /> AI 抽取
                   </button>
                   <button
                     title="配置 LLM 服务:OpenAI 兼容 / Anthropic / Ollama 本地;Key 只存本机"
@@ -510,13 +512,13 @@ export default function App() {
                   <div className="tools-sep" />
                   <div className="tools-label">导出</div>
                   <button onClick={() => { setToolsOpen(false); exportProject(project); }}>
-                    <Icon name="download" size={14} /> JSON 完整备份
+                    <Icon name="download" size={14} /> JSON 备份
                   </button>
                   <button
                     title="带版本 JSON Schema 的引擎包(zip):数据 + 索引 + 类型定义;配合独立运行库在任何 JS 环境演出"
                     onClick={() => { setToolsOpen(false); setEngineExport(true); }}
                   >
-                    <Icon name="braces" size={14} /> 引擎包 .zip(游戏引擎)
+                    <Icon name="braces" size={14} /> 引擎包 .zip
                   </button>
                   <button
                     title="一份 xlsx 覆盖实体 / 资源 / 大纲 / 变量 / 时间线 / 资料 所有表格数据(比单独 CSV 更完整,且可再导回带预检)"
@@ -530,7 +532,7 @@ export default function App() {
                       URL.revokeObjectURL(a.href);
                     }}
                   >
-                    <Icon name="grid" size={14} /> Excel 工作簿 .xlsx(全项目表)
+                    <Icon name="grid" size={14} /> Excel 工作簿 .xlsx
                   </button>
                   <button onClick={() => {
                     setToolsOpen(false);
@@ -553,7 +555,7 @@ export default function App() {
                     onClick={() => { setToolsOpen(false); setChapterCompile(true); }}
                     title="按卷/章勾选文档，编译为 Word / Markdown / TXT / Final Draft 成品稿件"
                   >
-                    <Icon name="script" size={14} /> 成稿导出 / 章节编译…
+                    <Icon name="script" size={14} /> 成稿导出 / 章节编译
                   </button>
                   <div className="tools-sep" />
                   <div className="tools-label">导入</div>
@@ -565,7 +567,7 @@ export default function App() {
                   </button>
                   <button onClick={() => { setToolsOpen(false); importManuscriptRef.current?.click(); }}
                     title="TXT / Markdown / EPUB / DOCX / MOBI 长稿:自动按 # 标题、「第X章」正则、EPUB spine、Word 标题样式或 MOBI 分页符拆卷 / 章 / 场景">
-                    <Icon name="upload" size={14} /> 长稿导入(TXT / MD / EPUB / DOCX / MOBI)
+                    <Icon name="upload" size={14} /> 长稿导入
                   </button>
                   <input
                     ref={importXlsxRef}
