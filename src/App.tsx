@@ -10,6 +10,7 @@ import {
 } from './storage';
 import { describeNavTarget, useNav } from './search';
 import { confirmDialog, alertDialog } from './dialog';
+import { flushPendingPush, loadPendingPush } from './sync';
 import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
 import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
 import SearchPalette from './components/SearchPalette';
@@ -191,6 +192,8 @@ export default function App() {
   const saveError = useLoom((s) => s.saveError);
   const recoveryNotice = useLoom((s) => s.recoveryNotice);
   const storageUsage = useLoom((s) => s.storageUsage);
+  const online = useLoom((s) => s.online);
+  const pendingPush = useLoom((s) => s.pendingPush);
   const setFolder = useLoom((s) => s.setFolder);
   const revision = useLoom((s) => s.revision);
   const canUndo = useLoom((s) => s.canUndo);
@@ -275,6 +278,32 @@ export default function App() {
   useEffect(() => {
     if (isTauri) return;
     void hydrateFromIdb();
+  }, []);
+
+  // P3 离线状态:监听在线/离线;恢复联网时自动补发「待推送」队列里积压的版本
+  useEffect(() => {
+    const handleOnline = async () => {
+      const state = useLoom.getState();
+      state.setOnline(true);
+      if (loadPendingPush()) {
+        const result = await flushPendingPush();
+        state.refreshSyncState();
+        if (result.ok && result.version != null) {
+          await alertDialog(`已恢复联网,离线时的改动已自动补发到云端(v${result.version})。`);
+        } else if (result.conflict) {
+          await alertDialog('补发遇到冲突:云端已有更新的版本。请打开「工具 → 协作」手动处理。');
+        }
+      } else {
+        state.refreshSyncState();
+      }
+    };
+    const handleOffline = () => useLoom.getState().setOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   return (
@@ -428,6 +457,15 @@ export default function App() {
             <span className="saved-hint" title={folder ?? undefined}>
               {folder ? `已同步 · ${folder.split(/[\\/]/).pop()}` : '已自动保存到本地'}
             </span>
+          )}
+          {(!online || pendingPush) && (
+            <button
+              className={`ghost saved-hint sync-status-ind ${!online ? 'offline' : 'pending'}`}
+              title={!online ? '当前离线,改动会保存在本机,恢复联网后自动补发云端' : '有待推送的云端版本,联网后会自动补发;也可点开手动处理'}
+              onClick={() => setSyncing(true)}
+            >
+              {!online ? '⛔ 离线' : '↥ 待推送'}
+            </button>
           )}
           <ThemeToggle />
           <button
