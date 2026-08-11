@@ -270,11 +270,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   margin-top: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow: 0 4px 16px rgba(27, 27, 25, 0.12);
-  padding: 4px;
+  padding: 6px;
   z-index: 50;
-  min-width: 180px;
+  min-width: 210px;
+  max-width: min(360px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -284,20 +285,30 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .tools-menu button {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 7px 10px;
   border: none;
   background: transparent;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   color: var(--text-dim);
   text-align: left;
   width: 100%;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .tools-menu button:hover { background: var(--bg-hover); color: var(--text); }
-.tools-sep { height: 1px; background: var(--border); margin: 4px 6px; }
-.tools-label { font-size: 10px; color: var(--text-faint); padding: 4px 10px 2px; letter-spacing: 1px; text-transform: uppercase; }
+.tools-menu button svg { flex-shrink: 0; }
+.tools-sep { height: 1px; background: var(--border); margin: 5px 4px; flex-shrink: 0; }
+.tools-label {
+  font-size: 10px;
+  color: var(--text-faint);
+  padding: 6px 10px 3px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
 .tools-link {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px; border-radius: 5px;

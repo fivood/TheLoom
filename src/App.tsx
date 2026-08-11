@@ -456,7 +456,7 @@ export default function App() {
                     <Icon name="script" size={14} /> 体检
                   </button>
                   <button onClick={() => { setToolsOpen(false); setQuerying(true); }}>
-                    <Icon name="search" size={14} /> 组合查询
+                    <Icon name="grid" size={14} /> 组合查询
                   </button>
                   <button
                     title="在全部文档正文里查找并替换;替换是一步操作,可撤销"
@@ -470,7 +470,7 @@ export default function App() {
                     <Icon name="undo" size={14} /> 版本历史
                   </button>
                   <button onClick={() => { setToolsOpen(false); setRecovering(true); }}>
-                    <Icon name="archive" size={14} /> 恢复与备份
+                    <Icon name="refresh" size={14} /> 恢复与备份
                   </button>
                   <button
                     title="查看本机数据占用,备份或清除项目槽位与资源缓存"
@@ -505,12 +505,12 @@ export default function App() {
                     title="配置 LLM 服务:OpenAI 兼容 / Anthropic / Ollama 本地;Key 只存本机"
                     onClick={() => { setToolsOpen(false); setAiSettings(true); }}
                   >
-                    <Icon name="braces" size={14} /> AI 设置
+                    <Icon name="key" size={14} /> AI 设置
                   </button>
                   <div className="tools-sep" />
                   <div className="tools-label">导出</div>
                   <button onClick={() => { setToolsOpen(false); exportProject(project); }}>
-                    JSON 完整备份
+                    <Icon name="download" size={14} /> JSON 完整备份
                   </button>
                   <button
                     title="带版本 JSON Schema 的引擎包(zip):数据 + 索引 + 类型定义;配合独立运行库在任何 JS 环境演出"
@@ -530,7 +530,7 @@ export default function App() {
                       URL.revokeObjectURL(a.href);
                     }}
                   >
-                    Excel 工作簿 .xlsx(全项目表)
+                    <Icon name="grid" size={14} /> Excel 工作簿 .xlsx(全项目表)
                   </button>
                   <button onClick={() => {
                     setToolsOpen(false);
@@ -547,25 +547,25 @@ export default function App() {
                     a.click();
                     URL.revokeObjectURL(a.href);
                   }}>
-                    Final Draft .fdx
+                    <Icon name="doc" size={14} /> Final Draft .fdx
                   </button>
                   <button
                     onClick={() => { setToolsOpen(false); setChapterCompile(true); }}
                     title="按卷/章勾选文档，编译为 Word / Markdown / TXT / Final Draft 成品稿件"
                   >
-                    <Icon name="script" size={12} /> 成稿导出 / 章节编译…
+                    <Icon name="script" size={14} /> 成稿导出 / 章节编译…
                   </button>
                   <div className="tools-sep" />
                   <div className="tools-label">导入</div>
                   <button onClick={() => { setToolsOpen(false); importXlsxRef.current?.click(); }}>
-                    <Icon name="upload" size={12} /> Excel .xlsx(带预检)
+                    <Icon name="upload" size={14} /> Excel .xlsx(带预检)
                   </button>
                   <button onClick={() => { setToolsOpen(false); importFdxRef.current?.click(); }}>
-                    <Icon name="upload" size={12} /> Final Draft .fdx(带预检)
+                    <Icon name="upload" size={14} /> Final Draft .fdx(带预检)
                   </button>
                   <button onClick={() => { setToolsOpen(false); importManuscriptRef.current?.click(); }}
                     title="TXT / Markdown / EPUB / DOCX / MOBI 长稿:自动按 # 标题、「第X章」正则、EPUB spine、Word 标题样式或 MOBI 分页符拆卷 / 章 / 场景">
-                    <Icon name="upload" size={12} /> TXT / Markdown / EPUB / DOCX / MOBI 稿件(带预检)
+                    <Icon name="upload" size={14} /> 长稿导入(TXT / MD / EPUB / DOCX / MOBI)
                   </button>
                   <input
                     ref={importXlsxRef}
