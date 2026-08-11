@@ -1,7 +1,9 @@
-name: Deploy Mobile (PWA) to Cloudflare Pages
+name: Deploy Web (PWA) to Cloudflare Pages
 
-# 移动版(PWA)独立发布线:推送到 mobile-pwa 分支时部署到 Pages 项目 theloom-mobile,
-# 与 main 的桌面安装版(项目 theloom,见 deploy.yml)互不覆盖。
+# 网页版(PWA)发布线:推送到 mobile-pwa 分支时,构建并部署到 Pages 项目 theloom 的生产分支,
+# the-loom.net 即移动版(超集:桌面功能全保留 + 移动布局 + PWA 离线/安装 + IndexedDB)。
+# main 分支不再部署 Web(见 deploy.yml,仅验证构建),只负责桌面安装包(v* 标签 release)。
+# 桌面版更新代理 /api/update、/api/download 由本项目 functions/ 提供,不受影响。
 
 on:
   push:
@@ -37,12 +39,12 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Deploy Mobile PWA to Cloudflare Pages
+      - name: Deploy to Cloudflare Pages (production)
         if: steps.check.outputs.configured == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           # 项目已存在时 create 会失败,忽略即可
-          npx wrangler pages project create theloom-mobile --production-branch=mobile-pwa 2>/dev/null || true
-          npx wrangler pages deploy dist --project-name=theloom-mobile --branch=mobile-pwa
+          npx wrangler pages project create theloom --production-branch=main 2>/dev/null || true
+          npx wrangler pages deploy dist --project-name=theloom --branch=main
