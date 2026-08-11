@@ -15,8 +15,10 @@ import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
 import {
   clearProjectRecovery, clearQuarantinedProject, parseProjectData, readProjectWithRecovery,
-  saveProjectWithRecovery, storedProjectKey, type RecoveryBackup,
+  readProjectWithRecoveryAsync, saveProjectWithRecovery, saveProjectWithRecoveryAsync,
+  storedProjectKey, type RecoveryBackup,
 } from './recovery';
+import { estimateWebStorage, mirrorIdbToLocal, readThrough, requestPersistentStorage, webdbAvailable, writeThrough } from './webdb';
 import { getStorageUsage, type StorageUsage } from './diagnostics';
 import type { AiProposalApplyResult, ApplyAiProposalOptions } from './ai/proposal';
 import { unlinkDocumentReferences } from './documentReferences';
@@ -67,14 +69,17 @@ function readSnapshots(slotId: string): Snapshot[] {
   } catch { /* 忽略 */ }
   return [];
 }
-function writeSnapshots(slotId: string, list: Snapshot[]): string | null {
+/** 快照写穿:localStorage 镜像 + IDB 权威;至少一个成功即成功(P2b) */
+async function persistSnapshots(slotId: string, list: Snapshot[]): Promise<string | null> {
+  return writeThrough(snapshotsKey(slotId), JSON.stringify(list), localStorage);
+}
+/** 快照读取:优先 IDB,回退 localStorage(P2b) */
+async function readSnapshotsWeb(slotId: string): Promise<Snapshot[]> {
   try {
-    localStorage.setItem(snapshotsKey(slotId), JSON.stringify(list));
-    return null;
-  } catch (error) {
-    console.error('快照写入失败', error);
-    return error instanceof Error ? error.message : String(error);
-  }
+    const raw = await readThrough(snapshotsKey(slotId), localStorage);
+    if (raw) return JSON.parse(raw) as Snapshot[];
+  } catch { /* 忽略 */ }
+  return readSnapshots(slotId);
 }
 
 export interface SlotMeta {
@@ -375,23 +380,29 @@ export const useLoom = create<LoomState>((set, get) => {
       const current = get();
       const id = current.currentSlotId;
       const folderOnly = current.slots.find((slot) => slot.id === id)?.folderOnly === true;
-      try {
-        const result = folderOnly
-          ? { backup: null, backupError: null }
-          : saveProjectWithRecovery(localStorage, id, p);
-        const slots = current.slots.map((s) =>
-          s.id === id ? { ...s, name: p.name || '未命名项目', updatedAt: p.updatedAt } : s,
-        );
-        writeSlots(slots);
-        set({
-          slots,
-          savedAt: Date.now(),
-          saveStatus: 'saved',
-          saveError: result.backupError ? `项目已保存，但自动恢复点写入失败:${result.backupError}` : null,
-          recoveryBackup: result.backup,
-          storageUsage: getStorageUsage(localStorage),
-        });
-      } catch (e) {
+
+      const finalize = (result: { backup: RecoveryBackup | null; backupError: string | null }) => {
+        try {
+          const slots = current.slots.map((s) =>
+            s.id === id ? { ...s, name: p.name || '未命名项目', updatedAt: p.updatedAt } : s,
+          );
+          writeSlots(slots);
+          set({
+            slots,
+            savedAt: Date.now(),
+            saveStatus: 'saved',
+            saveError: result.backupError ? `项目已保存，但自动恢复点写入失败:${result.backupError}` : null,
+            recoveryBackup: result.backup,
+            storageUsage: getStorageUsage(localStorage),
+          });
+        } catch (error) {
+          console.error('槽位元数据写入失败', error);
+        }
+        void estimateWebStorage(localStorage.length)
+          .then((usage) => { if (get().currentSlotId === id) set({ storageUsage: usage }); })
+          .catch(() => {});
+      };
+      const fail = (e: unknown) => {
         if (get().folder && isTauri) {
           // 文件夹模式:localStorage 只是镜像,写不下不算保存失败(文件夹为权威存储)
           set({ savedAt: Date.now(), saveStatus: 'saved', saveError: null, storageUsage: getStorageUsage(localStorage) });
@@ -399,7 +410,20 @@ export const useLoom = create<LoomState>((set, get) => {
           console.error('保存失败', e);
           set({ saveStatus: 'error', saveError: e instanceof Error ? e.message : String(e) });
         }
+      };
+
+      if (folderOnly) {
+        finalize({ backup: null, backupError: null });
+      } else {
+        saveProjectWithRecoveryAsync(localStorage, id, p)
+          .then((result) => {
+            const ok = result.localError == null || result.idbError == null;
+            if (ok) finalize(result);
+            else fail(new Error(result.localError ?? result.idbError ?? '未知错误'));
+          })
+          .catch(fail);
       }
+
       const folder = current.folder;
       if (folder && isTauri) {
         enqueueFolderSave(folder, p)
@@ -423,7 +447,8 @@ export const useLoom = create<LoomState>((set, get) => {
     const currentFolderOnly = cur.slots.find((slot) => slot.id === cur.currentSlotId)?.folderOnly === true;
     if (!currentFolderOnly) {
       try {
-        saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
+        const saved = await saveProjectWithRecoveryAsync(localStorage, cur.currentSlotId, cur.project);
+        if (saved.localError != null && saved.idbError != null) throw new Error(saved.localError ?? saved.idbError ?? '');
       } catch (error) {
         if (!cur.folder || !isTauri) {
           set({
@@ -446,7 +471,7 @@ export const useLoom = create<LoomState>((set, get) => {
       }
     }
 
-    const localLoaded = readProjectWithRecovery(localStorage, targetId);
+    const localLoaded = await readProjectWithRecoveryAsync(localStorage, targetId);
     let next = localLoaded.project ?? blankProject();
     let folderRecoveryNotice: string | null = null;
     if (target.folder && isTauri) {
@@ -457,7 +482,7 @@ export const useLoom = create<LoomState>((set, get) => {
           ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
           : null;
         if (!target.folderOnly) {
-          try { saveProjectWithRecovery(localStorage, targetId, next); } catch { /* 文件夹仍是权威存储 */ }
+          try { await saveProjectWithRecoveryAsync(localStorage, targetId, next); } catch { /* 文件夹仍是权威存储 */ }
         }
       } catch (error) {
         set({
@@ -488,12 +513,13 @@ export const useLoom = create<LoomState>((set, get) => {
     }
 
     undoStack = []; redoStack = []; lastUndoPush = 0;
+    const targetSnapshots = await readSnapshotsWeb(targetId);
     set((s) => ({
       project: next,
       currentSlotId: targetId,
       slots,
       folder: isTauri ? target.folder ?? null : null,
-      snapshots: readSnapshots(targetId),
+      snapshots: targetSnapshots,
       savedAt: Date.now(),
       saveStatus: 'saved',
       saveError: null,
@@ -549,9 +575,9 @@ export const useLoom = create<LoomState>((set, get) => {
       auto: true,
     };
     const list = trimSnapshots([snap, ...cur.snapshots]);
-    if (writeSnapshots(cur.currentSlotId, list) === null) {
-      set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
-    }
+    void persistSnapshots(cur.currentSlotId, list).then((error) => {
+      if (error === null) set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
+    });
   };
 
   /** 整项目替换(撤销/重做/导入/重置)后递增 revision,让画布重新挂载 */
@@ -1158,12 +1184,10 @@ export const useLoom = create<LoomState>((set, get) => {
       const cur = get();
       const snap: Snapshot = { id: uid(), name: name || `版本 ${new Date().toLocaleString()}`, createdAt: Date.now(), data: JSON.stringify(cur.project) };
       const list = trimSnapshots([snap, ...cur.snapshots]);
-      const error = writeSnapshots(cur.currentSlotId, list);
-      if (error) {
-        set({ saveError: `快照保存失败:${error}`, storageUsage: getStorageUsage(localStorage) });
-        return;
-      }
       set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
+      void persistSnapshots(cur.currentSlotId, list).then((error) => {
+        if (error) set({ saveError: `快照保存失败:${error}` });
+      });
     },
     restoreSnapshot: async (id) => {
       const cur = get();
@@ -1186,12 +1210,10 @@ export const useLoom = create<LoomState>((set, get) => {
     deleteSnapshot: (id) => {
       const cur = get();
       const list = cur.snapshots.filter((s) => s.id !== id);
-      const error = writeSnapshots(cur.currentSlotId, list);
-      if (error) {
-        set({ saveError: `快照删除失败:${error}`, storageUsage: getStorageUsage(localStorage) });
-        return;
-      }
       set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
+      void persistSnapshots(cur.currentSlotId, list).then((error) => {
+        if (error) set({ saveError: `快照删除失败:${error}` });
+      });
     },
   };
 });
@@ -1223,4 +1245,44 @@ export function importProject(file: File): Promise<Project> {
     reader.onerror = () => reject(reader.error);
     reader.readAsText(file);
   });
+}
+
+/**
+ * P2:网页版启动后异步 hydration。
+ * 把 IndexedDB 中较新的项目 / 槽位 / 快照镜像回 localStorage,再补丁进 store
+ * (仅在 IDB 数据确实更新时发生,避免与现有同步启动产生可见抖动)。
+ * 之后申请持久化存储并刷新用量估算。
+ */
+export async function hydrateFromIdb(): Promise<void> {
+  if (!webdbAvailable()) return;
+  try {
+    const mirror = await mirrorIdbToLocal(localStorage);
+    const cur = useLoom.getState();
+    const localId = localStorage.getItem(CURRENT_KEY);
+    const id = localId && cur.slots.some((slot) => slot.id === localId) ? localId : cur.currentSlotId;
+    const projectKeyChanged = mirror.changedProjectKeys.includes(storedProjectKey(id));
+
+    if (projectKeyChanged || mirror.slotsUpdated || mirror.currentUpdated) {
+      const loaded = readProjectWithRecovery(localStorage, id);
+      const slots = readSlots();
+      const nextId = (() => {
+        const raw = localStorage.getItem(CURRENT_KEY);
+        return raw && slots.some((slot) => slot.id === raw) ? raw : id;
+      })();
+      useLoom.setState({
+        project: loaded.project ?? cur.project,
+        slots: slots.length ? slots : cur.slots,
+        currentSlotId: nextId,
+        snapshots: readSnapshots(nextId),
+        recoveryBackup: loaded.backup,
+        quarantinedProject: loaded.quarantine,
+        recoveryNotice: loaded.notice,
+        storageUsage: getStorageUsage(localStorage),
+      });
+    }
+    void estimateWebStorage(localStorage.length)
+      .then((usage) => useLoom.setState({ storageUsage: usage }))
+      .catch(() => {});
+    void requestPersistentStorage().catch(() => {});
+  } catch { /* hydration 失败不影响启动 */ }
 }

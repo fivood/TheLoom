@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { exportProject, useLoom } from './store';
+import { exportProject, hydrateFromIdb, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
 import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
 import OverviewPanel from './components/OverviewPanel';
@@ -269,6 +269,12 @@ export default function App() {
         setFolder(null);
       });
     // 仅启动时执行一次
+  }, []);
+
+  // P2 网页版:启动后异步从 IndexedDB 恢复较新的数据(镜像回 localStorage 并补丁 store)
+  useEffect(() => {
+    if (isTauri) return;
+    void hydrateFromIdb();
   }, []);
 
   return (

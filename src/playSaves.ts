@@ -1,8 +1,10 @@
 import type { VarValue } from './script';
+import { writeThrough } from './webdb';
 
 /**
  * R7 演出运行态的本机存储:存档 / 读档 + 节点断点。
- * 属于调试工具状态,只存本机 localStorage,不写入项目、不参与云同步。
+ * 属于调试工具状态,只存本机,不写入项目、不参与云同步。
+ * P2b:写入走「localStorage 镜像 + IndexedDB 权威」双写,镜像由启动 hydration 补齐。
  */
 
 export interface SavedBeat {
@@ -60,6 +62,7 @@ export function storePlaySave(slotId: string, flowId: string, save: PlaySave): s
     const all = readJson<Record<string, PlaySave>>(savesKey(slotId)) ?? {};
     all[flowId] = save;
     localStorage.setItem(savesKey(slotId), JSON.stringify(all));
+    void writeThrough(savesKey(slotId), JSON.stringify(all), localStorage);
     return null;
   } catch (e) {
     return e instanceof Error ? e.message : String(e);
@@ -71,6 +74,7 @@ export function clearPlaySave(slotId: string, flowId: string) {
     const all = readJson<Record<string, PlaySave>>(savesKey(slotId)) ?? {};
     delete all[flowId];
     localStorage.setItem(savesKey(slotId), JSON.stringify(all));
+    void writeThrough(savesKey(slotId), JSON.stringify(all), localStorage);
   } catch { /* 忽略 */ }
 }
 
@@ -87,6 +91,7 @@ export function toggleBreakpoint(slotId: string, flowId: string, nodeId: string)
     if (set.size) all[flowId] = [...set];
     else delete all[flowId];
     localStorage.setItem(bpKey(slotId), JSON.stringify(all));
+    void writeThrough(bpKey(slotId), JSON.stringify(all), localStorage);
   } catch { /* 忽略 */ }
   return set;
 }

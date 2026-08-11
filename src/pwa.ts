@@ -6,6 +6,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import { isTauri } from './storage';
+import { requestPersistentStorage } from './webdb';
 
 export interface PwaStatus {
   /** 浏览器已触发 beforeinstallprompt,可在页面内引导安装 */
@@ -62,6 +63,8 @@ export function installPwa(): void {
     .then(() => {
       deferredPrompt = null;
       patch({ canInstall: false });
+      // iOS 要求用户手势后才可申请持久化存储,安装确认正是一次手势
+      void requestPersistentStorage();
     })
     .catch(() => { /* 用户取消安装,忽略 */ });
 }

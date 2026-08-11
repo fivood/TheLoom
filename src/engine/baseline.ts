@@ -11,6 +11,7 @@
  * 两种后端都支持显式导出 / 导入 JSON,便于团队之间搬运同一份基线。
  */
 import type { EngineBaselineFile } from './package';
+import { readThrough, removeThrough, writeThrough } from '../webdb';
 
 export type { EngineBaselineFile };
 
@@ -90,7 +91,7 @@ export async function loadBaseline(
     } catch { /* 文件夹不可用时回落本机 */ }
   }
   try {
-    const raw = localStorage.getItem(localKey(slotId, configId));
+    const raw = await readThrough(localKey(slotId, configId), localStorage);
     if (raw) {
       const baseline = parseBaseline(raw);
       if (baseline) return { baseline, source: 'local' };
@@ -133,6 +134,8 @@ export async function saveBaseline(
   try {
     localStorage.setItem(localKey(slotId, baseline.configId), serializeBaseline(baseline));
   } catch { /* 配额不足不阻塞导出 */ }
+  // P2b:双写 IndexedDB 权威副本,网页端换浏览器 / 清 localStorage 后增量历史不断档
+  void writeThrough(localKey(slotId, baseline.configId), serializeBaseline(baseline), localStorage);
   // 迁移完成:旧的全项目单份基线不再需要
   try { localStorage.removeItem(legacyKey(slotId)); } catch { /* 忽略 */ }
   return source;
@@ -150,6 +153,7 @@ export async function deleteBaseline(
     } catch { /* 忽略 */ }
   }
   try { localStorage.removeItem(localKey(slotId, configId)); } catch { /* 忽略 */ }
+  void removeThrough(localKey(slotId, configId), localStorage);
 }
 
 function readLegacyManifest(slotId: string): Record<string, string> | null {

@@ -1,4 +1,5 @@
 import type { AiSourceRef } from './context';
+import { writeThrough } from '../webdb';
 
 export interface AiSessionMessage {
   id: string;
@@ -97,6 +98,10 @@ export function saveAiSessions(slotId: string, sessions: AiSession[], storage: S
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, MAX_SESSIONS);
   storage.setItem(key(slotId), JSON.stringify(safe));
+  // P2b:双写 IndexedDB(仅默认 localStorage;测试注入的伪存储不触发)
+  if (typeof localStorage !== 'undefined' && storage === localStorage) {
+    void writeThrough(key(slotId), JSON.stringify(safe), localStorage);
+  }
 }
 
 export function newAiSession(now = Date.now()): AiSession {
