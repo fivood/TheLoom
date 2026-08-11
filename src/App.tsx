@@ -26,6 +26,7 @@ import ProjectImportWizard from './components/ProjectImportWizard';
 import ProjectMenu from './components/ProjectMenu';
 import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
 import RecoveryPanel from './components/RecoveryPanel';
+import PwaBanner from './components/PwaBanner';
 import DialogHost from './components/Dialog';
 import ImportPreview from './components/ImportPreview';
 import FindReplace from './components/FindReplace';
@@ -346,7 +347,7 @@ export default function App() {
             onClick={() => useNav.getState().back()}
           >←</button>
           <div className="nav-history-wrap">
-            <button className={`ghost ${recentOpen ? 'active' : ''}`} title="最近访问" onClick={() => setRecentOpen((open) => !open)}>
+            <button className={`ghost mobile-hide ${recentOpen ? 'active' : ''}`} title="最近访问" onClick={() => setRecentOpen((open) => !open)}>
               ◴ 最近
             </button>
             {recentOpen && (
@@ -371,11 +372,11 @@ export default function App() {
             )}
           </div>
           <button className="ghost" title="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
-          <button className="ghost" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
-          <button className="ghost" title="使用指南 (F1)" aria-label="使用指南" onClick={() => setHelp(true)}>?</button>
+          <button className="ghost mobile-hide" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" onClick={() => setOverview(true)}><Icon name="grid" /> 总览</button>
+          <button className="ghost icon-btn mobile-hide" title="使用指南 (F1)" aria-label="使用指南" onClick={() => setHelp(true)}>?</button>
           <button
-            className={`ghost ${secondaryTab ? 'active' : ''}`}
-            title="分屏:主副两个模块并列显示 (Ctrl+\\)"
+            className={`ghost mobile-hide ${secondaryTab ? 'active' : ''}`}
+            title="分屏:主副两个模块并列显示 (Ctrl+\)"
             onClick={() => setSecondaryTab((cur) => cur ? null : (tab === 'documents' ? 'flow' : 'documents'))}
           >⇆ 分屏</button>
           <button
@@ -424,7 +425,7 @@ export default function App() {
           )}
           <ThemeToggle />
           <button
-            className="ghost saved-hint"
+            className="ghost saved-hint mobile-hide"
             style={{ padding: '2px 6px' }}
             title={isTauri ? '点击检查更新' : '网页版随部署自动更新'}
             disabled={checkingUpdate}
@@ -673,6 +674,7 @@ export default function App() {
           />
         </Suspense>
       )}
+      <PwaBanner />
       <DialogHost />
     </div>
   );

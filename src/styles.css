@@ -4531,3 +4531,133 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .revision-change-compare > div + div { border-top: 1px solid var(--border); border-left: 0; }
   .revision-detail-head { flex-direction: column; }
 }
+
+/* ---------- PWA 横幅与提示 ---------- */
+.pwa-banner {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100vw - 24px));
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+}
+.pwa-banner-btn {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
+.pwa-banner-btn:hover { background: var(--accent-hover); }
+.pwa-banner-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pwa-toast {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: 999px;
+  font-size: 12.5px;
+  box-shadow: var(--shadow);
+}
+
+/* ---------- 移动端布局(≤768px) ---------- */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column-reverse;
+    padding: 0;
+    gap: 0;
+  }
+  .main {
+    border-radius: 0;
+    border: 0;
+    flex: 1;
+    min-height: 0;
+  }
+  /* 左侧导航栏变为底部 tab 栏 */
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0;
+    padding: 4px 2px calc(4px + env(safe-area-inset-bottom));
+    border-radius: 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar .logo { display: none; }
+  .nav-sep { display: none; }
+  .sidebar .nav-btn {
+    flex: 1 1 0;
+    min-width: 48px;
+    height: 52px;
+    border-radius: 10px;
+  }
+  .sidebar-more .nav-btn { flex: 0 1 auto; padding: 0 10px; }
+  .sidebar-more-menu {
+    left: 8px;
+    right: 8px;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: calc(100vh - 80px - env(safe-area-inset-top));
+  }
+  /* 顶栏:窄屏可横向滚动,低优先级项隐藏 */
+  .topbar {
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .topbar::-webkit-scrollbar { display: none; }
+  .topbar > * { flex-shrink: 0; }
+  .topbar .project-name { width: min(160px, 34vw); }
+  .topbar .saved-hint { white-space: nowrap; }
+  .mobile-hide { display: none !important; }
+  /* 分屏副面板在窄屏直接隐藏(分屏按钮也已隐藏) */
+  .content-pane-secondary { display: none; }
+  .content-split > .content-pane { flex: 1 1 0; }
+  /* 模块内部布局:窄屏纵向堆叠(导航树 / 内容 / 检查器) */
+  .content-pane { flex-direction: column; }
+  .content-pane > .side-list {
+    width: 100%;
+    max-height: 34vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .content-pane > .inspector {
+    width: 100%;
+    max-height: 36vh;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .content-pane > .pane-col { flex: 1 1 0; }
+}
