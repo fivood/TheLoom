@@ -171,9 +171,10 @@ export default function ProjectMenu() {
       <button
         className="ghost icon-btn project-menu-toggle"
         title="切换项目 / 新建 / 导入"
+        aria-label="切换项目 / 新建 / 导入"
         onClick={() => setOpen((v) => !v)}
       >
-        ▾
+        <Icon name="chevronDown" size={14} />
       </button>
 
       {open && (

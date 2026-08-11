@@ -327,7 +327,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
               </div>
               <div className="field">
                 <button className="ghost" style={{ alignSelf: 'start', fontSize: 12 }} onClick={() => setShowPrompt((v) => !v)}>
-                  {showPrompt ? '▾' : '▸'} 提示词模板(随项目保存,可自定义)
+                  <Icon name={showPrompt ? 'chevronDown' : 'chevronRight'} size={12} style={{ verticalAlign: '-1px' }} /> 提示词模板(随项目保存,可自定义)
                 </button>
                 {showPrompt && (
                   <>

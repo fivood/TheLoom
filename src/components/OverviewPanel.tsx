@@ -101,7 +101,7 @@ export default function OverviewPanel({ onClose }: { onClose: () => void }) {
       <div key={key} style={{ marginLeft: folder ? 14 : 0 }}>
         {folder && (
           <div className="overview-folder" onClick={() => toggle(key)}>
-            <span className="overview-caret">{isCollapsed ? '▸' : '▾'}</span>
+            <span className="overview-caret"><Icon name={isCollapsed ? 'chevronRight' : 'chevronDown'} size={12} /></span>
             <Icon name="folder" size={12} />
             <span className="overview-folder-name">{folder.name}</span>
             <span className="overview-count">{countMatches(module, folder.id, tree)}</span>
