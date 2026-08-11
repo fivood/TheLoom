@@ -42,6 +42,15 @@ cd src-tauri && cargo test --lib
 
 也可以在 Cloudflare Dashboard → Workers & Pages 创建 Pages 项目并连接本仓库,构建命令 `npm run build`,输出目录 `dist`。
 
+### 移动版(PWA)部署
+
+移动版(PWA / 移动布局 / IndexedDB 数据层)独立在 `mobile-pwa` 分支开发与发布,与 main 的桌面安装版隔离:
+
+- 推送到 `mobile-pwa` 时,[deploy-mobile.yml](../.github/workflows/deploy-mobile.yml) 构建并部署到 **独立 Pages 项目 `theloom-mobile`**(生产分支 `mobile-pwa`),不会覆盖 main 的项目 `theloom`。
+- PWA 产物:`dist/sw.js`(Service Worker)、`dist/manifest.webmanifest`、`pwa-*.png` 图标;`public/_headers` 保证 SW / manifest / index.html 走 `no-cache`,更新及时传播。
+- 离线能力:网页版数据以 IndexedDB(`theloom-app`)为权威存储、localStorage 为镜像,离线可读写;断网推送会进入待补发队列,联网自动补发。
+- 桌面版(Tauri)与 main 分支不使用 Service Worker,不受影响。
+
 ## 启用协作后端(可选)
 
 协作同步基于 Pages Functions(`functions/api/room/[id].ts`)与 D1 数据库:
