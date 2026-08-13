@@ -16,6 +16,7 @@ import Manuscript from './Manuscript';
 import RevisionDiff from './RevisionDiff';
 import Inspector from '../../components/Inspector';
 import DocumentStructureDialog from './DocumentStructureDialog';
+import { useToolBus } from '../../toolBus';
 import {
   countDocumentReferences,
   mergeAdjacentDocuments,
@@ -51,6 +52,10 @@ export default function DocumentView() {
   const [mode, setMode] = useState<'writing' | 'structure' | 'manuscript'>('writing');
   const [focusMode, setFocusMode] = useState(false);
   const [structureToolsOpen, setStructureToolsOpen] = useState(false);
+
+  const workspacePreset = project.workspacePreset ?? 'universal';
+  const isNovel = workspacePreset === 'novel';
+  const isInteractive = workspacePreset === 'interactive';
 
   const navSeq = useNav((s) => s.seq);
   useEffect(() => {
@@ -408,6 +413,18 @@ export default function DocumentView() {
             onClick={() => setFocusMode(true)}
           >专注</button>
           <button className="ghost" onClick={() => setStructureToolsOpen(true)}>长篇工具</button>
+          {!isInteractive && (
+            <button
+              className="ghost"
+              title="导入 TXT / Markdown / EPUB / DOCX / MOBI 长稿,自动拆卷 / 章 / 场景"
+              onClick={() => useToolBus.getState().open('manuscriptImport')}
+            ><Icon name="upload" size={13} /> 导入长稿</button>
+          )}
+          <button
+            className="ghost"
+            title="按卷 / 章勾选场景,编译为 Word / Markdown / TXT / Final Draft 成品稿"
+            onClick={() => useToolBus.getState().open('chapterCompile')}
+          ><Icon name="script" size={13} /> 成稿导出</button>
           <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -494,7 +511,7 @@ export default function DocumentView() {
                 {!categories.includes('未分类') && <option value="未分类">未分类</option>}
                 <option value="__new__">＋ 新建分类…</option>
               </select>
-              {linkedFlow ? (
+              {!isNovel && (linkedFlow ? (
                 <>
                   <button className="primary" onClick={() => go({ tab: 'flow', flowId: linkedFlow.id })}>
                     <Icon name="flow" size={13} /> 打开关联流程
@@ -505,7 +522,7 @@ export default function DocumentView() {
                 <button className="primary" onClick={convertToFlow}>
                   <Icon name="flow" size={13} /> 生成流程
                 </button>
-              )}
+              ))}
               <button
                 className="ghost"
                 onClick={splitSelected}
@@ -797,11 +814,13 @@ export default function DocumentView() {
             </div>
           </details>
 
-          <TechNameField
-            value={selected.technicalName}
-            onChange={(v) => patchDoc((d) => { d.technicalName = v; })}
-            displayName={selected.name}
-          />
+          {!isNovel && (
+            <TechNameField
+              value={selected.technicalName}
+              onChange={(v) => patchDoc((d) => { d.technicalName = v; })}
+              displayName={selected.name}
+            />
+          )}
 
           <div className="field">
             <label>文件夹</label>
@@ -818,25 +837,27 @@ export default function DocumentView() {
             />
           </div>
 
-          <div className="field">
-            <label>结构块(参与流程)</label>
-            <ul className="doc-legend">
-              <li><b>场景锚点</b> → 片段节点(兼容多场景剧本)</li>
-              <li><b>动作</b> → 对白节点(无说话人)</li>
-              <li><b>对白</b> → 对白节点(带说话人)</li>
-              <li><b>选项</b> → 汇聚点(分支提示)</li>
-              <li><b>条件</b> → 条件节点(真/假引脚)</li>
-              <li><b>指令</b> → 指令节点(变量赋值)</li>
-            </ul>
-            <label style={{ marginTop: 8 }}>写作块</label>
-            <ul className="doc-legend">
-              <li><b>正文</b> → 默认不进入流程，可在结构视图标为节拍</li>
-              <li><b>子标题</b> → H2 / H3,只影响排版和 Markdown</li>
-              <li><b>引用</b> → Markdown 的 <code>&gt;</code> 块</li>
-              <li><b>列表</b> → 有序 / 无序列表</li>
-              <li><b>注释</b> → 不导出,不进入流程</li>
-            </ul>
-          </div>
+          {!isNovel && (
+            <div className="field">
+              <label>结构块(参与流程)</label>
+              <ul className="doc-legend">
+                <li><b>场景锚点</b> → 片段节点(兼容多场景剧本)</li>
+                <li><b>动作</b> → 对白节点(无说话人)</li>
+                <li><b>对白</b> → 对白节点(带说话人)</li>
+                <li><b>选项</b> → 汇聚点(分支提示)</li>
+                <li><b>条件</b> → 条件节点(真/假引脚)</li>
+                <li><b>指令</b> → 指令节点(变量赋值)</li>
+              </ul>
+              <label style={{ marginTop: 8 }}>写作块</label>
+              <ul className="doc-legend">
+                <li><b>正文</b> → 默认不进入流程，可在结构视图标为节拍</li>
+                <li><b>子标题</b> → H2 / H3,只影响排版和 Markdown</li>
+                <li><b>引用</b> → Markdown 的 <code>&gt;</code> 块</li>
+                <li><b>列表</b> → 有序 / 无序列表</li>
+                <li><b>注释</b> → 不导出,不进入流程</li>
+              </ul>
+            </div>
+          )}
         </Inspector>
       )}
 

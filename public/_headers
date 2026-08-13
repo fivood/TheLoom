@@ -1,0 +1,7 @@
+# Cloudflare Pages 自定义响应头
+# Service Worker 与 Web 清单必须 no-cache,否则浏览器会缓存旧版本,更新无法传播
+# index.html 由 Pages 默认下发 max-age=0 重校验,无需在此覆盖
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache

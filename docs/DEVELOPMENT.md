@@ -33,7 +33,9 @@ cd src-tauri && cargo test --lib
 
 ## 部署到 Cloudflare Pages
 
-仓库自带 GitHub Actions 工作流([deploy.yml](../.github/workflows/deploy.yml)),推送到 `main` 自动构建并部署。启用步骤:
+**网页版(PWA)由 `mobile-pwa` 分支发布到 the-loom.net**(桌面功能超集 + 移动布局 + PWA 离线/安装 + IndexedDB)。推送到 `mobile-pwa` 时,[deploy-mobile.yml](../.github/workflows/deploy-mobile.yml) 构建并部署到 Pages 项目 `theloom` 的生产分支。`main` 不再部署 Web([deploy.yml](../.github/workflows/deploy.yml) 仅验证构建),只负责桌面安装包(`v*` 标签触发 [release.yml](../.github/workflows/release.yml))。
+
+启用步骤:
 
 1. 在 [Cloudflare Dashboard → API Tokens](https://dash.cloudflare.com/profile/api-tokens) 使用 Edit Cloudflare Workers 模板创建 Token;Account ID 位于 Cloudflare 首页右侧栏。
 2. GitHub 仓库 → Settings → Secrets and variables → Actions,添加 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID`。
@@ -41,6 +43,14 @@ cd src-tauri && cargo test --lib
 未配置密钥时,工作流仅验证构建并跳过部署。
 
 也可以在 Cloudflare Dashboard → Workers & Pages 创建 Pages 项目并连接本仓库,构建命令 `npm run build`,输出目录 `dist`。
+
+### 移动版(PWA)部署细节
+
+- 部署目标:Pages 项目 `theloom` 生产分支(the-loom.net);PWA 产物为 `dist/sw.js`(Service Worker)、`dist/manifest.webmanifest`、`pwa-*.png` 图标。
+- `public/_headers` 保证 `sw.js` / `manifest.webmanifest` 走 `no-cache`,更新及时传播;index.html 由 Pages 默认重校验。
+- 桌面版更新代理 `/api/update/{target}/{version}`、`/api/download/...` 由本项目 `functions/` 提供,随移动分支部署继续生效,桌面版自动更新不受影响。
+- 离线能力:网页版数据以 IndexedDB(`theloom-app`)为权威存储、localStorage 为镜像,离线可读写;断网推送会进入待补发队列,联网自动补发。
+- 桌面版(Tauri)不使用 Service Worker,不受影响。
 
 ## 启用协作后端(可选)
 

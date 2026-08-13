@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import { version } from './package.json';
 
 /**
@@ -28,7 +29,49 @@ function runtimeSourcePlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), runtimeSourcePlugin()],
+  plugins: [
+    react(),
+    runtimeSourcePlugin(),
+    // PWA:仅网页版需要;桌面(Tauri)版由前端运行时 isTauri 跳过 SW 注册
+    VitePWA({
+      registerType: 'prompt',
+      includeAssets: ['logo.svg'],
+      manifest: {
+        name: '叙事织机 TheLoom',
+        short_name: 'TheLoom',
+        description: '本地优先的叙事设计工具:流程编辑、实体库、大纲、时间线与文档写作',
+        lang: 'zh-CN',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        theme_color: '#eceae6',
+        background_color: '#eceae6',
+        icons: [
+          { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        runtimeCaching: [
+          // 图标等图片静态资源:缓存优先
+          {
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: { cacheName: 'theloom-images' },
+          },
+          // 协作房间接口:网络优先,SW 不缓存房间密文,保持端到端加密边界
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/functions/') || url.pathname.includes('/api/'),
+            handler: 'NetworkOnly',
+          },
+        ],
+        cleanupOutdatedCaches: true,
+      },
+      devOptions: { enabled: false },
+    }),
+  ],
   server: { port: 5173 },
   define: {
     __APP_VERSION__: JSON.stringify(version),

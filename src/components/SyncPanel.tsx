@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLoom } from '../store';
 import {
-  loadSyncConfig, pullProject, pushProject, saveSyncConfig, SyncError, type SyncConfig,
+  clearPendingPush, flushPendingPush, loadPendingPush, loadSyncConfig, pullProject,
+  pushProject, queuePendingPush, saveSyncConfig, SyncError, type SyncConfig,
 } from '../sync';
 import { isTauri } from '../storage';
 import { confirmDialog } from '../dialog';
@@ -9,8 +10,16 @@ import Icon from './Icon';
 
 export default function SyncPanel({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg] = useState<SyncConfig>(loadSyncConfig);
-  const [busy, setBusy] = useState<'push' | 'pull' | null>(null);
+  const [busy, setBusy] = useState<'push' | 'pull' | 'flush' | null>(null);
   const [status, setStatus] = useState('');
+  const [pending, setPending] = useState(() => loadPendingPush());
+
+  useEffect(() => { setPending(loadPendingPush()); }, []);
+
+  const refresh = () => {
+    setPending(loadPendingPush());
+    useLoom.getState().refreshSyncState();
+  };
 
   const patch = (p: Partial<SyncConfig>) => {
     const next = { ...cfg, ...p };
@@ -32,6 +41,7 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
       }
       useLoom.getState().replaceProject(project);
       patch({ lastVersion: version, lastSyncAt: Date.now() });
+      refresh();
       setStatus(`已拉取云端 v${version}`);
     } catch (e) {
       setStatus(e instanceof Error ? e.message : String(e));
@@ -45,9 +55,23 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
     try {
       const version = await pushProject(cfg, useLoom.getState().project);
       patch({ lastVersion: version, lastSyncAt: Date.now() });
+      refresh();
       setStatus(`已推送,云端现为 v${version}`);
     } catch (e) {
-      if (e instanceof SyncError && e.status === 409) {
+      if (e instanceof TypeError) {
+        // 网络不可用 / 服务器未部署协作接口 → 存进离线队列,恢复联网后自动补发
+        const shouldQueue = await confirmDialog({
+          message: '网络不可用,推送没有成功。\n\n把当前改动存进「待推送」队列,恢复联网后自动补发?',
+          confirmText: '存入队列',
+        });
+        if (shouldQueue) {
+          queuePendingPush(cfg, useLoom.getState().project);
+          refresh();
+          setStatus('已存入待推送队列;联网后会自动补发,也可点下方「立即补发」。');
+        } else {
+          setStatus('未推送(网络不可用)');
+        }
+      } else if (e instanceof SyncError && e.status === 409) {
         setStatus(`冲突:云端已是 v${e.cloudVersion},比你的基线(v${cfg.lastVersion})新`);
         if (await confirmDialog({ message: `云端已有更新版本(v${e.cloudVersion}),可能是同伴推送的。\n\n【确定】拉取云端版本(覆盖你的本地改动)\n【取消】保留本地,稍后自行处理`, confirmText: '拉取云端' })) {
           await doPull(true);
@@ -57,6 +81,7 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
           try {
             const version = await pushProject(next, useLoom.getState().project);
             patch({ lastVersion: version, lastSyncAt: Date.now() });
+            refresh();
             setStatus(`已强制推送,云端现为 v${version}`);
           } catch (e2) {
             setStatus(e2 instanceof Error ? e2.message : String(e2));
@@ -67,6 +92,46 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
       }
     }
     setBusy(null);
+  };
+
+  /** 用给定配置拉取(补发冲突后的跟随拉取) */
+  const doPullWith = async (nextCfg: SyncConfig) => {
+    try {
+      const { project, version } = await pullProject(nextCfg);
+      useLoom.getState().replaceProject(project);
+      const merged = { ...nextCfg, lastVersion: version, lastSyncAt: Date.now() };
+      setCfg(merged);
+      saveSyncConfig(merged);
+      refresh();
+      setStatus(`已拉取云端 v${version}(冲突解决)`);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const doFlushPending = async () => {
+    if (!pending) return;
+    setBusy('flush');
+    setStatus('正在补发…');
+    try {
+      const result = await flushPendingPush();
+      if (result.ok) {
+        const merged = { ...cfg, lastVersion: result.version ?? cfg.lastVersion, lastSyncAt: Date.now() };
+        setCfg(merged);
+        saveSyncConfig(merged);
+        refresh();
+        setStatus(result.message);
+      } else if (result.conflict) {
+        setStatus(result.message);
+        if (await confirmDialog({ message: `${result.message}\n\n拉取云端版本,放弃待补发的本地改动?`, confirmText: '拉取云端' })) {
+          await doPullWith(cfg);
+        }
+      } else {
+        setStatus(result.message);
+      }
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -113,6 +178,20 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
               placeholder="至少 4 位,首次推送时确定"
             />
           </div>
+
+          {pending && (
+            <div className="sync-pending-box">
+              <div>
+                <b>待推送队列</b> · 有 1 份离线改动
+                <span className="hint" style={{ marginLeft: 6 }}>
+                  存于 {new Date(pending.queuedAt).toLocaleString()} · 联网后会自动补发
+                </span>
+              </div>
+              <button className="primary" disabled={busy !== null} onClick={doFlushPending}>
+                {busy === 'flush' ? '补发中…' : '立即补发'}
+              </button>
+            </div>
+          )}
 
           <div className="sync-actions">
             <button className="primary" disabled={!ready || busy !== null} onClick={doPush}>
