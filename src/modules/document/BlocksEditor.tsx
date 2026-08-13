@@ -12,7 +12,7 @@ import StaticBlock from './StaticBlock';
 
 const COMMON_TYPES: DocBlockType[] = ['paragraph', 'action', 'dialogue'];
 const MORE_TYPES: DocBlockType[] = ['heading', 'subheading', 'quote', 'list', 'choice', 'condition', 'instruction', 'note'];
-const SLASH_TYPES = [...COMMON_TYPES, ...MORE_TYPES];
+const GAME_TYPES: DocBlockType[] = ['choice', 'condition', 'instruction'];
 
 export function emptyBlock(type: DocBlockType): DocBlock {
   const b: DocBlock = { id: uid(), type, text: '' };
@@ -40,8 +40,12 @@ export default function BlocksEditor({
 }) {
   const entities = useLoom((s) => s.project.entities);
   const flows = useLoom((s) => s.project.flows);
+  const workspacePreset = useLoom((s) => s.project.workspacePreset);
   const updateDocument = useLoom((s) => s.updateDocument);
   const addEntity = useLoom((s) => s.addEntity);
+  const isNovel = workspacePreset === 'novel';
+  const moreTypes = isNovel ? MORE_TYPES.filter((t) => !GAME_TYPES.includes(t)) : MORE_TYPES;
+  const slashTypes = [...COMMON_TYPES, ...moreTypes];
   const [activeBlockId, setActiveBlockIdRaw] = useState<string | null>(focusBlockId ?? doc.blocks[0]?.id ?? null);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(focusBlockId ?? null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -92,7 +96,7 @@ export default function BlocksEditor({
     : null;
   const slashMatches = slashQuery === null
     ? []
-    : SLASH_TYPES.filter((type) =>
+    : slashTypes.filter((type) =>
       DOC_BLOCK_LABEL[type].includes(slashQuery) || type.includes(slashQuery));
 
   useEffect(() => {
@@ -513,7 +517,7 @@ export default function BlocksEditor({
                 </div>
               </div>}
               <div className="doc-block-main">
-                {variant === 'structure' && (b.type === 'paragraph' || b.type === 'action' || b.type === 'dialogue') && (
+                {variant === 'structure' && !isNovel && (b.type === 'paragraph' || b.type === 'action' || b.type === 'dialogue') && (
                   <div className="doc-flow-role-row">
                     <span>流程</span>
                     <select
@@ -532,8 +536,8 @@ export default function BlocksEditor({
                 {renderTextEditor(b)}
                 {(slashQuery !== null && activeBlockId === b.id) || typeMenuBlockId === b.id ? (
                   <div className="doc-slash-menu">
-                    {(typeMenuBlockId === b.id ? SLASH_TYPES : slashMatches).length > 0
-                      ? (typeMenuBlockId === b.id ? SLASH_TYPES : slashMatches).map((type, index) => (
+                    {(typeMenuBlockId === b.id ? slashTypes : slashMatches).length > 0
+                      ? (typeMenuBlockId === b.id ? slashTypes : slashMatches).map((type, index) => (
                       <button
                         key={type}
                         type="button"
@@ -565,7 +569,7 @@ export default function BlocksEditor({
         <span className="hint">Enter 新段 · Shift+Enter 换行 · / 切换类型 · Alt+↑↓ 移动</span>
         {moreOpen && (
           <div className="doc-more-types">
-            {MORE_TYPES.map((type) => (
+            {moreTypes.map((type) => (
               <button key={type} className="ghost" onClick={() => insertBlock(type)}>
                 {DOC_BLOCK_LABEL[type]}
               </button>

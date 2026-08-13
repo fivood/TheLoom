@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { exportProject, hydrateFromIdb, useLoom } from './store';
 import { useAiPanelBus } from './ai/panelBus';
+import { useToolBus } from './toolBus';
 import Onboarding, { ONBOARDING_KEY, markOnboarded } from './components/Onboarding';
 import OverviewPanel from './components/OverviewPanel';
 import StorageManager from './components/StorageManager';
@@ -34,6 +35,8 @@ import FindReplace from './components/FindReplace';
 import EngineExportModal from './components/EngineExportModal';
 import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
+import { useIsMobile, useMobilePref } from './mobile/useIsMobile';
+import MobileShell from './mobile/MobileShell';
 import { projectToXlsx } from './interop/projectXlsx';
 import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
 import { WORKSPACE_PRIMARY_TABS, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
@@ -99,7 +102,8 @@ export default function App() {
       const saved = localStorage.getItem(TAB_MEMORY_KEY) as Tab | null;
       if (saved && VALID_TABS.includes(saved)) return saved;
     } catch { /* 忽略 */ }
-    return 'documents';
+    // 首次进入:小说/通用落在「文档」,互动叙事落在「流程」
+    return useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents';
   });
   useEffect(() => {
     try { localStorage.setItem(TAB_MEMORY_KEY, tab); } catch { /* 忽略 */ }
@@ -118,6 +122,14 @@ export default function App() {
   useEffect(() => {
     if (aiPanelRequest) setAiAssistant(true);
   }, [aiPanelRequest]);
+  const toolRequest = useToolBus((s) => s.request);
+  useEffect(() => {
+    if (!toolRequest) return;
+    const kind = toolRequest.kind;
+    useToolBus.getState().consume();
+    if (kind === 'chapterCompile') setChapterCompile(true);
+    else if (kind === 'manuscriptImport') importManuscriptRef.current?.click();
+  }, [toolRequest]);
   const [findReplace, setFindReplace] = useState(false);
   const [engineExport, setEngineExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
@@ -135,6 +147,9 @@ export default function App() {
   const [moreModulesOpen, setMoreModulesOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
+  const isMobile = useIsMobile();
+  const forceDesktop = useMobilePref((s) => s.forceDesktop);
+  const mobileShell = isMobile && !isTauri && !forceDesktop;
   const [storageMgr, setStorageMgr] = useState(false);
   const [help, setHelp] = useState(false);
   // R14-3 分屏:副 pane 打开时,值为当前副 pane 的模块 tab;null = 单栏
@@ -196,8 +211,6 @@ export default function App() {
   const pendingPush = useLoom((s) => s.pendingPush);
   const setFolder = useLoom((s) => s.setFolder);
   const revision = useLoom((s) => s.revision);
-  const canUndo = useLoom((s) => s.canUndo);
-  const canRedo = useLoom((s) => s.canRedo);
   const workspacePreset = project.workspacePreset ?? 'universal';
   const primaryTabKeys = workspacePrimaryTabs(workspacePreset);
   const primaryTabs = WORKSPACE_PRIMARY_TABS[workspacePreset]
@@ -307,8 +320,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
-      <nav className="sidebar">
+    <div className={`app ${mobileShell ? 'app-mobile' : ''}`}>
+      {mobileShell ? <MobileShell /> : (
+        <>
+          <nav className="sidebar">
         <div className="logo" title="叙事织机 TheLoom"><img src="/logo.svg" alt="TheLoom" width={26} height={26} /></div>
         {primaryTabs.map((t, i) => {
           const prev = i > 0 ? primaryTabs[i - 1].group : null;
@@ -346,7 +361,7 @@ export default function App() {
                 <div className="backdrop" onClick={() => setMoreModulesOpen(false)} />
                 <div className="sidebar-more-menu">
                   <strong>更多模块</strong>
-                  <span className="hint">这些模块仍然完整保留</span>
+                  <span className="hint">当前布局折叠起来的模块,完整保留,可随时切回</span>
                   {moreTabs.map((item) => {
                     const label = workspaceTabLabel(workspacePreset, item.key);
                     return (
@@ -423,8 +438,6 @@ export default function App() {
           >
             <Icon name="bulb" />
           </button>
-          <button className="ghost icon-btn" disabled={!canUndo} title="撤销 (Ctrl+Z)" onClick={() => useLoom.getState().undo()}><Icon name="undo" /></button>
-          <button className="ghost icon-btn" disabled={!canRedo} title="重做 (Ctrl+Y)" onClick={() => useLoom.getState().redo()}><Icon name="redo" /></button>
           <span className="spacer" />
           {recoveryNotice ? (
             <button className="ghost saved-hint recovery-status" onClick={() => setRecovering(true)} title={recoveryNotice}>⚠ 恢复提醒</button>
@@ -470,15 +483,6 @@ export default function App() {
             </button>
           )}
           <ThemeToggle />
-          <button
-            className="ghost saved-hint mobile-hide"
-            style={{ padding: '2px 6px' }}
-            title={isTauri ? '点击检查更新' : '网页版随部署自动更新'}
-            disabled={checkingUpdate}
-            onClick={() => { if (isTauri) runUpdateCheck(false); }}
-          >
-            {checkingUpdate ? '检查中…' : `v${__APP_VERSION__}`}
-          </button>
           <div className="tools-wrap">
             <button className="ghost icon-btn" onClick={() => setToolsOpen((o) => !o)} title="工具:文件 / 体检 / 历史 / 协作 / 导出" aria-label="工具菜单">
               <Icon name="script" />
@@ -647,6 +651,20 @@ export default function App() {
                       e.currentTarget.value = '';
                     }}
                   />
+                  {isTauri && (
+                    <>
+                      <div className="tools-sep" />
+                      <div className="tools-label">关于</div>
+                      <button
+                        title="检查并安装新版本"
+                        onClick={() => { setToolsOpen(false); runUpdateCheck(false); }}
+                        disabled={checkingUpdate}
+                      >
+                        <Icon name="refresh" size={14} /> {checkingUpdate ? '检查中…' : '检查更新'}
+                      </button>
+                      <span className="hint" style={{ padding: '2px 12px 6px' }}>当前版本 v{__APP_VERSION__}</span>
+                    </>
+                  )}
                 </div>
               </>
             )}
@@ -681,6 +699,8 @@ export default function App() {
           )}
         </div>
       </div>
+        </>
+      )}
 
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
@@ -698,8 +718,8 @@ export default function App() {
       {help && <HelpPanel onClose={() => setHelp(false)} />}
       {onboarding && (
         <Onboarding
-          onContinueBlank={() => { setTab('documents'); }}
-          onLoadSample={() => { useLoom.getState().loadSampleProject(); setTab('flow'); markOnboarded(); }}
+          onContinueBlank={() => { setTab(useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents'); }}
+          onLoadSample={() => { useLoom.getState().loadSampleProject(); setTab('flow'); }}
           onAiImport={() => { setProjectImport(true); }}
           onClose={() => setOnboarding(false)}
         />

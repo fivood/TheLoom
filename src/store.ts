@@ -848,6 +848,7 @@ export const useLoom = create<LoomState>((set, get) => {
       // 走 normalize 补齐,保持与从 localStorage 加载的项目一致。
       const p = sampleProject();
       normalizeProject(p);
+      p.workspacePreset = 'interactive';
       swapProject(p);
     },
 
