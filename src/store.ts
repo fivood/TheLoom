@@ -846,9 +846,11 @@ export const useLoom = create<LoomState>((set, get) => {
       undoStack = []; redoStack = []; lastUndoPush = 0;
       // 手写的示例项目可能缺 R14 之后新增的字段(如 map layers),
       // 走 normalize 补齐,保持与从 localStorage 加载的项目一致。
+      // 保留当前项目的工作区布局:用户在引导里选的「小说 / 互动叙事 / 通用」不被示例覆盖。
+      const preset = get().project.workspacePreset ?? 'universal';
       const p = sampleProject();
       normalizeProject(p);
-      p.workspacePreset = 'interactive';
+      p.workspacePreset = preset;
       swapProject(p);
     },
 

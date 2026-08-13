@@ -33,7 +33,7 @@ cd src-tauri && cargo test --lib
 
 ## 部署到 Cloudflare Pages
 
-**网页版(PWA)由 `mobile-pwa` 分支发布到 the-loom.net**(桌面功能超集 + 移动布局 + PWA 离线/安装 + IndexedDB)。推送到 `mobile-pwa` 时,[deploy-mobile.yml](../.github/workflows/deploy-mobile.yml) 构建并部署到 Pages 项目 `theloom` 的生产分支。`main` 不再部署 Web([deploy.yml](../.github/workflows/deploy.yml) 仅验证构建),只负责桌面安装包(`v*` 标签触发 [release.yml](../.github/workflows/release.yml))。
+**网页版(PWA)与桌面版共用 `main` 分支**:推送到 `main` 时,[deploy-mobile.yml](../.github/workflows/deploy-mobile.yml) 构建并部署到 Pages 项目 `theloom` 的生产分支(the-loom.net),同时 [verify.yml](../.github/workflows/verify.yml) 跑完整检查;`v*` 标签再触发 [release.yml](../.github/workflows/release.yml) 发布桌面安装包。不再维护单独的发版分支,`mobile-pwa` 已废弃。
 
 启用步骤:
 
@@ -48,7 +48,7 @@ cd src-tauri && cargo test --lib
 
 - 部署目标:Pages 项目 `theloom` 生产分支(the-loom.net);PWA 产物为 `dist/sw.js`(Service Worker)、`dist/manifest.webmanifest`、`pwa-*.png` 图标。
 - `public/_headers` 保证 `sw.js` / `manifest.webmanifest` 走 `no-cache`,更新及时传播;index.html 由 Pages 默认重校验。
-- 桌面版更新代理 `/api/update/{target}/{version}`、`/api/download/...` 由本项目 `functions/` 提供,随移动分支部署继续生效,桌面版自动更新不受影响。
+- 桌面版更新代理 `/api/update/{target}/{version}`、`/api/download/...` 由本项目 `functions/` 提供,随 main 的 Web 部署继续生效,桌面版自动更新不受影响。
 - 离线能力:网页版数据以 IndexedDB(`theloom-app`)为权威存储、localStorage 为镜像,离线可读写;断网推送会进入待补发队列,联网自动补发。
 - 桌面版(Tauri)不使用 Service Worker,不受影响。
 

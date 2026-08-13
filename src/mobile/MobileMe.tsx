@@ -1,4 +1,4 @@
-import { useLoom } from '../store';
+import { useLoom, exportProject } from '../store';
 import { documentWordCount } from '../util';
 import { useMobilePref } from './useIsMobile';
 
@@ -27,6 +27,9 @@ export default function MobileMe() {
               : '已自动保存到本地'}
         </span>
       </div>
+      <button className="m-me-full" onClick={() => exportProject(project)}>
+        导出 JSON 备份
+      </button>
       <button className="m-me-full" onClick={() => useMobilePref.getState().toggle()}>
         切换到完整版(桌面布局)
       </button>

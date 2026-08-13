@@ -719,7 +719,10 @@ export default function App() {
       {onboarding && (
         <Onboarding
           onContinueBlank={() => { setTab(useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents'); }}
-          onLoadSample={() => { useLoom.getState().loadSampleProject(); setTab('flow'); }}
+          onLoadSample={() => {
+            useLoom.getState().loadSampleProject();
+            setTab(useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents');
+          }}
           onAiImport={() => { setProjectImport(true); }}
           onClose={() => setOnboarding(false)}
         />

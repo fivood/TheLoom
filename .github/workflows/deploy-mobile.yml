@@ -1,13 +1,13 @@
 name: Deploy Web (PWA) to Cloudflare Pages
 
-# 网页版(PWA)发布线:推送到 mobile-pwa 分支时,构建并部署到 Pages 项目 theloom 的生产分支,
+# 网页版(PWA)发布线:推送到 main 时,构建并部署到 Pages 项目 theloom 的生产分支,
 # the-loom.net 即移动版(超集:桌面功能全保留 + 移动布局 + PWA 离线/安装 + IndexedDB)。
-# main 分支不再部署 Web(见 deploy.yml,仅验证构建),只负责桌面安装包(v* 标签 release)。
+# main 同时负责桌面安装包(v* 标签 release),两者共用同一份代码,不再维护单独的发版分支。
 # 桌面版更新代理 /api/update、/api/download 由本项目 functions/ 提供,不受影响。
 
 on:
   push:
-    branches: [mobile-pwa]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
