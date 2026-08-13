@@ -4,6 +4,7 @@ import { normalizeProject } from '../util';
 import { parseModelJson } from './llm';
 import {
   applyAiImportPreview, buildAiImportPreview, composeExtractSystemPrompt,
+  DEFAULT_EXTRACT_PROMPT, defaultExtractPrompt, EXTRACT_SCENARIOS, guessExtractScenario,
   mergeExtracted, normalizeExtracted, normalizeFieldFill, pushAiLog,
 } from './extract';
 
@@ -225,5 +226,31 @@ describe('pushAiLog', () => {
     }
     expect(project.aiLog).toHaveLength(50);
     expect(project.aiLog![0].inChars).toBe(54);
+  });
+});
+
+describe('抽取场景提示词', () => {
+  it('五种内容类型都有独立的非空提示词,通用即历史默认', () => {
+    expect(EXTRACT_SCENARIOS).toHaveLength(5);
+    for (const s of EXTRACT_SCENARIOS) {
+      expect(s.prompt.trim().length).toBeGreaterThan(200);
+      expect(defaultExtractPrompt(s.key)).toBe(s.prompt);
+    }
+    expect(defaultExtractPrompt('unknown' as never)).toBe(DEFAULT_EXTRACT_PROMPT);
+  });
+});
+
+describe('guessExtractScenario', () => {
+  it('剧本特征(场次/内外景)判定为 screenplay', () => {
+    expect(guessExtractScenario('第一场\n内景·咖啡店 - 夜\n阿珂:你来了。\n第二场\n外景·巷口 - 晨')).toBe('screenplay');
+  });
+  it('互动特征(选项/分支/好感度)判定为 interactive', () => {
+    expect(guessExtractScenario('你面前有两条路线。\n选项: 追出去\n选项: 留在原地\n好感度 +1\n达成结局')).toBe('interactive');
+  });
+  it('设定特征(世界观/角色卡/图鉴)判定为 setting', () => {
+    expect(guessExtractScenario('世界观设定\n角色卡:阿珂\n图鉴:传送软盘\n能力体系总览')).toBe('setting');
+  });
+  it('无明显特征的散文返回 null(保持现状)', () => {
+    expect(guessExtractScenario('雨打在遮阳篷上,她摸出口袋里的手机。')).toBeNull();
   });
 });

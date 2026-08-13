@@ -1005,8 +1005,8 @@ export interface Project {
   nodeTemplates?: Partial<Record<FlowNodeType, EntityTemplateSpec[]>>;
   /** 叙事单元:文档块与流程节点共享内容的权威存储(R1) */
   units?: NarrativeUnit[];
-  /** AI 提示词模板(随项目保存、可导出);extract = 长文抽取提示词 */
-  aiPrompts?: { extract?: string };
+  /** AI 提示词模板(随项目保存、可导出);extract = 长文抽取提示词,extractType = 内容类型(小说/剧本/互动/设定/通用) */
+  aiPrompts?: { extract?: string; extractType?: string };
   /** AI 调用记录(仅元信息,上限 50 条) */
   aiLog?: AiLogEntry[];
   /** 批注(R5 正文修订) */

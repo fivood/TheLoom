@@ -11,9 +11,10 @@ import {
   type LlmConfig, type LlmProvider,
 } from '../ai/llm';
 import {
-  applyAiImportPreview, buildAiImportPreview, buildFieldFillPrompt, composeExtractSystemPrompt, DEFAULT_EXTRACT_PROMPT,
-  mergeExtracted, normalizeExtracted, normalizeFieldFill, pushAiLog, STAGE1_SUFFIX, STAGE2_SUFFIX,
-  type AiImportPreview,
+  applyAiImportPreview, buildAiImportPreview, buildFieldFillPrompt, composeExtractSystemPrompt,
+  defaultExtractPrompt, EXTRACT_SCENARIOS, guessExtractScenario, mergeExtracted, normalizeExtracted, normalizeFieldFill,
+  pushAiLog, STAGE1_SUFFIX, STAGE2_SUFFIX,
+  type AiImportPreview, type ExtractScenario,
 } from '../ai/extract';
 
 /* ---------- AI 设置 ---------- */
@@ -169,7 +170,15 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
   const go = useNav((s) => s.go);
   const [text, setText] = useState('');
   const [fileNote, setFileNote] = useState('');
-  const [prompt, setPrompt] = useState(() => project.aiPrompts?.extract || DEFAULT_EXTRACT_PROMPT);
+  const [type, setType] = useState<ExtractScenario>(() => {
+    const t = project.aiPrompts?.extractType;
+    return EXTRACT_SCENARIOS.some((s) => s.key === t) ? (t as ExtractScenario) : 'generic';
+  });
+  const [prompt, setPrompt] = useState<string>(() => {
+    const t = project.aiPrompts?.extractType;
+    const savedType: ExtractScenario = EXTRACT_SCENARIOS.some((s) => s.key === t) ? (t as ExtractScenario) : 'generic';
+    return project.aiPrompts?.extract || defaultExtractPrompt(savedType);
+  });
   const [showPrompt, setShowPrompt] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<'idle' | 'stage1' | 'stage2'>('idle');
@@ -179,6 +188,12 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  const changeType = (next: ExtractScenario) => {
+    setType(next);
+    // 提示词仍是当前类型的默认值时,随类型一起换默认;已被手改则保留自定义内容
+    setPrompt((cur) => (cur === defaultExtractPrompt(type) ? defaultExtractPrompt(next) : cur));
+  };
 
   const readFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -190,7 +205,12 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
       names.push(f.name);
     }
     setText(combined);
-    setFileNote(`已读入 ${names.length} 个文件:${names.join('、')}`);
+    const guessed = guessExtractScenario(combined);
+    const note = guessed
+      ? `已读入 ${names.length} 个文件:${names.join('、')}(内容像「${EXTRACT_SCENARIOS.find((s) => s.key === guessed)?.label}」,已自动切换抽取类型,可手动改)`
+      : `已读入 ${names.length} 个文件:${names.join('、')}`;
+    setFileNote(note);
+    if (guessed) changeType(guessed);
   };
 
   const run = async () => {
@@ -274,9 +294,8 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
     if (!preview) return;
     update((p) => {
       applyAiImportPreview(p, preview);
-      if (prompt !== DEFAULT_EXTRACT_PROMPT) {
-        p.aiPrompts = { ...(p.aiPrompts ?? {}), extract: prompt };
-      }
+      p.aiPrompts = { ...(p.aiPrompts ?? {}), extractType: type };
+      if (prompt !== defaultExtractPrompt(type)) p.aiPrompts.extract = prompt;
     });
     const firstDoc = preview.newDocs[0];
     onClose();
@@ -285,24 +304,23 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="palette-backdrop" onClick={onClose}>
-      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 780 }}>
+      <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 780, height: 'min(88vh, 860px)', display: 'flex', flexDirection: 'column' }}>
         <div className="sync-head">
           <Icon name="bulb" size={14} />
           <span>AI 抽取 · 长文 → 实体 / 场景 / 时间线</span>
           <span className="spacer" />
           <button className="ghost icon-btn" onClick={onClose}>×</button>
         </div>
-        <div className="sync-body">
+        <div className="sync-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {!preview && (
             <>
-              <div className="field">
+              <div className="field" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <label>源文本(小说 / 剧本 / 设定 / Obsidian 笔记;PDF 请先复制文字粘贴)</label>
                 <textarea
-                  rows={18}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="把长文粘贴到这里,或用下面的按钮读入 .md / .txt 文件…"
-                  style={{ minHeight: 320, resize: 'vertical', fontSize: 13, lineHeight: 1.55 }}
+                  style={{ flex: 1, minHeight: 240, resize: 'vertical', fontSize: 13, lineHeight: 1.55 }}
                 />
                 <div className="hint" style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button className="ghost" style={{ fontSize: 12 }} onClick={() => fileRef.current?.click()}>
@@ -320,6 +338,23 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
                 />
               </div>
               <div className="field">
+                <label>内容类型(决定抽取提示词;读入文件时会按内容自动判断)</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {EXTRACT_SCENARIOS.map((s) => (
+                    <button
+                      key={s.key}
+                      type="button"
+                      className={type === s.key ? 'primary' : 'ghost'}
+                      style={{ fontSize: 12, padding: '3px 10px' }}
+                      title={s.hint}
+                      onClick={() => changeType(s.key)}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="field">
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
                   <input type="checkbox" checked={twoStage} onChange={(e) => setTwoStage(e.target.checked)} />
                   <span>分两轮抽取(先实体+时间线,再场景;结果更稳,但 token 消耗约 1.8×)</span>
@@ -332,7 +367,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
                 {showPrompt && (
                   <>
                     <textarea rows={8} value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ fontFamily: 'Consolas, monospace', fontSize: 12 }} />
-                    <button className="ghost" style={{ alignSelf: 'start', fontSize: 11 }} onClick={() => setPrompt(DEFAULT_EXTRACT_PROMPT)}>恢复默认</button>
+                    <button className="ghost" style={{ alignSelf: 'start', fontSize: 11 }} onClick={() => setPrompt(defaultExtractPrompt(type))}>恢复为「{EXTRACT_SCENARIOS.find((s) => s.key === type)?.label}」默认</button>
                   </>
                 )}
               </div>

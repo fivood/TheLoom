@@ -96,6 +96,8 @@ export interface ImportPlan {
 }
 
 export function buildPlanPrompt(config: ImportConfig): string {
+  // 注意:interactive 走 buildInteractivePlanPrompt(带变量/结局),向导已按 config.projectKind 路由;
+  // 这里只负责 novel / shorts,不要传 interactive 进来。
   const shape = config.projectKind === 'shorts'
     ? '这是一部短篇集:每个 volume 代表一个分辑(没有分辑就只输出一个),每个 chapter 代表一篇短篇,scenes 是该篇内的场景。'
     : '这是一部长篇小说:volumes = 卷,chapters = 章,scenes = 章内场景标题列表。';

@@ -46,6 +46,150 @@ export const DEFAULT_EXTRACT_PROMPT = `你是叙事设计工具的资料抽取�
 - 没有的类别输出空数组`;
 
 /**
+ * AI 抽取按内容类型区分的提示词:共享同一套 JSON 输出模式(normalizeExtracted 校验不变),
+ * 只在抽取重点与规则上区分场景。
+ */
+export type ExtractScenario = 'novel' | 'screenplay' | 'interactive' | 'setting' | 'generic';
+
+export interface ExtractScenarioDef {
+  key: ExtractScenario;
+  label: string;
+  hint: string;
+  prompt: string;
+}
+
+const NOVEL_EXTRACT_PROMPT = `你是叙事设计工具的小说正文抽取助手。用户会给你一部小说的正文(整篇或片段)。
+从中抽取结构化信息,严格按下面的 JSON 模式输出,不要输出任何 JSON 以外的内容(不要解释、不要 markdown 围栏):
+
+{
+  "entities": [
+    { "kind": "character|location|item|faction|concept", "name": "名称", "summary": "一句话简介", "fields": [{ "label": "字段名", "value": "值" }] }
+  ],
+  "scenes": [
+    { "title": "场景标题", "blocks": [
+      { "type": "heading", "text": "场景标题" },
+      { "type": "action", "text": "叙述/动作描写" },
+      { "type": "dialogue", "speaker": "说话人名称", "text": "台词" }
+    ] }
+  ],
+  "timelinePoints": ["时间点标签(按故事内时间,如:第1日 / 雨夜 / 三年前)"],
+  "timelineEvents": [
+    { "point": "时间点标签", "title": "事件标题", "text": "事件描述", "entities": ["涉及的实体名称"] }
+  ]
+}
+
+规则:
+- kind 只能取 character / location / item / faction / concept(character 含配角与提及人物;location 是角色能到达的场所)
+- 场景 = 连续的时间 / 地点单元,按故事顺序拆分;正文压缩为要点式动作块,重要对白保留原文;title 用能一眼看出情节的短语(如「印刷间验尸」),不要只写地点或人名
+- 说话人姓名严格使用标准名或已登记别名;不确定归属就留空
+- 时间线按故事内时间推进(第几日 / 季节 / 时辰),不要按阅读顺序
+- 只抽取文本中确实存在的信息,不要虚构;没有的类别输出空数组`;
+
+const SCREENPLAY_EXTRACT_PROMPT = `你是叙事设计工具的剧本抽取助手。用户会给你一份影视 / 舞台 / 广播剧本。
+从中抽取结构化信息,严格按下面的 JSON 模式输出,不要输出任何 JSON 以外的内容(不要解释、不要 markdown 围栏):
+
+{
+  "entities": [
+    { "kind": "character|location|item|faction|concept", "name": "名称", "summary": "一句话简介", "fields": [{ "label": "字段名", "value": "值" }] }
+  ],
+  "scenes": [
+    { "title": "场景标题", "blocks": [
+      { "type": "heading", "text": "场景标题" },
+      { "type": "action", "text": "动作 / 舞台指示" },
+      { "type": "dialogue", "speaker": "说话人名称", "text": "台词" }
+    ] }
+  ],
+  "timelinePoints": ["时间点标签(按场次或剧本内时间,如:第一幕 / 内景·夜)"],
+  "timelineEvents": [
+    { "point": "时间点标签", "title": "事件标题", "text": "事件描述", "entities": ["涉及的实体名称"] }
+  ]
+}
+
+规则:
+- 场景 = 一场,按场次拆分(INT./EXT. 地点 - 时间,或「第 X 场」);title 保留场次标记(如「内景·咖啡店 - 夜」)或情节短语
+- 对白 = speaker + 台词原文(含画外音 / 旁白,标注角色名);动作行与舞台指示压缩为 action 块
+- character = 有名有姓的登场角色;location = 场景地点(内外景);item = 关键道具
+- timelinePoints 按场次顺序或剧本内时间推进
+- 只抽取文本中确实存在的信息,不要虚构;没有的类别输出空数组`;
+
+const INTERACTIVE_EXTRACT_PROMPT = `你是叙事设计工具的互动剧本抽取助手。用户会给你一份互动小说 / 视觉小说 / 文字冒险游戏的脚本或大纲。
+从中抽取结构化信息,严格按下面的 JSON 模式输出,不要输出任何 JSON 以外的内容(不要解释、不要 markdown 围栏):
+
+{
+  "entities": [
+    { "kind": "character|location|item|faction|concept", "name": "名称", "summary": "一句话简介", "fields": [{ "label": "字段名", "value": "值" }] }
+  ],
+  "scenes": [
+    { "title": "场景标题", "blocks": [
+      { "type": "heading", "text": "场景标题" },
+      { "type": "action", "text": "叙述 / 旁白" },
+      { "type": "dialogue", "speaker": "说话人名称", "text": "台词" }
+    ] }
+  ],
+  "timelinePoints": ["时间点标签(按故事内时间或路线,如:序章 / 第3章 / 真结局路线)"],
+  "timelineEvents": [
+    { "point": "时间点标签", "title": "事件标题", "text": "事件描述", "entities": ["涉及的实体名称"] }
+  ]
+}
+
+规则:
+- 场景 = 一个可停留的叙事节点(章节 / 地点 / 事件),按叙事顺序拆分;分支、选项、路线、好感的提示写进 action 或 timelineEvents,不要拆散成孤立场景
+- 对白 speaker 严格用角色标准名;旁白压为 action
+- character / location / item 尽量穷举(道具、线索物件在互动剧本里很关键)
+- timelinePoints 按故事内时间或路线推进
+- 只抽取文本中确实存在的信息,不要虚构;没有的类别输出空数组`;
+
+const SETTING_EXTRACT_PROMPT = `你是叙事设计工具的资料设定抽取助手。用户会给你世界观设定、角色卡、组织说明、物品图鉴等资料文本。
+从中抽取结构化信息,严格按下面的 JSON 模式输出,不要输出任何 JSON 以外的内容(不要解释、不要 markdown 围栏):
+
+{
+  "entities": [
+    { "kind": "character|location|item|faction|concept", "name": "名称", "summary": "一句话简介", "fields": [{ "label": "字段名", "value": "值" }] }
+  ],
+  "scenes": [
+    { "title": "场景标题", "blocks": [
+      { "type": "heading", "text": "场景标题" },
+      { "type": "action", "text": "叙述/动作描写" },
+      { "type": "dialogue", "speaker": "说话人名称", "text": "台词" }
+    ] }
+  ],
+  "timelinePoints": ["时间点标签"],
+  "timelineEvents": [
+    { "point": "时间点标签", "title": "事件标题", "text": "事件描述", "entities": ["涉及的实体名称"] }
+  ]
+}
+
+规则:
+- 以 entities 为主(可多而全),scenes / timeline 按需输出,资料里没有就返回空数组
+- concept / faction 优先:世界规则、组织、家族、教派、机制、术语、能力体系
+- 每个实体 summary 写清「是什么 / 在设定里起什么作用」;可量化的数值、分类、关系放 fields
+- 只抽取文本中确实存在的信息,不要虚构;没有的类别输出空数组`;
+
+export const EXTRACT_SCENARIOS: ExtractScenarioDef[] = [
+  { key: 'novel', label: '小说正文', hint: '按故事内时间拆场景,重人物与地点', prompt: NOVEL_EXTRACT_PROMPT },
+  { key: 'screenplay', label: '剧本 / 脚本', hint: '按场次拆场景,重对白与说话人', prompt: SCREENPLAY_EXTRACT_PROMPT },
+  { key: 'interactive', label: '互动游戏剧本', hint: '场景=叙事节点,重选择、角色与道具', prompt: INTERACTIVE_EXTRACT_PROMPT },
+  { key: 'setting', label: '设定 / 资料', hint: '重实体(世界观/组织/机制),场景可少', prompt: SETTING_EXTRACT_PROMPT },
+  { key: 'generic', label: '通用', hint: '混合内容,默认', prompt: DEFAULT_EXTRACT_PROMPT },
+];
+
+export function defaultExtractPrompt(type: ExtractScenario): string {
+  return EXTRACT_SCENARIOS.find((s) => s.key === type)?.prompt ?? DEFAULT_EXTRACT_PROMPT;
+}
+
+/** 读入文件时按内容猜测类型(保守:只在有明确特征时返回,否则 null 保持现状) */
+export function guessExtractScenario(text: string): ExtractScenario | null {
+  const t = text.slice(0, 30000);
+  const screenplayHits = (t.match(/INT\.\s|EXT\.\s|内景|外景|第\s*[0-9一二三四五六七八九十百]+\s*场/g) ?? []).length;
+  if (screenplayHits >= 2) return 'screenplay';
+  const interactiveHits = (t.match(/选项[：:→]|分支|好感度|达成结局|路线|【[^】\n]{1,24}】/g) ?? []).length;
+  if (interactiveHits >= 2) return 'interactive';
+  const settingHits = (t.match(/世界观|设定集|角色卡|图鉴|能力体系|编年史/g) ?? []).length;
+  if (settingHits >= 2) return 'setting';
+  return null;
+}
+
+/**
  * 分两轮模式的阶段指令,追加到 system prompt 末尾。
  * - 第一轮:实体 + 时间线;scenes 输出空数组
  * - 第二轮:场景 + 说话人;其余输出空数组(实体已由第一轮定稿)
