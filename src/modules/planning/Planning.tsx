@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNav } from '../../search';
 import RelationGraph from './RelationGraph';
 import ArcBoard from './ArcBoard';
@@ -23,6 +23,13 @@ const VIEWS: { key: PlanningView; label: string; hint: string }[] = [
   { key: 'pacing', label: '节奏图', hint: '逐场景字数与情节张力' },
 ];
 
+/** 规划子视图分组:写作 / 修订 / 分析,便于扫一眼定位 */
+const VIEW_GROUPS: { label: string; keys: PlanningView[] }[] = [
+  { label: '写作', keys: ['progress', 'wall'] },
+  { label: '修订', keys: ['revision'] },
+  { label: '分析', keys: ['relations', 'arcs', 'foreshadow', 'appearance', 'pacing'] },
+];
+
 export default function Planning() {
   const workspacePreset = useLoom((state) => state.project.workspacePreset);
   const [view, setView] = useState<PlanningView>(workspacePreset === 'novel' ? 'progress' : 'relations');
@@ -45,16 +52,25 @@ export default function Planning() {
   return (
     <div className="pane-col">
       <div className="toolbar">
-        {VIEWS.map((v) => (
-          <button
-            key={v.key}
-            className={view === v.key ? 'primary' : undefined}
-            title={v.hint}
-            onClick={() => {
-              setView(v.key);
-              useNav.getState().visit({ tab: 'planning', planningView: v.key }, `规划 · ${v.label}`);
-            }}
-          >{v.label}</button>
+        {VIEW_GROUPS.map((group, gi) => (
+          <Fragment key={group.label}>
+            {gi > 0 && <span className="tool-sep" aria-hidden="true" />}
+            <span className="tool-group">{group.label}</span>
+            {group.keys.map((key) => {
+              const v = VIEWS.find((x) => x.key === key)!;
+              return (
+                <button
+                  key={key}
+                  className={view === key ? 'primary' : undefined}
+                  title={v.hint}
+                  onClick={() => {
+                    setView(key);
+                    useNav.getState().visit({ tab: 'planning', planningView: key }, `规划 · ${v.label}`);
+                  }}
+                >{v.label}</button>
+              );
+            })}
+          </Fragment>
         ))}
         <span className="hint">{active.hint}</span>
       </div>

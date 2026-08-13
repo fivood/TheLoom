@@ -2,12 +2,14 @@ import { useRef } from 'react';
 import { sanitizeTechnicalName, validateTechnicalName } from '../util';
 
 /** 技术名输入字段:输入 + 自动生成 + 格式校验,复用于实体/资源/文档/流程 inspector */
-export default function TechNameField({ value, onChange, displayName, onRenamed }: {
+export default function TechNameField({ value, onChange, displayName, onRenamed, bare }: {
   value: string | undefined;
   onChange: (v: string | undefined) => void;
   displayName: string;
   /** 编辑结束(blur / 自动生成)且新旧都非空时回调,用于脚本重命名联动 */
   onRenamed?: (oldValue: string, newValue: string) => void;
+  /** 不渲染自带 label(用于外层 summary 已说明标题的折叠区) */
+  bare?: boolean;
 }) {
   const error = value ? validateTechnicalName(value) : null;
   const focusValue = useRef<string | undefined>(undefined);
@@ -18,9 +20,11 @@ export default function TechNameField({ value, onChange, displayName, onRenamed 
   };
   return (
     <div className="field">
-      <label>
-        技术名 <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>可选 · 脚本寻址与导出用</span>
-      </label>
+      {!bare && (
+        <label>
+          技术名 <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>可选 · 脚本寻址与导出用</span>
+        </label>
+      )}
       <div style={{ display: 'flex', gap: 4 }}>
         <input
           value={value ?? ''}

@@ -532,11 +532,11 @@ export default function NavigatorTree<T extends NavigatorItem>({
           >
             <span className="btn-glyph">★</span> 收藏 {favoriteCount}
           </button>
-          <button className="ghost navigator-head-btn" onClick={() => createFolder(null)} title="新建文件夹(用于分组归档)">
+          <button className="ghost navigator-head-btn" onClick={() => createFolder(null)} title="新建文件夹(普通归档分组,不影响成稿结构)">
             <span className="btn-glyph">▤</span> 文件夹
           </button>
           {module === 'document' && (
-            <button className="ghost navigator-head-btn" onClick={() => createFolder(null, 'volume')} title="新建卷">
+            <button className="ghost navigator-head-btn" onClick={() => createFolder(null, 'volume')} title="新建卷(按 卷→章→小节 组织,影响连续稿与章节编译)">
               <span className="btn-glyph">卷</span> 新建卷
             </button>
           )}
@@ -550,7 +550,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
       <div className="items" onDragOver={(e) => { if (dragRef.current) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } }}>
         {renderTree(null, 0, new Set())}
         {!favoritesOnly && items.length === 0 && folders.length === 0 && (
-          <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部「＋ {createLabel}」新建,或「▤ 文件夹」建立分组</div>
+          <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部「＋ {createLabel}」新建{module === 'document' ? '；用「卷」组织成稿结构，用「文件夹」仅归档' : '，或「▤ 文件夹」建立分组'}</div>
         )}
         {favoritesOnly && favoriteCount === 0 && (
           <div className="empty-hint navigator-empty">还没有收藏<br />点击条目右侧的 ☆ 即可加入收藏夹</div>

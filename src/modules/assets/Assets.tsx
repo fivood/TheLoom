@@ -9,7 +9,7 @@ import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
 import { classifyAsset, fileToImageThumb, fileToVideoThumb, formatSize } from '../../util';
 import {
   assetExt, collectReferencedTexts, computeOrphans, deleteStoredFiles, getAssetUrl,
-  hashBlob, invalidateAssetUrl, isAssetStored, listStoredFiles, storeAssetFile,
+  hashBlob, invalidateAssetUrl, isAssetStored, listStoredFiles, storeAssetFile, storeAssetThumb,
 } from '../../assetFiles';
 import Inspector from '../../components/Inspector';
 import TechNameField from '../../components/TechNameField';
@@ -129,13 +129,15 @@ export default function Assets() {
       } catch (e) {
         failed.push(`${file.name}:${e instanceof Error ? e.message : e}`);
       }
+      const thumbnail = await fileThumb(file, kind);
+      if (thumbnail) void storeAssetThumb(folder, hash, thumbnail);
       const a: Asset = {
         id: uid(),
         folderId: selected?.folderId,
         name: file.name.replace(/\.[^.]+$/, ''),
         kind,
         mime: file.type || 'application/octet-stream',
-        thumbnail: await fileThumb(file, kind),
+        thumbnail,
         hash,
         ext,
         size: file.size,
@@ -166,11 +168,13 @@ export default function Assets() {
       return;
     }
     invalidateAssetUrl(hash);
+    const thumbnail = await fileThumb(file, kind);
+    if (thumbnail) void storeAssetThumb(folder, hash, thumbnail);
     updateAsset(a.id, {
       hash, ext, kind,
       mime: file.type || 'application/octet-stream',
       size: file.size,
-      thumbnail: await fileThumb(file, kind),
+      thumbnail,
     });
     await refreshStored();
   };
@@ -197,11 +201,13 @@ export default function Assets() {
     invalidateAssetUrl(hash);
     if (!a.hash) {
       const kind = classifyAsset(file);
+      const thumbnail = a.thumbnail ?? await fileThumb(file, kind);
+      if (thumbnail) void storeAssetThumb(folder, hash, thumbnail);
       updateAsset(a.id, {
         hash, ext, kind,
         mime: file.type || a.mime || 'application/octet-stream',
         size: file.size,
-        thumbnail: a.thumbnail ?? await fileThumb(file, kind),
+        thumbnail,
       });
     }
     await refreshStored();

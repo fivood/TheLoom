@@ -611,24 +611,6 @@ export default function DocumentView() {
           )}
 
           <div className="field">
-            <label>跨模块引用 ({documentRefs.length})</label>
-            <div className="document-ref-list">
-              {documentRefs.map((ref) => (
-                <button key={ref.key} className="ref-item document-ref-item" onClick={() => go(ref.nav)} title={ref.snippet}>
-                  <span>{ref.module} · {ref.kind}</span>
-                  <strong>{ref.title}</strong>
-                </button>
-              ))}
-              {documentRefs.length === 0 && <span className="hint">尚未被其他模块引用</span>}
-            </div>
-          </div>
-
-          <ObjectTemplateSection
-            module="document"
-            object={selected}
-            onFieldsChange={(fields) => patchDoc((d) => { d.fields = fields; })}
-          />
-          <div className="field">
             <label>场景元数据</label>
             <div className="kv-row">
               <div className="field" style={{ flex: 1 }}>
@@ -716,6 +698,25 @@ export default function DocumentView() {
               <div className="field" style={{ flex: 1 }} />
             </div>
           </div>
+
+          <div className="field">
+            <label>跨模块引用 ({documentRefs.length})</label>
+            <div className="document-ref-list">
+              {documentRefs.map((ref) => (
+                <button key={ref.key} className="ref-item document-ref-item" onClick={() => go(ref.nav)} title={ref.snippet}>
+                  <span>{ref.module} · {ref.kind}</span>
+                  <strong>{ref.title}</strong>
+                </button>
+              ))}
+              {documentRefs.length === 0 && <span className="hint">尚未被其他模块引用</span>}
+            </div>
+          </div>
+
+          <ObjectTemplateSection
+            module="document"
+            object={selected}
+            onFieldsChange={(fields) => patchDoc((d) => { d.fields = fields; })}
+          />
 
           <details className="field inspector-fold" open={docAnnotations.some((a) => !a.resolved)}>
             <summary>批注({docAnnotations.filter((a) => !a.resolved).length} 未解决)</summary>
@@ -815,11 +816,15 @@ export default function DocumentView() {
           </details>
 
           {!isNovel && (
-            <TechNameField
-              value={selected.technicalName}
-              onChange={(v) => patchDoc((d) => { d.technicalName = v; })}
-              displayName={selected.name}
-            />
+            <details className="field inspector-fold">
+              <summary>技术名 <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>可选 · 脚本寻址与导出用</span></summary>
+              <TechNameField
+                value={selected.technicalName}
+                onChange={(v) => patchDoc((d) => { d.technicalName = v; })}
+                displayName={selected.name}
+                bare
+              />
+            </details>
           )}
 
           <div className="field">
@@ -838,7 +843,8 @@ export default function DocumentView() {
           </div>
 
           {!isNovel && (
-            <div className="field">
+            <details className="field inspector-fold">
+              <summary>块类型对照</summary>
               <label>结构块(参与流程)</label>
               <ul className="doc-legend">
                 <li><b>场景锚点</b> → 片段节点(兼容多场景剧本)</li>
@@ -856,7 +862,7 @@ export default function DocumentView() {
                 <li><b>列表</b> → 有序 / 无序列表</li>
                 <li><b>注释</b> → 不导出,不进入流程</li>
               </ul>
-            </div>
+            </details>
           )}
         </Inspector>
       )}

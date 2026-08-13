@@ -21,7 +21,7 @@ import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
 import TemplateManager from './components/TemplateManager';
 import ChapterCompileDialog from './components/ChapterCompileDialog';
-import { initPaneWidths } from './components/PaneHandle';
+import PaneHandle, { initPaneWidths } from './components/PaneHandle';
 import ThemeToggle from './components/ThemeToggle';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
 import ProjectImportWizard from './components/ProjectImportWizard';
@@ -144,7 +144,6 @@ export default function App() {
   const checkingUpdateRef = useRef(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
-  const [moreModulesOpen, setMoreModulesOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
   const isMobile = useIsMobile();
@@ -154,6 +153,8 @@ export default function App() {
   const [help, setHelp] = useState(false);
   // R14-3 分屏:副 pane 打开时,值为当前副 pane 的模块 tab;null = 单栏
   const [secondaryTab, setSecondaryTab] = useState<Tab | null>(null);
+  // 拖拽长稿文件到窗口时显示导入遮罩
+  const [dragOver, setDragOver] = useState(false);
   const navTarget = useNav((s) => s.target);
   const navSeq = useNav((s) => s.seq);
   const navBackCount = useNav((s) => s.backStack.length);
@@ -211,12 +212,14 @@ export default function App() {
   const pendingPush = useLoom((s) => s.pendingPush);
   const setFolder = useLoom((s) => s.setFolder);
   const revision = useLoom((s) => s.revision);
+  const canUndo = useLoom((s) => s.canUndo);
+  const canRedo = useLoom((s) => s.canRedo);
   const workspacePreset = project.workspacePreset ?? 'universal';
   const primaryTabKeys = workspacePrimaryTabs(workspacePreset);
   const primaryTabs = WORKSPACE_PRIMARY_TABS[workspacePreset]
     .map((key) => TABS.find((item) => item.key === key)!)
     .filter(Boolean);
-  const moreTabs = TABS.filter((item) => !primaryTabKeys.has(item.key));
+  const otherTabs = TABS.filter((item) => !primaryTabKeys.has(item.key));
 
   // 全局撤销/重做快捷键;焦点在输入框时交给浏览器原生文本撤销
   useEffect(() => {
@@ -293,6 +296,44 @@ export default function App() {
     void hydrateFromIdb();
   }, []);
 
+  // 拖拽文件到窗口:按扩展名路由到长稿 / Excel / Final Draft 导入预检
+  useEffect(() => {
+    const MANUSCRIPT_EXT = /\.(md|markdown|txt|epub|docx|mobi|azw|azw3|prc)$/i;
+    const hasFiles = (e: DragEvent) => e.dataTransfer?.types?.includes('Files') ?? false;
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragOver(true);
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (e.relatedTarget == null) setDragOver(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (MANUSCRIPT_EXT.test(file.name)) {
+        setImportFile({ mode: 'manuscript', file });
+      } else if (/\.xlsx$/i.test(file.name)) {
+        setImportFile({ mode: 'xlsx', file });
+      } else if (/\.fdx$/i.test(file.name)) {
+        setImportFile({ mode: 'fdx', file });
+      } else {
+        void alertDialog(`无法识别该文件类型:${file.name}\n\n可拖入 TXT / Markdown / EPUB / DOCX / MOBI 长稿、Excel .xlsx 或 Final Draft .fdx。`);
+      }
+    };
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('dragleave', onDragLeave);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, []);
+
   // P3 离线状态:监听在线/离线;恢复联网时自动补发「待推送」队列里积压的版本
   useEffect(() => {
     const handleOnline = async () => {
@@ -346,49 +387,43 @@ export default function App() {
             </div>
           );
         })}
-        {moreTabs.length > 0 && (
-          <div className="sidebar-more">
+        {otherTabs.length > 0 && <div className="nav-sep" title="其他模块"><span>其他</span></div>}
+        {otherTabs.map((t) => {
+          const label = workspaceTabLabel(workspacePreset, t.key);
+          return (
             <button
-              className={`nav-btn ${moreTabs.some((item) => item.key === tab) ? 'active' : ''}`}
-              title="更多模块"
-              onClick={() => setMoreModulesOpen((open) => !open)}
+              key={t.key}
+              className={`nav-btn ${tab === t.key ? 'active' : ''}`}
+              onClick={() => {
+                useNav.getState().visit({ tab: t.key }, label);
+                setTab(t.key);
+              }}
+              title={label}
             >
-              <span className="sidebar-more-icon"><Icon name="more" /></span>
-              <span>更多</span>
+              <Icon name={t.icon} size={18} />
+              <span>{label}</span>
             </button>
-            {moreModulesOpen && (
-              <>
-                <div className="backdrop" onClick={() => setMoreModulesOpen(false)} />
-                <div className="sidebar-more-menu">
-                  <strong>更多模块</strong>
-                  <span className="hint">当前布局折叠起来的模块,完整保留,可随时切回</span>
-                  {moreTabs.map((item) => {
-                    const label = workspaceTabLabel(workspacePreset, item.key);
-                    return (
-                      <button
-                        key={item.key}
-                        className={tab === item.key ? 'active' : undefined}
-                        onClick={() => {
-                          setMoreModulesOpen(false);
-                          useNav.getState().visit({ tab: item.key }, label);
-                          setTab(item.key);
-                        }}
-                      >
-                        <Icon name={item.icon} size={17} />
-                        <span>{label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        )}
+          );
+        })}
       </nav>
 
       <div className="main">
         <header className="topbar">
           <ProjectMenu />
+          <button
+            className="ghost icon-btn"
+            title="撤销 (Ctrl+Z)"
+            aria-label="撤销"
+            disabled={!canUndo}
+            onClick={() => useLoom.getState().undo()}
+          ><Icon name="undo" /></button>
+          <button
+            className="ghost icon-btn"
+            title="重做 (Ctrl+Y)"
+            aria-label="重做"
+            disabled={!canRedo}
+            onClick={() => useLoom.getState().redo()}
+          ><Icon name="redo" /></button>
           <button
             className="ghost icon-btn"
             title="返回上一个位置"
@@ -421,15 +456,13 @@ export default function App() {
               </>
             )}
           </div>
-          <button className="ghost icon-btn" title="全局搜索 (Ctrl+K)" aria-label="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /></button>
-          <button className="ghost icon-btn mobile-hide" title="项目总览 · 一屏看全 5 个模块 (Ctrl+Shift+K)" aria-label="项目总览" onClick={() => setOverview(true)}><Icon name="grid" /></button>
-          <button className="ghost icon-btn mobile-hide" title="使用指南 (F1)" aria-label="使用指南" onClick={() => setHelp(true)}><Icon name="help" /></button>
+          <button className="ghost icon-btn search-btn" title="全局搜索 (Ctrl+K)" aria-label="全局搜索 (Ctrl+K)" onClick={() => setSearching(true)}><Icon name="search" /> 搜索</button>
           <button
             className={`ghost icon-btn mobile-hide ${secondaryTab ? 'active' : ''}`}
             title="分屏:主副两个模块并列显示 (Ctrl+\)"
             aria-label="分屏"
             onClick={() => setSecondaryTab((cur) => cur ? null : (tab === 'documents' ? 'flow' : 'documents'))}
-          ><Icon name="split" /></button>
+          ><Icon name="split" /> 分屏</button>
           <button
             className={`ghost icon-btn ${aiAssistant ? 'active' : ''}`}
             title="打开只读 AI 助手"
@@ -503,6 +536,18 @@ export default function App() {
                     </>
                   )}
                   <div className="tools-label">检查</div>
+                  <button
+                    title="一屏看全各模块的概览 (Ctrl+Shift+K)"
+                    onClick={() => { setToolsOpen(false); setOverview(true); }}
+                  >
+                    <Icon name="grid" size={14} /> 项目总览
+                  </button>
+                  <button
+                    title="使用指南与快捷键 (F1)"
+                    onClick={() => { setToolsOpen(false); setHelp(true); }}
+                  >
+                    <Icon name="help" size={14} /> 使用指南
+                  </button>
                   <button onClick={() => { setToolsOpen(false); setAuditing(true); }}>
                     <Icon name="script" size={14} /> 体检
                   </button>
@@ -672,21 +717,30 @@ export default function App() {
         </header>
 
         <div className={`content ${secondaryTab ? 'content-split' : ''}`} key={revision}>
-          <div className="content-pane">
+          <div className="content-pane content-pane-primary">
             <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
               {renderTabContent(tab)}
             </Suspense>
+            {secondaryTab && <PaneHandle varName="--pane-split" side="right" />}
           </div>
           {secondaryTab && (
             <div className="content-pane content-pane-secondary">
               <div className="pane-tabbar">
-                <select
-                  value={secondaryTab}
-                  onChange={(e) => setSecondaryTab(e.target.value as Tab)}
-                  title="副面板显示的模块"
-                >
-                  {TABS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-                </select>
+                <div className="pane-tabs">
+                  {TABS.map((t) => {
+                    const label = workspaceTabLabel(workspacePreset, t.key);
+                    return (
+                      <button
+                        key={t.key}
+                        className={`pane-tab ${secondaryTab === t.key ? 'active' : ''}`}
+                        title={label}
+                        onClick={() => setSecondaryTab(t.key)}
+                      >
+                        <Icon name={t.icon} size={15} /><span>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <span className="spacer" />
                 <button className="ghost icon-btn" title="关闭副面板" onClick={() => setSecondaryTab(null)}>×</button>
               </div>
@@ -742,6 +796,15 @@ export default function App() {
             onOpenSettings={() => setAiSettings(true)}
           />
         </Suspense>
+      )}
+      {dragOver && (
+        <div className="drop-overlay">
+          <div className="drop-overlay-card">
+            <Icon name="upload" size={28} />
+            <div>松手导入稿件</div>
+            <div className="drop-overlay-hint">TXT · Markdown · EPUB · DOCX · MOBI · Excel · Final Draft</div>
+          </div>
+        </div>
       )}
       <PwaBanner />
       <DialogHost />

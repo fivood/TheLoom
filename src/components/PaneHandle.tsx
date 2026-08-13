@@ -7,11 +7,12 @@ import { useRef } from 'react';
 
 const STORE_KEY = 'theloom-panes-v1';
 
-type PaneVar = '--pane-nav' | '--pane-inspector';
+type PaneVar = '--pane-nav' | '--pane-inspector' | '--pane-split';
 
 const LIMITS: Record<PaneVar, { min: number; max: number; fallback: number }> = {
   '--pane-nav': { min: 170, max: 480, fallback: 260 },
   '--pane-inspector': { min: 240, max: 560, fallback: 320 },
+  '--pane-split': { min: 280, max: 1600, fallback: 600 },
 };
 
 function readStore(): Partial<Record<PaneVar, number>> {
@@ -36,6 +37,8 @@ export function initPaneWidths() {
 
 function currentWidth(varName: PaneVar): number {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  // 百分比默认值(如分屏 50%)没有 px 可拖,拖拽起点回退到 fallback
+  if (raw.endsWith('%')) return LIMITS[varName].fallback;
   const parsed = parseFloat(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : LIMITS[varName].fallback;
 }
@@ -50,7 +53,13 @@ export default function PaneHandle({ varName, side }: { varName: PaneVar; side: 
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
-    drag.current = { startX: e.clientX, startWidth: currentWidth(varName) };
+    let startWidth = currentWidth(varName);
+    // 分屏默认是 50%(百分比),拖拽起点取主 pane 实际宽度,避免第一次拖动跳变
+    if (varName === '--pane-split') {
+      const el = document.querySelector('.content-pane-primary');
+      if (el) startWidth = el.getBoundingClientRect().width;
+    }
+    drag.current = { startX: e.clientX, startWidth };
     const { min, max } = LIMITS[varName];
     const move = (ev: PointerEvent) => {
       if (!drag.current) return;

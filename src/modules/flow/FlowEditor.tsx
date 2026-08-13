@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   applyNodeChanges, applyEdgeChanges, addEdge, useReactFlow, MarkerType,
-  type Node, type Edge, type NodeChange, type EdgeChange, type Connection,
+  BaseEdge, EdgeLabelRenderer, getBezierPath,
+  type Node, type Edge, type NodeChange, type EdgeChange, type Connection, type EdgeProps,
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
@@ -49,6 +50,14 @@ const EDGE_STYLE = {
   markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
 } as const;
 
+/** 节点面板分组:叙事 / 逻辑 / 流程 / 画布,便于扫一眼定位 */
+const NODE_GROUPS: { label: string; types: FlowNodeType[] }[] = [
+  { label: '叙事', types: ['dialogue', 'fragment', 'hub'] },
+  { label: '逻辑', types: ['condition', 'instruction', 'check'] },
+  { label: '流程', types: ['jump', 'call', 'return', 'event', 'exit'] },
+  { label: '画布', types: ['note', 'zone'] },
+];
+
 interface EdgeData {
   label: string;
   condition: string;
@@ -66,6 +75,40 @@ function edgeDisplayLabel(d: EdgeData): string | undefined {
   const s = `${d.label}${marks}`.trim();
   return s || undefined;
 }
+
+/** 默认收起边标签,悬停或选中该边时才展开全文,避免密集分支图被标签糊住 */
+function CollapsibleEdge(props: EdgeProps) {
+  const [hover, setHover] = useState(false);
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX: props.sourceX,
+    sourceY: props.sourceY,
+    sourcePosition: props.sourcePosition,
+    targetX: props.targetX,
+    targetY: props.targetY,
+    targetPosition: props.targetPosition,
+  });
+  const labelText = typeof props.label === 'string' && props.label ? props.label : undefined;
+  const show = hover || !!props.selected;
+  return (
+    <>
+      <g onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+        <BaseEdge id={props.id} path={edgePath} markerEnd={props.markerEnd} style={props.style} />
+      </g>
+      {show && labelText && (
+        <EdgeLabelRenderer>
+          <div
+            className="flow-edge-label nodrag nopan"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          >
+            {labelText}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+const edgeTypes = { default: CollapsibleEdge };
 
 interface Crumb {
   label: string;
@@ -424,13 +467,19 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     <>
       <div className="pane-col">
         <div className="toolbar">
-          {(Object.keys(FLOW_NODE_LABEL) as FlowNodeType[])
-            .filter((t) => t !== 'exit' || path.length > 0)
-            .map((t) => (
-              <button key={t} onClick={() => addNode(t)} title={t === 'exit' ? '出口会成为父层片段节点的命名引脚' : `点击在画布中央添加「${FLOW_NODE_LABEL[t]}」节点`}>
-                <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
-              </button>
-            ))}
+          {NODE_GROUPS.map((group, gi) => (
+            <Fragment key={group.label}>
+              {gi > 0 && <span className="tool-sep" aria-hidden="true" />}
+              <span className="tool-group">{group.label}</span>
+              {group.types
+                .filter((t) => t !== 'exit' || path.length > 0)
+                .map((t) => (
+                  <button key={t} onClick={() => addNode(t)} title={t === 'exit' ? '出口会成为父层片段节点的命名引脚' : `点击在画布中央添加「${FLOW_NODE_LABEL[t]}」节点`}>
+                    <span style={{ color: TYPE_COLORS[t] }}>●</span> {FLOW_NODE_LABEL[t]}
+                  </button>
+                ))}
+            </Fragment>
+          ))}
           {selectedCount >= 1 && (
             <button
               title="把选中节点封装成一个剧情片段:内部连线跟着搬进去,进出选区的连线自动改接"
@@ -550,6 +599,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}

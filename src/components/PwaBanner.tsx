@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import { installPwa, refreshForUpdate, usePwaStatus } from '../pwa';
 
 const INSTALL_DISMISS_KEY = 'theloom-install-dismissed';
+const IOS_SAFETY_DISMISS_KEY = 'theloom-ios-safety-dismissed';
+
+/** iOS Safari(非 Chrome/Firefox/Edge):不触发 beforeinstallprompt,且存储 7 天不活跃会被清 */
+function isIosSafari(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const isIos = /iPad|iPhone|iPod/.test(ua);
+  const isOther = /CriOS|FxiOS|EdgiOS/.test(ua);
+  return isIos && !isOther;
+}
 
 export default function PwaBanner() {
   const { canInstall, needRefresh, offlineReady } = usePwaStatus();
@@ -9,6 +19,9 @@ export default function PwaBanner() {
     try { return localStorage.getItem(INSTALL_DISMISS_KEY) === '1'; } catch { return false; }
   });
   const [offlineSeen, setOfflineSeen] = useState(false);
+  const [safetyDismissed, setSafetyDismissed] = useState(() => {
+    try { return localStorage.getItem(IOS_SAFETY_DISMISS_KEY) === '1'; } catch { return false; }
+  });
 
   useEffect(() => {
     if (!offlineReady) return;
@@ -38,6 +51,23 @@ export default function PwaBanner() {
           onClick={() => {
             try { localStorage.setItem(INSTALL_DISMISS_KEY, '1'); } catch { /* 忽略 */ }
             setDismissed(true);
+          }}
+        >×</button>
+      </div>
+    );
+  }
+
+  if (isIosSafari() && !safetyDismissed) {
+    return (
+      <div className="pwa-banner" role="status">
+        <span>数据保存在本机浏览器,iOS 长期不打开可能被清理。建议定期「工具 → JSON 备份」,或用协作同步 / 桌面版绑定文件夹。</span>
+        <button
+          className="pwa-banner-close"
+          aria-label="知道了"
+          title="知道了"
+          onClick={() => {
+            try { localStorage.setItem(IOS_SAFETY_DISMISS_KEY, '1'); } catch { /* 忽略 */ }
+            setSafetyDismissed(true);
           }}
         >×</button>
       </div>

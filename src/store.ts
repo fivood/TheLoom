@@ -10,7 +10,7 @@ import { cleanTemplateRefs, migrateTemplateInstances } from './templates';
 import { mapProjectScripts } from './script';
 import { renameEntityField, renameIdentifier, renameSeenTarget } from './script/rename';
 import { getSavedFolder, isTauri, loadFromFolder, saveToFolder, setSavedFolder } from './storage';
-import { clearProjectBrowserBlobs } from './assetFiles';
+import { clearProjectBrowserBlobs, loadAssetThumb, storeAssetThumb, stripAssetThumbs } from './assetFiles';
 import { confirmDialog, alertDialog } from './dialog';
 import { sampleProject } from './sample';
 import {
@@ -374,6 +374,32 @@ let lastUndoPush = 0;
 
 const boot = initSlots();
 
+/**
+ * 网页版项目加载后:内联缩略图(旧数据)迁移到 IndexedDB,缺失缩略图从 IndexedDB 读回填内存。
+ * 返回有变化时的新 project,否则 null;调用方据此 set 触发重渲染。
+ */
+async function hydrateAssetThumbs(p: Project): Promise<Project | null> {
+  if (!webdbAvailable()) return null;
+  const stores: Promise<void>[] = [];
+  const fills: { id: string; thumbnail: string }[] = [];
+  for (const a of p.assets) {
+    if (a.thumbnail) {
+      if (a.hash) stores.push(storeAssetThumb(null, a.hash, a.thumbnail));
+    } else if (a.hash) {
+      const t = await loadAssetThumb(a.hash);
+      if (t) fills.push({ id: a.id, thumbnail: t });
+    }
+  }
+  await Promise.all(stores);
+  if (fills.length === 0) return null;
+  const copy = structuredClone(p);
+  for (const f of fills) {
+    const a = copy.assets.find((x) => x.id === f.id);
+    if (a) a.thumbnail = f.thumbnail;
+  }
+  return copy;
+}
+
 export const useLoom = create<LoomState>((set, get) => {
   const enqueueFolderSave = (folder: string, project: Project) => {
     const save = folderSaveQueue.catch(() => undefined).then(() => saveToFolder(folder, project));
@@ -387,6 +413,8 @@ export const useLoom = create<LoomState>((set, get) => {
       const current = get();
       const id = current.currentSlotId;
       const folderOnly = current.slots.find((slot) => slot.id === id)?.folderOnly === true;
+      // 网页版:持久化前剔除缩略图(单独存 IndexedDB),桌面版(含文件夹模式)保持内联
+      const forSave = webdbAvailable() ? stripAssetThumbs(p) : p;
 
       const finalize = (result: { backup: RecoveryBackup | null; backupError: string | null }) => {
         try {
@@ -422,7 +450,7 @@ export const useLoom = create<LoomState>((set, get) => {
       if (folderOnly) {
         finalize({ backup: null, backupError: null });
       } else {
-        saveProjectWithRecoveryAsync(localStorage, id, p)
+        saveProjectWithRecoveryAsync(localStorage, id, forSave)
           .then((result) => {
             const ok = result.localError == null || result.idbError == null;
             if (ok) finalize(result);
@@ -433,7 +461,7 @@ export const useLoom = create<LoomState>((set, get) => {
 
       const folder = current.folder;
       if (folder && isTauri) {
-        enqueueFolderSave(folder, p)
+        enqueueFolderSave(folder, forSave)
           .then(() => {
             if (get().folder === folder) set({ syncError: null });
           })
@@ -452,9 +480,10 @@ export const useLoom = create<LoomState>((set, get) => {
     if (!target) return false;
 
     const currentFolderOnly = cur.slots.find((slot) => slot.id === cur.currentSlotId)?.folderOnly === true;
+    const currentForSave = webdbAvailable() ? stripAssetThumbs(cur.project) : cur.project;
     if (!currentFolderOnly) {
       try {
-        const saved = await saveProjectWithRecoveryAsync(localStorage, cur.currentSlotId, cur.project);
+        const saved = await saveProjectWithRecoveryAsync(localStorage, cur.currentSlotId, currentForSave);
         if (saved.localError != null && saved.idbError != null) throw new Error(saved.localError ?? saved.idbError ?? '');
       } catch (error) {
         if (!cur.folder || !isTauri) {
@@ -489,7 +518,7 @@ export const useLoom = create<LoomState>((set, get) => {
           ? '项目文件夹中的 project.json 无法读取，已从 project.json.bak 恢复。'
           : null;
         if (!target.folderOnly) {
-          try { await saveProjectWithRecoveryAsync(localStorage, targetId, next); } catch { /* 文件夹仍是权威存储 */ }
+          try { await saveProjectWithRecoveryAsync(localStorage, targetId, webdbAvailable() ? stripAssetThumbs(next) : next); } catch { /* 文件夹仍是权威存储 */ }
         }
       } catch (error) {
         set({
@@ -539,6 +568,9 @@ export const useLoom = create<LoomState>((set, get) => {
       canUndo: false,
       canRedo: false,
     }));
+    void hydrateAssetThumbs(next).then((hydrated) => {
+      if (hydrated && get().project === next && get().currentSlotId === targetId) set({ project: hydrated });
+    });
     return true;
   };
 
@@ -578,7 +610,7 @@ export const useLoom = create<LoomState>((set, get) => {
       id: uid(),
       name: `自动 · ${new Date(now).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`,
       createdAt: now,
-      data: JSON.stringify(cur.project),
+      data: JSON.stringify(webdbAvailable() ? stripAssetThumbs(cur.project) : cur.project),
       auto: true,
     };
     const list = trimSnapshots([snap, ...cur.snapshots]);
@@ -595,6 +627,10 @@ export const useLoom = create<LoomState>((set, get) => {
       canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
       ...extra,
     }));
+    // 网页版:加载/替换后迁移内联缩略图到 IDB,并从 IDB 读回缺失的缩略图
+    void hydrateAssetThumbs(p).then((hydrated) => {
+      if (hydrated && get().project === p) set({ project: hydrated });
+    });
   };
 
   return {
@@ -687,7 +723,7 @@ export const useLoom = create<LoomState>((set, get) => {
       const cur = get();
       if (!cur.folder) return true;
       try {
-        saveProjectWithRecovery(localStorage, cur.currentSlotId, cur.project);
+        saveProjectWithRecovery(localStorage, cur.currentSlotId, webdbAvailable() ? stripAssetThumbs(cur.project) : cur.project);
         const slots = cur.slots.map((s) =>
           s.id === cur.currentSlotId
             ? {
@@ -1202,7 +1238,7 @@ export const useLoom = create<LoomState>((set, get) => {
 
     createSnapshot: (name) => {
       const cur = get();
-      const snap: Snapshot = { id: uid(), name: name || `版本 ${new Date().toLocaleString()}`, createdAt: Date.now(), data: JSON.stringify(cur.project) };
+      const snap: Snapshot = { id: uid(), name: name || `版本 ${new Date().toLocaleString()}`, createdAt: Date.now(), data: JSON.stringify(webdbAvailable() ? stripAssetThumbs(cur.project) : cur.project) };
       const list = trimSnapshots([snap, ...cur.snapshots]);
       set({ snapshots: list, storageUsage: getStorageUsage(localStorage) });
       void persistSnapshots(cur.currentSlotId, list).then((error) => {
@@ -1237,6 +1273,14 @@ export const useLoom = create<LoomState>((set, get) => {
     },
   };
 });
+
+// 网页版:启动即迁移内联缩略图到 IndexedDB / 从 IndexedDB 读回缺失的缩略图
+{
+  const bootProject = useLoom.getState().project;
+  void hydrateAssetThumbs(bootProject).then((hydrated) => {
+    if (hydrated && useLoom.getState().project === bootProject) useLoom.setState({ project: hydrated });
+  });
+}
 
 /* ---------- 导入 / 导出 ---------- */
 
@@ -1298,6 +1342,10 @@ export async function hydrateFromIdb(): Promise<void> {
         quarantinedProject: loaded.quarantine,
         recoveryNotice: loaded.notice,
         storageUsage: getStorageUsage(localStorage),
+      });
+      const hydratedProject = loaded.project ?? cur.project;
+      void hydrateAssetThumbs(hydratedProject).then((hydrated) => {
+        if (hydrated && useLoom.getState().project === hydratedProject) useLoom.setState({ project: hydrated });
       });
     }
     void estimateWebStorage(localStorage.length)

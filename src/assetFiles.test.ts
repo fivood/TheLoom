@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import 'fake-indexeddb/auto';
 import {
-  assetExt, assetFileName, computeOrphans, hashBlob, isAssetStored, projectBrowserBlobKeysToClear,
-  type StoredAssetFile,
+  assetExt, assetFileName, computeOrphans, hashBlob, isAssetStored, loadAssetThumb,
+  projectBrowserBlobKeysToClear, storeAssetThumb, stripAssetThumbs, type StoredAssetFile,
 } from './assetFiles';
 
 describe('R8 资源原文件:哈希与命名', () => {
@@ -65,5 +66,51 @@ describe('R8 资源原文件:存在性与孤儿计算', () => {
       ],
     } as import('./types').Project;
     expect(projectBrowserBlobKeysToClear(project, [`另一个槽位仍引用 ${'b'.repeat(64)}`])).toEqual(['a'.repeat(64)]);
+  });
+});
+
+describe('R8 资源缩略图:持久化前剔除', () => {
+  const base = () => ({
+    version: 1,
+    name: '测试项目',
+    flows: [],
+    entities: [],
+    documents: [],
+    researchCards: [],
+    folders: [],
+    assets: [
+      { id: 'a1', name: '图', kind: 'image', mime: 'image/png', size: 1, tags: [], source: '', notes: '', createdAt: 1, hash: 'h1', thumbnail: 'data:image/jpeg;base64,AAAA' },
+      { id: 'a2', name: '文', kind: 'file', mime: 'text/plain', size: 1, tags: [], source: '', notes: '', createdAt: 1, hash: 'h2' },
+    ],
+  } as unknown as import('./types').Project);
+
+  it('无缩略图时返回原引用,不产生拷贝', () => {
+    const p = base();
+    p.assets[0].thumbnail = undefined;
+    expect(stripAssetThumbs(p)).toBe(p);
+  });
+
+  it('剔除缩略图但保留其余字段,且不修改原对象', () => {
+    const p = base();
+    const out = stripAssetThumbs(p);
+    expect(out).not.toBe(p);
+    expect(out.assets[0].thumbnail).toBeUndefined();
+    expect(out.assets[0].hash).toBe('h1');
+    expect(out.assets[0].name).toBe('图');
+    expect(out.assets[1]).toEqual(p.assets[1]);
+    expect(p.assets[0].thumbnail).toBe('data:image/jpeg;base64,AAAA');
+  });
+});
+
+describe('R8 资源缩略图:IndexedDB 往返', () => {
+  it('网页模式存读往返;文件夹模式跳过', async () => {
+    const h1 = 'a1'.padEnd(64, '0');
+    const h2 = 'b2'.padEnd(64, '0');
+    const dataUrl = 'data:image/jpeg;base64,QUJD';
+    await storeAssetThumb(null, h1, dataUrl);
+    await storeAssetThumb('/some/folder', h2, dataUrl);
+    expect(await loadAssetThumb(h1)).toBe(dataUrl);
+    expect(await loadAssetThumb(h2)).toBeNull();
+    expect(await loadAssetThumb('c3'.padEnd(64, '0'))).toBeNull();
   });
 });

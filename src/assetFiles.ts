@@ -67,13 +67,16 @@ function base64ToBlob(b64: string, mime: string): Blob {
 
 const DB_NAME = 'theloom-assets';
 const STORE = 'blobs';
+const THUMB_STORE = 'thumbs';
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
   dbPromise ??= new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(THUMB_STORE)) db.createObjectStore(THUMB_STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -116,6 +119,53 @@ async function idbDelete(hashes: string[]): Promise<void> {
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<T>(cmd, args);
+}
+
+/* ---------- 缩略图(网页版单独存 IDB,不内联进项目 JSON) ---------- */
+
+/**
+ * 存缩略图 dataURL。仅网页 / 未绑定文件夹(folder = null)写 IDB;
+ * 桌面文件夹模式缩略图内联进 project.json,这里跳过。
+ */
+export async function storeAssetThumb(folder: string | null, hash: string, dataUrl: string): Promise<void> {
+  if (folder || !hash || !dataUrl) return;
+  try {
+    const db = await openDb();
+    await idbRequest(db.transaction(THUMB_STORE, 'readwrite').objectStore(THUMB_STORE).put(dataUrl, hash));
+  } catch { /* 缩略图丢失可接受:下次从原文件重建 */ }
+}
+
+/** 读缩略图 dataURL;不存在时返回 null */
+export async function loadAssetThumb(hash: string): Promise<string | null> {
+  if (!hash) return null;
+  try {
+    const db = await openDb();
+    const v = await idbRequest(db.transaction(THUMB_STORE, 'readonly').objectStore(THUMB_STORE).get(hash));
+    return typeof v === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 删除一组缩略图(仅供清理工具显式调用) */
+export async function deleteAssetThumbs(hashes: string[]): Promise<void> {
+  if (hashes.length === 0) return;
+  try {
+    const db = await openDb();
+    const store = db.transaction(THUMB_STORE, 'readwrite').objectStore(THUMB_STORE);
+    for (const h of hashes) await idbRequest(store.delete(h));
+  } catch { /* 忽略 */ }
+}
+
+/**
+ * 持久化前剔除资源缩略图(纯函数,深拷贝,不动原对象)。
+ * 无缩略图时直接返回原引用,避免不必要的拷贝。
+ */
+export function stripAssetThumbs(p: Project): Project {
+  if (!p.assets.some((a) => a.thumbnail)) return p;
+  const copy = structuredClone(p);
+  for (const a of copy.assets) delete a.thumbnail;
+  return copy;
 }
 
 /* ---------- 统一 API(folder = null 走 IndexedDB,否则走项目文件夹) ---------- */

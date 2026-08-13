@@ -99,7 +99,20 @@ button.danger { color: var(--danger); }
 button.danger:hover { background: var(--danger-bg); border-color: var(--danger); }
 button.ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
 button.ghost:hover { background: var(--bg-hover); color: var(--text); }
-button.icon-btn { padding: 4px 8px; line-height: 1; }
+button.icon-btn { padding: 4px 8px; line-height: 1; display: inline-flex; align-items: center; gap: 5px; }
+button.icon-btn svg { flex-shrink: 0; }
+button.icon-btn:disabled { opacity: 0.4; cursor: default; }
+button.icon-btn:disabled:hover { background: transparent; }
+/* 顶栏醒目搜索入口:带边框与快捷键提示 */
+button.search-btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 4px 10px;
+}
+button.search-btn:hover { border-color: var(--focus); color: var(--text); }
 button:disabled { opacity: 0.4; cursor: default; }
 
 /* R16-3 无障碍:键盘导航时可见的 focus 环(鼠标点击不显示) */
@@ -148,7 +161,11 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   padding: 12px 0;
   gap: 4px;
   flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
+.sidebar::-webkit-scrollbar { display: none; }
 .sidebar .logo {
   margin-bottom: 10px;
   width: 40px; height: 40px;
@@ -181,40 +198,6 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .nav-btn:hover { background: var(--bg-hover); color: var(--text); }
 .nav-btn.active { background: var(--focus); color: var(--focus-fg); }
-.sidebar-more { position: relative; }
-.sidebar-more-icon { font-size: 13px; letter-spacing: 1px; line-height: 15px; }
-.sidebar-more-menu {
-  position: fixed;
-  z-index: 60;
-  left: calc(10px + var(--sidebar-w) + 8px);
-  bottom: 18px;
-  display: flex;
-  width: 190px;
-  max-height: calc(100vh - 36px);
-  flex-direction: column;
-  gap: 3px;
-  padding: 9px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  box-shadow: 0 8px 28px rgba(27, 27, 25, 0.16);
-}
-.sidebar-more-menu > strong { padding: 3px 6px 0; font-size: 12px; }
-.sidebar-more-menu > .hint { padding: 0 6px 5px; font-size: 10px; }
-.sidebar-more-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 9px;
-  border: 0;
-  background: transparent;
-  color: var(--text-dim);
-  text-align: left;
-}
-.sidebar-more-menu button:hover { background: var(--bg-hover); color: var(--text); }
-.sidebar-more-menu button.active { background: var(--focus); color: var(--focus-fg); }
 
 .nav-sep {
   width: 30px;
@@ -352,7 +335,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* R14-3 分屏:两个 content-pane 并列;每个 pane 内部布局与非分屏时一致 */
 .content > .content-pane { flex: 1; min-width: 0; display: flex; overflow: hidden; }
-.content-split > .content-pane { flex: 1 1 0; }
+.content-split > .content-pane-primary { flex: 0 0 var(--pane-split, 50%); position: relative; }
+.content-split > .content-pane-secondary { flex: 1 1 0; }
 .content-pane-secondary {
   border-left: 1px solid var(--border);
   display: flex; flex-direction: column;
@@ -363,8 +347,20 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   padding: 4px 8px; border-bottom: 1px solid var(--border);
   background: var(--bg-panel); font-size: 12px;
 }
-.pane-tabbar select { font-size: 12px; padding: 2px 6px; }
 .pane-tabbar .spacer { flex: 1; }
+.pane-tabs {
+  display: flex; align-items: center; gap: 2px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.pane-tabs::-webkit-scrollbar { display: none; }
+.pane-tab {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 0; background: transparent;
+  color: var(--text-dim); font-size: 12px;
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+}
+.pane-tab:hover { background: var(--bg-hover); color: var(--text); }
+.pane-tab.active { background: var(--focus); color: var(--focus-fg); }
 
 
 .ai-assistant {
@@ -848,6 +844,32 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .pane-resizing { cursor: col-resize; user-select: none; }
 .pane-resizing * { cursor: col-resize !important; }
 
+/* 拖拽文件导入遮罩 */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(27, 27, 25, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.drop-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 36px;
+  border: 2px dashed var(--focus);
+  border-radius: 14px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.drop-overlay-hint { font-size: 12px; color: var(--text-faint); font-weight: 400; }
+
 /* ---------- Navigator 头部按钮(文字化) ---------- */
 
 .navigator-head-btn {
@@ -975,6 +997,15 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   box-sizing: border-box;
 }
 .toolbar .hint { color: var(--text-faint); font-size: 12px; margin-left: auto; }
+.tool-group {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  user-select: none;
+  align-self: center;
+}
+.tool-sep { width: 1px; height: 16px; background: var(--border); align-self: center; }
 
 /* 「＋ 新 XX」这种"添加对象"按钮:CTA 但不与 .primary(表示当前激活)混淆 */
 .btn-create {
@@ -1116,6 +1147,22 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .react-flow__edge-path { stroke: var(--edge); }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--focus); }
 .react-flow__attribution { display: none; }
+.flow-edge-label {
+  position: absolute;
+  pointer-events: all;
+  font-size: 11px;
+  line-height: 1.4;
+  max-width: 220px;
+  padding: 2px 7px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(27, 27, 25, 0.12);
+}
 
 .rf-light {
   --xy-background-color: var(--flow-canvas);
@@ -4668,14 +4715,6 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
     height: 52px;
     border-radius: 10px;
   }
-  .sidebar-more .nav-btn { flex: 0 1 auto; padding: 0 10px; }
-  .sidebar-more-menu {
-    left: 8px;
-    right: 8px;
-    bottom: calc(64px + env(safe-area-inset-bottom));
-    width: auto;
-    max-height: calc(100vh - 80px - env(safe-area-inset-top));
-  }
   /* 工具下拉在窄屏改为固定底部面板,避免被顶栏横向滚动裁剪 */
   .tools-menu {
     position: fixed;
@@ -4702,6 +4741,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   /* 分屏副面板在窄屏直接隐藏(分屏按钮也已隐藏) */
   .content-pane-secondary { display: none; }
   .content-split > .content-pane { flex: 1 1 0; }
+  .content-split > .content-pane-primary { flex: 1 1 0; }
   /* 模块内部布局:窄屏纵向堆叠(导航树 / 内容 / 检查器) */
   .content-pane { flex-direction: column; }
   .content-pane > .side-list {
