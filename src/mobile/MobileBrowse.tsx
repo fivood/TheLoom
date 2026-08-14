@@ -1,18 +1,28 @@
 import { useMemo, useState } from 'react';
-import { useLoom } from '../store';
+import { uid, useLoom } from '../store';
 import Icon from '../components/Icon';
 import { readableInk } from '../theme';
+import { confirmDialog, promptText } from '../dialog';
 import type { OutlineRow, TimelineEvent } from '../types';
 
 type View = 'outline' | 'timeline';
 
+/** 新建剧情线 / 轨道时的默认灰阶,与示例项目同一套 */
+const LANE_COLORS = ['#1b1b19', '#565550', '#8e8d86', '#aaa9a1'];
+
+function nextColor(used: number): string {
+  return LANE_COLORS[used % LANE_COLORS.length];
+}
+
 /**
- * 移动端查阅:大纲与时间线的竖排只读视图。
+ * 移动端查阅与编辑:大纲与时间线的竖排形态。
  *
  * 桌面端这两个模块都是宽表格(大纲 = 章节 × 剧情线,时间线 = 轨道 × 时间点),
  * 在手机上横着看没有意义。这里把它们**按主轴展开成竖排**:
  * 大纲以章节为单位,把各剧情线折进章节卡片;时间线以时间点为单位,把各轨道的事件折进去。
- * 编辑仍在桌面端 —— 这里解决的是「写到一半想查下一章该写什么」。
+ *
+ * 编辑采用即时提交(与文档块编辑器同惯例,store 的 commit 自带 800ms 合并),
+ * 所以没有「保存」按钮 —— 手机上少一次点击,也不会因为切走而丢内容。
  */
 export default function MobileBrowse() {
   const [view, setView] = useState<View>('outline');
@@ -32,10 +42,19 @@ export default function MobileBrowse() {
   );
 }
 
+/* ---------------- 大纲 ---------------- */
+
 function OutlineList() {
   const rows = useLoom((s) => s.project.outlineRows);
   const columns = useLoom((s) => s.project.outlineColumns);
+  const addOutlineRow = useLoom((s) => s.addOutlineRow);
+  const updateOutlineRow = useLoom((s) => s.updateOutlineRow);
+  const setOutlineCell = useLoom((s) => s.setOutlineCell);
+  const removeOutlineRow = useLoom((s) => s.removeOutlineRow);
+  const addOutlineColumn = useLoom((s) => s.addOutlineColumn);
+
   const [query, setQuery] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -46,12 +65,37 @@ function OutlineList() {
     return rows.filter(hit);
   }, [rows, query]);
 
-  if (rows.length === 0) {
-    return <div className="hint">还没有大纲。在桌面端「大纲」模块里按章节 × 剧情线填好后,这里可以随时查阅。</div>;
-  }
+  const addRow = () => {
+    addOutlineRow();
+    // 新行追加在末尾,拿最新的 id 展开编辑
+    const next = useLoom.getState().project.outlineRows;
+    setOpenId(next[next.length - 1]?.id ?? null);
+  };
+
+  const addLane = async () => {
+    const title = await promptText({ title: '新建剧情线', message: '例如:主角线 / 反派线 / 感情线', placeholder: '剧情线名称' });
+    if (!title?.trim()) return;
+    addOutlineColumn({ id: uid(), title: title.trim(), color: nextColor(columns.length) });
+  };
+
+  const onRemove = async (r: OutlineRow) => {
+    const ok = await confirmDialog({
+      title: `删除「${r.title || '未命名章节'}」?`,
+      message: '这一章的大纲内容会一并删除(不影响正文场景)。',
+      danger: true,
+    });
+    if (!ok) return;
+    removeOutlineRow(r.id);
+    setOpenId(null);
+  };
 
   return (
     <>
+      <div className="m-browse-actions">
+        <button className="ghost" onClick={addRow}>＋ 章节</button>
+        <button className="ghost" onClick={() => void addLane()}>＋ 剧情线</button>
+      </div>
+
       {rows.length > 6 && (
         <input
           className="m-browse-search"
@@ -60,44 +104,100 @@ function OutlineList() {
           onChange={(e) => setQuery(e.target.value)}
         />
       )}
+
+      {rows.length === 0 && (
+        <div className="hint">还没有大纲。点「＋ 章节」建第一章;剧情线是纵向的分栏(主角线 / 感情线…),按需添加。</div>
+      )}
+
       <div className="m-outline-list">
         {visible.map((r) => {
-          // 只展示填了内容的剧情线,否则手机上全是空标签
+          const open = openId === r.id;
+          // 收起时只展示填了内容的剧情线,否则手机上全是空标签
           const filled = columns.filter((c) => (r.cells?.[c.id] ?? '').trim());
           return (
-            <div key={r.id} className="m-outline-row">
-              <div className="m-outline-head">
+            <div key={r.id} className={`m-outline-row ${open ? 'open' : ''}`}>
+              <button className="m-outline-head" onClick={() => setOpenId(open ? null : r.id)}>
                 {r.no && <span className="m-outline-no">{r.no}</span>}
                 <strong>{r.title || '未命名章节'}</strong>
                 {r.time && <span className="m-outline-time">{r.time}</span>}
-              </div>
-              {r.main && <p className="m-outline-main">{r.main}</p>}
-              {filled.map((c) => (
-                <div key={c.id} className="m-outline-cell">
-                  <span className="m-outline-col" style={{ background: c.color, color: readableInk(c.color) }}>{c.title}</span>
-                  <span>{r.cells[c.id]}</span>
+                <span className="m-outline-caret">{open ? '▾' : '▸'}</span>
+              </button>
+
+              {open ? (
+                <div className="m-edit">
+                  <div className="m-edit-row2">
+                    <label>
+                      <span>章节号</span>
+                      <input value={r.no} onChange={(e) => updateOutlineRow(r.id, { no: e.target.value })} />
+                    </label>
+                    <label>
+                      <span>故事时间</span>
+                      <input value={r.time} onChange={(e) => updateOutlineRow(r.id, { time: e.target.value })} />
+                    </label>
+                  </div>
+                  <label>
+                    <span>标题</span>
+                    <input value={r.title} onChange={(e) => updateOutlineRow(r.id, { title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span>主线剧情</span>
+                    <textarea rows={3} value={r.main} onChange={(e) => updateOutlineRow(r.id, { main: e.target.value })} />
+                  </label>
+                  {columns.map((c) => (
+                    <label key={c.id}>
+                      <span className="m-outline-col" style={{ background: c.color, color: readableInk(c.color) }}>{c.title}</span>
+                      <textarea
+                        rows={2}
+                        value={r.cells?.[c.id] ?? ''}
+                        onChange={(e) => setOutlineCell(r.id, c.id, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                  {columns.length === 0 && (
+                    <div className="hint">还没有剧情线。用上面的「＋ 剧情线」加一条,就能在每章下分栏记录。</div>
+                  )}
+                  <div className="m-edit-foot">
+                    <button className="ghost m-del" onClick={() => void onRemove(r)}>删除本章</button>
+                    <span style={{ flex: 1 }} />
+                    <button className="ghost" onClick={() => setOpenId(null)}>收起</button>
+                  </div>
                 </div>
-              ))}
+              ) : (
+                <>
+                  {r.main && <p className="m-outline-main">{r.main}</p>}
+                  {filled.map((c) => (
+                    <div key={c.id} className="m-outline-cell">
+                      <span className="m-outline-col" style={{ background: c.color, color: readableInk(c.color) }}>{c.title}</span>
+                      <span>{r.cells[c.id]}</span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           );
         })}
-        {visible.length === 0 && <div className="hint">没有匹配的章节。</div>}
+        {rows.length > 0 && visible.length === 0 && <div className="hint">没有匹配的章节。</div>}
       </div>
     </>
   );
 }
+
+/* ---------------- 时间线 ---------------- */
 
 function TimelineList() {
   const points = useLoom((s) => s.project.timelinePoints);
   const tracks = useLoom((s) => s.project.timelineTracks);
   const events = useLoom((s) => s.project.timelineEvents);
   const entities = useLoom((s) => s.project.entities);
+  const update = useLoom((s) => s.update);
+
   const [query, setQuery] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const trackById = useMemo(() => new Map(tracks.map((t) => [t.id, t])), [tracks]);
   const entityById = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities]);
 
-  // 按时间点分组:时间点顺序就是作者在桌面端排好的故事顺序
+  // 按时间点分组:时间点顺序就是作者排好的故事顺序
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (ev: TimelineEvent) => !q
@@ -109,12 +209,84 @@ function TimelineList() {
     })).filter((g) => !q || g.events.length > 0);
   }, [points, events, query]);
 
-  if (points.length === 0) {
-    return <div className="hint">还没有时间线。在桌面端「时间线」模块里建时间点与事件后,这里可以按故事时间顺序查阅。</div>;
-  }
+  const addPoint = async () => {
+    const label = await promptText({ title: '新建时间点', message: '任意写法:雨夜 / 三年前 / 第 7 日 / 16:09', placeholder: '故事时间' });
+    if (!label?.trim()) return;
+    update((p) => { p.timelinePoints.push({ id: uid(), label: label.trim() }); });
+  };
+
+  /** 事件必须挂在某条轨道上,项目里一条都没有时先建一条默认轨 */
+  const ensureTrack = (p: { timelineTracks: typeof tracks }): string => {
+    if (p.timelineTracks.length === 0) {
+      const t = { id: uid(), name: '主线', color: nextColor(0) };
+      p.timelineTracks.push(t);
+      return t.id;
+    }
+    return p.timelineTracks[0].id;
+  };
+
+  const addEvent = (pointId: string) => {
+    const id = uid();
+    update((p) => {
+      p.timelineEvents.push({
+        id, pointId, trackId: ensureTrack(p), title: '', text: '', entityIds: [],
+      });
+    });
+    setOpenId(id);
+  };
+
+  const addTrack = async () => {
+    const name = await promptText({ title: '新建轨道', message: '例如:明线 / 暗线 / 某个角色', placeholder: '轨道名称' });
+    if (!name?.trim()) return;
+    update((p) => { p.timelineTracks.push({ id: uid(), name: name.trim(), color: nextColor(p.timelineTracks.length) }); });
+  };
+
+  const patchEvent = (id: string, patch: Partial<TimelineEvent>) => {
+    update((p) => {
+      const ev = p.timelineEvents.find((x) => x.id === id);
+      if (ev) Object.assign(ev, patch);
+    });
+  };
+
+  const removeEvent = async (ev: TimelineEvent) => {
+    const ok = await confirmDialog({
+      title: `删除「${ev.title || '未命名事件'}」?`, message: '该事件会从时间线上移除。', danger: true,
+    });
+    if (!ok) return;
+    update((p) => { p.timelineEvents = p.timelineEvents.filter((x) => x.id !== ev.id); });
+    setOpenId(null);
+  };
+
+  const renamePoint = async (id: string, label: string) => {
+    const next = await promptText({ title: '时间点', message: '改写这个时间点的名称', defaultValue: label });
+    if (next === null || !next.trim()) return;
+    update((p) => {
+      const pt = p.timelinePoints.find((x) => x.id === id);
+      if (pt) pt.label = next.trim();
+    });
+  };
+
+  const removePoint = async (id: string, label: string) => {
+    const n = events.filter((e) => e.pointId === id).length;
+    const ok = await confirmDialog({
+      title: `删除时间点「${label}」?`,
+      message: n > 0 ? `该时刻的 ${n} 个事件也会一并删除。` : '该时间点下没有事件。',
+      danger: true,
+    });
+    if (!ok) return;
+    update((p) => {
+      p.timelinePoints = p.timelinePoints.filter((x) => x.id !== id);
+      p.timelineEvents = p.timelineEvents.filter((x) => x.pointId !== id);
+    });
+  };
 
   return (
     <>
+      <div className="m-browse-actions">
+        <button className="ghost" onClick={() => void addPoint()}>＋ 时间点</button>
+        <button className="ghost" onClick={() => void addTrack()}>＋ 轨道</button>
+      </div>
+
       {events.length > 6 && (
         <input
           className="m-browse-search"
@@ -123,30 +295,72 @@ function TimelineList() {
           onChange={(e) => setQuery(e.target.value)}
         />
       )}
+
+      {points.length === 0 && (
+        <div className="hint">还没有时间线。点「＋ 时间点」建一个故事时刻(雨夜 / 第 7 日 / 16:09),再往里加事件。</div>
+      )}
+
       <div className="m-tl-list">
         {grouped.map(({ point, events: evs }) => (
           <div key={point.id} className="m-tl-point">
-            <div className="m-tl-label">{point.label || '未命名时间点'}</div>
+            <div className="m-tl-label">
+              <button className="m-tl-label-btn" onClick={() => void renamePoint(point.id, point.label)}>
+                {point.label || '未命名时间点'}
+              </button>
+              <button className="ghost icon-btn" title="添加事件" onClick={() => addEvent(point.id)}>＋</button>
+              <button className="ghost icon-btn m-del" title="删除时间点" onClick={() => void removePoint(point.id, point.label)}>
+                <Icon name="trash" size={13} />
+              </button>
+            </div>
+
             {evs.length === 0 && <div className="m-tl-empty">(无事件)</div>}
+
             {evs.map((ev) => {
               const track = trackById.get(ev.trackId);
+              const open = openId === ev.id;
               const cast = (ev.entityIds ?? []).map((id) => entityById.get(id)?.name).filter(Boolean);
               return (
-                <div key={ev.id} className="m-tl-event">
-                  <div className="m-tl-event-head">
-                    {track && (
-                      <span className="m-tl-track" style={{ background: track.color, color: readableInk(track.color) }}>{track.name}</span>
-                    )}
-                    <strong>{ev.title || '未命名事件'}</strong>
-                  </div>
-                  {ev.text && <p className="m-tl-text">{ev.text}</p>}
-                  {cast.length > 0 && <div className="m-tl-cast">{cast.join(' · ')}</div>}
+                <div key={ev.id} className={`m-tl-event ${open ? 'open' : ''}`}>
+                  {open ? (
+                    <div className="m-edit">
+                      <label>
+                        <span>事件标题</span>
+                        <input value={ev.title} onChange={(e) => patchEvent(ev.id, { title: e.target.value })} />
+                      </label>
+                      <label>
+                        <span>描述</span>
+                        <textarea rows={3} value={ev.text} onChange={(e) => patchEvent(ev.id, { text: e.target.value })} />
+                      </label>
+                      <label>
+                        <span>轨道</span>
+                        <select value={ev.trackId} onChange={(e) => patchEvent(ev.id, { trackId: e.target.value })}>
+                          {tracks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                      </label>
+                      <div className="m-edit-foot">
+                        <button className="ghost m-del" onClick={() => void removeEvent(ev)}>删除事件</button>
+                        <span style={{ flex: 1 }} />
+                        <button className="ghost" onClick={() => setOpenId(null)}>收起</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button className="m-tl-event-btn" onClick={() => setOpenId(ev.id)}>
+                      <span className="m-tl-event-head">
+                        {track && (
+                          <span className="m-tl-track" style={{ background: track.color, color: readableInk(track.color) }}>{track.name}</span>
+                        )}
+                        <strong>{ev.title || '未命名事件'}</strong>
+                      </span>
+                      {ev.text && <span className="m-tl-text">{ev.text}</span>}
+                      {cast.length > 0 && <span className="m-tl-cast">{cast.join(' · ')}</span>}
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
         ))}
-        {grouped.length === 0 && <div className="hint">没有匹配的事件。</div>}
+        {points.length > 0 && grouped.length === 0 && <div className="hint">没有匹配的事件。</div>}
       </div>
     </>
   );

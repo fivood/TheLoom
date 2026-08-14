@@ -5160,3 +5160,38 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .m-tl-text { margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-dim); }
 .m-tl-cast { margin-top: 6px; font-size: 12px; color: var(--text-faint); }
+
+/* 查阅页:新建入口与就地编辑 */
+.m-browse-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.m-browse-actions button {
+  flex: 1; min-height: 40px; white-space: nowrap;
+  border: 1px solid var(--border-light); border-radius: 9px; font-size: 13.5px;
+}
+.m-outline-row.open, .m-tl-event.open { border-color: var(--focus); }
+.m-outline-head {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  width: 100%; text-align: left; background: none; border: 0; padding: 0;
+  color: inherit; cursor: pointer; min-height: 40px;
+}
+.m-outline-caret { margin-left: auto; color: var(--text-faint); font-size: 12px; }
+.m-tl-label { display: flex; align-items: center; gap: 6px; }
+.m-tl-label-btn {
+  flex: 1; text-align: left; background: none; border: 0; padding: 0;
+  color: inherit; font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; min-height: 40px;
+}
+.m-tl-event-btn {
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  width: 100%; text-align: left; background: none; border: 0; padding: 0;
+  color: inherit; font: inherit; cursor: pointer;
+}
+.m-tl-event-btn .m-tl-text, .m-tl-event-btn .m-tl-cast { margin: 0; }
+
+/* 竖排就地编辑表单(大纲章节 / 时间线事件共用) */
+.m-edit { display: flex; flex-direction: column; gap: 10px; }
+.m-edit label { display: flex; flex-direction: column; gap: 4px; }
+.m-edit label > span:first-child { font-size: 12px; color: var(--text-faint); align-self: flex-start; }
+.m-edit input, .m-edit textarea, .m-edit select { width: 100%; }
+.m-edit-row2 { display: flex; gap: 8px; }
+.m-edit-row2 label { flex: 1; min-width: 0; }
+.m-edit-foot { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.m-del { color: var(--danger); }

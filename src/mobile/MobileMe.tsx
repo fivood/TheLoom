@@ -3,6 +3,7 @@ import { useLoom, exportProject } from '../store';
 import { documentWordCount } from '../util';
 import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgress';
 import SyncPanel from '../components/SyncPanel';
+import { confirmDialog } from '../dialog';
 
 /** 移动端「我的」:字数 / 场景 / 设定统计、保存状态、云同步、切项目、切回完整版 */
 export default function MobileMe() {
@@ -12,7 +13,25 @@ export default function MobileMe() {
   const slots = useLoom((s) => s.slots);
   const currentSlotId = useLoom((s) => s.currentSlotId);
   const switchSlot = useLoom((s) => s.switchSlot);
+  const loadSampleProject = useLoom((s) => s.loadSampleProject);
+  const newSlot = useLoom((s) => s.newSlot);
   const [syncing, setSyncing] = useState(false);
+
+  /** 载入示例:当前项目已有内容时开新槽位,绝不覆盖 */
+  const onLoadSample = async () => {
+    const dirty = project.documents.length > 0 || project.entities.length > 0
+      || project.outlineRows.length > 0 || project.timelinePoints.length > 0;
+    if (!dirty) {
+      loadSampleProject();
+      return;
+    }
+    const ok = await confirmDialog({
+      title: '在新项目里载入示例?',
+      message: '当前项目已有内容,示例会载入到一个新的项目槽位,不会覆盖它。',
+    });
+    if (!ok) return;
+    await newSlot('sample');
+  };
   const totalWords = project.documents.reduce((s, d) => s + documentWordCount(d), 0);
   const mode = project.writingProgress?.countMode ?? 'characters';
   const bodyOnly = project.writingProgress?.bodyOnly ?? false;
@@ -67,6 +86,11 @@ export default function MobileMe() {
         </>
       )}
 
+      {/* 手机上原本没有任何载入示例的入口:跳过引导后就再也见不到,
+          空项目里「查阅」等页面只剩空状态文案,没法看出长什么样 */}
+      <button className="m-me-full" onClick={() => void onLoadSample()}>
+        载入示例项目(老伦敦寻人记)
+      </button>
       <button className="m-me-full" onClick={() => exportProject(project)}>
         导出 JSON 备份
       </button>

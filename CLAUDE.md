@@ -179,6 +179,14 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.49.0 手机端大纲 / 时间线可编辑 + 载入示例)
+
+- `MobileBrowse` 从只读改为可编辑:大纲支持建章 / 建剧情线 / 就地改全部字段与各列单元格 / 删章;时间线支持建时间点 / 建轨道 / 在指定时刻加事件 / 改标题描述与所属轨道 / 改时间点名 / 删事件与删时间点(连带其下事件)
+- **编辑即时提交**(`updateOutlineRow` / `setOutlineCell` / `update((p)=>…)`),不做「保存」按钮 —— 与 `BlocksEditor` 同惯例,靠 store commit 的 800ms 合并;手机上少一次点击,切走也不丢
+- **`TimelineEvent.trackId` 是必填**,项目里一条轨道都没有时新建事件会挂空。`ensureTrack` 在 commit 回调内按需建一条「主线」再返回 id,避免产生孤儿事件
+- 时间线没有专用 store action,沿用 `update((p) => …)`,与桌面 Timeline 模块一致
+- **`MobileMe` 补「载入示例项目」** —— 载入示例原本只在首次引导页出现,跳过后手机上再无入口,空项目里查阅 / 设定等页只剩空状态文案,用户反馈「没有样例能看」。非空项目走 `newSlot('sample')` 开新槽位,绝不覆盖当前内容(`newSlot` 本就接受 `'blank' | 'sample'`,不必自己拼)
+
 ## 最近变更(v0.48.0 手机端查阅:大纲 / 时间线竖排)
 
 v0.47.0 把手机挡在桌面布局之外,代价是流程 / 大纲 / 时间线全都够不着。这一批把其中**查得最多的两个**以竖排只读形态补回来:
