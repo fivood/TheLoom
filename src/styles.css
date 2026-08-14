@@ -4913,8 +4913,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .doc-block-side .doc-block-tools { opacity: 1; }
 }
 
-/* 移动端专用壳内的编辑区:给吸底操作条与软键盘留出余量 */
-.app-mobile .m-write-editor { padding-bottom: 24px; }
+/* 操作条自身就贴在编辑区底部,不要再留额外内边距,否则它与 tab 栏之间空出一条缝 */
+.app-mobile .m-write-editor { padding-bottom: 0; }
 .app-mobile .doc-focus-bar { bottom: -1px; }
 
 /* 「我的」页:云同步 / 项目切换 */
@@ -5028,3 +5028,85 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .toolbar > * { flex-shrink: 0; white-space: nowrap; }
   .toolbar .hint { display: none; }
 }
+
+/*
+ * 小屏(含横屏手机)下的溢出与错位收口。
+ *
+ * .side-head 是 flex-wrap:nowrap + overflow:visible,侧栏只有 200px 而四个头部按钮
+ * 一路排到 x=314 —— 直接压在右侧内容区上(横屏截图里「新建卷 / 新建场景」盖住
+ * 「写作 / 结构」就是这么来的)。同类问题还有顶栏的保存状态被压成竖排。
+ * 统一处理:该滚的滚、该截断的截断,一律不许溢出到别人的地盘。
+ */
+@media (max-width: 1100px), (max-height: 520px) {
+  /* 侧栏头部改横向滚动,并且绝不溢出容器 */
+  .side-list { overflow: hidden; }
+  .side-head {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .side-head::-webkit-scrollbar { display: none; }
+  .side-head > * { flex-shrink: 0; white-space: nowrap; }
+
+  /* 顶栏:可横向滚动,元素不压缩不换行 */
+  .topbar {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar::-webkit-scrollbar { display: none; }
+  .topbar > * { flex-shrink: 0; }
+  .topbar .saved-hint { white-space: nowrap; }
+  /* 横屏高度紧张,保存状态与版本号让位 */
+  .topbar .saved-hint { display: none; }
+
+  /* 左侧模块栏在矮视口下可纵向滚动,不再把末尾几项裁掉 */
+  .sidebar { overflow-y: auto; scrollbar-width: none; }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar .nav-btn { flex-shrink: 0; }
+  .sidebar .nav-btn span { white-space: nowrap; }
+}
+
+/* ---------- 软键盘适配(配合 useKeyboardInset) ---------- */
+
+/*
+ * 移动壳高度跟随 visualViewport:键盘弹出时整个壳缩到键盘之上,
+ * 吸底的操作条与 tab 栏自然跟着上移,而不是留在键盘底下。
+ */
+.app-mobile { height: var(--vvh, 100%); }
+
+/*
+ * 内容不够长时,sticky 只会让操作条停在最后一个块下面(真机上表现为
+ * 操作条浮在屏幕中间、下方一片空白)。让块区域撑满剩余高度把它顶到底部。
+ */
+.app-mobile .m-write-editor { display: flex; flex-direction: column; }
+.app-mobile .m-write-editor > .doc-blocks { flex: 1 0 auto; }
+
+/* 键盘打开时收起 tab 栏,把高度让给正文;操作条仍然贴在键盘上沿 */
+:root[data-kb="1"] .app-mobile .m-tabbar { display: none; }
+/* tab 栏收起后,类型面板相应下移(只需让开操作条) */
+:root[data-kb="1"] .app-mobile .doc-blocks-focus .doc-slash-menu {
+  bottom: calc(88px + env(safe-area-inset-bottom));
+}
+
+/* 设定页:新建入口与就地编辑 */
+.m-ref-new {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  padding-bottom: 8px; margin-bottom: 4px;
+}
+.m-ref-new::-webkit-scrollbar { display: none; }
+.m-ref-new button {
+  flex-shrink: 0; white-space: nowrap; font-size: 13px;
+  border: 1px solid var(--border-light); border-radius: 8px; padding: 0 12px;
+}
+.m-ref-item {
+  display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left;
+  cursor: pointer;
+}
+.m-ref-item .m-ref-summary { margin: 0; }
+.m-ref-edit {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; margin-bottom: 8px;
+  border: 1px solid var(--focus); border-radius: 10px; background: var(--bg-card);
+}
+.m-ref-edit-row { display: flex; gap: 8px; align-items: center; }
+.m-ref-del { color: var(--danger); }

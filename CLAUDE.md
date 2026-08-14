@@ -179,6 +179,18 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.46.0 软键盘 / 设定可编辑 / 横屏收口)
+
+第二轮 iPhone 真机回归:
+
+- **新增 `src/mobile/useKeyboardInset.ts`** —— iOS 弹键盘不缩布局视口(`innerHeight` 与 CSS 100% 都不变),吸底元素原地不动被键盘盖住。改为跟随 `visualViewport`:把可见高度写进 `--vvh`(`.app-mobile { height: var(--vvh, 100%) }`),并在 `<html>` 打 `data-kb`,键盘打开时隐藏 tab 栏。`covered > 80` 的阈值用来躲开 Safari 上下工具栏收放的抖动
+- **⚠ 首次写入绝对不能放进 `requestAnimationFrame`** —— 页面在后台或无头环境时 rAF 根本不触发,`--vvh` 永远不会被设置。第一版就是这么写的,查了很久:探针显示 `hookCalled/effectRan` 都为 true 而 `rafFired` 为 0。visualViewport 的事件频率本来就不高,直接同步写
+- **内容短时 sticky 只把操作条停在最后一个块下面**(屏幕中间悬着一条)。`.app-mobile .m-write-editor` 改 flex column + `> .doc-blocks { flex: 1 0 auto }` 撑满剩余高度把它顶到底;同时去掉之前补的 `padding-bottom: 24px`,否则与 tab 栏之间空一条缝
+- **`MobileRef` 从只读改为可增删改** —— 原来必须先在桌面建好实体手机端才有内容,等于废的。现在五类实体可就地新建,点条目改名称 / 简介,带删除确认。字段 / 关系 / 头像仍留在桌面端
+- **横屏错位的第二批**:`.side-head` 是 `flex-wrap:nowrap + overflow:visible`,侧栏 200px 而按钮排到 x=314,直接压在右侧内容区上;顶栏 `.saved-hint` 被压成竖排。小屏下侧栏头部与顶栏统一改横向滚动 + `flex-shrink:0`,`.side-list` 加 `overflow:hidden`,`.sidebar` 在矮视口可纵向滚动
+
+**验证方法上的坑**:用 `getBoundingClientRect` 判重叠会把「已被祖先 overflow 裁掉」的部分算成重叠,必须先沿父链求交集算出真实可见矩形再比,否则修好了也显示一堆假阳性。模拟键盘可用 `Object.defineProperty(visualViewport,'height',...)` 再派发 resize。
+
 ## 最近变更(v0.45.1 真机回归)
 
 v0.45.0 发布后在 iPhone 真机上实测发现的四处,**都是无头浏览器里没暴露出来的**:

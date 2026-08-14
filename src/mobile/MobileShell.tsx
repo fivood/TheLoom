@@ -6,6 +6,7 @@ import MobileWrite from './MobileWrite';
 import MobileNote from './MobileNote';
 import MobileRef from './MobileRef';
 import MobileMe from './MobileMe';
+import { useKeyboardInset } from './useKeyboardInset';
 
 type MTab = 'write' | 'note' | 'ref' | 'me';
 
@@ -20,6 +21,7 @@ const TABS: { key: MTab; label: string; icon: IconName }[] = [
 export default function MobileShell() {
   const project = useLoom((s) => s.project);
   const [tab, setTab] = useState<MTab>('write');
+  useKeyboardInset();
 
   return (
     <>
