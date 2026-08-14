@@ -121,7 +121,7 @@ function renderContainer(raw: SubFlow, entities: Entity[], prefix: string): stri
           lines.push(`◈ ${n.data.title || '汇聚点'}`, '');
           break;
         case 'condition':
-          lines.push(`❓ 条件:\`${n.data.text || '(未填写)'}\``, '');
+          lines.push(`条件:\`${n.data.text || '(未填写)'}\``, '');
           break;
         case 'instruction':
           lines.push(`⚙ 指令:\`${n.data.text || '(未填写)'}\``, '');
@@ -133,7 +133,7 @@ function renderContainer(raw: SubFlow, entities: Entity[], prefix: string): stri
           lines.push(`⇥ 出口「${n.data.title || '出口'}」`, '');
           break;
         case 'check':
-          lines.push(`🎲 ${n.data.checkRed ? '红色' : '白色'}检定:\`2d6 + ${n.data.checkExpr || '0'} ≥ ${n.data.checkDc ?? 10}\`${n.data.text ? ` — ${n.data.text}` : ''}`, '');
+          lines.push(`检定 · ${n.data.checkRed ? '红色' : '白色'}检定:\`2d6 + ${n.data.checkExpr || '0'} ≥ ${n.data.checkDc ?? 10}\`${n.data.text ? ` — ${n.data.text}` : ''}`, '');
           break;
       }
     });

@@ -4,6 +4,7 @@ import { buildScriptScope } from '../script';
 import { lex } from '../script/lexer';
 import { checkCondition, checkInstructions, checkNumberExpr, type ScriptScope } from '../script/check';
 import type { Diagnostic } from '../script/ast';
+import Icon from './Icon';
 
 export type ScriptMode = 'condition' | 'number' | 'instruction';
 
@@ -206,7 +207,7 @@ export default function ScriptInput({ value, onChange, mode, rows = 2, placehold
         <div className="script-diags">
           {diagnostics.slice(0, 4).map((d, i) => (
             <div key={i} className={d.severity === 'error' ? 'script-diag-err' : 'script-diag-warn'}>
-              {d.severity === 'error' ? '✕' : '⚠'} 第 {d.start + 1}–{d.end} 字符:{d.message}
+              {d.severity === 'error' ? <Icon name="close" size={11} /> : <Icon name="warn" size={11} />} 第 {d.start + 1}–{d.end} 字符:{d.message}
             </div>
           ))}
         </div>

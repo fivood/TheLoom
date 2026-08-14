@@ -216,7 +216,7 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
 
           {originalCount > 0 && (
             <div className="player-tip" style={{ marginTop: 4 }}>
-              ⚠ 云房间<b>只传项目文本与缩略图</b>,不传资源原文件。
+              <Icon name="warn" size={12} /> 云房间<b>只传项目文本与缩略图</b>,不传资源原文件。
               当前有 <b>{originalCount}</b> 个资源挂着原文件,对端拉取后会显示「缺失」
               (缩略图仍在,可正常预览与排版)。
             </div>

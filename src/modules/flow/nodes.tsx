@@ -158,7 +158,7 @@ export function EventNode(props: NodeProps<LoomNode>) {
     <BaseNode {...props}>
       <div className="node-body">
         <div style={{ fontFamily: 'Consolas, monospace' }}>
-          ⚡ {props.data.eventName || '(未选择事件)'}
+          <Icon name="bolt" size={11} /> {props.data.eventName || '(未选择事件)'}
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
           {EVENT_WAIT_LABEL[wait]}

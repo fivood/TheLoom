@@ -423,7 +423,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
                   <button className={`ghost${childRole ? ' navigator-structure-add' : ' icon-btn'}`} title={childLabel} onClick={(event) => { event.stopPropagation(); createFolder(folder.id); }}>
                     ＋{childRole ? DOCUMENT_FOLDER_ROLE_LABEL[childRole] : ''}
                   </button>
-                  <button className="ghost icon-btn" title="重命名文件夹" onClick={(event) => { event.stopPropagation(); renameFolder(folder); }}>✎</button>
+                  <button className="ghost icon-btn" title="重命名文件夹" onClick={(event) => { event.stopPropagation(); renameFolder(folder); }}><Icon name="pencil" size={12} /></button>
                   <button className="ghost icon-btn" title="删除文件夹" onClick={(event) => { event.stopPropagation(); deleteFolder(folder); }}>×</button>
                 </span>
                 {isDrop && dropTarget?.position === 'after' && <span className="drop-line" />}
@@ -461,7 +461,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
                 aria-label={`${item.favorite ? '取消收藏' : '收藏'}${getLabel(item)}`}
                 onClick={(event) => { event.stopPropagation(); toggleFavorite(item); }}
               >
-                {item.favorite ? '★' : '☆'}
+                <Icon name={item.favorite ? 'starFilled' : 'star'} size={13} />
               </button>
               {renderItemActions?.(item)}
               <span className="move-to-folder-control" title="移到文件夹">
@@ -530,19 +530,23 @@ export default function NavigatorTree<T extends NavigatorItem>({
             }}
             title={favoritesOnly ? '返回全部内容' : '只看收藏'}
           >
-            <span className="btn-glyph">★</span> 收藏 {favoriteCount}
+            <Icon name={favoritesOnly ? 'starFilled' : 'star'} size={13} />
+            <span className="btn-label">收藏</span> {favoriteCount}
           </button>
           <button className="ghost navigator-head-btn" onClick={() => createFolder(null)} title="新建文件夹(普通归档分组,不影响成稿结构)">
-            <span className="btn-glyph">▤</span> 文件夹
+            <Icon name="folder" size={13} />
+            <span className="btn-label">文件夹</span>
           </button>
           {module === 'document' && (
             <button className="ghost navigator-head-btn" onClick={() => createFolder(null, 'volume')} title="新建卷(按 卷→章→小节 组织,影响连续稿与章节编译)">
-              <span className="btn-glyph">卷</span> 新建卷
+              <Icon name="book" size={13} />
+              <span className="btn-label">新建卷</span>
             </button>
           )}
           {onCreate && (
             <button className="ghost navigator-head-btn primary-ghost" onClick={() => onCreate()} title={createLabel}>
-              <span className="btn-glyph">＋</span> {createLabel}
+              <Icon name="plus" size={13} />
+              <span className="btn-label">{createLabel}</span>
             </button>
           )}
         </div>
@@ -553,7 +557,7 @@ export default function NavigatorTree<T extends NavigatorItem>({
           <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部「＋ {createLabel}」新建{module === 'document' ? '；用「卷」组织成稿结构，用「文件夹」仅归档' : '，或「▤ 文件夹」建立分组'}</div>
         )}
         {favoritesOnly && favoriteCount === 0 && (
-          <div className="empty-hint navigator-empty">还没有收藏<br />点击条目右侧的 ☆ 即可加入收藏夹</div>
+          <div className="empty-hint navigator-empty">还没有收藏<br />点击条目右侧的星标即可加入收藏夹</div>
         )}
       </div>
       <PaneHandle varName="--pane-nav" side="right" />

@@ -668,7 +668,7 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
       {task === 'fix' && fix && (
         <div className={`ai-fix-card ai-fix-${fix.dryRun.status}`}>
           <div className="ai-section-title">
-            修复提案 · {fix.dryRun.status === 'pass' ? '✓ 验证通过' : fix.dryRun.status === 'warning' ? '⚠ 有警告' : '✕ 被拦截'}
+            修复提案 · {fix.dryRun.status === 'pass' ? '✓ 验证通过' : fix.dryRun.status === 'warning' ? <><Icon name="warn" size={12} /> 有警告</> : '✕ 被拦截'}
           </div>
           <div className="ai-fix-summary">{fix.proposal.summary}</div>
           {fix.proposal.confirmations.length > 0 && (
@@ -707,7 +707,7 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
                   )}
                   {opIssues.map((item, index) => (
                     <div key={index} className={item.severity === 'blocked' ? 'ai-fix-issue-blocked' : 'ai-fix-issue-warning'}>
-                      {item.severity === 'blocked' ? '✕' : '⚠'} {item.message}
+                      {item.severity === 'blocked' ? <Icon name="close" size={12} /> : <Icon name="warn" size={12} />} {item.message}
                     </div>
                   ))}
                 </div>
@@ -716,7 +716,7 @@ export default function AiAssistantPanel({ currentTab, onClose, onOpenSettings }
           </div>
           {fix.dryRun.issues.filter((item) => !item.operationId).map((item, index) => (
             <div key={index} className={item.severity === 'blocked' ? 'ai-fix-issue-blocked' : 'ai-fix-issue-warning'}>
-              {item.severity === 'blocked' ? '✕' : '⚠'} {item.message}
+              {item.severity === 'blocked' ? <Icon name="close" size={12} /> : <Icon name="warn" size={12} />} {item.message}
             </div>
           ))}
           <div className="ai-fix-metrics">

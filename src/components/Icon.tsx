@@ -7,7 +7,9 @@ export type IconName =
   | 'play' | 'script' | 'pin' | 'image' | 'plus' | 'cloud'
   | 'user' | 'mappin' | 'key' | 'flag' | 'book' | 'doc' | 'tag' | 'trash' | 'film' | 'music'
   | 'palette' | 'check'
-  | 'sun' | 'moon' | 'monitor' | 'split' | 'more' | 'help' | 'arrowLeft' | 'compare' | 'chevronDown' | 'chevronRight';
+  | 'sun' | 'moon' | 'monitor' | 'split' | 'more' | 'help' | 'arrowLeft' | 'compare' | 'chevronDown' | 'chevronRight'
+  | 'lock' | 'unlock' | 'eye' | 'folderOpen' | 'comment' | 'warn' | 'ban' | 'bolt' | 'gear'
+  | 'star' | 'starFilled' | 'pencil' | 'sparkle' | 'flagCheck' | 'close';
 
 /** 实体类型 → 图标 */
 export const KIND_ICON: Record<EntityKind, IconName> = {
@@ -248,6 +250,66 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M10.5 12H7M7 12l2-2M7 12l2 2M13.5 12h3M17 12l-2-2M17 12l-2 2" />
     </>
   ),
+  lock: (
+    <>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  unlock: (
+    <>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+      <path d="M8 10.5V7.5a4 4 0 0 1 7.5-2" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  folderOpen: (
+    <>
+      <path d="M3 8.5V6a1.5 1.5 0 0 1 1.5-1.5h4L11 7h7A1.5 1.5 0 0 1 19.5 8.5v1" />
+      <path d="M3 8.5h17.5L18.5 19H4.5z" />
+    </>
+  ),
+  comment: <path d="M20.5 12.5c0 3.6-3.8 6.5-8.5 6.5-.9 0-1.8-.1-2.6-.3L4 20.5l1.4-3.6C4 15.7 3.5 14.2 3.5 12.5 3.5 8.9 7.3 6 12 6s8.5 2.9 8.5 6.5z" />,
+  warn: (
+    <>
+      <path d="M12 3.5 22 20H2z" />
+      <path d="M12 9.5v5M12 17.2v.1" />
+    </>
+  ),
+  ban: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M6 6l12 12" />
+    </>
+  ),
+  bolt: <path d="M13.5 2.5 5 13.5h6L10.5 21.5 19 10.5h-6z" />,
+  gear: (
+    <>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.5v2.6M12 18.9v2.6M21.5 12h-2.6M5.1 12H2.5M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8M18.7 18.7l-1.8-1.8M7.1 7.1 5.3 5.3" />
+    </>
+  ),
+  star: <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9-5.3-2.9-5.3 2.9 1.1-5.9L3.5 9.7l5.9-.8z" />,
+  starFilled: <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9-5.3-2.9-5.3 2.9 1.1-5.9L3.5 9.7l5.9-.8z" fill="currentColor" />,
+  pencil: (
+    <>
+      <path d="M16.5 3.9 20.1 7.5 8.6 19H5v-3.6z" />
+      <path d="M14.4 6 18 9.6" />
+    </>
+  ),
+  sparkle: <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />,
+  flagCheck: (
+    <>
+      <path d="M5.5 21V4.5" />
+      <path d="M5.5 5h13l-2.5 4 2.5 4h-13" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6 6 18" />,
   chevronDown: <path d="M6 9.5 12 15.5l6-6" />,
   chevronRight: <path d="M9.5 6 15.5 12l-6 6" />,
 };

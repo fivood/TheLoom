@@ -3,6 +3,7 @@ import { uid, useLoom } from '../store';
 import { EntityRefEditor } from './EntityRefField';
 import type { EntityField, EntityFieldType, EntityKind, EntityTemplateField, EntityTemplateSpec } from '../types';
 import { ENTITY_KIND_LABEL } from '../types';
+import Icon from './Icon';
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
@@ -58,7 +59,7 @@ export default function FieldListEditor({ fields, specs, onChange, refKindLabel 
               />
               {spec?.required && <span className="req-mark" title="必填">*</span>}
               {spec?.readonly ? (
-                <span className="hint" style={{ fontSize: 11 }} title="模板只读字段">🔒</span>
+                <span className="hint" title="模板只读字段"><Icon name="lock" size={12} /></span>
               ) : (
                 <>
                   <select

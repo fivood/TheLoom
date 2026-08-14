@@ -5,6 +5,7 @@ import { DOC_STATUS_LABEL } from '../../types';
 import { documentWordCount, folderPath } from '../../util';
 import BlocksEditor from './BlocksEditor';
 import StaticBlock from './StaticBlock';
+import Icon from '../../components/Icon';
 
 /**
  * 非活动场景的轻量静态渲染:纯只读 DOM,点击整块激活编辑。
@@ -63,7 +64,7 @@ export default function Manuscript({ docs, selectedId, onSelect }: {
             <header className="ms-scene-head">
               <span className="ms-scene-path">{path && `${path} · `}{d.name}</span>
               {d.status && <span className={`ms-status ms-status-${d.status}`}>{DOC_STATUS_LABEL[d.status]}</span>}
-              {d.timeLabel && <span className="ms-scene-tag">🕓 {d.timeLabel}</span>}
+              {d.timeLabel && <span className="ms-scene-tag"><Icon name="clock" size={11} /> {d.timeLabel}</span>}
               {d.povId && <span className="ms-scene-tag">POV {entities.find((e) => e.id === d.povId)?.name ?? '?'}</span>}
               <span className="ms-scene-words">
                 {words}{typeof d.wordTarget === 'number' && d.wordTarget > 0 ? ` / ${d.wordTarget}` : ''} 字

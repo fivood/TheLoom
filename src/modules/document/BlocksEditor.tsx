@@ -478,7 +478,7 @@ export default function BlocksEditor({
                 <span className="doc-block-badges">
                   <span className="doc-block-kind-inline">{DOC_BLOCK_LABEL[b.type]}</span>
                   {b.unitId && flowUnitIds.has(b.unitId) && <span className="doc-block-linked">⇄</span>}
-                  {(annotationCounts?.get(b.id) ?? 0) > 0 && <span className="doc-block-anno">💬{annotationCounts!.get(b.id)}</span>}
+                  {(annotationCounts?.get(b.id) ?? 0) > 0 && <span className="doc-block-anno"><Icon name="comment" size={11} />{annotationCounts!.get(b.id)}</span>}
                 </span>
                 <div className="doc-flow-body"><StaticBlock b={b} entities={entities} /></div>
               </div>
@@ -509,7 +509,7 @@ export default function BlocksEditor({
                   }}
                 >{DOC_BLOCK_LABEL[b.type]}</button>
                 {b.unitId && flowUnitIds.has(b.unitId) && <span className="doc-block-linked">⇄</span>}
-                {(annotationCounts?.get(b.id) ?? 0) > 0 && <span className="doc-block-anno">💬{annotationCounts!.get(b.id)}</span>}
+                {(annotationCounts?.get(b.id) ?? 0) > 0 && <span className="doc-block-anno"><Icon name="comment" size={11} />{annotationCounts!.get(b.id)}</span>}
                 <div className="doc-block-tools">
                   <button className="ghost icon-btn" title="上移 Alt+↑" onClick={() => moveBlock(b.id, -1)}>↑</button>
                   <button className="ghost icon-btn" title="下移 Alt+↓" onClick={() => moveBlock(b.id, 1)}>↓</button>

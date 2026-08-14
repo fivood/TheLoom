@@ -431,7 +431,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             kind: 'event',
             title: node.data.title || decl.label || evName,
             text: node.data.text,
-            note: `⚡ ${decl.label || evName}${argText ? `(${argText})` : ''} · ${EVENT_WAIT_LABEL[wait]}`,
+            note: `[事件] ${decl.label || evName}${argText ? `(${argText})` : ''} · ${EVENT_WAIT_LABEL[wait]}`,
           });
           if (wait !== 'continue') {
             suspendEvent = {
@@ -543,7 +543,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         if (c0.nodeId && breakpoints.has(c0.nodeId)) {
           setCurPath(curP);
           commitVars(nextVars);
-          setChoices([{ ...c0, label: `⛔ ${c0.label}(断点)` }]);
+          setChoices([{ ...c0, label: `[断点] ${c0.label}` }]);
           return;
         }
         // 直通型节点自动前进,沿途执行边效果并记录一次性选项
@@ -762,7 +762,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             <button onClick={loadGame} title={`恢复到 ${new Date(saveInfo.at).toLocaleString()} 的存档(种子 ${saveInfo.seed})`}>
               读档
             </button>
-            <button className="ghost icon-btn" onClick={dropSave} title="删除本流程的演出存档">🗑</button>
+            <button className="ghost icon-btn" onClick={dropSave} title="删除本流程的演出存档"><Icon name="trash" size={14} /></button>
           </>
         )}
         <button
@@ -804,7 +804,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
           {pendingEvent && (
             <div className="player-event" role="group" aria-label="等待宿主引擎响应">
               <div className="player-event-head">
-                ⚡ {pendingEvent.label}
+                <Icon name="bolt" size={12} /> {pendingEvent.label}
                 <span className="player-event-wait">{EVENT_WAIT_LABEL[pendingEvent.wait]}</span>
               </div>
               {pendingEvent.argText && (
@@ -881,7 +881,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
             </>
           )}
           {breakpoints.size > 0 && (
-            <div className="player-tip">⛔ 本流程有 {breakpoints.size} 个断点:自动前进会在断点处暂停。</div>
+            <div className="player-tip"><Icon name="ban" size={12} /> 本流程有 {breakpoints.size} 个断点:自动前进会在断点处暂停。</div>
           )}
           <div className="player-tip">
             高亮 = 上一步发生变化;<br />条件分支按变量自动走向;<br />同种子重开可复现检定结果。

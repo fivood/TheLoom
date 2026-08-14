@@ -175,7 +175,7 @@ export default function StorageManager({ onClose }: { onClose: () => void }) {
 
   const doClearAll = async () => {
     const backed = await confirmDialog({
-      message: '⚠️ 危险操作 · 清除本机全部 TheLoom 数据\n\n将删除:\n· 所有项目槽位(浏览器本地副本)\n· 所有版本快照、演出存档、断点\n· 主题偏好 / AI 配置 / 首启引导标记\n· IndexedDB 资源原文件缓存\n\n绑定文件夹的项目 —— 磁盘上的文件不会动;但浏览器镜像会消失,下次打开会从文件夹重新加载。\n\n继续吗?建议先「全部导出为 zip」。',
+      message: '危险操作 · 清除本机全部 TheLoom 数据\n\n将删除:\n· 所有项目槽位(浏览器本地副本)\n· 所有版本快照、演出存档、断点\n· 主题偏好 / AI 配置 / 首启引导标记\n· IndexedDB 资源原文件缓存\n\n绑定文件夹的项目 —— 磁盘上的文件不会动;但浏览器镜像会消失,下次打开会从文件夹重新加载。\n\n继续吗?建议先「全部导出为 zip」。',
       danger: true, confirmText: '我已备份,清除全部',
     });
     if (!backed) return;
@@ -254,7 +254,7 @@ export default function StorageManager({ onClose }: { onClose: () => void }) {
                                 try { await revealFolder(s.folder!); }
                                 catch (e) { await alertDialog(`无法打开文件夹:${e instanceof Error ? e.message : String(e)}`); }
                               }}
-                            >📂</button>
+                            ><Icon name="folderOpen" size={14} /></button>
                           )}
                           <button
                             className="ghost icon-btn danger"

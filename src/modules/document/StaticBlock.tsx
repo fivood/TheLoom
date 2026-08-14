@@ -1,5 +1,6 @@
 import { RichText } from '../../components/RichText';
 import type { DocBlock, Entity } from '../../types';
+import Icon from '../../components/Icon';
 
 /** 只读的文章式块渲染:文档正文全篇视图与连续稿共用 */
 export default function StaticBlock({ b, entities }: { b: DocBlock; entities: Entity[] }) {
@@ -40,7 +41,7 @@ export default function StaticBlock({ b, entities }: { b: DocBlock; entities: En
     case 'condition':
       return <div className="ms-meta-block">◇ {b.condition || '(空条件)'}</div>;
     case 'instruction':
-      return <div className="ms-meta-block">⚡ {b.instruction || '(空指令)'}</div>;
+      return <div className="ms-meta-block"><Icon name="bolt" size={11} /> {b.instruction || '(空指令)'}</div>;
     case 'note':
       return <div className="ms-note">✎ {b.text}</div>;
     default:

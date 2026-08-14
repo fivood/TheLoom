@@ -907,7 +907,7 @@ export class FlowRuntime {
           };
           if (node.data.technicalName) call.nodeTechnicalName = node.data.technicalName;
           const argText = Object.entries(args).map(([k, v]) => `${k}=${String(v)}`).join(', ');
-          const note = `⚡ ${decl.label || evName}${argText ? `(${argText})` : ''} · ${
+          const note = `[事件] ${decl.label || evName}${argText ? `(${argText})` : ''} · ${
             wait === 'continue' ? '立即继续' : wait === 'ack' ? '等待宿主确认' : '等待宿主返回值'}`;
           this.pushBeat({ kind: 'event', title: node.data.title || decl.label || evName, text: node.data.text ?? '', note });
           displayNote = note;

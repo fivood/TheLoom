@@ -270,7 +270,7 @@ export default function ProjectMenu() {
                         try { await revealFolder(s.folder!); }
                         catch (err) { await alertDialog(`无法打开文件夹:${err instanceof Error ? err.message : String(err)}`); }
                       }}
-                    >📂</button>
+                    ><Icon name="folderOpen" size={14} /></button>
                   )}
                   <button
                     className="ghost icon-btn"

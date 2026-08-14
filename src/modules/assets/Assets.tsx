@@ -402,7 +402,7 @@ export default function Assets() {
             <div className="asset-file-row">
               {selected.hash
                 ? selectedMissing
-                  ? <span className="asset-file-state warn">⚠ 缺失 —— 未在{folder ? '项目文件夹 assets/' : '浏览器存储'}中找到</span>
+                  ? <span className="asset-file-state warn"><Icon name="warn" size={11} /> 缺失 —— 未在{folder ? '项目文件夹 assets/' : '浏览器存储'}中找到</span>
                   : <span className="asset-file-state ok">已保留 · {selected.ext ? `.${selected.ext}` : ''} {formatSize(selected.size)}</span>
                 : <span className="asset-file-state">无原文件(旧版本导入,仅缩略图)</span>}
             </div>

@@ -179,6 +179,14 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.50.0 界面图形化:emoji 全部改 SVG)
+
+- 全量扫描后共 30 处 UI emoji + 3 处文本产物。`Icon.tsx` 新增 16 个图标(lock/unlock/eye/folderOpen/comment/warn/ban/bolt/gear/star/starFilled/pencil/sparkle/flagCheck/close),JSX 位置一律换成 `<Icon>`
+- **三类位置放不了 SVG,只能改文字**:① 字符串字面量(对话框 message、React Flow 的 string 边标签、演出日志 note、选项 label);② `<option>` 内容(HTML 不允许元素);③ 纯文本产物(`export.ts` 剧本导出、`interop/fdx.ts`、`cli/main.ts`)。这些改为文本标注:边标签效果符 `⚡ → ↯`(几何符号是文本呈现,不会被渲染成彩色 emoji)、`⛔ x` → `[断点] x`、`🎲 检定` → `检定 ·`、图层 `🔒/👁` → `(锁定)/(隐藏)`
+- **注意 `runtime/player.ts` 也有一处** —— 独立运行库输出的日志不该带 emoji,与 `Player.tsx` 同步改
+- Navigator 头部四个按钮(收藏 / 文件夹 / 新建卷 / 新建场景)改 `<Icon> + <span class="btn-label">`,窄屏隐藏 label。**这不只是美化**:原先 `.side-head` 内容宽 339px 而侧栏只有 199px,溢出压住右侧内容;改图标后总宽 140px,`fitsNow` 为真,根本不再溢出
+- 验收脚本:`scratchpad/emoji_scan.py` 按码位区间扫源码并区分 UI / 文本产物;浏览器端再用 TextNode 遍历确认渲染后 DOM 里 0 个 emoji
+
 ## 最近变更(v0.49.0 手机端大纲 / 时间线可编辑 + 载入示例)
 
 - `MobileBrowse` 从只读改为可编辑:大纲支持建章 / 建剧情线 / 就地改全部字段与各列单元格 / 删章;时间线支持建时间点 / 建轨道 / 在指定时刻加事件 / 改标题描述与所属轨道 / 改时间点名 / 删事件与删时间点(连带其下事件)

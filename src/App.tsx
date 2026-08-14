@@ -487,7 +487,7 @@ export default function App() {
           </button>
           <span className="spacer" />
           {recoveryNotice ? (
-            <button className="ghost saved-hint recovery-status" onClick={() => setRecovering(true)} title={recoveryNotice}>⚠ 恢复提醒</button>
+            <button className="ghost saved-hint recovery-status" onClick={() => setRecovering(true)} title={recoveryNotice}><Icon name="warn" size={12} /> 恢复提醒</button>
           ) : saveStatus === 'error' ? (
             <span style={{ display: 'inline-flex', gap: 4 }}>
               <button
@@ -495,7 +495,7 @@ export default function App() {
                 style={{ color: 'var(--danger)' }}
                 onClick={() => setRecovering(true)}
                 title={saveError ?? undefined}
-              >⚠ 保存失败</button>
+              ><Icon name="warn" size={12} /> 保存失败</button>
               <button
                 className="primary"
                 title="立即把当前内存里的项目 JSON 下载到本地(浏览器磁盘配额满 / IndexedDB 崩了时的抢救按钮)"
@@ -503,9 +503,9 @@ export default function App() {
               >↓ 应急下载</button>
             </span>
           ) : saveError ? (
-            <button className="ghost saved-hint" style={{ color: 'var(--danger)' }} onClick={() => setRecovering(true)} title={saveError}>⚠ 备份失败</button>
+            <button className="ghost saved-hint" style={{ color: 'var(--danger)' }} onClick={() => setRecovering(true)} title={saveError}><Icon name="warn" size={12} /> 备份失败</button>
           ) : syncError ? (
-            <span className="saved-hint" style={{ color: 'var(--danger)' }} title={syncError}>⚠ 同步失败</span>
+            <span className="saved-hint" style={{ color: 'var(--danger)' }} title={syncError}><Icon name="warn" size={12} /> 同步失败</span>
           ) : saveStatus === 'saving' ? (
             <span className="saved-hint">正在保存…</span>
           ) : !folder && storageUsage.available && storageUsage.bytes >= LOCAL_STORAGE_WARNING_BYTES ? (
@@ -514,7 +514,7 @@ export default function App() {
               style={{ color: 'var(--danger)' }}
               onClick={() => setRecovering(true)}
               title={`本地数据约 ${(storageUsage.bytes / 1024 / 1024).toFixed(1)} MB，建议检查备份和大尺寸资源`}
-            >⚠ 本地空间偏高</button>
+            ><Icon name="warn" size={12} /> 本地空间偏高</button>
           ) : (
             <span className="saved-hint" title={folder ?? undefined}>
               {folder ? `已同步 · ${folder.split(/[\\/]/).pop()}` : '已自动保存到本地'}
@@ -526,7 +526,7 @@ export default function App() {
               title={!online ? '当前离线,改动会保存在本机,恢复联网后自动补发云端' : '有待推送的云端版本,联网后会自动补发;也可点开手动处理'}
               onClick={() => setSyncing(true)}
             >
-              {!online ? '⛔ 离线' : '↥ 待推送'}
+              {!online ? <><Icon name="ban" size={12} /> 离线</> : <>↥ 待推送</>}
             </button>
           )}
           <ThemeToggle />

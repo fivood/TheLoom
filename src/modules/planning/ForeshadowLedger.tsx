@@ -5,6 +5,7 @@ import { useNav } from '../../search';
 import { foreshadowStatus, groupDocsByChapter } from '../../planning';
 import type { Foreshadow, ForeshadowStatus } from '../../types';
 import { FORESHADOW_STATUS_LABEL } from '../../types';
+import Icon from '../../components/Icon';
 
 const STATUS_ORDER: ForeshadowStatus[] = ['idea', 'planted', 'resolved', 'abandoned'];
 
@@ -91,7 +92,7 @@ export default function ForeshadowLedger({ focusId, onConsumeFocus }: {
           </button>
         ))}
         {counts.planted > 0 && (
-          <span className="hint">⚠ 有 {counts.planted} 条伏笔埋了还没回收</span>
+          <span className="hint"><Icon name="warn" size={11} /> 有 {counts.planted} 条伏笔埋了还没回收</span>
         )}
       </div>
 

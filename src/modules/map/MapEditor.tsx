@@ -703,7 +703,7 @@ function LayerPicker({ layers, value, onChange }: { layers: MapLayer[]; value?: 
     <div className="field">
       <label>图层</label>
       <select value={value ?? layers[0].id} onChange={(e) => onChange(e.target.value || undefined)}>
-        {layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.locked ? ' 🔒' : ''}{!l.visible ? ' 👁' : ''}</option>)}
+        {layers.map((l) => <option key={l.id} value={l.id}>{l.name}{l.locked ? '(锁定)' : ''}{!l.visible ? '(隐藏)' : ''}</option>)}
       </select>
     </div>
   );
@@ -887,11 +887,11 @@ function LayerPanel({ map, activeLayerId, setActiveLayerId, patch }: {
                 className="ghost icon-btn" title={l.visible ? '隐藏' : '显示'}
                 onClick={(e) => { e.stopPropagation(); patchLayer(l.id, { visible: !l.visible }); }}
                 style={{ opacity: l.visible ? 1 : 0.4 }}
-              >{l.visible ? '👁' : '⨯'}</button>
+              ><Icon name="eye" size={13} style={l.visible ? undefined : { opacity: 0.35 }} /></button>
               <button
                 className="ghost icon-btn" title={l.locked ? '解锁' : '锁定'}
                 onClick={(e) => { e.stopPropagation(); patchLayer(l.id, { locked: !l.locked }); }}
-              >{l.locked ? '🔒' : '🔓'}</button>
+              ><Icon name={l.locked ? 'lock' : 'unlock'} size={13} /></button>
               <span
                 style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}
                 onDoubleClick={(e) => { e.stopPropagation(); rename(l.id, l.name); }}

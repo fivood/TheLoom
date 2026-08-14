@@ -79,9 +79,9 @@ interface EdgeData {
   [key: string]: unknown;
 }
 
-/** 画布上显示的边标签:文本 + 逻辑标记(◇条件 ⚡效果 ①一次性 ⤓兜底) */
+/** 画布上显示的边标签:文本 + 逻辑标记(◇条件 ↯效果 ①一次性 ⤓兜底) */
 function edgeDisplayLabel(d: EdgeData): string | undefined {
-  const marks = `${d.condition ? ' ◇' : ''}${d.effect ? ' ⚡' : ''}${d.once ? ' ①' : ''}${d.fallback ? ' ⤓' : ''}`;
+  const marks = `${d.condition ? ' ◇' : ''}${d.effect ? ' ↯' : ''}${d.once ? ' ①' : ''}${d.fallback ? ' ⤓' : ''}`;
   const s = `${d.label}${marks}`.trim();
   return s || undefined;
 }
@@ -800,7 +800,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                   checked={bp.has(selectedNode.id)}
                   onChange={() => setBp(new Set(toggleBreakpoint(slotId, flow.id, selectedNode.id)))}
                 />
-                ⛔ 断点(演出自动前进在此暂停;只存本机)
+                <Icon name="ban" size={12} /> 断点(演出自动前进在此暂停;只存本机)
               </label>
             </div>
             <TechNameField
@@ -850,7 +850,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               />
             </div>
             <div className="field">
-              <label>选中效果 ⚡(指令,如 favor += 1)</label>
+              <label>选中效果 <Icon name="bolt" size={11} />(指令,如 favor += 1)</label>
               <ScriptInput
                 mode="instruction"
                 value={selEdgeData.effect}
@@ -1331,7 +1331,7 @@ function ExternalEventFields({ data, events, onPatch }: {
         </select>
         {events.length === 0 && (
           <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
-            还没有声明外部事件。请到「变量」模块的「⚡ 外部事件」里先加一个。
+            还没有声明外部事件。请到「变量」模块的「外部事件」里先加一个。
           </div>
         )}
         {name && !ev && (

@@ -154,7 +154,7 @@ export function flowToParagraphs(flow: Flow, entities: Entity[]): FdxParagraph[]
         out.push({ type: 'Transition', text: `⇥ 经「${n.data.title || '出口'}」离开子流程` });
         break;
       case 'check':
-        out.push({ type: 'Action', text: `🎲 ${n.data.checkRed ? '红' : '白'}检定 2d6+${n.data.checkExpr || '0'}≥${n.data.checkDc ?? 10}${n.data.text ? ` · ${n.data.text}` : ''}` });
+        out.push({ type: 'Action', text: `检定 · ${n.data.checkRed ? '红' : '白'} 2d6+${n.data.checkExpr || '0'}≥${n.data.checkDc ?? 10}${n.data.text ? ` · ${n.data.text}` : ''}` });
         break;
     }
   };

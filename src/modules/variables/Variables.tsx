@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { confirmDialog } from '../../dialog';
 import type { ExternalEvent, VariableType } from '../../types';
+import Icon from '../../components/Icon';
 
 /** 稳定的空数组:selector 里返回 `?? []` 会因新引用触发无限重渲染 */
 const NO_EVENTS: ExternalEvent[] = [];
@@ -33,7 +34,7 @@ export default function Variables() {
         <button
           onClick={() => setTab('events')}
           title="管理外部事件声明:流程用「外部事件」节点请求宿主引擎播动画 / 切场景 / 启动谜题"
-        >⚡ 外部事件{events.length > 0 ? `(${events.length})` : ''}</button>
+        ><Icon name="bolt" size={12} /> 外部事件{events.length > 0 ? `(${events.length})` : ''}</button>
         <span className="hint">全局变量可在流程的「条件分支」和「指令」节点中引用,用于追踪剧情状态</span>
       </div>
       <div className="pad-wrap">
