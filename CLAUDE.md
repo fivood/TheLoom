@@ -179,6 +179,27 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.45.0 移动端可用性大修)
+
+网页版手机适配的一轮系统性修整。两条会直接卡死写作:
+
+- **MobileWrite 的 `selectedId` 只在挂载时初始化** —— 载入示例 / 切换项目 / 删掉当前场景后 documents 才到位,永远停在「未选择场景」。改为 `doc` 失效时用 `pickFallbackId` 重新归位。场景列表同时从「按 updatedAt 排」改成 `linearizeByFolders` 树序 —— 前者会让当前场景在打字时不断跳到列表顶
+- **`variant="focus"` 把插入栏和逐块侧栏一起隐藏了**(`BlocksEditor` 两处 `variant !== 'focus'`),手机上只能改已有块的文字。补 `.doc-focus-bar` 吸底操作条(换类型 / ＋三种常用块 / 上下移 / 删除),复用已有的 `typeMenuBlockId` 菜单
+- **iOS 聚焦缩放**:全站输入框 12–15px,iOS Safari 对 <16px 的字段聚焦时强制放大页面且不还原。修在 `@media (pointer: coarse), (max-width: 768px)` 里,**必须用 `!important`** —— `.doc-speaker-row input { font-size: 12px }` 这类组件规则特异性(0,1,1)高于裸 `input`(0,0,1)。双条件是因为粗指针覆盖横屏平板、窄屏覆盖上报 fine 指针的安卓浏览器;桌面鼠标端(>768px 且 fine)完全不受影响
+- **「切换到完整版」是单向门**:`toggle()` 只在 `MobileMe` 里调用,而 `MobileMe` 只在移动壳内渲染,切走后开关随之消失,唯一出路是清 localStorage = 删掉网页版的稿子。顶栏补 `.mobile-back-btn`(仅 `isMobile && !isTauri && forceDesktop` 时渲染)
+- **新增 `src/brainstormLayout.ts`**:`nextNotePosition` 按网格找空位。**比对的是各便签的真实坐标而不是把它们吸附到格上** —— 示例便签(120,80 等)本就不在格点上,只按格记占用会算出一个离它 190px 的位置,而便签宽 210px,照样叠。桌面 `Brainstorm.addNote` 一并换掉(那里传的是 React Flow 的 `ns`,不是 project,所以入参放宽为 `PlacedNote`)
+- **`writingProgress` 接出到移动端**:写作页与「我的」显示今日新增 / 连续天数。新增纯函数 `writingStreak` —— **今天没动笔不算断,从昨天接着数**,否则每天零点后打开都显示 0 天
+- 快记补编辑 / 删除 / 搜索(原来是纯 `<div>`,只能新增);写作页加灵感抽屉(点一条插入当前场景末尾)、上下场切换、卷章路径;设定速查加搜索(覆盖名称 / 简介 / 字段值);移动端补云同步与项目切换入口(云房间是手机取稿的唯一通道)
+- 触摸目标统一抬到 40px(原顶栏图标 33×25、块内工具 22×19)
+- 测试 561 项(新增 `brainstormLayout.test.ts` 7 项 + `writingStreak` 4 项)
+
+**验证环境的两个坑**(下次别再踩):
+- 这个无头浏览器的 CDP 视口改写**不派发 `resize` 与 matchMedia `change` 事件** —— 挂探针实测视口 375→1100、媒体查询翻转,探针一条没收到。CSS 会重新求值,JS 监听不会触发,所以 `useIsMobile` 的实时响应(横屏旋转)在这里验不了
+- `(pointer: coarse)` 在无头环境为真、`innerWidth` 在面板收起时为 0,单看媒体查询会误判;测移动规则要显式 `resize_window` 到具体宽高再 reload
+- store 持久化是防抖的,改完立刻读 localStorage 会拿到旧值;且**多槽位时 `Object.keys().find()` 可能命中的不是当前槽**,要用 `theloom-current-v1` 定位
+
+**仍未修 / 需真机**:软键盘弹出时吸底操作条是否被遮挡(0 处 `visualViewport` 处理);NavigatorTree 的 HTML5 拖放在触摸设备上完全不工作(平板走桌面布局时无法拖动排序)。
+
 ## 最近变更(v0.44.1 · v0.44.0 审计修复)
 
 对 `bf951cc..HEAD` 做代码审计,修 7 个问题。核心是 v0.44.0 的缩略图瘦身「剥离无条件、回填有条件」造成的两处永久数据丢失:

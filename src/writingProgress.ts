@@ -167,3 +167,30 @@ export function normalizeWritingProgress(project: Project): void {
   }
   progress.daily = [...normalized.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-DAILY_LIMIT);
 }
+
+/**
+ * 连续写作天数:从今天往回数,连着有产出的天数。
+ * 今天还没动笔时不算断 —— 从昨天接着数,否则每天零点前打开都会看到「0 天」。
+ */
+export function writingStreak(
+  progress: WritingProgressState | undefined,
+  mode: WritingCountMode,
+  bodyOnly: boolean,
+  timestamp = Date.now(),
+): number {
+  const byDate = new Map((progress?.daily ?? []).map((stat) => [stat.date, stat]));
+  const wroteOn = (offset: number): boolean => {
+    const day = new Date(timestamp);
+    day.setHours(12, 0, 0, 0);
+    day.setDate(day.getDate() - offset);
+    return dailyStatValue(byDate.get(writingDateKey(day.getTime())), mode, bodyOnly) > 0;
+  };
+
+  let offset = wroteOn(0) ? 0 : 1;
+  let streak = 0;
+  while (wroteOn(offset)) {
+    streak++;
+    offset++;
+  }
+  return streak;
+}

@@ -4853,3 +4853,120 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .m-me-stats span { font-size: 11px; color: var(--text-faint); }
 .m-me-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); }
 .m-me-full { padding: 13px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); cursor: pointer; font-size: 14px; }
+
+/* ---------- 移动端触摸适配 ---------- */
+
+/* 场景选择器:搜索框 + 章节路径 */
+.m-doc-search {
+  margin: 8px 12px; width: calc(100% - 24px);
+  padding: 9px 12px; font-size: 16px;
+}
+.m-doc-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; text-align: left; }
+.m-doc-item-path { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 专注变体的块操作条:手机上唯一的增删块 / 换类型入口,吸底常驻 */
+.doc-focus-bar {
+  position: sticky; bottom: 0; z-index: 3;
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px; padding: 8px;
+  overflow-x: auto; scrollbar-width: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.doc-focus-bar::-webkit-scrollbar { display: none; }
+.doc-focus-bar > * { flex-shrink: 0; }
+.doc-focus-spacer { flex: 1 0 8px; }
+.doc-focus-sep { width: 1px; align-self: stretch; background: var(--border); }
+.doc-focus-bar button { min-height: 40px; padding: 0 12px; }
+.doc-focus-bar button:disabled { opacity: 0.4; }
+
+/*
+ * 触摸设备(粗指针)与窄屏统一放大 —— 两个条件都要:
+ * 粗指针覆盖横屏平板等宽视口触摸设备,窄屏覆盖上报 fine 指针的安卓浏览器。
+ * - 字号 ≥16px 是 iOS Safari 聚焦输入框时不缩放页面的硬门槛,写作工具尤其不能被缩放打断
+ * - 点击目标抬到 ~44px,原来顶栏 33x25 / 块控件 22x19 在手指下几乎点不中
+ * 只作用于 pointer: coarse,鼠标端布局完全不变
+ */
+@media (pointer: coarse), (max-width: 768px) {
+  /* !important 是必要的:组件级的 .doc-speaker-row input { font-size: 12px } 这类
+     规则特异性更高,而 16px 在触摸设备上是「聚焦不缩放」的硬门槛,必须压过它们 */
+  input, textarea, select { font-size: 16px !important; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select { min-height: 40px; }
+
+  button, [role="button"], summary { min-height: 40px; }
+  .icon-btn { min-width: 40px; min-height: 40px; }
+  .topbar button, .m-tabbar button { min-height: 44px; }
+
+  /* 行内的小尺寸控件按内容留白抬高,不强行撑满整行 */
+  .doc-block-tools button, .navigator-favorite, .doc-block-kind { min-height: 36px; min-width: 36px; }
+
+  /* 粗指针下没有 hover,常隐的行内工具改为常显 */
+  .doc-block-side .doc-block-tools { opacity: 1; }
+}
+
+/* 移动端专用壳内的编辑区:给吸底操作条与软键盘留出余量 */
+.app-mobile .m-write-editor { padding-bottom: 24px; }
+.app-mobile .doc-focus-bar { bottom: -1px; }
+
+/* 「我的」页:云同步 / 项目切换 */
+.m-me-section { font-size: 12px; color: var(--text-faint); margin: 4px 0 -4px; }
+.m-me-slots { display: flex; flex-direction: column; gap: 6px; }
+.m-me-slot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-panel); font-size: 14px; text-align: left; cursor: pointer;
+}
+.m-me-slot.on { border-color: var(--focus); font-weight: 600; }
+.m-me-slot span:last-child { color: var(--text-faint); font-size: 12px; flex-shrink: 0; }
+
+/* 桌面布局下的「回到手机版」出口:仅窄屏可见,是切回移动壳的唯一入口,不能被隐藏或挤走 */
+.mobile-back-btn {
+  flex-shrink: 0; white-space: nowrap;
+  border: 1px solid var(--border-light); border-radius: 8px;
+  padding: 0 10px; font-size: 13px;
+}
+
+/* ---------- 移动端:进度 / 灵感抽屉 / 快记编辑 / 设定搜索 ---------- */
+
+.m-doc-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
+.m-doc-chapter { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 场景切换 + 今日进度 + 灵感入口 */
+.m-write-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.m-write-bar .icon-btn { font-size: 20px; line-height: 1; }
+.m-write-bar button:disabled { opacity: 0.35; }
+.m-write-progress { flex: 1; text-align: center; font-size: 12px; color: var(--text-dim); }
+.m-write-progress strong { color: var(--text); font-size: 13px; }
+.m-idea-btn { font-size: 12px; padding: 0 10px; border: 1px solid var(--border-light); border-radius: 8px; }
+.m-idea-btn.on { border-color: var(--focus); font-weight: 600; }
+
+.m-idea-drawer {
+  flex-shrink: 0; max-height: 40vh; overflow-y: auto;
+  border-bottom: 1px solid var(--border); background: var(--bg-panel);
+}
+.m-idea-item {
+  display: block; width: 100%; text-align: left;
+  padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border);
+  background: none; color: var(--text); font-size: 13px; line-height: 1.5; cursor: pointer;
+}
+.m-idea-item:active { background: var(--bg-hover); }
+
+/* 快记:整条可点进入编辑,右侧删除 */
+.m-note-search, .m-ref-search { width: 100%; margin-bottom: 8px; }
+.m-note-item { display: flex; align-items: flex-start; gap: 6px; }
+.m-note-text {
+  flex: 1; min-width: 0; text-align: left;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: inherit; font: inherit; line-height: 1.55; white-space: pre-wrap;
+}
+.m-note-del { flex-shrink: 0; opacity: 0.5; }
+.m-note-edit {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; border: 1px solid var(--focus); border-radius: 10px; background: var(--bg-card);
+}
+.m-note-edit-row { display: flex; gap: 8px; justify-content: flex-end; }

@@ -3,8 +3,21 @@ import { sampleProject } from './sample';
 import { normalizeProject } from './util';
 import {
   countDocumentWriting, countWritingText, dailyStatValue, recentWritingSeries, recordWritingProgress,
-  writingDateKey,
+  writingDateKey, writingStreak,
 } from './writingProgress';
+
+const DAY = 86400000;
+
+/** 造一份 daily:offsets 里的每一天都记 n 字 */
+function progressWith(offsets: number[], now: number) {
+  return {
+    daily: offsets.map((offset) => ({
+      date: writingDateKey(now - offset * DAY),
+      cjk: 10, characters: 10, englishWords: 10,
+      bodyCjk: 10, bodyCharacters: 10, bodyEnglishWords: 10,
+    })),
+  };
+}
 
 describe('writingProgress', () => {
   it('支持中文字符、含标点字符与英文单词三种口径', () => {
@@ -97,5 +110,26 @@ describe('writingProgress', () => {
     expect(project.writingProgress?.daily).toHaveLength(1);
     expect(project.writingProgress?.daily?.[0].cjk).toBe(12);
     expect(project.writingProgress?.daily?.[0].characters).toBe(0);
+  });
+
+  it('连续写作天数:今天算在内', () => {
+    const now = new Date('2026-08-14T09:00:00').getTime();
+    expect(writingStreak(progressWith([0, 1, 2], now), 'characters', false, now)).toBe(3);
+  });
+
+  it('今天还没动笔不算断,从昨天接着数', () => {
+    const now = new Date('2026-08-14T09:00:00').getTime();
+    expect(writingStreak(progressWith([1, 2], now), 'characters', false, now)).toBe(2);
+  });
+
+  it('中间断一天就停在断点', () => {
+    const now = new Date('2026-08-14T09:00:00').getTime();
+    expect(writingStreak(progressWith([0, 1, 3, 4], now), 'characters', false, now)).toBe(2);
+  });
+
+  it('没有记录时为 0', () => {
+    const now = new Date('2026-08-14T09:00:00').getTime();
+    expect(writingStreak(undefined, 'characters', false, now)).toBe(0);
+    expect(writingStreak(progressWith([5], now), 'characters', false, now)).toBe(0);
   });
 });

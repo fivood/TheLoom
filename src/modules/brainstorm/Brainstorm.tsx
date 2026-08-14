@@ -6,6 +6,7 @@ import {
   type Node, type Edge, type NodeChange, type EdgeChange, type Connection, type NodeProps,
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
+import { nextNotePosition } from '../../brainstormLayout';
 import { getThemeMode, readableInk, subscribeThemeMode } from '../../theme';
 
 interface StickyData {
@@ -95,7 +96,7 @@ function Canvas() {
       ...ns.map((n) => ({ ...n, selected: false })),
       {
         id: uid(), type: 'sticky' as const,
-        position: position ?? { x: 80 + Math.random() * 120, y: 80 + Math.random() * 120 },
+        position: position ?? nextNotePosition(ns),
         data: { text: '', color },
         selected: true,
       },

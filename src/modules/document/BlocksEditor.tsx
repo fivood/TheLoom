@@ -557,6 +557,45 @@ export default function BlocksEditor({
         })}
       </div>
 
+      {/* 专注(移动端)变体没有逐块侧栏与插入栏,这里给当前块补一条紧凑操作条,
+          否则手机上只能改已有块的文字,既加不了块也换不了类型 */}
+      {variant === 'focus' && activeBlock && (
+        <div className="doc-focus-bar">
+          <button
+            className="ghost"
+            type="button"
+            title="更改当前块类型"
+            onClick={() => setTypeMenuBlockId((id) => id === activeBlock.id ? null : activeBlock.id)}
+          >{DOC_BLOCK_LABEL[activeBlock.type]} ▾</button>
+          <span className="doc-focus-sep" />
+          {COMMON_TYPES.map((type) => (
+            <button key={type} className="ghost" type="button" onClick={() => insertBlock(type)}>
+              ＋{DOC_BLOCK_LABEL[type]}
+            </button>
+          ))}
+          <span className="doc-focus-spacer" />
+          <button
+            className="ghost icon-btn"
+            type="button"
+            title="上移"
+            onClick={() => moveBlock(activeBlock.id, -1)}
+          >↑</button>
+          <button
+            className="ghost icon-btn"
+            type="button"
+            title="下移"
+            onClick={() => moveBlock(activeBlock.id, 1)}
+          >↓</button>
+          <button
+            className="ghost icon-btn"
+            type="button"
+            title="删除当前块"
+            disabled={doc.blocks.length <= 1}
+            onClick={() => removeBlock(activeBlock.id)}
+          ><Icon name="trash" size={14} /></button>
+        </div>
+      )}
+
       {variant !== 'focus' && <div className="doc-insert-bar">
         {COMMON_TYPES.map((type) => (
           <button key={type} className="ghost" onClick={() => insertBlock(type)}>
