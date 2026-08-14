@@ -51,12 +51,22 @@ const EDGE_STYLE = {
 } as const;
 
 /** 节点面板分组:叙事 / 逻辑 / 流程 / 画布,便于扫一眼定位 */
-const NODE_GROUPS: { label: string; types: FlowNodeType[] }[] = [
+const NODE_GROUPS = [
   { label: '叙事', types: ['dialogue', 'fragment', 'hub'] },
   { label: '逻辑', types: ['condition', 'instruction', 'check'] },
   { label: '流程', types: ['jump', 'call', 'return', 'event', 'exit'] },
   { label: '画布', types: ['note', 'zone'] },
-];
+] as const satisfies readonly { label: string; types: readonly FlowNodeType[] }[];
+
+/**
+ * 编译期兜底:工具栏原先遍历 FLOW_NODE_LABEL 的键,天然穷尽;改成手写分组后
+ * 漏掉一个类型不会报错,只是按钮静默消失。这里把「漏掉」变成编译错误。
+ */
+type UngroupedNodeType = Exclude<FlowNodeType, (typeof NODE_GROUPS)[number]['types'][number]>;
+const _allNodeTypesGrouped: UngroupedNodeType extends never
+  ? true
+  : ['以下节点类型未归入 NODE_GROUPS', UngroupedNodeType] = true;
+void _allNodeTypesGrouped;
 
 interface EdgeData {
   label: string;

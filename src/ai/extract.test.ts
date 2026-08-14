@@ -5,7 +5,7 @@ import { parseModelJson } from './llm';
 import {
   applyAiImportPreview, buildAiImportPreview, composeExtractSystemPrompt,
   DEFAULT_EXTRACT_PROMPT, defaultExtractPrompt, EXTRACT_SCENARIOS, guessExtractScenario,
-  mergeExtracted, normalizeExtracted, normalizeFieldFill, pushAiLog,
+  mergeExtracted, nextAiPrompts, normalizeExtracted, normalizeFieldFill, pushAiLog,
 } from './extract';
 
 describe('parseModelJson', () => {
@@ -237,6 +237,30 @@ describe('抽取场景提示词', () => {
       expect(defaultExtractPrompt(s.key)).toBe(s.prompt);
     }
     expect(defaultExtractPrompt('unknown' as never)).toBe(DEFAULT_EXTRACT_PROMPT);
+  });
+});
+
+describe('nextAiPrompts', () => {
+  const novelDefault = defaultExtractPrompt('novel');
+
+  it('自定义提示词随类型一起存下', () => {
+    expect(nextAiPrompts(undefined, 'novel', '我的提示词')).toEqual({ extractType: 'novel', extract: '我的提示词' });
+  });
+
+  it('提示词是内置默认时不写 extract', () => {
+    expect(nextAiPrompts(undefined, 'novel', novelDefault)).toEqual({ extractType: 'novel' });
+  });
+
+  it('恢复默认后必须删掉旧的自定义提示词,否则下次会遮蔽类型选择', () => {
+    const stale = { extract: '上一轮的自定义', extractType: 'generic' };
+    const next = nextAiPrompts(stale, 'novel', novelDefault);
+    expect(next.extract).toBeUndefined();
+    expect(next).toEqual({ extractType: 'novel' });
+  });
+
+  it('换类型但仍用自定义提示词时,自定义内容保留', () => {
+    const next = nextAiPrompts({ extract: '自定义', extractType: 'generic' }, 'setting', '自定义');
+    expect(next).toEqual({ extractType: 'setting', extract: '自定义' });
   });
 });
 

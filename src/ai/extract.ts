@@ -177,6 +177,24 @@ export function defaultExtractPrompt(type: ExtractScenario): string {
   return EXTRACT_SCENARIOS.find((s) => s.key === type)?.prompt ?? DEFAULT_EXTRACT_PROMPT;
 }
 
+/**
+ * 应用抽取结果时该往项目里写什么 aiPrompts。
+ *
+ * 关键:提示词回到内置默认时必须**删掉** extract。留着的话下次打开会反过来
+ * 遮蔽类型选择(界面显示新类型、实际发的是旧自定义提示词),而且从界面上
+ * 再也清不掉 —— 「恢复默认」后这里若只是「不写」,旧值仍会随对象展开保留。
+ */
+export function nextAiPrompts(
+  current: { extract?: string; extractType?: string } | undefined,
+  type: ExtractScenario,
+  prompt: string,
+): { extract?: string; extractType?: string } {
+  const next = { ...(current ?? {}), extractType: type as string };
+  if (prompt === defaultExtractPrompt(type)) delete next.extract;
+  else next.extract = prompt;
+  return next;
+}
+
 /** 读入文件时按内容猜测类型(保守:只在有明确特征时返回,否则 null 保持现状) */
 export function guessExtractScenario(text: string): ExtractScenario | null {
   const t = text.slice(0, 30000);

@@ -335,7 +335,14 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* R14-3 分屏:两个 content-pane 并列;每个 pane 内部布局与非分屏时一致 */
 .content > .content-pane { flex: 1; min-width: 0; display: flex; overflow: hidden; }
-.content-split > .content-pane-primary { flex: 0 0 var(--pane-split, 50%); position: relative; }
+/* flex-shrink 必须为 1,且给副面板留出 280px:否则在比「上次拖拽时」更窄的窗口里,
+   主面板不收缩会把副面板挤成 0,连带把右缘的拖拽柄推到视口外,再也拖不回来 */
+.content-split > .content-pane-primary {
+  flex: 0 1 var(--pane-split, 50%);
+  min-width: 240px;
+  max-width: calc(100% - 280px);
+  position: relative;
+}
 .content-split > .content-pane-secondary { flex: 1 1 0; }
 .content-pane-secondary {
   border-left: 1px solid var(--border);

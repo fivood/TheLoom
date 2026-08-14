@@ -29,6 +29,11 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
 
   const ready = cfg.room.trim().length >= 3 && cfg.pass.length >= 4;
 
+  // 云房间只传项目 JSON(正文 / 结构 / 缩略图)。资源原文件按内容寻址存在本机
+  // (桌面 assets/ 目录、网页 IndexedDB),不进密文 —— 对端拉取后这些资源会显示「缺失」。
+  const assets = useLoom((s) => s.project.assets);
+  const originalCount = assets.filter((a) => a.hash).length;
+
   const doPull = async (silent = false) => {
     setBusy('pull');
     setStatus('正在拉取…');
@@ -209,10 +214,21 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
             {status && <div className="sync-msg">{status}</div>}
           </div>
 
+          {originalCount > 0 && (
+            <div className="player-tip" style={{ marginTop: 4 }}>
+              ⚠ 云房间<b>只传项目文本与缩略图</b>,不传资源原文件。
+              当前有 <b>{originalCount}</b> 个资源挂着原文件,对端拉取后会显示「缺失」
+              (缩略图仍在,可正常预览与排版)。
+            </div>
+          )}
+
           <div className="player-tip" style={{ marginTop: 4 }}>
-            用法:一人先「推送」创建房间并把房间码和口令告诉同伴;
-            同伴填入后「拉取」。之后遵循<b>先拉取、改完就推送</b>的节奏,
-            版本冲突时会提示。同一时间仍建议只有一人编辑。
+            <b>多设备同步</b>:桌面之间建议改用「文件夹模式」—— 把项目文件夹放进
+            OneDrive / Dropbox,正文与 <code>assets/</code> 原文件一并同步,不受 20MB 上限约束。
+            云房间更适合把文本推给手机 / 网页版查看与轻量编辑。
+            <br />
+            用法:先「推送」创建房间,另一台设备填入相同房间码与口令后「拉取」。
+            之后遵循<b>先拉取、改完就推送</b>的节奏,版本冲突会提示;同一时间只在一台设备上编辑。
           </div>
         </div>
       </div>

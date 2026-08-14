@@ -8,7 +8,6 @@
  */
 import type { Project } from './types';
 import { normalizeProject } from './util';
-import { stripAssetThumbs } from './assetFiles';
 
 const CONFIG_KEY = 'theloom-sync-v1';
 
@@ -82,8 +81,13 @@ function fromBase64(b64: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * 缩略图必须随密文一起走:接力的对端没有本机 IDB 缩略图库,
+ * 桌面端更是连回填路径都没有(hydrateAssetThumbs 在 Tauri 下直接 return),
+ * 这里剥掉就是对端永久丢失。服务端上限 20MB,缩略图是 256px jpeg,留得下。
+ */
 async function encryptProject(project: Project, key: CryptoKey): Promise<string> {
-  const plain = await gzip(new TextEncoder().encode(JSON.stringify(stripAssetThumbs(project))), 'gzip');
+  const plain = await gzip(new TextEncoder().encode(JSON.stringify(project)), 'gzip');
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain as BufferSource));
   const out = new Uint8Array(iv.length + ct.length);

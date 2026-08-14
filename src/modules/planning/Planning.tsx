@@ -24,11 +24,21 @@ const VIEWS: { key: PlanningView; label: string; hint: string }[] = [
 ];
 
 /** 规划子视图分组:写作 / 修订 / 分析,便于扫一眼定位 */
-const VIEW_GROUPS: { label: string; keys: PlanningView[] }[] = [
+const VIEW_GROUPS = [
   { label: '写作', keys: ['progress', 'wall'] },
   { label: '修订', keys: ['revision'] },
   { label: '分析', keys: ['relations', 'arcs', 'foreshadow', 'appearance', 'pacing'] },
-];
+] as const satisfies readonly { label: string; keys: readonly PlanningView[] }[];
+
+/**
+ * 编译期兜底:VIEW_GROUPS 漏掉一个视图只会让按钮消失,多出一个 VIEWS 里没有的
+ * 则会让下面的查找拿到 undefined 直接崩掉整个规划页。两边都锁死。
+ */
+type UngroupedView = Exclude<PlanningView, (typeof VIEW_GROUPS)[number]['keys'][number]>;
+const _allViewsGrouped: UngroupedView extends never
+  ? true
+  : ['以下规划视图未归入 VIEW_GROUPS', UngroupedView] = true;
+void _allViewsGrouped;
 
 export default function Planning() {
   const workspacePreset = useLoom((state) => state.project.workspacePreset);
@@ -57,7 +67,8 @@ export default function Planning() {
             {gi > 0 && <span className="tool-sep" aria-hidden="true" />}
             <span className="tool-group">{group.label}</span>
             {group.keys.map((key) => {
-              const v = VIEWS.find((x) => x.key === key)!;
+              const v = VIEWS.find((x) => x.key === key);
+              if (!v) return null;
               return (
                 <button
                   key={key}

@@ -124,6 +124,20 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 /* ---------- 缩略图(网页版单独存 IDB,不内联进项目 JSON) ---------- */
 
 /**
+ * 本会话已确认落在 IDB 缩略图库里的哈希。
+ *
+ * `stripAssetThumbs` 只敢剥离这个集合里的缩略图 —— 剥离是不可逆的
+ * (没有任何代码会从原文件重建缩略图),所以必须先确认存得进去、读得回来。
+ * 无 hash 的旧资源、写 IDB 失败的、以及回填尚未落盘的,一律保持内联。
+ */
+const thumbsInDb = new Set<string>();
+
+/** 仅供测试重置会话状态 */
+export function resetThumbCacheForTest(): void {
+  thumbsInDb.clear();
+}
+
+/**
  * 存缩略图 dataURL。仅网页 / 未绑定文件夹(folder = null)写 IDB;
  * 桌面文件夹模式缩略图内联进 project.json,这里跳过。
  */
@@ -132,7 +146,8 @@ export async function storeAssetThumb(folder: string | null, hash: string, dataU
   try {
     const db = await openDb();
     await idbRequest(db.transaction(THUMB_STORE, 'readwrite').objectStore(THUMB_STORE).put(dataUrl, hash));
-  } catch { /* 缩略图丢失可接受:下次从原文件重建 */ }
+    thumbsInDb.add(hash);
+  } catch { /* 存不进去就不标记,缩略图继续内联在项目里 */ }
 }
 
 /** 读缩略图 dataURL;不存在时返回 null */
@@ -141,9 +156,22 @@ export async function loadAssetThumb(hash: string): Promise<string | null> {
   try {
     const db = await openDb();
     const v = await idbRequest(db.transaction(THUMB_STORE, 'readonly').objectStore(THUMB_STORE).get(hash));
-    return typeof v === 'string' ? v : null;
+    if (typeof v !== 'string') return null;
+    thumbsInDb.add(hash);
+    return v;
   } catch {
     return null;
+  }
+}
+
+/** 列出 IDB 缩略图库里的全部哈希(清理工具用) */
+export async function listAssetThumbKeys(): Promise<string[]> {
+  try {
+    const db = await openDb();
+    const keys = await idbRequest(db.transaction(THUMB_STORE, 'readonly').objectStore(THUMB_STORE).getAllKeys());
+    return keys.map(String);
+  } catch {
+    return [];
   }
 }
 
@@ -154,17 +182,21 @@ export async function deleteAssetThumbs(hashes: string[]): Promise<void> {
     const db = await openDb();
     const store = db.transaction(THUMB_STORE, 'readwrite').objectStore(THUMB_STORE);
     for (const h of hashes) await idbRequest(store.delete(h));
+    for (const h of hashes) thumbsInDb.delete(h);
   } catch { /* 忽略 */ }
 }
 
 /**
  * 持久化前剔除资源缩略图(纯函数,深拷贝,不动原对象)。
- * 无缩略图时直接返回原引用,避免不必要的拷贝。
+ *
+ * 只剥离已确认存进 IDB 缩略图库的那些 —— 剥离没有回头路,
+ * 剥掉一个 IDB 里没有的缩略图就是永久丢失。无可剥离项时返回原引用。
  */
 export function stripAssetThumbs(p: Project): Project {
-  if (!p.assets.some((a) => a.thumbnail)) return p;
+  const strippable = (a: Project['assets'][number]) => !!a.thumbnail && !!a.hash && thumbsInDb.has(a.hash);
+  if (!p.assets.some(strippable)) return p;
   const copy = structuredClone(p);
-  for (const a of copy.assets) delete a.thumbnail;
+  for (const a of copy.assets) if (strippable(a)) delete a.thumbnail;
   return copy;
 }
 

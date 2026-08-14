@@ -12,8 +12,8 @@ import {
 } from '../ai/llm';
 import {
   applyAiImportPreview, buildAiImportPreview, buildFieldFillPrompt, composeExtractSystemPrompt,
-  defaultExtractPrompt, EXTRACT_SCENARIOS, guessExtractScenario, mergeExtracted, normalizeExtracted, normalizeFieldFill,
-  pushAiLog, STAGE1_SUFFIX, STAGE2_SUFFIX,
+  defaultExtractPrompt, EXTRACT_SCENARIOS, guessExtractScenario, mergeExtracted, nextAiPrompts,
+  normalizeExtracted, normalizeFieldFill, pushAiLog, STAGE1_SUFFIX, STAGE2_SUFFIX,
   type AiImportPreview, type ExtractScenario,
 } from '../ai/extract';
 
@@ -189,10 +189,13 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  /** 提示词是否仍是某个内置默认值(是则跟随类型切换,否则视为用户自定义,保留) */
+  const promptIsDefault = prompt === defaultExtractPrompt(type);
+
   const changeType = (next: ExtractScenario) => {
     setType(next);
     // 提示词仍是当前类型的默认值时,随类型一起换默认;已被手改则保留自定义内容
-    setPrompt((cur) => (cur === defaultExtractPrompt(type) ? defaultExtractPrompt(next) : cur));
+    if (promptIsDefault) setPrompt(defaultExtractPrompt(next));
   };
 
   const readFiles = async (files: FileList | null) => {
@@ -206,9 +209,14 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
     }
     setText(combined);
     const guessed = guessExtractScenario(combined);
-    const note = guessed
-      ? `已读入 ${names.length} 个文件:${names.join('、')}(内容像「${EXTRACT_SCENARIOS.find((s) => s.key === guessed)?.label}」,已自动切换抽取类型,可手动改)`
-      : `已读入 ${names.length} 个文件:${names.join('、')}`;
+    const base = `已读入 ${names.length} 个文件:${names.join('、')}`;
+    const guessLabel = guessed && EXTRACT_SCENARIOS.find((s) => s.key === guessed)?.label;
+    // 提示词被手改过时只切类型标签、不动提示词,措辞必须如实反映这一点
+    const note = !guessed || guessed === type
+      ? base
+      : promptIsDefault
+        ? `${base}(内容像「${guessLabel}」,已自动切换抽取类型,可手动改)`
+        : `${base}(内容像「${guessLabel}」,已切换类型标签;提示词是你自定义的,未改动)`;
     setFileNote(note);
     if (guessed) changeType(guessed);
   };
@@ -294,8 +302,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
     if (!preview) return;
     update((p) => {
       applyAiImportPreview(p, preview);
-      p.aiPrompts = { ...(p.aiPrompts ?? {}), extractType: type };
-      if (prompt !== defaultExtractPrompt(type)) p.aiPrompts.extract = prompt;
+      p.aiPrompts = nextAiPrompts(p.aiPrompts, type, prompt);
     });
     const firstDoc = preview.newDocs[0];
     onClose();

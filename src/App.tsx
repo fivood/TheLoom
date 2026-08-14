@@ -56,6 +56,9 @@ const Planning = lazy(() => import('./modules/planning/Planning'));
 const AiAssistantPanel = lazy(() => import('./components/AiAssistantPanel'));
 
 export type Tab = WorkspaceTab;
+/** 一次待预检的导入任务(拖入多文件时排队) */
+interface ImportJob { mode: 'xlsx' | 'fdx' | 'manuscript'; file: File }
+
 type TabGroup = 'build' | 'library' | 'plan' | 'logic';
 
 const GROUP_LABEL: Record<TabGroup, string> = {
@@ -134,7 +137,10 @@ export default function App() {
   const [engineExport, setEngineExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
   const [projectImport, setProjectImport] = useState(false);
-  const [importFile, setImportFile] = useState<{ mode: 'xlsx' | 'fdx' | 'manuscript'; file: File } | null>(null);
+  // 导入队列:一次拖入多个文件时逐个走预检,关掉当前预检自动推进到下一个
+  const [importQueue, setImportQueue] = useState<ImportJob[]>([]);
+  const importFile = importQueue[0] ?? null;
+  const setImportFile = (job: ImportJob | null) => setImportQueue(job ? [job] : []);
   const importManuscriptRef = useRef<HTMLInputElement>(null);
   const importXlsxRef = useRef<HTMLInputElement>(null);
   const importFdxRef = useRef<HTMLInputElement>(null);
@@ -308,20 +314,28 @@ export default function App() {
     const onDragLeave = (e: DragEvent) => {
       if (e.relatedTarget == null) setDragOver(false);
     };
+    const routeFile = (file: File): ImportJob | null => {
+      if (MANUSCRIPT_EXT.test(file.name)) return { mode: 'manuscript', file };
+      if (/\.xlsx$/i.test(file.name)) return { mode: 'xlsx', file };
+      if (/\.fdx$/i.test(file.name)) return { mode: 'fdx', file };
+      return null;
+    };
     const onDrop = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
       setDragOver(false);
-      const file = e.dataTransfer?.files?.[0];
-      if (!file) return;
-      if (MANUSCRIPT_EXT.test(file.name)) {
-        setImportFile({ mode: 'manuscript', file });
-      } else if (/\.xlsx$/i.test(file.name)) {
-        setImportFile({ mode: 'xlsx', file });
-      } else if (/\.fdx$/i.test(file.name)) {
-        setImportFile({ mode: 'fdx', file });
-      } else {
-        void alertDialog(`无法识别该文件类型:${file.name}\n\n可拖入 TXT / Markdown / EPUB / DOCX / MOBI 长稿、Excel .xlsx 或 Final Draft .fdx。`);
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      if (files.length === 0) return;
+      // 拖入多个文件时全部排队,逐个走预检 —— 只取第一个会静默丢掉其余的
+      const jobs = files.map(routeFile).filter((j): j is ImportJob => j !== null);
+      const rejected = files.filter((f) => routeFile(f) === null).map((f) => f.name);
+      if (jobs.length > 0) setImportQueue((q) => [...q, ...jobs]);
+      if (rejected.length > 0) {
+        void alertDialog(
+          `${rejected.length === 1 ? `无法识别该文件类型:${rejected[0]}` : `有 ${rejected.length} 个文件无法识别:\n${rejected.map((n) => `· ${n}`).join('\n')}`}`
+          + `\n\n可拖入 TXT / Markdown / EPUB / DOCX / MOBI 长稿、Excel .xlsx 或 Final Draft .fdx。`
+          + (jobs.length > 0 ? `\n\n其余 ${jobs.length} 个文件已排队导入。` : ''),
+        );
       }
     };
     window.addEventListener('dragover', onDragOver);
@@ -784,7 +798,12 @@ export default function App() {
       {findReplace && <FindReplace onClose={() => setFindReplace(false)} />}
       {engineExport && <EngineExportModal onClose={() => setEngineExport(false)} />}
       {importFile && (
-        <ImportPreview mode={importFile.mode} file={importFile.file} onClose={() => setImportFile(null)} />
+        <ImportPreview
+          key={`${importQueue.length}-${importFile.file.name}`}
+          mode={importFile.mode}
+          file={importFile.file}
+          onClose={() => setImportQueue((q) => q.slice(1))}
+        />
       )}
       {recovering && <RecoveryPanel onClose={() => setRecovering(false)} />}
       {updateDialog && <UpdateDialog state={updateDialog} onClose={() => setUpdateDialog(null)} />}

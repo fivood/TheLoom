@@ -20,10 +20,6 @@ scripts/
 .playwright-mcp/
 npm-dev*.log
 
-# 测试文件(分支发布不纳入)
-*.test.ts
-*.test.tsx
-
 # Godot editor cache & UIDs (examples/godot-demo/)
 examples/godot-demo/.godot/
 examples/godot-demo/*.uid

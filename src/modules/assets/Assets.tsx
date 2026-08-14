@@ -8,8 +8,8 @@ import type { Asset, AssetKind } from '../../types';
 import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
 import { classifyAsset, fileToImageThumb, fileToVideoThumb, formatSize } from '../../util';
 import {
-  assetExt, collectReferencedTexts, computeOrphans, deleteStoredFiles, getAssetUrl,
-  hashBlob, invalidateAssetUrl, isAssetStored, listStoredFiles, storeAssetFile, storeAssetThumb,
+  assetExt, collectReferencedTexts, computeOrphans, deleteAssetThumbs, deleteStoredFiles, getAssetUrl,
+  hashBlob, invalidateAssetUrl, isAssetStored, listAssetThumbKeys, listStoredFiles, storeAssetFile, storeAssetThumb,
 } from '../../assetFiles';
 import Inspector from '../../components/Inspector';
 import TechNameField from '../../components/TechNameField';
@@ -221,7 +221,7 @@ export default function Assets() {
     else await doRelocate(a, file);
   };
 
-  /** 清理未被任何项目 / 快照引用的原文件字节(唯一会删除字节的入口) */
+  /** 清理未被任何项目 / 快照引用的原文件字节与缩略图(唯一会删除字节的入口) */
   const cleanupOrphans = async () => {
     let stored;
     try {
@@ -230,20 +230,31 @@ export default function Assets() {
       await alertDialog(`无法扫描原文件:${e instanceof Error ? e.message : e}`);
       return;
     }
-    const orphans = computeOrphans(stored, collectReferencedTexts(useLoom.getState().project));
-    if (orphans.length === 0) {
-      await alertDialog('没有未引用的原文件,无需清理。');
+    const referenced = collectReferencedTexts(useLoom.getState().project);
+    const orphans = computeOrphans(stored, referenced);
+    // 缩略图库只在网页 / 未绑定文件夹模式下存在(桌面文件夹模式缩略图内联在 project.json)。
+    // 它和原文件字节各自独立成孤儿:资源删掉后原文件可能早已回收,缩略图仍留在 IDB 里。
+    const thumbOrphans = folder
+      ? []
+      : computeOrphans((await listAssetThumbKeys()).map((key) => ({ key })), referenced).map((f) => f.key);
+    if (orphans.length === 0 && thumbOrphans.length === 0) {
+      await alertDialog('没有未引用的原文件或缩略图,无需清理。');
       return;
     }
     const total = orphans.reduce((s, f) => s + (f.size ?? 0), 0);
     const names = orphans.slice(0, 12).map((f) => `· ${f.key}`).join('\n');
+    const parts = [
+      orphans.length ? `${orphans.length} 个原文件${total ? `(共 ${formatSize(total)})` : ''}` : '',
+      thumbOrphans.length ? `${thumbOrphans.length} 个缩略图` : '',
+    ].filter(Boolean).join(' + ');
     if (!await confirmDialog({
-      message: `发现 ${orphans.length} 个未被任何项目 / 快照 / 恢复点引用的原文件${total ? `(共 ${formatSize(total)})` : ''}:\n\n${names}${orphans.length > 12 ? '\n…' : ''}\n\n删除这些文件?此操作不可撤销。`,
+      message: `发现未被任何项目 / 快照 / 恢复点引用的 ${parts}${names ? `:\n\n${names}${orphans.length > 12 ? '\n…' : ''}` : ''}\n\n删除?此操作不可撤销。`,
       danger: true,
       confirmText: '删除',
     })) return;
     try {
       await deleteStoredFiles(folder, orphans.map((f) => f.key));
+      await deleteAssetThumbs(thumbOrphans);
     } catch (e) {
       await alertDialog(`清理失败:${e instanceof Error ? e.message : e}`);
     }

@@ -179,6 +179,21 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.44.1 · v0.44.0 审计修复)
+
+对 `bf951cc..HEAD` 做代码审计,修 7 个问题。核心是 v0.44.0 的缩略图瘦身「剥离无条件、回填有条件」造成的两处永久数据丢失:
+
+- **`stripAssetThumbs` 改为「确认可恢复才剥」** —— `assetFiles.ts` 加会话级 `thumbsInDb: Set<string>`,只有 `storeAssetThumb` 写成功或 `loadAssetThumb` 读到过的哈希才进集合,剥离只动集合内的。无 hash 的旧资源(R8 之前)、写 IDB 失败的、回填未落盘的一律保持内联。**剥离没有回头路** —— 代码里没有任何路径会从原文件重建缩略图(`fileThumb` 只在导入 / 替换 / 重定位三处调用),`storeAssetThumb` 那句「下次从原文件重建」的注释是错的,已改
+- **协作密文不再剥缩略图**(`sync.ts`)—— 对端没有本机 IDB 缩略图库,桌面端 `hydrateAssetThumbs` 因 `webdbAvailable() = !isTauri && …` 直接 return,连回填逻辑都不执行。**「个人多设备」不等于安全**:B 设备的 IDB 同样是空的。代价实测可忽略(正文密文 ~30KB vs 缩略图 ~60KB,服务端上限 20MB)
+- 新增 `src/sync.test.ts` 守这条。**注意**:测试必须先 `storeAssetThumb` 复现推送方「缩略图已落 IDB」的状态,否则新的 `stripAssetThumbs` 会因「未确认可恢复」直接放行,把剥离加回去测试照样绿 —— 第一版就是这么写的,守不住
+- 分屏 `--pane-split` 改 `flex: 0 1` + `max-width: calc(100% - 280px)`;原 `flex: 0 0` 在更窄窗口里会把副面板挤成 0 并把拖拽柄推出视口(实测 1280 视口灌 1500px:副面板 1px、柄右缘 1585)
+- `nextAiPrompts` 纯函数:提示词回到内置默认时**必须 `delete extract`**,只是「不写」的话旧值仍随对象展开保留,会反过来遮蔽类型选择且界面上清不掉
+- 清理工具接上 `deleteAssetThumbs` + 新增 `listAssetThumbKeys`,缩略图独立参与孤儿扫描(它和原文件字节各自成孤儿)
+- 拖入多文件改队列(`importQueue`),原来只取 `files[0]` 静默丢弃其余
+- `NODE_GROUPS` / `VIEW_GROUPS` 加 `as const satisfies` + `Exclude` 编译期穷尽断言 —— 手写分组漏掉一个类型原本只会让按钮静默消失;Planning 那处还会因 `VIEWS.find(...)!` 拿到 undefined 崩掉整页
+- **多设备同步定位**:桌面之间走文件夹模式 + OneDrive(实测 800 次原子替换零失败、5MB 资源字节一致、文件属性为 `Archive` 非占位符);云房间降级为「只传文本 + 缩略图」给手机 / 网页,SyncPanel 与 README 已写明
+- 已知未修:`SyncPanel.tsx:73` 的离线推送队列把完整项目(含缩略图)写进 localStorage,是唯一不走剥离的写路径 —— **但不能直接加剥离**(队列内容就是稍后要推送的),正确修法是挪进 IndexedDB;`PwaBanner.tsx` 的 `isIosSafari()` 匹配不到 iPadOS 13+(UA 报 `Macintosh`),存储清理警告在 iPad 上不显示
+
 ## 最近变更(R22 · v0.41.0)
 
 《老伦敦寻人记》正式示例:

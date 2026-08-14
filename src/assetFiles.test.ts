@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
 import {
-  assetExt, assetFileName, computeOrphans, hashBlob, isAssetStored, loadAssetThumb,
-  projectBrowserBlobKeysToClear, storeAssetThumb, stripAssetThumbs, type StoredAssetFile,
+  assetExt, assetFileName, computeOrphans, deleteAssetThumbs, hashBlob, isAssetStored, listAssetThumbKeys,
+  loadAssetThumb, projectBrowserBlobKeysToClear, resetThumbCacheForTest, storeAssetThumb, stripAssetThumbs,
+  type StoredAssetFile,
 } from './assetFiles';
 
 describe('R8 资源原文件:哈希与命名', () => {
@@ -70,6 +71,7 @@ describe('R8 资源原文件:存在性与孤儿计算', () => {
 });
 
 describe('R8 资源缩略图:持久化前剔除', () => {
+  const THUMB = 'data:image/jpeg;base64,AAAA';
   const base = () => ({
     version: 1,
     name: '测试项目',
@@ -79,26 +81,51 @@ describe('R8 资源缩略图:持久化前剔除', () => {
     researchCards: [],
     folders: [],
     assets: [
-      { id: 'a1', name: '图', kind: 'image', mime: 'image/png', size: 1, tags: [], source: '', notes: '', createdAt: 1, hash: 'h1', thumbnail: 'data:image/jpeg;base64,AAAA' },
+      { id: 'a1', name: '图', kind: 'image', mime: 'image/png', size: 1, tags: [], source: '', notes: '', createdAt: 1, hash: 'h1', thumbnail: THUMB },
       { id: 'a2', name: '文', kind: 'file', mime: 'text/plain', size: 1, tags: [], source: '', notes: '', createdAt: 1, hash: 'h2' },
     ],
   } as unknown as import('./types').Project);
 
-  it('无缩略图时返回原引用,不产生拷贝', () => {
+  beforeEach(() => resetThumbCacheForTest());
+
+  it('无缩略图时返回原引用,不产生拷贝', async () => {
     const p = base();
     p.assets[0].thumbnail = undefined;
     expect(stripAssetThumbs(p)).toBe(p);
   });
 
-  it('剔除缩略图但保留其余字段,且不修改原对象', () => {
+  it('缩略图尚未存进 IDB 时一律保持内联(剥离不可逆,不能赌)', () => {
     const p = base();
+    expect(stripAssetThumbs(p)).toBe(p);
+    expect(p.assets[0].thumbnail).toBe(THUMB);
+  });
+
+  it('已确认存进 IDB 后才剔除,保留其余字段且不修改原对象', async () => {
+    const p = base();
+    await storeAssetThumb(null, 'h1', THUMB);
     const out = stripAssetThumbs(p);
     expect(out).not.toBe(p);
     expect(out.assets[0].thumbnail).toBeUndefined();
     expect(out.assets[0].hash).toBe('h1');
     expect(out.assets[0].name).toBe('图');
     expect(out.assets[1]).toEqual(p.assets[1]);
-    expect(p.assets[0].thumbnail).toBe('data:image/jpeg;base64,AAAA');
+    expect(p.assets[0].thumbnail).toBe(THUMB);
+  });
+
+  it('无 hash 的旧资源永不剔除(没有 IDB 键可回填)', async () => {
+    const p = base();
+    delete (p.assets[0] as { hash?: string }).hash;
+    await storeAssetThumb(null, 'h1', THUMB);
+    expect(stripAssetThumbs(p)).toBe(p);
+    expect(p.assets[0].thumbnail).toBe(THUMB);
+  });
+
+  it('缩略图被清理工具删除后不再剔除', async () => {
+    const p = base();
+    await storeAssetThumb(null, 'h1', THUMB);
+    expect(stripAssetThumbs(p).assets[0].thumbnail).toBeUndefined();
+    await deleteAssetThumbs(['h1']);
+    expect(stripAssetThumbs(p)).toBe(p);
   });
 });
 
@@ -112,5 +139,16 @@ describe('R8 资源缩略图:IndexedDB 往返', () => {
     expect(await loadAssetThumb(h1)).toBe(dataUrl);
     expect(await loadAssetThumb(h2)).toBeNull();
     expect(await loadAssetThumb('c3'.padEnd(64, '0'))).toBeNull();
+    expect(await listAssetThumbKeys()).toContain(h1);
+    expect(await listAssetThumbKeys()).not.toContain(h2);
+  });
+
+  it('清理工具可按哈希删除缩略图', async () => {
+    const h = 'd4'.padEnd(64, '0');
+    await storeAssetThumb(null, h, 'data:image/jpeg;base64,QUJD');
+    expect(await loadAssetThumb(h)).not.toBeNull();
+    await deleteAssetThumbs([h]);
+    expect(await loadAssetThumb(h)).toBeNull();
+    expect(await listAssetThumbKeys()).not.toContain(h);
   });
 });
