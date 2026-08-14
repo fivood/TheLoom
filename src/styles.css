@@ -5104,3 +5104,59 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .m-ref-edit-row { display: flex; gap: 8px; align-items: center; }
 .m-ref-del { color: var(--danger); }
+
+/* ---------- 移动端查阅:大纲 / 时间线竖排 ---------- */
+
+.m-browse { padding: 0 12px 12px; }
+.m-seg {
+  display: flex; gap: 6px; margin: 12px 0 10px;
+}
+.m-seg button {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 40px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--bg-panel); color: var(--text-dim); font-size: 14px; cursor: pointer;
+}
+.m-seg button.on { border-color: var(--focus); color: var(--text); font-weight: 600; background: var(--bg-card); }
+.m-browse-search { width: 100%; margin-bottom: 10px; }
+
+/* 大纲:一章一卡,剧情线折进卡片内竖排 */
+.m-outline-list { display: flex; flex-direction: column; gap: 10px; }
+.m-outline-row {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-panel); padding: 12px;
+}
+.m-outline-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.m-outline-head strong { font-size: 15px; }
+.m-outline-no {
+  font-size: 12px; color: var(--text-faint); flex-shrink: 0;
+  border: 1px solid var(--border-light); border-radius: 6px; padding: 1px 6px;
+}
+.m-outline-time { font-size: 12px; color: var(--text-faint); }
+.m-outline-main { margin: 8px 0 0; font-size: 13.5px; line-height: 1.6; }
+.m-outline-cell {
+  display: flex; gap: 8px; align-items: flex-start;
+  margin-top: 8px; font-size: 13px; line-height: 1.55;
+}
+.m-outline-col {
+  flex-shrink: 0; border-radius: 6px; padding: 1px 7px;
+  font-size: 11px;
+  border: 1px solid var(--chip-border);
+}
+
+/* 时间线:一个时间点一段,轨道降为事件上的色标 */
+.m-tl-list { display: flex; flex-direction: column; gap: 14px; }
+.m-tl-point { border-left: 2px solid var(--border-light); padding-left: 12px; }
+.m-tl-label { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.m-tl-empty { font-size: 12px; color: var(--text-faint); }
+.m-tl-event {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-panel); padding: 10px 12px; margin-bottom: 8px;
+}
+.m-tl-event-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.m-tl-event-head strong { font-size: 14px; }
+.m-tl-track {
+  flex-shrink: 0; border-radius: 6px; padding: 1px 7px;
+  font-size: 11px; border: 1px solid var(--chip-border);
+}
+.m-tl-text { margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+.m-tl-cast { margin-top: 6px; font-size: 12px; color: var(--text-faint); }

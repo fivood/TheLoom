@@ -5,15 +5,17 @@ import ThemeToggle from '../components/ThemeToggle';
 import MobileWrite from './MobileWrite';
 import MobileNote from './MobileNote';
 import MobileRef from './MobileRef';
+import MobileBrowse from './MobileBrowse';
 import MobileMe from './MobileMe';
 import { useKeyboardInset } from './useKeyboardInset';
 
-type MTab = 'write' | 'note' | 'ref' | 'me';
+type MTab = 'write' | 'note' | 'ref' | 'browse' | 'me';
 
 const TABS: { key: MTab; label: string; icon: IconName }[] = [
   { key: 'write', label: '写作', icon: 'doc' },
   { key: 'note', label: '快记', icon: 'bulb' },
   { key: 'ref', label: '设定', icon: 'book' },
+  { key: 'browse', label: '查阅', icon: 'grid' },
   { key: 'me', label: '我的', icon: 'user' },
 ];
 
@@ -33,6 +35,7 @@ export default function MobileShell() {
         {tab === 'write' && <MobileWrite />}
         {tab === 'note' && <MobileNote />}
         {tab === 'ref' && <MobileRef />}
+        {tab === 'browse' && <MobileBrowse />}
         {tab === 'me' && <MobileMe />}
       </div>
       <nav className="m-tabbar">
