@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLoom } from '../store';
 import {
-  clearPendingPush, flushPendingPush, loadPendingPush, loadSyncConfig, pullProject,
+  flushPendingPush, hasPendingPush, loadSyncConfig, pullProject,
   pushProject, queuePendingPush, saveSyncConfig, SyncError, type SyncConfig,
 } from '../sync';
 import { isTauri } from '../storage';
@@ -12,12 +12,12 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg] = useState<SyncConfig>(loadSyncConfig);
   const [busy, setBusy] = useState<'push' | 'pull' | 'flush' | null>(null);
   const [status, setStatus] = useState('');
-  const [pending, setPending] = useState(() => loadPendingPush());
+  const [pending, setPending] = useState(() => hasPendingPush());
 
-  useEffect(() => { setPending(loadPendingPush()); }, []);
+  useEffect(() => { setPending(hasPendingPush()); }, []);
 
   const refresh = () => {
-    setPending(loadPendingPush());
+    setPending(hasPendingPush());
     useLoom.getState().refreshSyncState();
   };
 
@@ -70,7 +70,7 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
           confirmText: '存入队列',
         });
         if (shouldQueue) {
-          queuePendingPush(cfg, useLoom.getState().project);
+          await queuePendingPush(cfg, useLoom.getState().project);
           refresh();
           setStatus('已存入待推送队列;联网后会自动补发,也可点下方「立即补发」。');
         } else {

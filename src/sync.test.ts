@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { pullProject, pushProject, type SyncConfig } from './sync';
+import {
+  clearPendingPush, flushPendingPush, hasPendingPush, loadPendingPush,
+  pullProject, pushProject, queuePendingPush, type SyncConfig,
+} from './sync';
 import { resetThumbCacheForTest, storeAssetThumb } from './assetFiles';
 import type { Project } from './types';
 
@@ -38,10 +41,21 @@ const cfg: SyncConfig = { server: 'https://example.test', room: 'room-1', pass: 
 
 afterEach(() => vi.unstubAllGlobals());
 
+// vitest 是 node 环境,没有 localStorage;按项目约定造最小假件,不引 jsdom。
+// 保留 Map 本体,方便断言「localStorage 里到底存了什么」。
+const lsStore = new Map<string, string>();
+
 // 复现网页版推送方的真实状态:缩略图已经落进本机 IDB。
 // 少了这一步,stripAssetThumbs 会因为「未确认可恢复」而放行,
 // 测试就守不住「推送时剥离」这个回归了。
 beforeEach(async () => {
+  lsStore.clear();
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => (lsStore.has(k) ? lsStore.get(k)! : null),
+    setItem: (k: string, v: string) => { lsStore.set(k, String(v)); },
+    removeItem: (k: string) => { lsStore.delete(k); },
+    clear: () => { lsStore.clear(); },
+  });
   resetThumbCacheForTest();
   await storeAssetThumb(null, HASH, THUMB);
 });
@@ -80,5 +94,71 @@ describe('协作密文往返', () => {
 
     await pushProject(cfg, projectWithThumb());
     await expect(pullProject({ ...cfg, pass: '另一个口令' })).rejects.toThrow(/解密失败/);
+  });
+});
+
+describe('离线推送队列', () => {
+  beforeEach(async () => {
+    await clearPendingPush();
+    lsStore.clear();
+  });
+
+  it('重负载进 IndexedDB,localStorage 只留轻量标记', async () => {
+    await queuePendingPush(cfg, projectWithThumb());
+
+    // 关键:项目内容(含缩略图)不得出现在 localStorage 里 —— 那是 5MB 配额
+    const allLs = [...lsStore.values()].join('');
+    expect(allLs).not.toContain(THUMB);
+    expect(allLs).not.toContain('协作测试');
+    expect(allLs.length).toBeLessThan(200);
+
+    // 但队列本身完好:同步可查、异步可取回
+    expect(hasPendingPush()).not.toBeNull();
+    const loaded = await loadPendingPush();
+    expect(loaded?.project.assets[0].thumbnail).toBe(THUMB);
+    expect(loaded?.cfg.room).toBe(cfg.room);
+  });
+
+  it('清空后同步标记与异步负载一起消失', async () => {
+    await queuePendingPush(cfg, projectWithThumb());
+    await clearPendingPush();
+    expect(hasPendingPush()).toBeNull();
+    expect(await loadPendingPush()).toBeNull();
+  });
+
+  it('升级前存下的旧格式队列不会凭空消失', async () => {
+    const legacy = { cfg, project: projectWithThumb(), queuedAt: 1700000000000 };
+    localStorage.setItem('theloom-sync-pending-v1', JSON.stringify(legacy));
+    expect(hasPendingPush()?.queuedAt).toBe(1700000000000);
+    const loaded = await loadPendingPush();
+    expect(loaded?.project.assets[0].thumbnail).toBe(THUMB);
+  });
+
+  it('补发成功后清空队列', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? new Response(JSON.stringify({ version: 7 }), { status: 200 })
+        : new Response('{}', { status: 200 })));
+    await queuePendingPush(cfg, projectWithThumb());
+    const result = await flushPendingPush();
+    expect(result.ok).toBe(true);
+    expect(result.version).toBe(7);
+    expect(hasPendingPush()).toBeNull();
+  });
+
+  it('补发遇 409 冲突时保留队列,交给用户处理', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ error: '云端已有更新版本,请先拉取', version: 9 }), { status: 409 })));
+    await queuePendingPush(cfg, projectWithThumb());
+    const result = await flushPendingPush();
+    expect(result.ok).toBe(false);
+    expect(result.conflict).toBe(true);
+    expect(hasPendingPush()).not.toBeNull();
+  });
+
+  it('没有队列时补发是无害的空操作', async () => {
+    const result = await flushPendingPush();
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/没有待推送/);
   });
 });

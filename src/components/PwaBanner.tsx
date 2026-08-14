@@ -4,13 +4,22 @@ import { installPwa, refreshForUpdate, usePwaStatus } from '../pwa';
 const INSTALL_DISMISS_KEY = 'theloom-install-dismissed';
 const IOS_SAFETY_DISMISS_KEY = 'theloom-ios-safety-dismissed';
 
-/** iOS Safari(非 Chrome/Firefox/Edge):不触发 beforeinstallprompt,且存储 7 天不活跃会被清 */
-function isIosSafari(): boolean {
+/**
+ * iOS Safari(非 Chrome/Firefox/Edge):不触发 beforeinstallprompt,且存储 7 天不活跃会被清。
+ *
+ * iPadOS 13+ 的 Safari 默认「请求桌面网站」,UA 里报的是 Macintosh 而非 iPad ——
+ * 只匹配 /iPad/ 会漏掉全部现代 iPad,而存储清理策略对 iPad 一样生效,
+ * 恰恰是最该看到这条提醒的设备。用触点数把它和真 Mac 分开(Mac 触点为 0)。
+ */
+export function isIosSafari(ua: string, maxTouchPoints: number): boolean {
+  if (/CriOS|FxiOS|EdgiOS/.test(ua)) return false;
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  return /Macintosh/.test(ua) && maxTouchPoints > 1;
+}
+
+function currentIsIosSafari(): boolean {
   if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent;
-  const isIos = /iPad|iPhone|iPod/.test(ua);
-  const isOther = /CriOS|FxiOS|EdgiOS/.test(ua);
-  return isIos && !isOther;
+  return isIosSafari(navigator.userAgent, navigator.maxTouchPoints ?? 0);
 }
 
 export default function PwaBanner() {
@@ -57,7 +66,7 @@ export default function PwaBanner() {
     );
   }
 
-  if (isIosSafari() && !safetyDismissed) {
+  if (currentIsIosSafari() && !safetyDismissed) {
     return (
       <div className="pwa-banner" role="status">
         <span>数据保存在本机浏览器,iOS 长期不打开可能被清理。建议定期「工具 → JSON 备份」,或用协作同步 / 桌面版绑定文件夹。</span>

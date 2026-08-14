@@ -192,7 +192,22 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 拖入多文件改队列(`importQueue`),原来只取 `files[0]` 静默丢弃其余
 - `NODE_GROUPS` / `VIEW_GROUPS` 加 `as const satisfies` + `Exclude` 编译期穷尽断言 —— 手写分组漏掉一个类型原本只会让按钮静默消失;Planning 那处还会因 `VIEWS.find(...)!` 拿到 undefined 崩掉整页
 - **多设备同步定位**:桌面之间走文件夹模式 + OneDrive(实测 800 次原子替换零失败、5MB 资源字节一致、文件属性为 `Archive` 非占位符);云房间降级为「只传文本 + 缩略图」给手机 / 网页,SyncPanel 与 README 已写明
-- 已知未修:`SyncPanel.tsx:73` 的离线推送队列把完整项目(含缩略图)写进 localStorage,是唯一不走剥离的写路径 —— **但不能直接加剥离**(队列内容就是稍后要推送的),正确修法是挪进 IndexedDB;`PwaBanner.tsx` 的 `isIosSafari()` 匹配不到 iPadOS 13+(UA 报 `Macintosh`),存储清理警告在 iPad 上不显示
+### 收尾(v0.44.1 之后)
+
+上面列的两条「已知未修」已完成:
+
+- **离线推送队列改存 IndexedDB**(`sync.ts`)—— 拆成「重负载进 IDB + 轻量标记留 localStorage」。
+  拆的原因:`store.ts` 的初始状态与 `refreshSyncState`、`SyncPanel` 的 useState 初始化都是**同步**读取,
+  全改 async 会连锁;标记只含 `queuedAt`,同步判断够用。新增 `hasPendingPush()`(同步)与
+  `loadPendingPush()`(异步取全量),`queuePendingPush` / `clearPendingPush` 改 async。
+  **这里的 IDB 不走 `webdb.ts`** —— 那边 `webdbAvailable()` 对 Tauri 恒假,而桌面版 localStorage 一样有配额,
+  队列同样该进 IDB;自带 `theloom-sync` 库,IDB 不可用(隐私模式)时退回旧格式保功能不消失。
+  旧格式 `theloom-sync-pending-v1` 作为 legacy 源读取并在下次入队时清除
+- **`isIosSafari` 补 iPadOS 13+**(`PwaBanner.tsx`)—— iPad Safari 默认「请求桌面网站」,UA 报 `Macintosh`,
+  原来的 `/iPad|iPhone|iPod/` 匹配不到任何现代 iPad,而「7 天不活跃清存储」对 iPad 一样生效。
+  改用 `/Macintosh/ && maxTouchPoints > 1` 与真 Mac(触点 0)区分;函数导出成纯函数便于测试
+- 合计 vitest 550 项。浏览器实测:localStorage 只剩 27 字节标记、IDB 取回完整项目、顶栏与面板状态联动、
+  旧格式队列可迁移、补发后新旧键一起清空
 
 ## 最近变更(R22 · v0.41.0)
 

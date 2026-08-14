@@ -19,7 +19,7 @@ import {
   storedProjectKey, type RecoveryBackup,
 } from './recovery';
 import { estimateWebStorage, mirrorIdbToLocal, readThrough, requestPersistentStorage, webdbAvailable, writeThrough } from './webdb';
-import { loadPendingPush } from './sync';
+import { hasPendingPush } from './sync';
 import { getStorageUsage, type StorageUsage } from './diagnostics';
 import type { AiProposalApplyResult, ApplyAiProposalOptions } from './ai/proposal';
 import { unlinkDocumentReferences } from './documentReferences';
@@ -646,12 +646,12 @@ export const useLoom = create<LoomState>((set, get) => {
     syncError: null,
     online: typeof navigator === 'undefined' ? true : navigator.onLine,
     pendingPush: (() => {
-      try { return loadPendingPush() !== null; } catch { return false; }
+      try { return hasPendingPush() !== null; } catch { return false; }
     })(),
     setOnline: (online) => set({ online }),
     refreshSyncState: () => {
       let pendingPush = false;
-      try { pendingPush = loadPendingPush() !== null; } catch { /* 忽略 */ }
+      try { pendingPush = hasPendingPush() !== null; } catch { /* 忽略 */ }
       set({ online: typeof navigator === 'undefined' ? true : navigator.onLine, pendingPush });
     },
     recoveryBackup: boot.recoveryBackup,

@@ -11,7 +11,7 @@ import {
 } from './storage';
 import { describeNavTarget, useNav } from './search';
 import { confirmDialog, alertDialog } from './dialog';
-import { flushPendingPush, loadPendingPush } from './sync';
+import { flushPendingPush, hasPendingPush } from './sync';
 import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
 import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
 import SearchPalette from './components/SearchPalette';
@@ -353,7 +353,7 @@ export default function App() {
     const handleOnline = async () => {
       const state = useLoom.getState();
       state.setOnline(true);
-      if (loadPendingPush()) {
+      if (hasPendingPush()) {
         const result = await flushPendingPush();
         state.refreshSyncState();
         if (result.ok && result.version != null) {

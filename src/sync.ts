@@ -169,8 +169,22 @@ export async function pullProject(cfg: SyncConfig): Promise<{ project: Project; 
 /**
  * 离线 / 断网时推送失败,把「要推的版本」暂存本地,恢复联网后自动补发。
  * 接力式模型下同一时刻只会有一次待补发,队列固定存一份。
+ *
+ * 存储拆两半:
+ *   - 重负载(完整项目 + 配置)进 IndexedDB —— 它和项目本体一样大(还含缩略图),
+ *     放 localStorage 会直接吃掉 5MB 配额里的一大块。**不能靠剥缩略图来省** ——
+ *     队列里存的就是稍后要推送的内容,剥了等于把缩略图丢给对端。
+ *   - 轻量标记(只有 queuedAt)留 localStorage —— store 的初始状态与
+ *     refreshSyncState 需要同步判断「有没有待推送」,不能 await。
+ *
+ * 这里的 IDB 不走 webdb.ts:那边 `webdbAvailable()` 对 Tauri 恒假,
+ * 而桌面版的 localStorage 一样有配额,队列同样该进 IDB。
  */
-const PENDING_KEY = 'theloom-sync-pending-v1';
+const PENDING_KEY = 'theloom-sync-pending-v1';        // 旧格式:完整负载,仅作读取迁移
+const PENDING_MARK_KEY = 'theloom-sync-pending-mark-v1';
+const PENDING_DB = 'theloom-sync';
+const PENDING_STORE = 'pending';
+const PENDING_ID = 'current';
 
 export interface PendingPush {
   cfg: SyncConfig;
@@ -178,12 +192,44 @@ export interface PendingPush {
   queuedAt: number;
 }
 
-export function queuePendingPush(cfg: SyncConfig, project: Project): void {
-  const payload: PendingPush = { cfg, project, queuedAt: Date.now() };
-  try { localStorage.setItem(PENDING_KEY, JSON.stringify(payload)); } catch { /* 忽略 */ }
+/** 待推送的轻量元信息(同步可读) */
+export interface PendingPushMeta {
+  queuedAt: number;
 }
 
-export function loadPendingPush(): PendingPush | null {
+let pendingDbPromise: Promise<IDBDatabase> | null = null;
+
+function pendingDb(): Promise<IDBDatabase> {
+  if (typeof indexedDB === 'undefined') return Promise.reject(new Error('IndexedDB 不可用'));
+  pendingDbPromise ??= new Promise((resolve, reject) => {
+    const req = indexedDB.open(PENDING_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(PENDING_STORE)) db.createObjectStore(PENDING_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return pendingDbPromise;
+}
+
+function pendingRequest<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function readMark(): PendingPushMeta | null {
+  try {
+    const raw = localStorage.getItem(PENDING_MARK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingPushMeta>;
+    return typeof parsed?.queuedAt === 'number' ? { queuedAt: parsed.queuedAt } : null;
+  } catch { return null; }
+}
+
+function readLegacy(): PendingPush | null {
   try {
     const raw = localStorage.getItem(PENDING_KEY);
     if (!raw) return null;
@@ -197,7 +243,58 @@ export function loadPendingPush(): PendingPush | null {
   } catch { return null; }
 }
 
-export function clearPendingPush(): void {
+/**
+ * 同步判断有没有待推送。旧格式的完整负载也算数(升级前存下的队列不能凭空消失)。
+ */
+export function hasPendingPush(): PendingPushMeta | null {
+  const mark = readMark();
+  if (mark) return mark;
+  const legacy = readLegacy();
+  return legacy ? { queuedAt: legacy.queuedAt } : null;
+}
+
+export async function queuePendingPush(cfg: SyncConfig, project: Project): Promise<void> {
+  const payload: PendingPush = { cfg, project, queuedAt: Date.now() };
+  try {
+    const db = await pendingDb();
+    await pendingRequest(
+      db.transaction(PENDING_STORE, 'readwrite').objectStore(PENDING_STORE).put(payload, PENDING_ID),
+    );
+    try { localStorage.setItem(PENDING_MARK_KEY, JSON.stringify({ queuedAt: payload.queuedAt })); } catch { /* 标记写不进也还有 IDB */ }
+    // 迁移完成,旧格式的大负载可以让出配额
+    try { localStorage.removeItem(PENDING_KEY); } catch { /* 忽略 */ }
+  } catch {
+    // IDB 不可用(隐私模式等)时退回旧格式,功能不能因此消失
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(payload)); } catch { /* 配额满则放弃 */ }
+  }
+}
+
+export async function loadPendingPush(): Promise<PendingPush | null> {
+  try {
+    const db = await pendingDb();
+    const v = await pendingRequest(
+      db.transaction(PENDING_STORE, 'readonly').objectStore(PENDING_STORE).get(PENDING_ID),
+    );
+    const p = v as Partial<PendingPush> | undefined;
+    if (p && p.cfg && p.project) {
+      return {
+        cfg: p.cfg as SyncConfig,
+        project: p.project as Project,
+        queuedAt: typeof p.queuedAt === 'number' ? p.queuedAt : Date.now(),
+      };
+    }
+  } catch { /* 落到旧格式 */ }
+  return readLegacy();
+}
+
+export async function clearPendingPush(): Promise<void> {
+  try {
+    const db = await pendingDb();
+    await pendingRequest(
+      db.transaction(PENDING_STORE, 'readwrite').objectStore(PENDING_STORE).delete(PENDING_ID),
+    );
+  } catch { /* 忽略 */ }
+  try { localStorage.removeItem(PENDING_MARK_KEY); } catch { /* 忽略 */ }
   try { localStorage.removeItem(PENDING_KEY); } catch { /* 忽略 */ }
 }
 
@@ -210,11 +307,11 @@ export interface FlushResult {
 
 /** 补发队列里的一份推送;成功即清除队列。409 冲突留给用户手动处理。 */
 export async function flushPendingPush(): Promise<FlushResult> {
-  const pending = loadPendingPush();
+  const pending = await loadPendingPush();
   if (!pending) return { ok: false, message: '没有待推送的版本' };
   try {
     const version = await pushProject(pending.cfg, pending.project);
-    clearPendingPush();
+    await clearPendingPush();
     return { ok: true, version, message: `已补发,云端现为 v${version}` };
   } catch (e) {
     if (e instanceof SyncError && e.status === 409) {
