@@ -79,21 +79,68 @@ export function subscribeThemeMode(cb: () => void): () => void {
   return () => window.removeEventListener('theloom-theme', cb);
 }
 
+/** 渲染层反色用的两个墨色:深墨与浅墨 */
+export const INK_DARK = '#1b1b19';
+export const INK_LIGHT = '#f5f4ef';
+
+/** sRGB 相对亮度(WCAG 口径,必须做 gamma 展开,不能直接线性加权) */
+function relativeLuminance(r: number, g: number, b: number): number {
+  const lin = (v: number): number => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrastRatio(a: number, b: number): number {
+  const hi = Math.max(a, b);
+  const lo = Math.min(a, b);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** #rgb / #rrggbb → [r,g,b];非法返回 null */
+function parseHex(bg: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(bg.trim());
+  if (!m) return null;
+  let hex = m[1];
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  return [
+    parseInt(hex.slice(0, 2), 16),
+    parseInt(hex.slice(2, 4), 16),
+    parseInt(hex.slice(4, 6), 16),
+  ];
+}
+
 /**
- * 按内容底色亮度选可读文字色(渲染层反色,不改写内容颜色本身)。
+ * 按内容底色选可读文字色(渲染层反色,不改写内容颜色本身)。
  * 非法 / 非 hex 输入返回 undefined(继承默认)。
+ *
+ * **深浅两种墨色都算一遍对比度取高者**,而不是用亮度阈值二分 ——
+ * 阈值法在中灰附近会选错方向:`#8e8d86` 亮度 140.7(旧阈值 145 判为「深底」)
+ * 于是配浅字,实测对比度仅 3.02;配深字本可达 5.25。
  */
 export function readableInk(bg?: string): string | undefined {
   if (!bg) return undefined;
-  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(bg.trim());
-  if (!m) return undefined;
-  let hex = m[1];
-  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 145 ? '#1b1b19' : '#f5f4ef';
+  const rgb = parseHex(bg);
+  if (!rgb) return undefined;
+  const lum = relativeLuminance(rgb[0], rgb[1], rgb[2]);
+  const darkRgb = parseHex(INK_DARK)!;
+  const lightRgb = parseHex(INK_LIGHT)!;
+  const onDark = contrastRatio(lum, relativeLuminance(darkRgb[0], darkRgb[1], darkRgb[2]));
+  const onLight = contrastRatio(lum, relativeLuminance(lightRgb[0], lightRgb[1], lightRgb[2]));
+  return onDark >= onLight ? INK_DARK : INK_LIGHT;
+}
+
+/** 底色与选中墨色的实际对比度,供测试与体检使用 */
+export function inkContrast(bg: string): number | null {
+  const rgb = parseHex(bg);
+  const ink = readableInk(bg);
+  if (!rgb || !ink) return null;
+  const inkRgb = parseHex(ink)!;
+  return contrastRatio(
+    relativeLuminance(rgb[0], rgb[1], rgb[2]),
+    relativeLuminance(inkRgb[0], inkRgb[1], inkRgb[2]),
+  );
 }
 
 /**

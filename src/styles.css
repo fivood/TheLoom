@@ -4836,7 +4836,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .m-note-list { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
 .m-note-item {
   padding: 12px; border-radius: 10px; font-size: 14px; line-height: 1.55;
-  border: 1px solid var(--border); white-space: pre-wrap; color: var(--text);
+  white-space: pre-wrap;
+  /* 便签底色是内容数据(固定浅色系)。浅色主题整块填充 + readableInk 反色;
+     深色主题改为面板底 + 左侧色条(见 MobileNote.noteStyle),两者都由内联样式给出。 */
+  border: 1px solid var(--chip-border);
+  background: var(--bg-panel);
+  color: var(--text);
 }
 
 .m-ref { padding: 0 12px 12px; }

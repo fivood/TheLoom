@@ -179,6 +179,14 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.50.1 深色可读性:快记 + readableInk)
+
+- **`readableInk` 从亮度阈值改为「两种墨色各算一次 WCAG 对比度取高者」**。旧实现 `lum > 145` 在中灰附近选错方向:`#8e8d86`(线性亮度 140.7)判为深底配浅字,实测仅 3.02;改后选深字得 5.18。**亮度必须做 sRGB gamma 展开**(`c<=0.03928 ? c/12.92 : ((c+0.055)/1.055)**2.4`),线性加权算出来的数不是对比度
+- 新增 `inkContrast(bg)` 供测试与将来体检使用;`INK_DARK` / `INK_LIGHT` 导出为常量
+- **测试做了负向验证**:临时把实现退回旧阈值,3 项断言全部失败(含独立实现一遍 WCAG 的「取高者」断言),确认测试真能挡住这个 bug
+- **手机快记深色**:便签色是内容数据(四档浅灰白),深色下整块填充是四张惨白的纸。按 R5-B「不改写内容颜色,只在渲染层处理」改为**深色 = 面板底 + 左侧 4px 色条,浅色 = 整块填充 + readableInk**,由 `noteStyle()` 按 `getThemeMode()` 分流。`.m-note-item` 的 CSS 不能再写死 `color: var(--text)`
+- 桌面风暴板**保持整块填充**未动 —— 空间画布上颜色即分组,且实测深色下对比度 11.87–17.25 正常
+
 ## 最近变更(v0.50.0 界面图形化:emoji 全部改 SVG)
 
 - 全量扫描后共 30 处 UI emoji + 3 处文本产物。`Icon.tsx` 新增 16 个图标(lock/unlock/eye/folderOpen/comment/warn/ban/bolt/gear/star/starFilled/pencil/sparkle/flagCheck/close),JSX 位置一律换成 `<Icon>`

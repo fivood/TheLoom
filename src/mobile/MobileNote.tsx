@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { uid, useLoom } from '../store';
 import { nextNotePosition } from '../brainstormLayout';
 import { confirmDialog } from '../dialog';
+import { getThemeMode, readableInk, subscribeThemeMode } from '../theme';
 import Icon from '../components/Icon';
 
 const NOTE_COLORS = ['#ffffff', '#f2f1ee', '#e6e4df', '#d8d6d0'];
@@ -14,6 +15,17 @@ export default function MobileNote() {
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+
+  const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode, () => 'light' as const);
+
+  /*
+   * 便签底色是内容数据(固定四档浅灰白),深色主题下整块填充等于在暗界面上
+   * 糊四张惨白的纸。按 R5-B 的约定「不改写内容颜色,只在渲染层处理」:
+   * 深色下改用面板底 + 左侧色条保留颜色身份;浅色下维持整块填充。
+   */
+  const noteStyle = (color: string) => (themeMode === 'dark'
+    ? { borderLeft: `4px solid ${color}` }
+    : { background: color, color: readableInk(color) });
 
   const recent = useMemo(() => [...notes].reverse(), [notes]);
   const visible = useMemo(() => {
@@ -104,7 +116,7 @@ export default function MobileNote() {
               </div>
             </div>
           ) : (
-            <div key={n.id} className="m-note-item" style={{ background: n.color }}>
+            <div key={n.id} className="m-note-item" style={noteStyle(n.color)}>
               <button
                 className="m-note-text"
                 onClick={() => startEdit(n.id, n.text)}

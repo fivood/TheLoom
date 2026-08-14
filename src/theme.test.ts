@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyPref, loadPref, readableInk, resolveMode, savePref, systemPrefersDark } from './theme';
+import { applyPref, inkContrast, loadPref, readableInk, resolveMode, savePref, systemPrefersDark } from './theme';
 
 const STORE_KEY = 'theloom-theme-v1';
 
@@ -70,7 +70,39 @@ describe('theme 偏好读写', () => {
   });
 });
 
-describe('readableInk 按底色亮度反色', () => {
+describe('readableInk 按对比度反色', () => {
+  it('中灰选对比度高的一侧 —— 旧的亮度阈值(145)在这里会选错', () => {
+    // #8e8d86 亮度 140.7,阈值法判为「深底」配浅字,实测只有 3.02
+    expect(readableInk('#8e8d86')).toBe('#1b1b19');
+    expect(inkContrast('#8e8d86')!).toBeGreaterThan(4.5);
+  });
+
+  it('示例项目的灰阶色板全部达到 AA(4.5)', () => {
+    for (const c of ['#1b1b19', '#565550', '#8e8d86', '#aaa9a1', '#ffffff', '#f2f1ee', '#e6e4df', '#d8d6d0']) {
+      expect(inkContrast(c)!, c).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('选中的墨色总是两者中对比度更高的那个', () => {
+    // 在测试里独立实现一遍 WCAG 对比度,避免与被测实现同错同对
+    const lin = (v: number) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : (((v / 255) + 0.055) / 1.055) ** 2.4);
+    const lum = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    };
+    const ratio = (a: string, b: string) => {
+      const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+    for (const c of ['#000000', '#404040', '#767676', '#808080', '#8e8d86', '#a0a0a0', '#cccccc', '#ffffff']) {
+      const picked = readableInk(c)!;
+      const rejected = picked === '#1b1b19' ? '#f5f4ef' : '#1b1b19';
+      expect(ratio(c, picked), `${c}:选中 ${picked} 应不劣于 ${rejected}`)
+        .toBeGreaterThanOrEqual(ratio(c, rejected));
+      expect(inkContrast(c)!).toBeCloseTo(ratio(c, picked), 5);
+    }
+  });
+
   it('浅底给深字、深底给浅字', () => {
     expect(readableInk('#ffffff')).toBe('#1b1b19');
     expect(readableInk('#f2f1ee')).toBe('#1b1b19');
