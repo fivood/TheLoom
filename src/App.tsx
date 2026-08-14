@@ -35,7 +35,7 @@ import FindReplace from './components/FindReplace';
 import EngineExportModal from './components/EngineExportModal';
 import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
-import { useIsMobile, useMobilePref } from './mobile/useIsMobile';
+import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
 import { projectToXlsx } from './interop/projectXlsx';
 import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
@@ -152,9 +152,9 @@ export default function App() {
   const [recentOpen, setRecentOpen] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
+  // 手机 / 小平板一律走移动壳:桌面三栏布局在这些尺寸上无法使用(判定见 useIsMobile)
   const isMobile = useIsMobile();
-  const forceDesktop = useMobilePref((s) => s.forceDesktop);
-  const mobileShell = isMobile && !isTauri && !forceDesktop;
+  const mobileShell = isMobile && !isTauri;
   const [storageMgr, setStorageMgr] = useState(false);
   const [help, setHelp] = useState(false);
   // R14-3 分屏:副 pane 打开时,值为当前副 pane 的模块 tab;null = 单栏
@@ -424,15 +424,6 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <ProjectMenu />
-          {/* 「切换到完整版」原本是单向门:开关只在移动壳的「我的」页里,
-              一旦切到桌面布局那个页面就不再渲染,除了清站点数据(=删稿)没有退路 */}
-          {isMobile && !isTauri && forceDesktop && (
-            <button
-              className="ghost mobile-back-btn"
-              title="回到手机版布局"
-              onClick={() => useMobilePref.getState().toggle()}
-            >手机版</button>
-          )}
           <button
             className="ghost icon-btn"
             title="撤销 (Ctrl+Z)"

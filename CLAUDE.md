@@ -179,6 +179,14 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.47.0 手机不进桌面布局)
+
+- **`useIsMobile` 改为按设备短边判定**(`Math.min(screen.width, screen.height) < 820`),不再用 `max-width: 768px` 媒体查询。原因:手机横屏视口宽 852,按宽度判定会掉进桌面三栏布局,而那个布局在 393px 高度里根本没法用。**短边与朝向无关**,横竖屏结论一致。阈值 820 对着 11 寸 iPad 的短边 834;iPad mini(744)归手机
+- **副作用(有意为之)**:桌面浏览器拖窄窗口不再变手机壳 —— 屏幕够大就是桌面。窄窗口仍由 ≤768 的 CSS 媒体查询兜底
+- **`forceDesktop` / `useMobilePref` 整个删掉**,连同 MobileMe 的「切换到完整版」与顶栏「手机版」按钮。手机上桌面布局不可用,留着入口就是陷阱。**代价:手机上无法访问流程 / 大纲 / 时间线等模块**,这是用户明确的取舍
+- **`getSnapshot` 不要缓存** —— 第一版用模块级 `cached` 只在 resize/orientationchange 时更新,结果在不派发 resize 的环境里把过时判定永久锁住(浏览器实测:`computeIsMobile()` 返回 false 而界面仍是手机壳)。返回的是布尔基元,`useSyncExternalStore` 按值比较,本来就不需要缓存 —— **「selector 必须返回稳定引用」那条只针对对象/数组,基元不适用**
+- `src/mobile/useIsMobile.test.ts` 8 项守住阈值与朝向语义(含「横屏手机仍走手机壳」这条真实回归)
+
 ## 最近变更(v0.46.0 软键盘 / 设定可编辑 / 横屏收口)
 
 第二轮 iPhone 真机回归:

@@ -3,7 +3,6 @@ import { useLoom, exportProject } from '../store';
 import { documentWordCount } from '../util';
 import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgress';
 import SyncPanel from '../components/SyncPanel';
-import { useMobilePref } from './useIsMobile';
 
 /** 移动端「我的」:字数 / 场景 / 设定统计、保存状态、云同步、切项目、切回完整版 */
 export default function MobileMe() {
@@ -71,14 +70,8 @@ export default function MobileMe() {
       <button className="m-me-full" onClick={() => exportProject(project)}>
         导出 JSON 备份
       </button>
-      <button className="m-me-full" onClick={() => useMobilePref.getState().toggle()}>
-        切换到完整版(桌面布局)
-      </button>
       <div className="hint" style={{ textAlign: 'center' }}>
-        完整版顶栏左上角有「手机版」可以切回来
-      </div>
-      <div className="hint" style={{ textAlign: 'center' }}>
-        碎片写作 · 成稿与完整功能请在桌面端继续
+        碎片写作 · 成稿与完整功能请在桌面端或 11 寸以上平板继续
       </div>
       {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
     </div>
