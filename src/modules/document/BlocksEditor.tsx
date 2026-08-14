@@ -561,38 +561,42 @@ export default function BlocksEditor({
           否则手机上只能改已有块的文字,既加不了块也换不了类型 */}
       {variant === 'focus' && activeBlock && (
         <div className="doc-focus-bar">
-          <button
-            className="ghost"
-            type="button"
-            title="更改当前块类型"
-            onClick={() => setTypeMenuBlockId((id) => id === activeBlock.id ? null : activeBlock.id)}
-          >{DOC_BLOCK_LABEL[activeBlock.type]} ▾</button>
-          <span className="doc-focus-sep" />
-          {COMMON_TYPES.map((type) => (
-            <button key={type} className="ghost" type="button" onClick={() => insertBlock(type)}>
-              ＋{DOC_BLOCK_LABEL[type]}
-            </button>
-          ))}
-          <span className="doc-focus-spacer" />
-          <button
-            className="ghost icon-btn"
-            type="button"
-            title="上移"
-            onClick={() => moveBlock(activeBlock.id, -1)}
-          >↑</button>
-          <button
-            className="ghost icon-btn"
-            type="button"
-            title="下移"
-            onClick={() => moveBlock(activeBlock.id, 1)}
-          >↓</button>
-          <button
-            className="ghost icon-btn"
-            type="button"
-            title="删除当前块"
-            disabled={doc.blocks.length <= 1}
-            onClick={() => removeBlock(activeBlock.id)}
-          ><Icon name="trash" size={14} /></button>
+          {/* 左半可横向滚动,右半的块操作固定不滚 —— 手机上整条一起滚会把删除按钮推出屏幕 */}
+          <div className="doc-focus-scroll">
+            <button
+              className="ghost doc-focus-kind"
+              type="button"
+              title="更改当前块类型"
+              onClick={() => setTypeMenuBlockId((id) => id === activeBlock.id ? null : activeBlock.id)}
+            >{DOC_BLOCK_LABEL[activeBlock.type]} ▾</button>
+            <span className="doc-focus-sep" />
+            {COMMON_TYPES.map((type) => (
+              <button key={type} className="ghost" type="button" onClick={() => insertBlock(type)}>
+                ＋{DOC_BLOCK_LABEL[type]}
+              </button>
+            ))}
+          </div>
+          <div className="doc-focus-actions">
+            <button
+              className="ghost icon-btn"
+              type="button"
+              title="上移"
+              onClick={() => moveBlock(activeBlock.id, -1)}
+            >↑</button>
+            <button
+              className="ghost icon-btn"
+              type="button"
+              title="下移"
+              onClick={() => moveBlock(activeBlock.id, 1)}
+            >↓</button>
+            <button
+              className="ghost icon-btn"
+              type="button"
+              title="删除当前块"
+              disabled={doc.blocks.length <= 1}
+              onClick={() => removeBlock(activeBlock.id)}
+            ><Icon name="trash" size={14} /></button>
+          </div>
         </div>
       )}
 

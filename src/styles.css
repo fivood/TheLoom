@@ -4869,15 +4869,23 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   position: sticky; bottom: 0; z-index: 3;
   display: flex; align-items: center; gap: 6px;
   margin-top: 10px; padding: 8px;
-  overflow-x: auto; scrollbar-width: none;
   border-top: 1px solid var(--border);
   background: var(--bg-panel);
 }
-.doc-focus-bar::-webkit-scrollbar { display: none; }
-.doc-focus-bar > * { flex-shrink: 0; }
-.doc-focus-spacer { flex: 1 0 8px; }
+/* 类型 + 插入:可横向滚动 */
+.doc-focus-scroll {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.doc-focus-scroll::-webkit-scrollbar { display: none; }
+.doc-focus-scroll > * { flex-shrink: 0; }
+/* 块操作:固定在右侧,永远不被滚出屏幕 */
+.doc-focus-actions { flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+.doc-focus-kind { max-width: 116px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-focus-sep { width: 1px; align-self: stretch; background: var(--border); }
-.doc-focus-bar button { min-height: 40px; padding: 0 12px; }
+.doc-focus-bar button { min-height: 40px; padding: 0 12px; white-space: nowrap; }
+.doc-focus-bar .icon-btn { padding: 0 8px; }
 .doc-focus-bar button:disabled { opacity: 0.4; }
 
 /*
@@ -4970,3 +4978,53 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   padding: 10px; border: 1px solid var(--focus); border-radius: 10px; background: var(--bg-card);
 }
 .m-note-edit-row { display: flex; gap: 8px; justify-content: flex-end; }
+
+/*
+ * 移动壳内的块类型菜单改为吸底面板。
+ * 原来是块内 position:absolute 向下弹,块靠近底部时会被滚动容器裁掉
+ * —— 真机上表现为菜单上下两头都被切掉、选项只露出中间几行。
+ */
+.app-mobile .doc-blocks-focus .doc-slash-menu {
+  position: fixed;
+  left: 8px; right: 8px; width: auto;
+  /* 底部 tab 栏(约 57)+ 块操作条(约 80)+ 余量,让面板落在操作条之上而不是压住它 */
+  top: auto; bottom: calc(146px + env(safe-area-inset-bottom));
+  max-height: 40vh; overflow-y: auto;
+  font-size: 14px; opacity: 1;
+  padding: 4px;
+}
+.app-mobile .doc-blocks-focus .doc-slash-menu button { min-height: 44px; padding: 8px 12px; }
+
+/*
+ * 桌面布局跑在小屏上(横屏手机 / 小平板 / 窄窗口):769–1100px,或视口很矮时。
+ *
+ * .side-list(260)与 .inspector(320)都是 flex-shrink:0,中间那列被挤到什么都不剩
+ * —— 实测 852×393 下工具栏只剩 176px,而按钮本身要 68–116px,于是 flex-wrap 把它们
+ * 摞成一根又高又窄的竖条,标签逐字换行(真机横屏截图里的「剧\n情\n片\n段」)。
+ *
+ * 对策:两侧收窄并允许收缩,中间给下限;工具栏在这个区间改为单行横向滚动,
+ * 而不是换行 —— 屏幕本来就矮,工具栏占三行等于没有画布。
+ */
+@media (min-width: 769px) and (max-width: 1100px), (min-width: 769px) and (max-height: 520px) {
+  .side-list { width: var(--pane-nav, 200px); min-width: 0; flex-shrink: 1; }
+  .inspector { width: var(--pane-inspector, 240px); min-width: 0; flex-shrink: 1; }
+  .pane-col { min-width: 300px; }
+}
+
+/*
+ * 工具栏在所有小屏上都改为单行横向滚动。
+ * 竖屏手机(≤768)虽然三栏已改为上下堆叠,不会逐字竖排,但工具栏换行后高达 271px
+ * ——占竖屏 32%,画布只剩 94px,等于看不见图。
+ */
+@media (max-width: 1100px), (max-height: 520px) {
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 8px 12px;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  /* 不许被压扁:压扁就是逐字竖排 */
+  .toolbar > * { flex-shrink: 0; white-space: nowrap; }
+  .toolbar .hint { display: none; }
+}

@@ -179,6 +179,17 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.45.1 真机回归)
+
+v0.45.0 发布后在 iPhone 真机上实测发现的四处,**都是无头浏览器里没暴露出来的**:
+
+- **`.side-list`(260)与 `.inspector`(320)都是 `flex-shrink: 0`**,中间 `.pane-col` 是唯一的收缩项 —— 852×393(横屏手机)下工具栏只剩 176px,而按钮要 68–116px,`flex-wrap` 把它们摞成一根竖条,CJK 无处不可断行于是逐字竖排。新增 `@media (min-width:769px) and (max-width:1100px), (min-width:769px) and (max-height:520px)`:两侧收窄到 200/240 并允许收缩,`.pane-col` 给 `min-width: 300px`
+- **工具栏换行在竖屏上同样致命**(不竖排但高 271px = 32% 屏幕,画布只剩 94px)。所以工具栏的 `flex-wrap: nowrap + overflow-x: auto` 单独用 `@media (max-width:1100px), (max-height:520px)` 覆盖到 768 以下;`.toolbar > *` 必须同时给 `flex-shrink: 0`,否则照样被压扁
+- **`.doc-focus-bar` 整条一起横向滚动会把删除按钮推出屏幕**。拆成 `.doc-focus-scroll`(类型+插入,可滚)+ `.doc-focus-actions`(块操作,`flex-shrink:0` 贴右固定)
+- **`.doc-slash-menu` 在移动壳内被滚动容器裁剪**(块内 `position:absolute` 向下弹,块靠底时上下两头都被切)。改为 `position: fixed` 吸底面板,`bottom: calc(146px + safe-area)` 让开 tab 栏(57)+ 操作条(80)
+
+**经验**:这四条在 375/393 宽的无头浏览器里全都测不出来 —— 前两条要「宽而矮」的横屏尺寸(852×393)才触发,后两条要真的把菜单打开并量位置。**下次改移动端,尺寸矩阵至少要覆盖竖屏(393×852)、横屏(852×393)与小平板(1024×768)三档**,只测竖屏会漏掉一整类挤压问题。
+
 ## 最近变更(v0.45.0 移动端可用性大修)
 
 网页版手机适配的一轮系统性修整。两条会直接卡死写作:
