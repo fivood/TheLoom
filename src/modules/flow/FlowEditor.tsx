@@ -491,11 +491,11 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             </Fragment>
           ))}
           {selectedCount >= 1 && (
+            <div className="tool-context">
             <button
               title="把选中节点封装成一个剧情片段:内部连线跟着搬进去,进出选区的连线自动改接"
               onClick={encapsulate}
             >封装</button>
-          )}
           {selectedCount >= 2 && (
             <>
               <button title="左对齐" onClick={() => alignSelection('left')}>⇤</button>
@@ -512,6 +512,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
               )}
             </>
           )}
+            </div>
+          )}
+          {/* 动作簇:靠右成组,不与左侧「加节点」调色板混在一行里 */}
+          <div className="tool-actions">
           <button
             title="复制选中节点(Ctrl+C)。可跨流程、跨子流程层级粘贴"
             onClick={copySelection}
@@ -585,7 +589,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             title="批量遍历所有分支:节点覆盖率、不可达分支、死循环、无出口卡死;结果可复现"
             onClick={() => { writeBack(); setPathTesting(true); }}
           ><Icon name="check" size={14} /> 路径测试</button>
-          <span className="hint">双击剧情片段进入子流程 · Delete 删除选中</span>
+          </div>
         </div>
         {crumbs.length > 1 && (
           <div className="breadcrumbs">
