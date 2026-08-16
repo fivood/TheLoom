@@ -6,7 +6,7 @@ import Icon from '../../components/Icon';
 import ObjectTemplateSection from '../../components/ObjectTemplateSection';
 import type { Asset, AssetKind } from '../../types';
 import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
-import { classifyAsset, fileToImageThumb, fileToVideoThumb, formatSize } from '../../util';
+import { classifyAsset, fileToImageThumb, formatSize } from '../../util';
 import {
   assetExt, collectReferencedTexts, computeOrphans, deleteAssetThumbs, deleteStoredFiles, getAssetUrl,
   hashBlob, invalidateAssetUrl, isAssetStored, listAssetThumbKeys, listStoredFiles, storeAssetFile, storeAssetThumb,
@@ -17,10 +17,14 @@ import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
 const KINDS = Object.keys(ASSET_KIND_LABEL) as AssetKind[];
 
+/*
+ * 只给图片生成缩略图。音视频在 TheLoom 里是「交给引擎的挂接物」,
+ * 不做播放集成,抽首帧当封面对这个定位没有价值(见 README「音视频的定位」)。
+ */
 async function fileThumb(file: File, kind: AssetKind): Promise<string | undefined> {
+  if (kind !== 'image') return undefined;
   try {
-    if (kind === 'image') return await fileToImageThumb(file);
-    if (kind === 'video') return await fileToVideoThumb(file);
+    return await fileToImageThumb(file);
   } catch { /* 单个缩略图失败不阻塞导入 */ }
   return undefined;
 }

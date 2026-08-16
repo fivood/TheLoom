@@ -961,45 +961,6 @@ export function fileToImageThumb(file: File, max = 256): Promise<string> {
   });
 }
 
-/** 视频文件 → 首帧缩略图 dataURL(默认 256px JPEG);解码失败时 reject,调用方可忽略 */
-export function fileToVideoThumb(file: File, max = 256): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    const url = URL.createObjectURL(file);
-    let done = false;
-    const finish = (fn: () => void) => {
-      if (done) return;
-      done = true;
-      URL.revokeObjectURL(url);
-      fn();
-    };
-    const capture = () => {
-      if (!video.videoWidth || !video.videoHeight) {
-        finish(() => reject(new Error('视频尺寸不可用')));
-        return;
-      }
-      const scale = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
-      const w = Math.max(1, Math.round(video.videoWidth * scale));
-      const h = Math.max(1, Math.round(video.videoHeight * scale));
-      const c = document.createElement('canvas');
-      c.width = w;
-      c.height = h;
-      c.getContext('2d')!.drawImage(video, 0, 0, w, h);
-      finish(() => resolve(c.toDataURL('image/jpeg', 0.82)));
-    };
-    video.muted = true;
-    video.preload = 'auto';
-    video.onerror = () => finish(() => reject(new Error('视频加载失败')));
-    video.onloadeddata = () => {
-      // 跳过纯黑首帧:略微前进再截,seek 不被支持时直接用当前帧
-      try { video.currentTime = Math.min(0.1, (video.duration || 0) / 2); } catch { capture(); }
-    };
-    video.onseeked = capture;
-    setTimeout(() => finish(() => reject(new Error('视频截帧超时'))), 10000);
-    video.src = url;
-  });
-}
-
 /** 字节数 → 人类可读 */
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

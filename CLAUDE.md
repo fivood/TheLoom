@@ -140,7 +140,8 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 
 ### 后续增强(独立小批,不阻塞主线)
 
-- 矢量地点编辑;演出 / 流程节点内直接播放挂接的音视频资源(R8 已有原文件与播放能力,差 Player 接入)
+- 矢量地点编辑
+- ~~演出 / 流程节点内直接播放挂接的音视频资源~~ —— **明确不做**(2026-08-15 决定)。产品专注文本流程(写作 / 游戏剧本 / 剧本导入引擎),音视频在 TheLoom 里只是「挂接物」:记录节点与资源的对应关系并交给引擎,播放由引擎负责。据此已删除 `fileToVideoThumb`(视频首帧封面,39 行);资源库里的 `<audio>` / `<video>` 预览保留,那是确认「挂对了文件」的手段,不是播放集成
 - Localization UI 文案层(与 R12 项目内容本地化解耦,可先做)
 
 暂不扩展多人同时协作;当前已有的接力式云协作维持现状,优先完成单人小说 / 游戏剧本工作流。
@@ -396,7 +397,7 @@ CLI 与目录同步:
   - API:`hashBlob` / `assetExt` / `assetFileName` / `storeAssetFile` / `loadAssetBlob` / `getAssetUrl`(对象 URL 缓存)/ `listStoredFiles` / `isAssetStored` / `deleteStoredFiles` / `computeOrphans`(纯函数)/ `collectReferencedTexts` / `exportBlobsToFolder`
 - Rust 新增 4 个命令:`list_asset_files`(名称 + 字节数,不读内容)/ `read_asset_file` / `write_asset_file`(同名 = 同内容,已存在直接跳过)/ `delete_asset_files`;名称白名单仅 `asset-` 前缀 + 字母数字 `._-`,杜绝穿越
 - `read_asset_dir` 收窄为只读 `entity-*` 头像:资源原文件不整读进内存,也不进 `knownManaged` 差量删除集合(顺带修复外部放入 `assets/` 的图片被保存流程误删的旧 bug)
-- `Assets.tsx`:导入哈希去重(重复文件跳过并提示);视频导入截首帧缩略图(`util.ts` `fileToVideoThumb`);任意文件类型可导入;inspector 原图预览 / 音视频播放 / 下载原文件;「替换文件」保 asset id 引用不断;「重新定位」哈希一致才关联、不一致询问转替换,旧资源(无 hash)可补挂原文件;卡片「缺失」徽标;「清理未引用原文件」是唯一删字节入口(扫描全部 theloom-* localStorage + 当前项目,子串匹配哈希,宁可漏删)
+- `Assets.tsx`:导入哈希去重(重复文件跳过并提示);视频导入截首帧缩略图(`util.ts` `fileToVideoThumb`,**已于 2026-08-15 删除**,见「后续增强」);任意文件类型可导入;inspector 原图预览 / 音视频播放 / 下载原文件;「替换文件」保 asset id 引用不断;「重新定位」哈希一致才关联、不一致询问转替换,旧资源(无 hash)可补挂原文件;卡片「缺失」徽标;「清理未引用原文件」是唯一删字节入口(扫描全部 theloom-* localStorage + 当前项目,子串匹配哈希,宁可漏删)
 - **删除 / 替换资源永不自动删字节**:保证撤销安全(删除 → Ctrl+Z 资源连原文件完整回来);孤儿由清理工具显式确认后回收
 - `App.tsx` 绑定新文件夹时 `exportBlobsToFolder` 把 IndexedDB 原文件落盘;xlsx 资源表增「授权」列往返
 - 测试:`assetFiles.test.ts` 6 项(哈希稳定 / 扩展名推导 / 文件名与非法输入 / 两模式存在性 / 孤儿计算与引用命中)+ util normalize 1 项 + Rust `asset_file_commands_roundtrip_and_guard`;合计 vitest 148 项 + cargo 2 项通过
