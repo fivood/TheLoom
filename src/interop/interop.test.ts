@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeZip, readZip, readEntryText } from './zip';
-import { writeXlsx, readXlsx, columnName } from './xlsx';
 import { paragraphsToFdx, parseFdx, documentToParagraphs, paragraphsToBlocks, previewFdxImport } from './fdx';
-import { projectToXlsx, previewProjectXlsx } from './projectXlsx';
 import type { Document, Entity, Project } from '../types';
 
 /** 一个最小 Project(补齐必填字段) */
@@ -34,118 +32,6 @@ describe('zip 读写往返', () => {
     expect(readEntryText(m.get('hello.txt')!)).toBe('Hello, 世界!');
     expect(readEntryText(m.get('文件夹/嵌套.txt')!)).toBe('中文内容多次重复'.repeat(50));
     expect(Array.from(m.get('raw.bin')!.content)).toEqual(Array.from(bin));
-  });
-});
-
-describe('xlsx 列名映射', () => {
-  it('columnName 覆盖 A / Z / AA / ZZ', () => {
-    expect(columnName(0)).toBe('A');
-    expect(columnName(25)).toBe('Z');
-    expect(columnName(26)).toBe('AA');
-    expect(columnName(51)).toBe('AZ');
-    expect(columnName(52)).toBe('BA');
-    expect(columnName(701)).toBe('ZZ');
-  });
-});
-
-describe('xlsx 单 sheet 往返', () => {
-  it('文本 / 数字 / 布尔混合', async () => {
-    const blob = await writeXlsx([{
-      name: '基础表',
-      rows: [
-        ['ID', '名称', '年龄', '在编'],
-        ['e1', '塞梅尔维斯', 128, true],
-        ['e2', '瓦伦缇娜', 1200, false],
-      ],
-    }]);
-    const parsed = await readXlsx(new Uint8Array(await blob.arrayBuffer()));
-    expect(parsed.length).toBe(1);
-    expect(parsed[0].name).toBe('基础表');
-    expect(parsed[0].rows[0]).toEqual(['ID', '名称', '年龄', '在编']);
-    expect(parsed[0].rows[1]).toEqual(['e1', '塞梅尔维斯', '128', 'true']);
-    expect(parsed[0].rows[2]).toEqual(['e2', '瓦伦缇娜', '1200', 'false']);
-  });
-
-  it('特殊字符与空单元格保留列位', async () => {
-    const blob = await writeXlsx([{
-      name: '特殊',
-      rows: [
-        ['a', 'b', 'c'],
-        ['<xml> & "quote"', '', "'apo"],
-      ],
-    }]);
-    const parsed = await readXlsx(new Uint8Array(await blob.arrayBuffer()));
-    expect(parsed[0].rows[1]).toEqual(['<xml> & "quote"', '', "'apo"]);
-  });
-});
-
-describe('项目 xlsx 往返', () => {
-  it('实体 / 变量 / 时间线 / 大纲导出并回读稳定', async () => {
-    const trackId = 't1', pointId = 'p1', semId = 'ent-sem';
-    const project = makeProject({
-      entities: [
-        { id: semId, kind: 'character', name: '塞梅尔维斯', color: '#111', emoji: '', summary: '调查员',
-          fields: [{ id: 'f1', label: '欲望', value: '安静', type: undefined }],
-          notes: '', technicalName: 'semelvie', createdAt: 1 },
-      ],
-      variables: [
-        { id: 'v1', name: 'has_address', type: 'boolean', value: 'false', description: '是否知道地址' },
-        { id: 'v2', name: 'focus', type: 'number', value: '3', description: '感知' },
-      ],
-      timelineTracks: [{ id: trackId, name: '明线', color: '#111' }],
-      timelinePoints: [{ id: pointId, label: '16:09' }],
-      timelineEvents: [{ id: 'te1', trackId, pointId, title: '第一条短信', text: '', entityIds: [semId] }],
-      outlineColumns: [{ id: 'oc1', title: '感情线', color: '#565550' }],
-      outlineRows: [{ id: 'or1', no: '1', time: '雨夜', title: '开场', main: '塞收到短信', cells: { oc1: '瓦已经被困' } }],
-    });
-
-    const blob = await projectToXlsx(project);
-    const empty = makeProject();
-    const preview = await previewProjectXlsx(new Uint8Array(await blob.arrayBuffer()), empty);
-
-    expect(preview.errors).toEqual([]);
-    expect(preview.next.entities.length).toBe(1);
-    expect(preview.next.entities[0].id).toBe(semId);
-    expect(preview.next.entities[0].name).toBe('塞梅尔维斯');
-    expect(preview.next.entities[0].technicalName).toBe('semelvie');
-    expect(preview.next.entities[0].fields.length).toBe(1);
-    expect(preview.next.entities[0].fields[0].label).toBe('欲望');
-    expect(preview.next.variables.length).toBe(2);
-    expect(preview.next.variables.find((v) => v.name === 'focus')?.type).toBe('number');
-    expect(preview.next.timelineTracks.length).toBe(1);
-    expect(preview.next.timelinePoints.length).toBe(1);
-    expect(preview.next.timelineEvents.length).toBe(1);
-    expect(preview.next.timelineEvents[0].entityIds).toEqual([semId]);
-    expect(preview.next.outlineColumns.length).toBe(1);
-    expect(preview.next.outlineRows.length).toBe(1);
-    expect(preview.next.outlineRows[0].cells.oc1).toBe('瓦已经被困');
-  });
-
-  it('第二次导入相同 xlsx 不产生新对象(按 ID 更新)', async () => {
-    const trackId = 't1', pointId = 'p1', semId = 'ent-sem';
-    const project = makeProject({
-      entities: [{ id: semId, kind: 'character', name: '塞梅尔维斯', color: '#111', emoji: '', summary: '', fields: [], notes: '', createdAt: 1 }],
-      variables: [{ id: 'v1', name: 'x', type: 'boolean', value: 'false', description: '' }],
-      timelineTracks: [{ id: trackId, name: '明线', color: '#111' }],
-      timelinePoints: [{ id: pointId, label: '傍晚' }],
-      folders: [
-        { id: 'volume', name: '第一卷', module: 'document', documentRole: 'volume' },
-        { id: 'chapter', name: '第一章', module: 'document', parentId: 'volume', documentRole: 'chapter' },
-      ],
-      documents: [{ id: 'doc-1', name: '开场', folderId: 'chapter', category: '正文', blocks: [], notes: '', createdAt: 1, updatedAt: 1 }],
-      outlineRows: [{ id: 'row-1', no: '1', time: '', title: '开场', main: '', cells: {}, chapterFolderId: 'chapter' }],
-      timelineEvents: [{ id: 'te1', trackId, pointId, title: '事件', text: '', entityIds: [], documentIds: ['doc-1'] }],
-    });
-    const blob = await projectToXlsx(project);
-    const preview = await previewProjectXlsx(new Uint8Array(await blob.arrayBuffer()), project);
-    expect(preview.next.entities.length).toBe(project.entities.length);
-    expect(preview.next.variables.length).toBe(project.variables.length);
-    expect(preview.next.timelineEvents.length).toBe(project.timelineEvents.length);
-    expect(preview.next.timelineEvents[0].documentIds).toEqual(['doc-1']);
-    expect(preview.next.outlineRows[0].chapterFolderId).toBe('chapter');
-    expect(preview.counts.entities.add).toBe(0);
-    expect(preview.counts.variables.add).toBe(0);
-    expect(preview.counts.timelineEvents.add).toBe(0);
   });
 });
 

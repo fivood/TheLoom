@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLoom, uid } from '../store';
-import { previewProjectXlsx, type XlsxImportPreview } from '../interop/projectXlsx';
 import { previewFdxImport, type FdxImportPreview } from '../interop/fdx';
 import {
   applyManuscript, parseManuscript, readManuscriptFile,
@@ -8,11 +7,10 @@ import {
 } from '../interop/manuscriptImport';
 import { parseEpub } from '../interop/epubImport';
 import { parseDocx } from '../interop/docxImport';
-import { parseMobi } from '../interop/mobiImport';
 import type { Document } from '../types';
 import Icon from './Icon';
 
-type Mode = 'xlsx' | 'fdx' | 'manuscript';
+type Mode = 'fdx' | 'manuscript';
 
 interface Props {
   mode: Mode;
@@ -22,7 +20,6 @@ interface Props {
 
 /**
  * 导入预检模态:先分析文件、展示差异统计,用户点确认才写入项目。
- * xlsx = 全项目合并(按 ID / 名称匹配 → 更新;缺失 → 新增);
  * fdx  = 生成一份新文档(不覆盖现有,分类 = 剧本草稿)。
  */
 export default function ImportPreview({ mode, file, onClose }: Props) {
@@ -33,7 +30,6 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
   const [progressLabel, setProgressLabel] = useState('正在读入文件…');
   const [progressPct, setProgressPct] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [xlsx, setXlsx] = useState<XlsxImportPreview | null>(null);
   const [fdx, setFdx] = useState<FdxImportPreview | null>(null);
   const [fdxDocName, setFdxDocName] = useState('');
   const [manuscript, setManuscript] = useState<ParsedManuscript | null>(null);
@@ -52,13 +48,7 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
       };
       try {
         await setStage(`正在读入文件…(${(file.size / 1024 / 1024).toFixed(1)} MB)`);
-        if (mode === 'xlsx') {
-          const buf = new Uint8Array(await file.arrayBuffer());
-          if (abortRef.current) return;
-          await setStage('正在解析 Excel…');
-          const p = await previewProjectXlsx(buf, project);
-          if (!abortRef.current) setXlsx(p);
-        } else if (mode === 'fdx') {
+        if (mode === 'fdx') {
           const text = await file.text();
           if (abortRef.current) return;
           await setStage('正在解析剧本…');
@@ -71,22 +61,6 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
             if (abortRef.current) return;
             await setStage('正在解压 EPUB 并抽取正文…');
             setManuscript(await parseEpub(buf));
-          } else if (/\.(mobi|azw3?|prc)$/i.test(file.name)) {
-            const buf = await file.arrayBuffer();
-            if (abortRef.current) return;
-            await setStage('正在解压 MOBI…', 0);
-            let lastLabelStage: string | null = null;
-            const onProgress = (stage: 'read' | 'decompress' | 'split', pct: number) => {
-              // 阶段切换时更新文案,把 pct 归零重新走进度
-              if (stage !== lastLabelStage) {
-                lastLabelStage = stage;
-                setProgressLabel(stage === 'split' ? '正在切分章节…' : '正在解压 MOBI…');
-              }
-              setProgressPct(pct);
-            };
-            const ms = parseMobi(buf, onProgress);
-            if (abortRef.current) return;
-            setManuscript(ms);
           } else if (/\.docx$/i.test(file.name)) {
             const buf = await file.arrayBuffer();
             if (abortRef.current) return;
@@ -107,12 +81,6 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
     })();
     return () => { abortRef.current = true; };
   }, [file, mode]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  const applyXlsx = () => {
-    if (!xlsx) return;
-    replaceProject(xlsx.next);
-    onClose();
-  };
 
   const applyFdx = () => {
     if (!fdx) return;
@@ -138,16 +106,14 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
     onClose();
   };
 
-  const title = mode === 'xlsx'
-    ? 'Excel 项目导入 · 预检'
-    : mode === 'fdx' ? 'Final Draft 剧本导入 · 预检'
+  const title = mode === 'fdx' ? 'Final Draft 剧本导入 · 预检'
     : 'TXT / Markdown / EPUB / DOCX 稿件导入 · 预检';
 
   return (
     <div className="palette-backdrop" onClick={onClose}>
       <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 640 }}>
         <div className="sync-head">
-          <Icon name={mode === 'xlsx' ? 'grid' : 'script'} size={14} />
+          <Icon name="script" size={14} />
           <span>{title}</span>
           <span className="spacer" />
           <button className="ghost icon-btn" onClick={onClose}>×</button>
@@ -189,66 +155,6 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
               <label style={{ color: 'var(--danger)' }}>解析失败</label>
               <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: 'var(--bg-panel)', padding: 10, borderRadius: 6 }}>{err}</pre>
             </div>
-          )}
-
-          {mode === 'xlsx' && xlsx && (
-            <>
-              {xlsx.errors.length > 0 && (
-                <div className="field">
-                  <label style={{ color: 'var(--danger)' }}>错误({xlsx.errors.length})· 需要修复才能导入</label>
-                  <ul className="doc-legend" style={{ color: 'var(--danger)' }}>
-                    {xlsx.errors.map((e, i) => <li key={i}>{e}</li>)}
-                  </ul>
-                </div>
-              )}
-              <div className="field">
-                <label>变更统计</label>
-                <table className="var-table">
-                  <thead><tr><th>对象</th><th>新增</th><th>更新</th><th>跳过</th></tr></thead>
-                  <tbody>
-                    <DiffRow label="实体" v={xlsx.counts.entities} />
-                    <DiffRow label="实体字段" v={xlsx.counts.entityFields} />
-                    <DiffRow label="大纲行" v={xlsx.counts.outlineRows} />
-                    <DiffRow label="大纲剧情线" v={xlsx.counts.outlineColumns} />
-                    <DiffRow label="变量" v={xlsx.counts.variables} />
-                    <DiffRow label="时间线轨道" v={xlsx.counts.timelineTracks} />
-                    <DiffRow label="时间线时间点" v={xlsx.counts.timelinePoints} />
-                    <DiffRow label="时间线事件" v={xlsx.counts.timelineEvents} />
-                    <DiffRow label="资源(仅元数据)" v={xlsx.counts.assets} />
-                  </tbody>
-                </table>
-              </div>
-
-              {xlsx.warnings.length > 0 && (
-                <div className="field">
-                  <label>警告({xlsx.warnings.length})· 允许继续</label>
-                  <ul className="doc-legend">
-                    {xlsx.warnings.map((w, i) => <li key={i}>{w}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {xlsx.ignoredSheets.length > 0 && (
-                <div className="hint" style={{ fontSize: 11 }}>
-                  忽略了未识别的 sheet:{xlsx.ignoredSheets.join(' / ')}
-                </div>
-              )}
-
-              <div className="player-tip" style={{ marginTop: 8 }}>
-                导入不会删除任何现有对象。相同 ID(或相同名称)的对象会被更新,其余新增。<br />
-                建议先在「工具 → 版本历史」保存一个快照,方便回滚。
-              </div>
-
-              <div className="sync-actions">
-                <button onClick={onClose}>取消</button>
-                <button
-                  className="primary"
-                  disabled={xlsx.errors.length > 0}
-                  onClick={applyXlsx}
-                  title={xlsx.errors.length > 0 ? '存在错误,请先修复表格' : '把变更应用到当前项目'}
-                >应用到项目</button>
-              </div>
-            </>
           )}
 
           {mode === 'manuscript' && manuscript && (
@@ -361,14 +267,3 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
   );
 }
 
-function DiffRow({ label, v }: { label: string; v: { add: number; update: number; skip: number } }) {
-  const zero = v.add === 0 && v.update === 0 && v.skip === 0;
-  return (
-    <tr style={zero ? { color: 'var(--text-faint)' } : undefined}>
-      <td>{label}</td>
-      <td>{v.add > 0 ? <b style={{ color: 'var(--diff-add-strong)' }}>+{v.add}</b> : v.add}</td>
-      <td>{v.update > 0 ? <b>{v.update}</b> : v.update}</td>
-      <td>{v.skip > 0 ? <span style={{ color: 'var(--text-faint)' }}>{v.skip}</span> : v.skip}</td>
-    </tr>
-  );
-}

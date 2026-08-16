@@ -11,7 +11,6 @@ import Icon from './Icon';
 interface Props {
   onContinueBlank: () => void;
   onLoadSample: () => void;
-  onAiImport: () => void;
   onClose: () => void;
 }
 
@@ -27,7 +26,7 @@ const MODES: { key: WorkspacePreset; label: string; desc: string }[] = [
   { key: 'universal', label: '通用', desc: '全模块完整导航,两种都做' },
 ];
 
-export default function Onboarding({ onContinueBlank, onLoadSample, onAiImport, onClose }: Props) {
+export default function Onboarding({ onContinueBlank, onLoadSample, onClose }: Props) {
   const [mode, setMode] = useState<WorkspacePreset>('novel');
   const pick = (fn: () => void) => {
     useLoom.getState().update((p) => { p.workspacePreset = mode; });
@@ -66,11 +65,6 @@ export default function Onboarding({ onContinueBlank, onLoadSample, onAiImport, 
             <Icon name="book" size={22} />
             <div className="onboarding-card-title">载入示例项目</div>
             <div className="onboarding-card-desc">一个已填好的短篇互动剧本,含流程 / 实体 / 大纲 / 时间线;10 秒看懂各模块。</div>
-          </button>
-          <button className="onboarding-card" onClick={() => pick(onAiImport)}>
-            <Icon name="bulb" size={22} />
-            <div className="onboarding-card-title">从材料生成项目</div>
-            <div className="onboarding-card-desc">粘正文 + 设定笔记,AI 分析后一次生成卷章 / 实体 / 关系(需先在「AI 设置」配 Key)。</div>
           </button>
         </div>
         <div className="onboarding-foot">

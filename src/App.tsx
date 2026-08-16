@@ -24,7 +24,6 @@ import ChapterCompileDialog from './components/ChapterCompileDialog';
 import PaneHandle, { initPaneWidths } from './components/PaneHandle';
 import ThemeToggle from './components/ThemeToggle';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
-import ProjectImportWizard from './components/ProjectImportWizard';
 import ProjectMenu from './components/ProjectMenu';
 import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
 import RecoveryPanel from './components/RecoveryPanel';
@@ -37,7 +36,6 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
-import { projectToXlsx } from './interop/projectXlsx';
 import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
 import { WORKSPACE_PRIMARY_TABS, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
 
@@ -57,7 +55,7 @@ const AiAssistantPanel = lazy(() => import('./components/AiAssistantPanel'));
 
 export type Tab = WorkspaceTab;
 /** 一次待预检的导入任务(拖入多文件时排队) */
-interface ImportJob { mode: 'xlsx' | 'fdx' | 'manuscript'; file: File }
+interface ImportJob { mode: 'fdx' | 'manuscript'; file: File }
 
 type TabGroup = 'build' | 'library' | 'plan' | 'logic';
 
@@ -136,13 +134,11 @@ export default function App() {
   const [findReplace, setFindReplace] = useState(false);
   const [engineExport, setEngineExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
-  const [projectImport, setProjectImport] = useState(false);
   // 导入队列:一次拖入多个文件时逐个走预检,关掉当前预检自动推进到下一个
   const [importQueue, setImportQueue] = useState<ImportJob[]>([]);
   const importFile = importQueue[0] ?? null;
   const setImportFile = (job: ImportJob | null) => setImportQueue(job ? [job] : []);
   const importManuscriptRef = useRef<HTMLInputElement>(null);
-  const importXlsxRef = useRef<HTMLInputElement>(null);
   const importFdxRef = useRef<HTMLInputElement>(null);
   const [recovering, setRecovering] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -304,7 +300,7 @@ export default function App() {
 
   // 拖拽文件到窗口:按扩展名路由到长稿 / Excel / Final Draft 导入预检
   useEffect(() => {
-    const MANUSCRIPT_EXT = /\.(md|markdown|txt|epub|docx|mobi|azw|azw3|prc)$/i;
+    const MANUSCRIPT_EXT = /\.(md|markdown|txt|epub|docx)$/i;
     const hasFiles = (e: DragEvent) => e.dataTransfer?.types?.includes('Files') ?? false;
     const onDragOver = (e: DragEvent) => {
       if (!hasFiles(e)) return;
@@ -316,8 +312,7 @@ export default function App() {
     };
     const routeFile = (file: File): ImportJob | null => {
       if (MANUSCRIPT_EXT.test(file.name)) return { mode: 'manuscript', file };
-      if (/\.xlsx$/i.test(file.name)) return { mode: 'xlsx', file };
-      if (/\.fdx$/i.test(file.name)) return { mode: 'fdx', file };
+            if (/\.fdx$/i.test(file.name)) return { mode: 'fdx', file };
       return null;
     };
     const onDrop = (e: DragEvent) => {
@@ -333,7 +328,7 @@ export default function App() {
       if (rejected.length > 0) {
         void alertDialog(
           `${rejected.length === 1 ? `无法识别该文件类型:${rejected[0]}` : `有 ${rejected.length} 个文件无法识别:\n${rejected.map((n) => `· ${n}`).join('\n')}`}`
-          + `\n\n可拖入 TXT / Markdown / EPUB / DOCX / MOBI 长稿、Excel .xlsx 或 Final Draft .fdx。`
+          + `\n\n可拖入 TXT / Markdown / EPUB / DOCX 长稿、Final Draft .fdx。`
           + (jobs.length > 0 ? `\n\n其余 ${jobs.length} 个文件已排队导入。` : ''),
         );
       }
@@ -600,12 +595,6 @@ export default function App() {
                   <div className="tools-sep" />
                   <div className="tools-label">AI</div>
                   <button
-                    title="多份材料(正文/设定/笔记/AI记录)→ 生成计划 → 审阅 → 完整预检 → 事务式导入整个小说项目"
-                    onClick={() => { setToolsOpen(false); setProjectImport(true); }}
-                  >
-                    <Icon name="archive" size={14} /> 完整项目导入
-                  </button>
-                  <button
                     title="粘贴长文或读入 md / txt,AI 抽取实体 / 场景 / 时间线,预检确认后写入"
                     onClick={() => { setToolsOpen(false); setAiExtract(true); }}
                   >
@@ -627,20 +616,6 @@ export default function App() {
                     onClick={() => { setToolsOpen(false); setEngineExport(true); }}
                   >
                     <Icon name="braces" size={14} /> 引擎包 .zip
-                  </button>
-                  <button
-                    title="一份 xlsx 覆盖实体 / 资源 / 大纲 / 变量 / 时间线 / 资料 所有表格数据(比单独 CSV 更完整,且可再导回带预检)"
-                    onClick={async () => {
-                      setToolsOpen(false);
-                      const blob = await projectToXlsx(project);
-                      const a = document.createElement('a');
-                      a.href = URL.createObjectURL(blob);
-                      a.download = `${project.name || 'theloom'}.xlsx`;
-                      a.click();
-                      URL.revokeObjectURL(a.href);
-                    }}
-                  >
-                    <Icon name="grid" size={14} /> Excel 工作簿 .xlsx
                   </button>
                   <button onClick={() => {
                     setToolsOpen(false);
@@ -667,27 +642,13 @@ export default function App() {
                   </button>
                   <div className="tools-sep" />
                   <div className="tools-label">导入</div>
-                  <button onClick={() => { setToolsOpen(false); importXlsxRef.current?.click(); }}>
-                    <Icon name="upload" size={14} /> Excel .xlsx(带预检)
-                  </button>
                   <button onClick={() => { setToolsOpen(false); importFdxRef.current?.click(); }}>
                     <Icon name="upload" size={14} /> Final Draft .fdx(带预检)
                   </button>
                   <button onClick={() => { setToolsOpen(false); importManuscriptRef.current?.click(); }}
-                    title="TXT / Markdown / EPUB / DOCX / MOBI 长稿:自动按 # 标题、「第X章」正则、EPUB spine、Word 标题样式或 MOBI 分页符拆卷 / 章 / 场景">
+                    title="TXT / Markdown / EPUB / DOCX 长稿:自动按 # 标题、「第X章」正则、EPUB spine 或 Word 标题样式拆卷 / 章 / 场景">
                     <Icon name="upload" size={14} /> 长稿导入
                   </button>
-                  <input
-                    ref={importXlsxRef}
-                    type="file"
-                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) setImportFile({ mode: 'xlsx', file: f });
-                      e.currentTarget.value = '';
-                    }}
-                  />
                   <input
                     ref={importFdxRef}
                     type="file"
@@ -702,7 +663,7 @@ export default function App() {
                   <input
                     ref={importManuscriptRef}
                     type="file"
-                    accept=".md,.markdown,.txt,.epub,.docx,.mobi,.azw,.azw3,.prc,text/plain,text/markdown,application/epub+zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/x-mobipocket-ebook"
+                    accept=".md,.markdown,.txt,.epub,.docx,text/plain,text/markdown,application/epub+zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     style={{ display: 'none' }}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
@@ -780,7 +741,6 @@ export default function App() {
       {chapterCompile && <ChapterCompileDialog onClose={() => setChapterCompile(false)} />}
       {aiSettings && <AiSettingsModal onClose={() => setAiSettings(false)} />}
       {aiExtract && <AiExtractModal onClose={() => setAiExtract(false)} />}
-      {projectImport && <ProjectImportWizard onClose={() => setProjectImport(false)} />}
       {overview && <OverviewPanel onClose={() => setOverview(false)} />}
       {storageMgr && <StorageManager onClose={() => setStorageMgr(false)} />}
       {help && <HelpPanel onClose={() => setHelp(false)} />}
@@ -791,7 +751,6 @@ export default function App() {
             useLoom.getState().loadSampleProject();
             setTab(useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents');
           }}
-          onAiImport={() => { setProjectImport(true); }}
           onClose={() => setOnboarding(false)}
         />
       )}
