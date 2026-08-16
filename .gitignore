@@ -16,6 +16,8 @@ src-tauri/gen/schemas/
 opencode.json
 .codex-import/
 imports/
+# 个人工具:不进仓库,内容见 personal/README.md
+personal/
 scripts/
 .playwright-mcp/
 npm-dev*.log
