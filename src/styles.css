@@ -771,6 +771,13 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   flex-direction: column;
   flex-shrink: 0;
   position: relative;
+  /*
+   * 容器查询:头部按钮要跟着**这一栏被拖动后的宽度**自适应,而不是视口宽度。
+   * --pane-nav 可以被拖到 170px,视口却仍然很宽,按视口写的媒体查询这时不会生效,
+   * 按钮就溢出到右侧内容区了。
+   */
+  container-type: inline-size;
+  overflow: hidden;
 }
 .side-list .side-head {
   padding: 12px 14px 8px;
@@ -898,6 +905,20 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .navigator-head-btn.primary-ghost .btn-glyph { color: var(--text-dim); }
 .navigator-head-btn.primary-ghost svg { color: var(--text-dim); }
+
+/* 侧栏被拖窄到放不下四个带字按钮时,收成纯图标(title 仍给出完整说明)。
+   300px 是实测值:文档模块四个按钮带文字共需 287px,再加两侧内边距 */
+@container (max-width: 300px) {
+  .navigator-head-btn .btn-label { display: none; }
+  .navigator-head-btn { padding: 3px 7px; min-width: 34px; justify-content: center; }
+}
+/* 再窄(拖到 170px 下限)连图标都排不开时横向滚动,而不是压到右边内容区 */
+.side-head {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.side-head::-webkit-scrollbar { display: none; }
+.side-head > * { flex-shrink: 0; }
 .inspector h3 {
   margin: 0 0 4px; font-size: 11px; color: var(--text-faint); font-weight: 700;
   letter-spacing: 1.5px; text-transform: uppercase;
