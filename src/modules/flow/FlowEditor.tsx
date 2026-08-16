@@ -618,6 +618,10 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeDoubleClick={(_, node) => { if (node.type === 'fragment') enterSub(node.id); }}
+            /* 画布缩放写进 CSS 变量:节点边框用 calc(1px / var(--rf-zoom)) 抵消缩放,
+               否则 1px 边框在 0.15 倍下渲染成 0.15px(几乎看不见)、放大时又变得很粗 */
+            onMove={(_, vp) => wrapRef.current?.style.setProperty('--rf-zoom', String(vp.zoom))}
+            onInit={(inst) => wrapRef.current?.style.setProperty('--rf-zoom', String(inst.getViewport().zoom))}
             onBeforeDelete={async ({ nodes: delNodes }) => {
               const withSub = delNodes.filter((n) => countSubNodes((n.data as FlowNodeData).sub) > 0);
               if (withSub.length === 0) return true;

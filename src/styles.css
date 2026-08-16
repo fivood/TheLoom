@@ -1069,7 +1069,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 .flow-node {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  /* 边框抵消画布缩放,渲染宽度恒为 1px(--rf-zoom 由 FlowEditor 写入) */
+  border: calc(1px / var(--rf-zoom, 1)) solid var(--border);
   border-radius: var(--radius);
   min-width: 190px;
   max-width: 260px;
@@ -1120,7 +1121,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .flow-note {
   width: 200px;
   background: var(--note-bg);
-  border: 1px solid var(--note-border);
+  border: calc(1px / var(--rf-zoom, 1)) solid var(--note-border);
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 12px;
@@ -1133,7 +1134,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .flow-note-text { white-space: pre-wrap; }
 
 .flow-zone {
-  border: 1.5px dashed var(--border-light);
+  border: calc(1.5px / var(--rf-zoom, 1)) dashed var(--border-light);
   border-radius: 12px;
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
