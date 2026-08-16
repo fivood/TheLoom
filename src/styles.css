@@ -912,7 +912,14 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .inspector-fold[open] > summary::before { content: '▾ '; }
 .inspector-fold > summary::-webkit-details-marker { display: none; }
 .inspector-fold > summary:hover { color: var(--text-dim); }
-.inspector input, .inspector textarea, .inspector select { width: 100%; }
+/*
+ * 表单控件填满所在列。原来只覆盖 .inspector,弹窗(实体宽版编辑窗等)里的
+ * .field 不在其中,textarea 就退回默认 cols 宽(约 20 字符),右侧一大片空白。
+ * 用直接子选择器,避免波及 .field 内部组件(ColorPicker / 附件行)自己的布局;
+ * 行内 style={{ width: 'auto' }} 的复选框仍然优先级更高,不受影响。
+ */
+.inspector input, .inspector textarea, .inspector select,
+.field > input, .field > textarea, .field > select { width: 100%; }
 
 .empty-hint {
   color: var(--text-faint);
