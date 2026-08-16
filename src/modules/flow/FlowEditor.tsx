@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
-  ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
+  ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Panel,
   applyNodeChanges, applyEdgeChanges, addEdge, useReactFlow, MarkerType,
   BaseEdge, EdgeLabelRenderer, getBezierPath,
   type Node, type Edge, type NodeChange, type EdgeChange, type Connection, type EdgeProps,
@@ -490,30 +490,6 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 ))}
             </Fragment>
           ))}
-          {selectedCount >= 1 && (
-            <div className="tool-context">
-            <button
-              title="把选中节点封装成一个剧情片段:内部连线跟着搬进去,进出选区的连线自动改接"
-              onClick={encapsulate}
-            >封装</button>
-          {selectedCount >= 2 && (
-            <>
-              <button title="左对齐" onClick={() => alignSelection('left')}>⇤</button>
-              <button title="水平居中对齐" onClick={() => alignSelection('centerX')}>⇹</button>
-              <button title="右对齐" onClick={() => alignSelection('right')}>⇥</button>
-              <button title="顶对齐" onClick={() => alignSelection('top')}>⤒</button>
-              <button title="垂直居中对齐" onClick={() => alignSelection('centerY')}>⇳</button>
-              <button title="底对齐" onClick={() => alignSelection('bottom')}>⤓</button>
-              {selectedCount >= 3 && (
-                <>
-                  <button title="水平等距分布" onClick={() => distributeSelection('x')}>⇿</button>
-                  <button title="垂直等距分布" onClick={() => distributeSelection('y')}>⇕</button>
-                </>
-              )}
-            </>
-          )}
-            </div>
-          )}
           {/* 动作簇:靠右成组,不与左侧「加节点」调色板混在一行里 */}
           <div className="tool-actions">
           <button
@@ -636,6 +612,32 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             minZoom={0.15}
             proOptions={{ hideAttribution: true }}
           >
+            {/* 选中相关的工具浮在画布上,不进工具栏 —— 否则选中数一变,
+                这一簇的宽度就变,工具栏换行导致整条菜单栏高度跳动 */}
+            {selectedCount >= 1 && (
+              <Panel position="top-right" className="tool-context">
+                <button
+                  title="把选中节点封装成一个剧情片段:内部连线跟着搬进去,进出选区的连线自动改接"
+                  onClick={encapsulate}
+                >封装</button>
+                {selectedCount >= 2 && (
+                  <>
+                    <button title="左对齐" onClick={() => alignSelection('left')}>⇤</button>
+                    <button title="水平居中对齐" onClick={() => alignSelection('centerX')}>⇹</button>
+                    <button title="右对齐" onClick={() => alignSelection('right')}>⇥</button>
+                    <button title="顶对齐" onClick={() => alignSelection('top')}>⤒</button>
+                    <button title="垂直居中对齐" onClick={() => alignSelection('centerY')}>⇳</button>
+                    <button title="底对齐" onClick={() => alignSelection('bottom')}>⤓</button>
+                    {selectedCount >= 3 && (
+                      <>
+                        <button title="水平等距分布" onClick={() => distributeSelection('x')}>⇿</button>
+                        <button title="垂直等距分布" onClick={() => distributeSelection('y')}>⇕</button>
+                      </>
+                    )}
+                  </>
+                )}
+              </Panel>
+            )}
             <Background gap={22} />
             <Controls />
             <MiniMap pannable zoomable />

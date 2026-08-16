@@ -1051,21 +1051,28 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
  * 原来 30 个按钮平铺在一行、视觉权重相同,而且对齐按钮随选中数插在中间,
  * 一选节点整行就被推着走 —— 这是「乱」的主因。
  */
-.tool-context, .tool-actions {
+.tool-actions {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
-/* 上下文簇:靠右贴着动作簇,自身有底色,出现 / 消失不挤压左侧调色板 */
+/*
+ * 上下文簇(封装 / 对齐 / 分布)用 React Flow 的 Panel 浮在画布右上角。
+ * 放在工具栏里的话,选中数一变这一簇宽度就变(1 个按钮 -> 9 个 = 404px),
+ * 工具栏换行,整条菜单栏高度跟着跳。浮层不参与工具栏排版,高度恒定。
+ * 左下是 Controls、右下是 MiniMap,右上空着。
+ */
 .tool-context {
-  margin-left: auto;
-  padding: 3px 8px; border-radius: 8px;
-  background: var(--bg-hover); border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 7px;
+  border-radius: 9px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }
 /* 动作簇:常驻最右;上下文簇不在时由它接管 margin-left:auto */
 .tool-actions {
   margin-left: auto;
   padding-left: 10px; border-left: 1px solid var(--border);
 }
-.tool-context + .tool-actions { margin-left: 0; }
 
 /*
  * 「加节点」调色板视觉降权:13 个按钮原本和右侧动作按钮同样粗重,
@@ -5093,9 +5100,9 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   }
   .toolbar::-webkit-scrollbar { display: none; }
   /* 不许被压扁:压扁就是逐字竖排 */
-  .toolbar > *, .tool-context > *, .tool-actions > * { flex-shrink: 0; white-space: nowrap; }
+  .toolbar > *, .tool-actions > * { flex-shrink: 0; white-space: nowrap; }
   /* 窄屏整条横向滚动,簇内不再另起一行 */
-  .tool-context, .tool-actions { flex-wrap: nowrap; margin-left: 0; }
+  .tool-actions { flex-wrap: nowrap; margin-left: 0; }
   .toolbar .hint { display: none; }
 }
 
