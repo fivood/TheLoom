@@ -399,7 +399,6 @@ export default function DocumentView() {
           </div>
         ) : (
         <div className="toolbar">
-          <button className="btn-create" onClick={() => createDoc()}>＋ 新场景</button>
           <div className="doc-mode-switch">
             <button className={mode === 'writing' ? 'primary' : 'ghost'} onClick={() => setMode('writing')}>写作</button>
             <button className={mode === 'structure' ? 'primary' : 'ghost'} onClick={() => setMode('structure')}>结构</button>
@@ -547,7 +546,7 @@ export default function DocumentView() {
         ) : (
           <div className="empty-hint" style={{ margin: 'auto' }}>
             {filtered.length === 0
-              ? <>还没有场景。<br />左侧「＋ 新场景」开始写作。</>
+              ? <>还没有场景。<br />左侧「＋ 新建场景」开始写作。</>
               : <>点击左侧场景查看和编辑</>}
           </div>
         )}

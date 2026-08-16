@@ -886,6 +886,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   padding: 3px 8px;
   font-size: 12px;
   line-height: 1;
+  white-space: nowrap; /* 侧栏窄时中文会逐字换行成「文件
+夹」 */
 }
 .navigator-head-btn .btn-glyph { font-size: 11px; color: var(--text-faint); }
 .navigator-head-btn svg { color: var(--text-faint); flex-shrink: 0; }
@@ -1049,8 +1051,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
  * 一眼看过去是 30 个等权按钮。这里去掉边框、收紧内边距,让它读成
  * 一块调色板而不是 13 个互相竞争的按钮;右侧动作保持原有权重。
  */
-.toolbar > button { padding: 3px 8px; border-color: transparent; background: var(--bg-hover); }
-.toolbar > button:hover { border-color: var(--border); }
+.flow-toolbar > button { padding: 3px 8px; border-color: transparent; background: var(--bg-hover); }
+.flow-toolbar > button:hover { border-color: var(--border); }
 
 /* 「＋ 新 XX」这种"添加对象"按钮:CTA 但不与 .primary(表示当前激活)混淆 */
 .btn-create {

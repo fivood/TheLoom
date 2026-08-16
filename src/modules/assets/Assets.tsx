@@ -289,7 +289,6 @@ export default function Assets() {
 
       <div className="pane-col">
         <div className="toolbar">
-          <button className="primary" onClick={() => fileRef.current?.click()}>＋ 导入资源</button>
           <input
             ref={fileRef}
             type="file"

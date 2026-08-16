@@ -476,7 +476,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   return (
     <>
       <div className="pane-col">
-        <div className="toolbar">
+        <div className="toolbar flow-toolbar">
           {NODE_GROUPS.map((group, gi) => (
             <Fragment key={group.label}>
               {gi > 0 && <span className="tool-sep" aria-hidden="true" />}

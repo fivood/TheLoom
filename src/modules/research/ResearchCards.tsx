@@ -112,7 +112,6 @@ export default function ResearchCards() {
 
       <div className="pane-col">
         <div className="toolbar">
-          <button className="primary" onClick={createCard}>＋ 新卡片</button>
           <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}

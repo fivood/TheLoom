@@ -260,7 +260,6 @@ export default function EntityLibrary() {
 
       <div className="pane-col">
         <div className="toolbar">
-          <button className="primary" onClick={createEntity}>＋ 新建实体</button>
           <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as EntityKind | 'all')} style={{ width: 110 }}>
             <option value="all">全部类型</option>
             {KINDS.map((kind) => <option key={kind} value={kind}>{ENTITY_KIND_LABEL[kind]}</option>)}
