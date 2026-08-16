@@ -180,6 +180,23 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.51.0 收窄到文本流程 + 界面修整)
+
+按 `ponytail-audit` 的结论做减法,**净 -3846 行 -1 依赖**(源码 44230 → 41334):
+
+- **AI 完整项目生成**(`ai/projectImport.ts` + `ai/interactiveImport.ts` + `ProjectImportWizard.tsx` + 两份测试 = 2085 行)移出仓库,保留为 **`personal/ai-project-import.patch`**(已 gitignore)。`git apply` 启用 / `git apply -R` 撤掉,用法见 `personal/README.md`。**冻结前验证过 tsc + src/ai 90 项测试 + build 都通过**,并在干净树上走过完整的 apply → 撤销往返
+- **全项目 Excel 往返**(`projectXlsx.ts` + 手写 OOXML `xlsx.ts` = 1013 行)、**MOBI 导入**(584 行)、**`sharp`** 依赖(仅 `scripts/gen-icons.mjs` 用,图标已提交)一并删除
+- **保留**(用户明确要求):地图模块、DOCX 成稿导出。后者顺带省事 —— `examples/old-london/verify.mts` 依赖它做验收
+- **未做**:`Player.tsx` 复用 `FlowRuntime`(-400 行)。这是重构不是删除,「三处行进语义必须手工同步」的隐患仍在
+
+界面部分:
+
+- **`.inspector input/textarea` 的 `width:100%` 只覆盖 `.inspector`**,弹窗的 `.field` 不在其中,textarea 退回默认 cols 宽(约 20 字符)。规则扩到 `.field >` 直接子元素(用子选择器避开内部自带布局的组件)
+- **`.toolbar > button`(0,1,1)压过了 `.primary`(0,1,0)**,把所有模块的主按钮染灰 —— 上一批只看了流程页。规则改挂 `.flow-toolbar`
+- **侧栏头部改容器查询**:`--pane-nav` 可拖到 170px 而视口仍宽,按视口写的媒体查询不生效。`.side-list` 加 `container-type: inline-size`,`@container (max-width:300px)` 收成纯图标
+- **流程节点边框 / 选中描边抵消画布缩放**:`calc(1px / var(--rf-zoom))`,`--rf-zoom` 由 `onInit`/`onMove` 写入。**`box-shadow` 的 spread 不被设备像素吸附,`border-width` 与 `outline-width` 会** —— 所以选中环用 box-shadow 能精确到 1.000px,普通边框只能收敛到 0.81–1.33
+- **封装 / 对齐改用 React Flow 的 `<Panel position="top-right">`**:这簇宽度随选中数从 1 个按钮涨到 404px,留在工具栏必然换行导致高度跳动(128→167)
+
 ## 最近变更(v0.50.1 深色可读性:快记 + readableInk)
 
 - **`readableInk` 从亮度阈值改为「两种墨色各算一次 WCAG 对比度取高者」**。旧实现 `lum > 145` 在中灰附近选错方向:`#8e8d86`(线性亮度 140.7)判为深底配浅字,实测仅 3.02;改后选深字得 5.18。**亮度必须做 sRGB gamma 展开**(`c<=0.03928 ? c/12.92 : ((c+0.055)/1.055)**2.4`),线性加权算出来的数不是对比度
