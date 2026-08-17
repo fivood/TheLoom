@@ -19,8 +19,8 @@ const MODULE_LABEL: Record<FolderModule, string> = {
 const MODULE_TO_TAB: Record<FolderModule, NavTab> = {
   flow: 'flow', document: 'documents', entity: 'entities', asset: 'assets', research: 'research',
 };
-const MODULE_ICON: Record<FolderModule, 'flow' | 'doc' | 'entity' | 'image' | 'archive'> = {
-  flow: 'flow', document: 'doc', entity: 'entity', asset: 'image', research: 'archive',
+const MODULE_ICON: Record<FolderModule, 'flow' | 'doc' | 'cards' | 'image' | 'archive'> = {
+  flow: 'flow', document: 'doc', entity: 'cards', asset: 'image', research: 'archive',
 };
 
 /** 每种模块的对象取名(不同模块字段不同) */

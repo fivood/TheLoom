@@ -46,7 +46,7 @@ describe('R17-3 跨模块导航历史', () => {
     const project = longNovelRegressionProject();
     project.workspacePreset = 'novel';
     expect(describeNavTarget(project, { tab: 'documents' })).toBe('正文');
-    expect(describeNavTarget(project, { tab: 'entities', entityId: project.entities[0].id })).toBe(`人物 · ${project.entities[0].name}`);
+    expect(describeNavTarget(project, { tab: 'entities', entityId: project.entities[0].id })).toBe(`设定集 · ${project.entities[0].name}`);
     project.workspacePreset = 'interactive';
     expect(describeNavTarget(project, { tab: 'documents' })).toBe('剧本');
   });

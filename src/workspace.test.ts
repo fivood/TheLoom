@@ -14,7 +14,7 @@ describe('R17-4 项目工作区预设', () => {
     expect(WORKSPACE_PRIMARY_TABS.novel).toEqual(['documents', 'entities', 'planning', 'research', 'outline']);
     expect(WORKSPACE_PRIMARY_TABS.interactive).toEqual(['flow', 'documents', 'entities', 'variables', 'assets']);
     expect(workspaceTabLabel('novel', 'documents')).toBe('正文');
-    expect(workspaceTabLabel('novel', 'entities')).toBe('人物');
+    expect(workspaceTabLabel('novel', 'entities')).toBe('设定集');
     expect(workspaceTabLabel('interactive', 'documents')).toBe('剧本');
     expect(workspaceTabLabel('universal', 'documents')).toBe('文档');
   });

@@ -21,7 +21,7 @@ export function markOnboarded() {
 }
 
 const MODES: { key: WorkspacePreset; label: string; desc: string }[] = [
-  { key: 'novel', label: '小说', desc: '正文为主:文档、人物、大纲、资料' },
+  { key: 'novel', label: '小说', desc: '正文为主:正文、设定集、大纲、资料' },
   { key: 'interactive', label: '互动叙事', desc: '游戏 / 剧本:流程、变量、实体、演出' },
   { key: 'universal', label: '通用', desc: '全模块完整导航,两种都做' },
 ];

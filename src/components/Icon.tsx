@@ -2,13 +2,13 @@
 import type { EntityKind } from '../types';
 
 export type IconName =
-  | 'logo' | 'flow' | 'entity' | 'bulb' | 'grid' | 'clock' | 'archive' | 'braces'
+  | 'logo' | 'flow' | 'bulb' | 'grid' | 'clock' | 'archive' | 'braces'
   | 'search' | 'undo' | 'redo' | 'folder' | 'refresh' | 'download' | 'upload' | 'reset'
   | 'play' | 'script' | 'pin' | 'image' | 'plus' | 'cloud'
   | 'user' | 'mappin' | 'key' | 'flag' | 'book' | 'doc' | 'tag' | 'trash' | 'film' | 'music'
   | 'palette' | 'check'
   | 'sun' | 'moon' | 'monitor' | 'split' | 'more' | 'help' | 'arrowLeft' | 'compare' | 'chevronDown' | 'chevronRight'
-  | 'lock' | 'unlock' | 'eye' | 'folderOpen' | 'comment' | 'warn' | 'ban' | 'bolt' | 'gear'
+  | 'cards' | 'lock' | 'unlock' | 'eye' | 'folderOpen' | 'comment' | 'warn' | 'ban' | 'bolt' | 'gear'
   | 'star' | 'starFilled' | 'pencil' | 'sparkle' | 'flagCheck' | 'close';
 
 /** 实体类型 → 图标 */
@@ -34,12 +34,6 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <circle cx="6" cy="18" r="2.5" />
       <circle cx="18" cy="12" r="2.5" />
       <path d="M8.2 7.2 15.8 11M8.2 16.8 15.8 13" />
-    </>
-  ),
-  entity: (
-    <>
-      <circle cx="12" cy="7.5" r="3.5" />
-      <path d="M4.5 20.5v-1a6 6 0 0 1 6-6h3a6 6 0 0 1 6 6v1" />
     </>
   ),
   bulb: (
@@ -248,6 +242,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <rect x="3.5" y="4.5" width="7.5" height="15" rx="1" />
       <rect x="13" y="4.5" width="7.5" height="15" rx="1" />
       <path d="M10.5 12H7M7 12l2-2M7 12l2 2M13.5 12h3M17 12l-2-2M17 12l-2 2" />
+    </>
+  ),
+  cards: (
+    <>
+      <rect x="3" y="7.5" width="12.5" height="13" rx="2" />
+      <path d="M7 4.5h10.5A2.5 2.5 0 0 1 20 7v10" />
     </>
   ),
   lock: (

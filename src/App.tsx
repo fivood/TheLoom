@@ -66,7 +66,7 @@ const GROUP_LABEL: Record<TabGroup, string> = {
 const TABS: { key: Tab; icon: IconName; label: string; group: TabGroup }[] = [
   { key: 'flow', icon: 'flow', label: '流程', group: 'build' },
   { key: 'documents', icon: 'doc', label: '文档', group: 'build' },
-  { key: 'entities', icon: 'entity', label: '实体', group: 'library' },
+  { key: 'entities', icon: 'cards', label: '实体', group: 'library' },
   { key: 'assets', icon: 'image', label: '资源', group: 'library' },
   { key: 'research', icon: 'archive', label: '资料', group: 'library' },
   { key: 'planning', icon: 'flag', label: '规划', group: 'plan' },

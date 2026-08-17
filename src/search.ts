@@ -111,7 +111,7 @@ export function describeNavTarget(project: Project, target: NavTarget): string {
     };
     return `规划 · ${labels[target.planningView]}`;
   }
-  if (target.entityId) return `${preset === 'novel' ? '人物' : '实体'} · ${project.entities.find((entity) => entity.id === target.entityId)?.name ?? '已删除实体'}`;
+  if (target.entityId) return `${preset === 'novel' ? '设定集' : '实体'} · ${project.entities.find((entity) => entity.id === target.entityId)?.name ?? '已删除实体'}`;
   if (target.eventId) return `时间线 · ${project.timelineEvents.find((event) => event.id === target.eventId)?.title ?? '已删除事件'}`;
   if (target.outlineRowId) {
     const row = project.outlineRows.find((candidate) => candidate.id === target.outlineRowId);

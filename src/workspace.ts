@@ -9,7 +9,7 @@ export const WORKSPACE_PRESET_LABEL: Record<WorkspacePreset, string> = {
 };
 
 export const WORKSPACE_PRESET_HINT: Record<WorkspacePreset, string> = {
-  novel: '优先显示正文、人物、规划、资料和大纲',
+  novel: '优先显示正文、设定集、规划、资料和大纲',
   interactive: '优先显示流程、剧本、实体、变量和资源',
   universal: '显示全部模块，保持完整导航',
 };
@@ -37,7 +37,7 @@ const UNIVERSAL_LABELS: Record<WorkspaceTab, string> = {
 export function workspaceTabLabel(preset: WorkspacePreset, tab: WorkspaceTab): string {
   if (preset === 'novel') {
     if (tab === 'documents') return '正文';
-    if (tab === 'entities') return '人物';
+    if (tab === 'entities') return '设定集';
   }
   if (preset === 'interactive' && tab === 'documents') return '剧本';
   return UNIVERSAL_LABELS[tab];
