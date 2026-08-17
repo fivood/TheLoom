@@ -180,6 +180,33 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.53.0 外链网盘同步 · S3 兼容)
+
+新增 `src/remote/`,把项目同步到用户自己的 S3 兼容存储。**选 S3 而不是 OAuth 网盘**:
+一套代码覆盖 R2 / B2 / MinIO / OSS,网页与 Tauri 共用,无需应用注册与审核;
+OAuth 每家要单独接(数百行 + PKCE + 令牌刷新 + 回调协议),三家就是一千多行。
+
+- **`sigv4.ts`**:手写 AWS SigV4(WebCrypto HMAC,零依赖)。**必须有官方向量测试** ——
+  签名差一个字节服务端只回 403 且不说原因,没有向量根本无从反推。用了 AWS 文档的
+  GET / PUT / LIST 三组示例
+- **`s3.ts`**:PUT/GET/HEAD/DELETE + 自检。载荷 ≤5MB 实算 SHA-256,超过走
+  `UNSIGNED-PAYLOAD` 省一次全量读取;**404 返回 null 而非抛错**(首次同步时对象本就
+  不存在);自检把 403 / 404 / CORS 分开报 —— 浏览器只会抛笼统的 TypeError
+- **`src/crypto.ts`**:gzip / base64 / PBKDF2 / AES-GCM 从 `sync.ts` 抽出共用。
+  两处各写一份 AES 是最不该出现的重复:实现分岔后同一份稿子在两条通道上解不开,
+  且只在真需要恢复数据时才暴露
+- **冲突用 ETag 不用时间戳**:对象存储 Last-Modified 只精确到秒,多设备同秒写入
+  分不出先后;ETag 是内容指纹。**已知边界**:HEAD 与 PUT 之间有秒级窗口,同时推送
+  仍可能后覆盖前;彻底杜绝要 `If-Match` 条件写入,R2/MinIO 支持但非所有实现都支持
+- **`assetSync.ts`**:资源按内容寻址存 `assets/{hash}.{ext}`,天然幂等去重、无冲突;
+  **不需要清单文件**,要拉哪些由解密后的 `project.assets` 直接得出
+- 测试 27 项(签名向量 6 / S3 客户端 7 / 同步 9 / 资源计划 5)。**写测试时踩的坑**:
+  vitest 是 node 环境没有 `localStorage`(afterEach 里调 clear 会把整个文件带崩);
+  HTTP 头值只能是 latin1,拿中文当 ETag 造数据无效;换桶会改 URL 路径导致 404,
+  测不出密钥作用域,要直接测派生函数
+
+**尚未做**:自动同步(现有 `sync.ts` 的 pendingPush 机制可复用)。先等真实桶跑通再接。
+
 ## 最近变更(v0.52.0 沉浸写作 + 实体改名设定集)
 
 - **新增 `src/immersive.ts`**:块 ↔ 纯 Markdown 文本。难点不是渲染而是**身份** —— 批注锚在 `blockId`、流程节点靠 `unitId` 与块共享内容,纯文本里没有这些标记(文件夹模式靠 `<!-- loom:block -->` 注释解决,但那不能给用户看见)。方案是**按段落次序重建身份**:第 n 段沿用原第 n 块的 id / type / unitId / speakerId,只换文字;写成块级 Markdown(`#` `>` `-` `1.`)才改类型;多出来的段落建新块
