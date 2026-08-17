@@ -19,7 +19,6 @@ import {
   storedProjectKey, type RecoveryBackup,
 } from './recovery';
 import { estimateWebStorage, mirrorIdbToLocal, readThrough, requestPersistentStorage, webdbAvailable, writeThrough } from './webdb';
-import { hasPendingPush } from './sync';
 import { getStorageUsage, type StorageUsage } from './diagnostics';
 import type { AiProposalApplyResult, ApplyAiProposalOptions } from './ai/proposal';
 import { unlinkDocumentReferences } from './documentReferences';
@@ -237,12 +236,7 @@ interface LoomState {
   /** Tauri 模式下的项目文件夹路径;null = 仅存浏览器 */
   folder: string | null;
   syncError: string | null;
-  /** 浏览器在线状态(P3,离线时数据仍在本机可写) */
-  online: boolean;
   /** 是否有离线推送积压在待补发队列(P3) */
-  pendingPush: boolean;
-  setOnline: (online: boolean) => void;
-  refreshSyncState: () => void;
   recoveryBackup: RecoveryBackup | null;
   quarantinedProject: RecoveryBackup | null;
   recoveryNotice: string | null;
@@ -644,16 +638,6 @@ export const useLoom = create<LoomState>((set, get) => {
     canRedo: false,
     folder: boot.folder,
     syncError: null,
-    online: typeof navigator === 'undefined' ? true : navigator.onLine,
-    pendingPush: (() => {
-      try { return hasPendingPush() !== null; } catch { return false; }
-    })(),
-    setOnline: (online) => set({ online }),
-    refreshSyncState: () => {
-      let pendingPush = false;
-      try { pendingPush = hasPendingPush() !== null; } catch { /* 忽略 */ }
-      set({ online: typeof navigator === 'undefined' ? true : navigator.onLine, pendingPush });
-    },
     recoveryBackup: boot.recoveryBackup,
     quarantinedProject: boot.quarantinedProject,
     recoveryNotice: boot.recoveryNotice,

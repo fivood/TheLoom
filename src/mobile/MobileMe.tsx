@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useLoom, exportProject } from '../store';
 import { documentWordCount } from '../util';
 import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgress';
-import SyncPanel from '../components/SyncPanel';
 import RemotePanel from '../components/RemotePanel';
 import { confirmDialog } from '../dialog';
 
@@ -16,7 +15,6 @@ export default function MobileMe() {
   const switchSlot = useLoom((s) => s.switchSlot);
   const loadSampleProject = useLoom((s) => s.loadSampleProject);
   const newSlot = useLoom((s) => s.newSlot);
-  const [syncing, setSyncing] = useState(false);
   const [remoteSync, setRemoteSync] = useState(false);
 
   /** 载入示例:当前项目已有内容时开新槽位,绝不覆盖 */
@@ -65,10 +63,6 @@ export default function MobileMe() {
               : '已自动保存到本地'}
         </span>
       </div>
-      {/* 云房间是手机取稿 / 回传的唯一通道,不能只在桌面布局里才有入口 */}
-      <button className="m-me-full" onClick={() => setSyncing(true)}>
-        云同步(取稿 / 回传)
-      </button>
       {/* 外链网盘:手机上同样是取稿通道,而且资源原文件也能跟着走 */}
       <button className="m-me-full" onClick={() => setRemoteSync(true)}>
         外链网盘同步(自己的存储)
@@ -103,7 +97,6 @@ export default function MobileMe() {
       <div className="hint" style={{ textAlign: 'center' }}>
         碎片写作 · 成稿与完整功能请在桌面端或 11 寸以上平板继续
       </div>
-      {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
       {remoteSync && <RemotePanel onClose={() => setRemoteSync(false)} />}
     </div>
   );

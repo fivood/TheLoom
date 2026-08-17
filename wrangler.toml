@@ -2,8 +2,3 @@ name = "theloom"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-01-01"
 
-# ---- 云同步 ----
-[[d1_databases]]
-binding = "SYNC_DB"
-database_name = "theloom-sync"
-database_id = "4f9e56b2-5565-48ae-bebd-1d672cdf2698"
