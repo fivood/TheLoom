@@ -12,6 +12,7 @@ import { documentWordCount, linearizeByFolders } from '../../util';
 import { downloadMarkdown, documentToMarkdown } from '../../export';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 import BlocksEditor, { emptyBlock } from './BlocksEditor';
+import ImmersiveEditor from './ImmersiveEditor';
 import Manuscript from './Manuscript';
 import RevisionDiff from './RevisionDiff';
 import Inspector from '../../components/Inspector';
@@ -469,12 +470,7 @@ export default function DocumentView() {
         {focusMode ? (
           selected ? (
             <div className="doc-editor doc-focus-editor">
-              <BlocksEditor
-                doc={selected}
-                variant="focus"
-                focusBlockId={focusBlockId}
-                onActiveChange={setActiveBlockId}
-              />
+              <ImmersiveEditor doc={selected} />
             </div>
           ) : (
             <div className="empty-hint" style={{ margin: 'auto' }}>点击左侧场景后进入专注模式</div>

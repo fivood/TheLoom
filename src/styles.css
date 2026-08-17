@@ -5289,3 +5289,26 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .navigator-head-btn .btn-label { display: none; }
   .navigator-head-btn { padding: 3px 7px; min-width: 34px; justify-content: center; }
 }
+
+/*
+ * 沉浸写作:一整块纯文本。没有边框、没有逐块控件,只留一段舒服的行宽。
+ * 38em 是常见的易读行长(约 38 个汉字),再宽眼睛要来回扫。
+ */
+.immersive-text {
+  flex: 1;
+  width: 100%;
+  max-width: 38em;
+  margin: 0 auto;
+  padding: 32px 8px 40vh; /* 底部留白:写到最后一行仍在视线中部,不用贴着屏幕底 */
+  border: 0;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font-size: 16px;
+  line-height: 2;
+  letter-spacing: 0.01em;
+}
+.immersive-text:focus { border: 0; outline: none; }
+/* 覆盖上面的 align-items:center —— 那是给分块编辑器居中用的,
+   纯文本要撑满高度才能一路往下写 */
+.doc-focus-editor { display: flex; align-items: stretch; overflow-y: auto; }
