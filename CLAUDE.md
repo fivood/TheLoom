@@ -180,6 +180,15 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.52.0 沉浸写作 + 实体改名设定集)
+
+- **新增 `src/immersive.ts`**:块 ↔ 纯 Markdown 文本。难点不是渲染而是**身份** —— 批注锚在 `blockId`、流程节点靠 `unitId` 与块共享内容,纯文本里没有这些标记(文件夹模式靠 `<!-- loom:block -->` 注释解决,但那不能给用户看见)。方案是**按段落次序重建身份**:第 n 段沿用原第 n 块的 id / type / unitId / speakerId,只换文字;写成块级 Markdown(`#` `>` `-` `1.`)才改类型;多出来的段落建新块
+- 对白渲染成「名字：台词」,回写时名字仍对得上就保留 `speakerId` 并剥掉前缀;`action` 不降级为 `paragraph`;`condition` / `instruction` 的表达式原样往返
+- **`ImmersiveEditor` 的文本不从 blocks 反推** —— 只在换场景时播种,之后以本地 state 为准。否则每次回写都会重算 value,光标会跳
+- `.doc-focus-editor` 原有 `align-items: center`(给分块编辑器居中用),纯文本要 `align-items: stretch` 才能撑满高度
+- `immersive.test.ts` 8 项守往返与身份保持;浏览器实测改一段文字后 8 个块的 id/type/unitId/speakerId 与编辑前逐字节一致
+- **实体模块改名「设定集」+ 新 `cards` 图标**:模块装五类对象,而小说预设叫「人物」、`entity` 图标画的是人形轮廓(与角色专用的 `user` 同形)。通用 / 互动仍叫「实体」。`navigation.test.ts` 与 `workspace.test.ts` 原本断言「人物」,正确挡住了改名;`OverviewPanel.tsx` 把图标名存在 Record 类型里,grep `name="entity"` 漏掉了,靠 tsc 报出来
+
 ## 最近变更(v0.51.0 收窄到文本流程 + 界面修整)
 
 按 `ponytail-audit` 的结论做减法,**净 -3846 行 -1 依赖**(源码 44230 → 41334):
