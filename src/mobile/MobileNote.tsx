@@ -1,84 +1,48 @@
-import { useMemo, useState, useSyncExternalStore } from 'react';
-import { uid, useLoom } from '../store';
-import { nextNotePosition } from '../brainstormLayout';
+import { useMemo, useState } from 'react';
 import { confirmDialog } from '../dialog';
-import { getThemeMode, readableInk, subscribeThemeMode } from '../theme';
+import {
+  addIdea, editIdea, loadInbox, removeIdea, saveInbox, visibleIdeas, type IdeaCard,
+} from '../inbox';
 import Icon from '../components/Icon';
 
-const NOTE_COLORS = ['#ffffff', '#f2f1ee', '#e6e4df', '#d8d6d0'];
-
-/** 移动端快记:零摩擦捕获想法,落风暴板,可就地改写与删除 */
+/**
+ * 移动端快记:零摩擦捕获想法。
+ *
+ * 写进**跨项目的灵感库**,而不是当前项目的风暴板 —— 点子产生时往往还不知道
+ * 属于哪部作品,塞进当前项目等于替你做了一个可能错的归属决定。
+ * 到桌面端再从灵感库「取用」到具体项目(转为便签 / 场景 / 大纲行)。
+ */
 export default function MobileNote() {
-  const notes = useLoom((s) => s.project.brainstormNotes);
-  const update = useLoom((s) => s.update);
+  const [cards, setCards] = useState<IdeaCard[]>(loadInbox);
   const [draft, setDraft] = useState('');
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
 
-  const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode, () => 'light' as const);
+  const commit = (next: IdeaCard[]) => { setCards(next); saveInbox(next); };
 
-  /*
-   * 便签底色是内容数据(固定四档浅灰白),深色主题下整块填充等于在暗界面上
-   * 糊四张惨白的纸。按 R5-B 的约定「不改写内容颜色,只在渲染层处理」:
-   * 深色下改用面板底 + 左侧色条保留颜色身份;浅色下维持整块填充。
-   */
-  const noteStyle = (color: string) => (themeMode === 'dark'
-    ? { borderLeft: `4px solid ${color}` }
-    : { background: color, color: readableInk(color) });
-
-  const recent = useMemo(() => [...notes].reverse(), [notes]);
-  const visible = useMemo(() => {
+  const list = useMemo(() => {
+    const all = visibleIdeas(cards);
     const q = query.trim().toLowerCase();
-    if (!q) return recent;
-    return recent.filter((n) => n.text.toLowerCase().includes(q));
-  }, [recent, query]);
+    return q ? all.filter((c) => c.text.toLowerCase().includes(q)) : all;
+  }, [cards, query]);
 
   const capture = () => {
-    const text = draft.trim();
-    if (!text) return;
-    const color = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
-    update((p) => {
-      p.brainstormNotes.push({
-        id: uid(),
-        text,
-        color,
-        // 占格排布:连着记也不会在桌面风暴板上叠成一摞
-        position: nextNotePosition(p.brainstormNotes),
-      });
-    });
+    if (!draft.trim()) return;
+    commit(addIdea(cards, draft));
     setDraft('');
   };
 
-  const startEdit = (id: string, text: string) => {
-    setEditingId(id);
-    setEditText(text);
-  };
-
-  const commitEdit = () => {
-    if (!editingId) return;
-    const text = editText.trim();
-    const id = editingId;
-    setEditingId(null);
-    if (!text) return;
-    update((p) => {
-      const n = p.brainstormNotes.find((x) => x.id === id);
-      if (n) n.text = text;
-    });
-  };
-
-  const removeNote = async (id: string, text: string) => {
+  const onRemove = async (c: IdeaCard) => {
     const ok = await confirmDialog({
-      title: '删除这条快记?',
-      message: text.length > 40 ? `${text.slice(0, 40)}…` : text,
+      title: '删除这条灵感?',
+      message: c.text.length > 40 ? `${c.text.slice(0, 40)}…` : c.text,
       danger: true,
     });
-    if (!ok) return;
-    update((p) => {
-      p.brainstormNotes = p.brainstormNotes.filter((n) => n.id !== id);
-      p.brainstormEdges = p.brainstormEdges.filter((e) => e.source !== id && e.target !== id);
-    });
+    if (ok) commit(removeIdea(cards, c.id));
   };
+
+  const visibleCount = visibleIdeas(cards).length;
 
   return (
     <div className="m-note">
@@ -92,8 +56,8 @@ export default function MobileNote() {
         <button className="primary" disabled={!draft.trim()} onClick={capture}>记下</button>
       </div>
       <div className="m-note-list">
-        <div className="m-section-label">最近的想法({notes.length})</div>
-        {notes.length > 6 && (
+        <div className="m-section-label">灵感库({visibleCount})· 跨项目</div>
+        {visibleCount > 6 && (
           <input
             className="m-note-search"
             value={query}
@@ -101,38 +65,43 @@ export default function MobileNote() {
             onChange={(e) => setQuery(e.target.value)}
           />
         )}
-        {visible.map((n) => (
-          editingId === n.id ? (
-            <div key={n.id} className="m-note-edit">
-              <textarea
-                value={editText}
-                rows={3}
-                autoFocus
-                onChange={(e) => setEditText(e.target.value)}
-              />
+        {list.map((c) => (
+          editingId === c.id ? (
+            <div key={c.id} className="m-note-edit">
+              <textarea value={editText} rows={3} autoFocus onChange={(e) => setEditText(e.target.value)} />
               <div className="m-note-edit-row">
                 <button className="ghost" onClick={() => setEditingId(null)}>取消</button>
-                <button className="primary" onClick={commitEdit}>保存</button>
+                <button
+                  className="primary"
+                  onClick={() => { commit(editIdea(cards, c.id, editText)); setEditingId(null); }}
+                >保存</button>
               </div>
             </div>
           ) : (
-            <div key={n.id} className="m-note-item" style={noteStyle(n.color)}>
+            <div key={c.id} className="m-note-item">
               <button
                 className="m-note-text"
-                onClick={() => startEdit(n.id, n.text)}
                 title="点击修改"
-              >{n.text}</button>
+                onClick={() => { setEditingId(c.id); setEditText(c.text); }}
+              >
+                {c.text}
+                {c.usedIn?.length ? (
+                  <span className="m-idea-used">已用于 {c.usedIn.map((u) => u.projectName).join('、')}</span>
+                ) : null}
+              </button>
               <button
                 className="ghost icon-btn m-note-del"
                 aria-label="删除"
-                onClick={() => void removeNote(n.id, n.text)}
+                onClick={() => void onRemove(c)}
               ><Icon name="trash" size={14} /></button>
             </div>
           )
         ))}
-        {notes.length > 0 && visible.length === 0 && <div className="hint">没有匹配的想法。</div>}
-        {notes.length === 0 && (
-          <div className="hint">还没有想法。写下的快记会同步到桌面端的「风暴」模块。</div>
+        {visibleCount > 0 && list.length === 0 && <div className="hint">没有匹配的想法。</div>}
+        {visibleCount === 0 && (
+          <div className="hint">
+            还没有灵感。这里记的点子不属于任何项目,到桌面端可以取用到某部作品里。
+          </div>
         )}
       </div>
     </div>

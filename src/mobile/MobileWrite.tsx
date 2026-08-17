@@ -5,6 +5,7 @@ import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgres
 import type { Document } from '../types';
 import BlocksEditor, { emptyBlock } from '../modules/document/BlocksEditor';
 import Icon from '../components/Icon';
+import { loadInbox, markUsed, saveInbox, visibleIdeas, type IdeaCard } from '../inbox';
 
 const LAST_DOC_KEY = 'theloom-mobile-last-doc';
 
@@ -25,13 +26,13 @@ export default function MobileWrite() {
   const folders = useLoom((s) => s.project.folders);
   const categories = useLoom((s) => s.project.documentCategories);
   const progress = useLoom((s) => s.project.writingProgress);
-  const notes = useLoom((s) => s.project.brainstormNotes);
   const addDocument = useLoom((s) => s.addDocument);
   const updateDocument = useLoom((s) => s.updateDocument);
   const [selectedId, setSelectedId] = useState<string | null>(() => pickFallbackId(documents));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [ideasOpen, setIdeasOpen] = useState(false);
+  const [inbox, setInbox] = useState<IdeaCard[]>(loadInbox);
 
   const doc = documents.find((d) => d.id === selectedId) ?? null;
 
@@ -75,16 +76,23 @@ export default function MobileWrite() {
   const nextDoc = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
   const chapter = doc ? folderPath(doc.folderId, folders) : '';
 
-  const recentIdeas = useMemo(() => [...notes].reverse().slice(0, 12), [notes]);
+  const recentIdeas = useMemo(() => visibleIdeas(inbox).slice(0, 12), [inbox]);
 
-  /** 把一条快记插进当前场景末尾 —— 手机上记的台词本来就是为了写进正文 */
-  const insertIdea = (text: string) => {
+  /**
+   * 把一条灵感插进当前场景末尾。灵感库是跨项目的,所以插入后记一笔去向
+   * (标记「已用于本项目」),但**不删卡片** —— 同一个点子可能还要用在别处。
+   */
+  const insertIdea = (card: IdeaCard) => {
     if (!doc) return;
     updateDocument(doc.id, (d) => {
       const block = emptyBlock('paragraph');
-      block.text = text;
+      block.text = card.text;
       d.blocks.push(block);
     });
+    const p = useLoom.getState().project;
+    const next = markUsed(inbox, card.id, useLoom.getState().currentSlotId, p.name || '未命名项目');
+    setInbox(next);
+    saveInbox(next);
     setIdeasOpen(false);
   };
 
@@ -142,9 +150,9 @@ export default function MobileWrite() {
           <button
             className={`ghost m-idea-btn ${ideasOpen ? 'on' : ''}`}
             onClick={() => setIdeasOpen((o) => !o)}
-            disabled={notes.length === 0}
+            disabled={recentIdeas.length === 0}
             title="灵感抽屉"
-          >灵感 {notes.length}</button>
+          >灵感 {recentIdeas.length}</button>
         </div>
       )}
 
@@ -152,7 +160,7 @@ export default function MobileWrite() {
         <div className="m-idea-drawer">
           <div className="m-section-label">点一条插到这一场末尾</div>
           {recentIdeas.map((n) => (
-            <button key={n.id} className="m-idea-item" onClick={() => insertIdea(n.text)}>
+            <button key={n.id} className="m-idea-item" onClick={() => insertIdea(n)}>
               {n.text}
             </button>
           ))}

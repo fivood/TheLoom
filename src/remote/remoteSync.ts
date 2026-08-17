@@ -2,6 +2,7 @@ import type { Project } from '../types';
 import { normalizeProject } from '../util';
 import { decryptBytes, deriveAesKey, encryptBytes, gzip } from '../crypto';
 import { getObject, headObject, putObject, type S3Config } from './s3';
+import { mergeInbox, type IdeaCard } from '../inbox';
 
 /**
  * 外链网盘同步:把整个项目加密后写进用户自己的 S3 兼容存储。
@@ -99,6 +100,29 @@ export async function pullFromRemote(
   const head = await headObject(cfg, PROJECT_KEY);
   const key = await keyFor(cfg);
   return { project: await decodeProject(bytes, key), etag: head?.etag ?? null, at: Date.now() };
+}
+
+/* ---------- 灵感库 ---------- */
+
+const INBOX_KEY = 'inbox.enc';
+
+/**
+ * 灵感库同步。与项目不同,这里**不做冲突判定**:收件箱以追加为主,
+ * 拉下远端后按 id 取并集合并再写回,两台设备各记各的点子都能留下。
+ * 删除靠墓碑传播(见 inbox.ts)。
+ */
+export async function syncInbox(cfg: RemoteConfig, local: IdeaCard[]): Promise<IdeaCard[]> {
+  const key = await keyFor(cfg);
+  const bytes = await getObject(cfg, INBOX_KEY);
+  let merged = local;
+  if (bytes) {
+    const plain = await decryptBytes(bytes, key);
+    const remote = JSON.parse(new TextDecoder().decode(await gzip(plain, 'gunzip'))) as IdeaCard[];
+    if (Array.isArray(remote)) merged = mergeInbox(local, remote);
+  }
+  const out = await gzip(new TextEncoder().encode(JSON.stringify(merged)), 'gzip');
+  await putObject(cfg, INBOX_KEY, await encryptBytes(out, key));
+  return merged;
 }
 
 /** 远端当前状态,供面板显示「是否有更新」 */

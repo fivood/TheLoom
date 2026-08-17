@@ -9,6 +9,7 @@ import { uid, useLoom } from '../../store';
 import { nextNotePosition } from '../../brainstormLayout';
 import { getThemeMode, readableInk, subscribeThemeMode } from '../../theme';
 import { useNav } from '../../search';
+import { loadInbox, markUsed, saveInbox, visibleIdeas } from '../../inbox';
 
 interface StickyData {
   text: string;
@@ -112,6 +113,31 @@ function Canvas() {
   /** 便签首行当标题;整段仍进正文 / 主线剧情 */
   const firstLine = (t: string) => t.split('\n')[0].trim().slice(0, 24);
 
+  /**
+   * 从跨项目灵感库取用:未用过的点子落成便签,进入本项目的空间梳理。
+   * 卡片留在库里只记去向 —— 同一个点子可能还要用在别的作品上。
+   */
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inbox, setInbox] = useState(loadInbox);
+  const projectName = useLoom((s) => s.project.name);
+  const slotId = useLoom((s) => s.currentSlotId);
+
+  const takeIdea = (id: string, text: string) => {
+    dirty.current = true;
+    setNodes((ns) => [
+      ...ns.map((n) => ({ ...n, selected: false })),
+      {
+        id: uid(), type: 'sticky' as const,
+        position: nextNotePosition(ns),
+        data: { text, color: NOTE_COLORS[0] },
+        selected: true,
+      },
+    ]);
+    const next = markUsed(inbox, id, slotId, projectName || '未命名项目');
+    setInbox(next);
+    saveInbox(next);
+  };
+
   const hasSelection = nodes.some((n) => n.selected);
   const selectedTexts = () => nodes.filter((n) => n.selected)
     .map((n) => String(n.data.text ?? '').trim()).filter(Boolean);
@@ -162,6 +188,11 @@ function Canvas() {
     <div className="pane-col">
       <div className="toolbar">
         <button className="primary" onClick={() => addNote()}>＋ 新便签</button>
+        <button
+          className={inboxOpen ? 'primary' : ''}
+          title="跨项目灵感库:手机快记写进这里,取用后卡片仍留在库中"
+          onClick={() => { setInbox(loadInbox()); setInboxOpen((v) => !v); }}
+        >灵感库 {visibleIdeas(inbox).length}</button>
         {hasSelection && (
           <>
             <span className="tool-sep" aria-hidden="true" />
@@ -178,6 +209,24 @@ function Canvas() {
         )}
         <span className="hint">双击空白处新建便签 · 拖动边缘连线 · Delete 删除</span>
       </div>
+      {inboxOpen && (
+        <div className="inbox-strip">
+          {visibleIdeas(inbox).length === 0 && (
+            <span className="hint">灵感库是空的。手机端「快记」记下的点子会出现在这里。</span>
+          )}
+          {visibleIdeas(inbox).map((c) => (
+            <button
+              key={c.id}
+              className="inbox-card"
+              title={c.usedIn?.length ? `已用于 ${c.usedIn.map((u) => u.projectName).join('、')}` : '点击取用为便签'}
+              onClick={() => takeIdea(c.id, c.text)}
+            >
+              <span>{c.text}</span>
+              {c.usedIn?.length ? <em>已用 {c.usedIn.length}</em> : null}
+            </button>
+          ))}
+        </div>
+      )}
       <div style={{ flex: 1 }}>
         <ReactFlow
           className="rf-light"

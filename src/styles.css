@@ -5325,3 +5325,24 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .secret-input { display: flex; gap: 4px; align-items: center; }
 .secret-input > input { flex: 1; min-width: 0; }
 .secret-input > button { flex-shrink: 0; }
+
+/* 风暴板上的灵感库取用条:横向一排卡片,点一张落成便签 */
+.inbox-strip {
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  background: var(--bg-panel); flex-shrink: 0;
+}
+.inbox-strip::-webkit-scrollbar { display: none; }
+.inbox-card {
+  flex-shrink: 0; max-width: 240px;
+  display: flex; align-items: center; gap: 6px;
+  text-align: left; font-size: 12.5px; line-height: 1.5;
+  padding: 6px 10px; border: 1px solid var(--border-light); border-radius: 9px;
+  background: var(--bg-card); cursor: pointer;
+}
+.inbox-card > span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.inbox-card > em {
+  flex-shrink: 0; font-style: normal; font-size: 11px; color: var(--text-faint);
+}

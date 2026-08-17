@@ -5,9 +5,10 @@ import { deriveAesKey } from '../crypto';
 import { testConnection } from '../remote/s3';
 import {
   RemoteConflict, loadRemoteConfig, pullFromRemote, pushToRemote, remoteConfigured,
-  remoteStatus, saveRemoteConfig, type RemoteConfig,
+  remoteStatus, saveRemoteConfig, syncInbox, type RemoteConfig,
 } from '../remote/remoteSync';
 import { syncAssets } from '../remote/assetSync';
+import { loadInbox, saveInbox } from '../inbox';
 import Icon from './Icon';
 import SecretInput from './SecretInput';
 
@@ -51,6 +52,8 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
       const key = await deriveAesKey(`theloom:${cfg.bucket}/${cfg.prefix ?? ''}`, cfg.pass);
       const a = await syncAssets(cfg, project, folder, key,
         (done, total, label) => setProgress(total ? `${label} ${done}/${total}` : ''));
+      // 灵感库跨项目,与项目并行同步;按 id 并集合并,不需要冲突判定
+      saveInbox(await syncInbox(cfg, loadInbox()));
       patch({ lastEtag: res.etag ?? '', lastSyncAt: res.at });
       setProgress('');
       setStatus(`已上传。资源:传 ${a.uploaded} / 跳过 ${a.skipped}`
@@ -90,6 +93,7 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
       const key = await deriveAesKey(`theloom:${cfg.bucket}/${cfg.prefix ?? ''}`, cfg.pass);
       const a = await syncAssets(cfg, got.project, folder, key,
         (done, total, label) => setProgress(total ? `${label} ${done}/${total}` : ''));
+      saveInbox(await syncInbox(cfg, loadInbox()));
       patch({ lastEtag: got.etag ?? '', lastSyncAt: got.at });
       setProgress('');
       setStatus(`已拉取。资源:取 ${a.downloaded} / 跳过 ${a.skipped}`
