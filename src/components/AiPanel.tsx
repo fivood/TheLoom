@@ -16,6 +16,7 @@ import {
   normalizeExtracted, normalizeFieldFill, pushAiLog, STAGE1_SUFFIX, STAGE2_SUFFIX,
   type AiImportPreview, type ExtractScenario,
 } from '../ai/extract';
+import SecretInput from './SecretInput';
 
 /* ---------- AI 设置 ---------- */
 
@@ -120,12 +121,11 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
                   </a>
                 )}
               </label>
-              <input
-                type="password"
+              <SecretInput
                 value={cfg.apiKey}
-                onChange={(e) => setCfg({ ...cfg, apiKey: e.target.value })}
                 placeholder={cfg.credentialStored ? '已安全保存；输入新 Key 可替换' : 'sk-…'}
                 autoComplete="off"
+                onChange={(v) => setCfg({ ...cfg, apiKey: v })}
               />
               <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
                 {cfg.credentialStored

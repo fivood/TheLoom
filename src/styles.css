@@ -5316,6 +5316,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* 两列表单行(外链网盘配置用) */
 .field-row2 { display: flex; gap: 10px; }
 .field-row2 > .field { flex: 1; min-width: 0; }
+/* 窄屏堆成单列:两列时口令框只剩 122px(还要减去显示按钮),没法核对 */
+@media (max-width: 560px) {
+  .field-row2 { flex-direction: column; gap: 0; }
+}
 
 /* 可切换明文的密码框:输入框占满,眼睛贴右 */
 .secret-input { display: flex; gap: 4px; align-items: center; }

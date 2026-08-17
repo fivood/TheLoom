@@ -7,6 +7,7 @@ import {
 import { isTauri } from '../storage';
 import { confirmDialog } from '../dialog';
 import Icon from './Icon';
+import SecretInput from './SecretInput';
 
 export default function SyncPanel({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg] = useState<SyncConfig>(loadSyncConfig);
@@ -176,11 +177,10 @@ export default function SyncPanel({ onClose }: { onClose: () => void }) {
           </div>
           <div className="field">
             <label>口令(即端到端加密密钥,服务器看不到内容;忘记则无法找回)</label>
-            <input
-              type="password"
+            <SecretInput
               value={cfg.pass}
-              onChange={(e) => patch({ pass: e.target.value })}
               placeholder="至少 4 位,首次推送时确定"
+              onChange={(v) => patch({ pass: v })}
             />
           </div>
 

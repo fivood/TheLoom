@@ -9,35 +9,7 @@ import {
 } from '../remote/remoteSync';
 import { syncAssets } from '../remote/assetSync';
 import Icon from './Icon';
-
-/**
- * 可切换明文的密码框。加密口令与密钥不同:密钥填错会立刻 403,
- * 口令填错却毫无反应 —— 照样能上传,只是换台设备再也解不开,且没有找回通道。
- * 所以必须让用户能看一眼自己敲的是什么。
- */
-function SecretInput({ value, placeholder, onChange }: {
-  value: string; placeholder?: string; onChange: (v: string) => void;
-}) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="secret-input">
-      <input
-        type={show ? 'text' : 'password'}
-        value={value}
-        placeholder={placeholder}
-        spellCheck={false}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <button
-        type="button"
-        className="ghost icon-btn"
-        title={show ? '隐藏' : '显示'}
-        aria-label={show ? '隐藏' : '显示'}
-        onClick={() => setShow((v) => !v)}
-      ><Icon name="eye" size={14} style={show ? undefined : { opacity: 0.45 }} /></button>
-    </div>
-  );
-}
+import SecretInput from './SecretInput';
 
 /**
  * 外链网盘(S3 兼容)同步面板。
