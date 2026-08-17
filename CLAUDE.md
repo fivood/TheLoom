@@ -180,6 +180,32 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.54.0 灵感库 + 开篇动线 + 云房间下线)
+
+**新增 `src/inbox.ts`(跨项目灵感库)**。动机是一个此前没看清的矛盾:捕获(手机快记,
+时间序)与梳理(桌面风暴板,空间画布 + 连线)被塞进同一个容器 `project.brainstormNotes`
+—— 之前修的「便签堆成一摞」就是这个矛盾的症状。
+
+- 灵感库是**扁平列表**,只有文字与时间,独立存 `theloom-inbox-v1`。不给坐标与连线,
+  那是风暴板的职责
+- **合并按 id 取并集,不需要冲突判定** —— 收件箱以追加为主。但**删除必须留墓碑**,
+  否则会被对端同步回来;测试专门守这条,还有「删除后又在别处编辑则复活」
+- `visibleIdeas` 排序对同毫秒写入做了兜底(createdAt 相同会退化成插入序)
+- 取用只记 `usedIn` 不删卡片;随外链网盘同步 `inbox.enc`
+
+**风暴板补上出口**:选中便签可转场景 / 大纲行(便签保留)。此前便签是死胡同,而大纲行
+↔ 场景的绑定早就有(`OutlineGrid`),所以断的只有第一步。小说预设首层加入 brainstorm。
+
+**下线云房间**(-691 行 + 一个 D1 库):两条通道能力已分叉(灵感库只跟外链网盘走),
+单人下原始动机不再成立。
+
+- 删 `sync.ts` / `SyncPanel.tsx` / `functions/api/room` / D1 绑定 / 离线队列
+  (`pendingPush` / `refreshSyncState`)/ `online` / `setOnline`
+- **`syncError` 不能删** —— 它名字像云房间,实际是**文件夹模式**的保存错误,
+  `ProjectMenu` 与 `RecoveryPanel` 都在用。差点误删,逐处 grep 才分清
+- 下线前把库中仅有的一条记录导出到 `personal/`(已 gitignore);内容端到端加密
+  无法确认是否为联调残留,故留档而非直接丢弃
+
 ## 最近变更(v0.53.1 密钥字段可查看 + 手机端接入)
 
 - **`components/SecretInput.tsx`**(输入框 + 眼睛)用于全部密钥字段:外链网盘加密口令与
