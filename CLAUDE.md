@@ -180,6 +180,17 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.53.1 密钥字段可查看 + 手机端接入)
+
+- **`components/SecretInput.tsx`**(输入框 + 眼睛)用于全部密钥字段:外链网盘加密口令与
+  Secret Key、云房间口令、AI API Key。**理由是后果不对称**:密钥填错点测试连接立刻 403,
+  口令填错毫无反应 —— 照样上传,换台设备才发现解不开且无找回通道。全项目已无裸
+  `type="password"`
+- `MobileMe` 接入 `RemotePanel`。手机上外链网盘比云房间更有用:无 20MB 上限,
+  资源原文件能跟着走(网页端 IndexedDB 附件换设备就没了)
+- **`.field-row2` 窄屏堆单列** —— 两列时口令框在 375px 下只剩 122px,再减去眼睛按钮
+  等于白加,正好抵消这次改动的意义。桌面 1440px 仍为两列,已实测未受影响
+
 ## 最近变更(v0.53.0 外链网盘同步 · S3 兼容)
 
 新增 `src/remote/`,把项目同步到用户自己的 S3 兼容存储。**选 S3 而不是 OAuth 网盘**:
