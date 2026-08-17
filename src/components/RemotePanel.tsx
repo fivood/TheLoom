@@ -11,6 +11,35 @@ import { syncAssets } from '../remote/assetSync';
 import Icon from './Icon';
 
 /**
+ * 可切换明文的密码框。加密口令与密钥不同:密钥填错会立刻 403,
+ * 口令填错却毫无反应 —— 照样能上传,只是换台设备再也解不开,且没有找回通道。
+ * 所以必须让用户能看一眼自己敲的是什么。
+ */
+function SecretInput({ value, placeholder, onChange }: {
+  value: string; placeholder?: string; onChange: (v: string) => void;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="secret-input">
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        placeholder={placeholder}
+        spellCheck={false}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        className="ghost icon-btn"
+        title={show ? '隐藏' : '显示'}
+        aria-label={show ? '隐藏' : '显示'}
+        onClick={() => setShow((v) => !v)}
+      ><Icon name="eye" size={14} style={show ? undefined : { opacity: 0.45 }} /></button>
+    </div>
+  );
+}
+
+/**
  * 外链网盘(S3 兼容)同步面板。
  * 与「协作」面板的区别:数据在用户自己的桶里,没有 20MB 上限,资源原文件
  * 也跟着走,且不经过本项目的服务器。
@@ -152,10 +181,9 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
           </div>
           <div className="field">
             <label>Secret Access Key</label>
-            <input
-              type="password"
+            <SecretInput
               value={cfg.secretAccessKey}
-              onChange={(e) => patch({ secretAccessKey: e.target.value.trim() })}
+              onChange={(v) => patch({ secretAccessKey: v.trim() })}
             />
           </div>
           <div className="field-row2">
@@ -165,11 +193,10 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
             </div>
             <div className="field">
               <label>加密口令</label>
-              <input
-                type="password"
+              <SecretInput
                 value={cfg.pass}
                 placeholder="忘记即无法恢复"
-                onChange={(e) => patch({ pass: e.target.value })}
+                onChange={(v) => patch({ pass: v })}
               />
             </div>
           </div>
