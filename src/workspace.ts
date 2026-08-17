@@ -9,13 +9,15 @@ export const WORKSPACE_PRESET_LABEL: Record<WorkspacePreset, string> = {
 };
 
 export const WORKSPACE_PRESET_HINT: Record<WorkspacePreset, string> = {
-  novel: '优先显示正文、设定集、规划、资料和大纲',
+  novel: '从风暴起步,首层为风暴、正文、大纲、设定集、规划、资料',
   interactive: '优先显示流程、剧本、实体、变量和资源',
   universal: '显示全部模块，保持完整导航',
 };
 
 export const WORKSPACE_PRIMARY_TABS: Record<WorkspacePreset, WorkspaceTab[]> = {
-  novel: ['documents', 'entities', 'planning', 'research', 'outline'],
+  // 风暴排在首位:从 0 开篇常是「先撒便签 → 挑几张变成场景 / 大纲行」,
+  // 起点模块却要点开「更多」才找得到,等于把第一步藏起来
+  novel: ['brainstorm', 'documents', 'outline', 'entities', 'planning', 'research'],
   interactive: ['flow', 'documents', 'entities', 'variables', 'assets'],
   universal: ['flow', 'documents', 'entities', 'assets', 'research', 'planning', 'outline', 'timeline', 'map', 'brainstorm', 'variables'],
 };

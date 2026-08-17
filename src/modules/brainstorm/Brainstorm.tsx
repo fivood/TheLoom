@@ -8,6 +8,7 @@ import {
 import { uid, useLoom } from '../../store';
 import { nextNotePosition } from '../../brainstormLayout';
 import { getThemeMode, readableInk, subscribeThemeMode } from '../../theme';
+import { useNav } from '../../search';
 
 interface StickyData {
   text: string;
@@ -108,12 +109,66 @@ function Canvas() {
     setNodes((ns) => ns.map((n) => (n.selected ? { ...n, data: { ...n.data, color } } : n)));
   };
 
+  /** 便签首行当标题;整段仍进正文 / 主线剧情 */
+  const firstLine = (t: string) => t.split('\n')[0].trim().slice(0, 24);
+
   const hasSelection = nodes.some((n) => n.selected);
+  const selectedTexts = () => nodes.filter((n) => n.selected)
+    .map((n) => String(n.data.text ?? '').trim()).filter(Boolean);
+
+  /**
+   * 便签原本是死胡同 —— 想不到别处去,只能手工复制粘贴。
+   * 从 0 开篇的顺序常是「先撒便签 → 挑几张变成场景 / 章节」,
+   * 这两个动作把那一步接上;便签本身保留,不是移动。
+   */
+  const toScenes = () => {
+    const texts = selectedTexts();
+    if (texts.length === 0) return;
+    const first = useLoom.getState().project.documentCategories[0] ?? '未分类';
+    useLoom.getState().update((p) => {
+      for (const text of texts) {
+        p.documents.push({
+          id: uid(),
+          name: firstLine(text) || '新场景',
+          category: first,
+          blocks: [{ id: uid(), type: 'paragraph', text, flowRole: 'none' }],
+          notes: '', status: 'outline',
+          createdAt: Date.now(), updatedAt: Date.now(),
+        });
+      }
+    });
+    useNav.getState().go({ tab: 'documents' });
+  };
+
+  const toOutlineRows = () => {
+    const texts = selectedTexts();
+    if (texts.length === 0) return;
+    useLoom.getState().update((p) => {
+      for (const text of texts) {
+        p.outlineRows.push({
+          id: uid(),
+          no: String(p.outlineRows.length + 1),
+          time: '',
+          title: firstLine(text),
+          main: text,
+          cells: {},
+        });
+      }
+    });
+    useNav.getState().go({ tab: 'outline' });
+  };
 
   return (
     <div className="pane-col">
       <div className="toolbar">
         <button className="primary" onClick={() => addNote()}>＋ 新便签</button>
+        {hasSelection && (
+          <>
+            <span className="tool-sep" aria-hidden="true" />
+            <button title="把选中便签各建一个场景(便签保留),并跳到正文" onClick={toScenes}>转为场景</button>
+            <button title="把选中便签各建一行大纲(便签保留),并跳到大纲" onClick={toOutlineRows}>转为大纲行</button>
+          </>
+        )}
         {hasSelection && (
           <div className="color-row" style={{ alignItems: 'center' }}>
             {NOTE_COLORS.map((c) => (

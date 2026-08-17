@@ -11,7 +11,8 @@ describe('R17-4 项目工作区预设', () => {
   });
 
   it('小说与互动叙事只改变首层模块和默认术语', () => {
-    expect(WORKSPACE_PRIMARY_TABS.novel).toEqual(['documents', 'entities', 'planning', 'research', 'outline']);
+    // 风暴在首位:小说从 0 开篇的起点是撒便签,不该藏在「更多」里
+    expect(WORKSPACE_PRIMARY_TABS.novel).toEqual(['brainstorm', 'documents', 'outline', 'entities', 'planning', 'research']);
     expect(WORKSPACE_PRIMARY_TABS.interactive).toEqual(['flow', 'documents', 'entities', 'variables', 'assets']);
     expect(workspaceTabLabel('novel', 'documents')).toBe('正文');
     expect(workspaceTabLabel('novel', 'entities')).toBe('设定集');
