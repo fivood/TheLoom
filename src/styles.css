@@ -5312,3 +5312,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* 覆盖上面的 align-items:center —— 那是给分块编辑器居中用的,
    纯文本要撑满高度才能一路往下写 */
 .doc-focus-editor { display: flex; align-items: stretch; overflow-y: auto; }
+
+/* 两列表单行(外链网盘配置用) */
+.field-row2 { display: flex; gap: 10px; }
+.field-row2 > .field { flex: 1; min-width: 0; }

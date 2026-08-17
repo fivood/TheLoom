@@ -16,6 +16,7 @@ import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
 import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
 import SearchPalette from './components/SearchPalette';
 import SyncPanel from './components/SyncPanel';
+import RemotePanel from './components/RemotePanel';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
@@ -111,6 +112,7 @@ export default function App() {
   }, [tab]);
   const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [remoteSync, setRemoteSync] = useState(false);
   const [auditing, setAuditing] = useState(false);
   const [querying, setQuerying] = useState(false);
   const [history, setHistory] = useState(false);
@@ -590,7 +592,13 @@ export default function App() {
                     <Icon name="braces" size={14} /> 模板管理器
                   </button>
                   <button onClick={() => { setToolsOpen(false); setSyncing(true); }}>
-                    <Icon name="cloud" size={14} /> 协作
+                    <Icon name="cloud" size={14} /> 协作(云房间)
+                  </button>
+                  <button
+                    title="同步到你自己的 S3 兼容存储(R2 / B2 / MinIO / OSS):端到端加密、无 20MB 上限、资源原文件一起走"
+                    onClick={() => { setToolsOpen(false); setRemoteSync(true); }}
+                  >
+                    <Icon name="upload" size={14} /> 外链网盘同步
                   </button>
                   <div className="tools-sep" />
                   <div className="tools-label">AI</div>
@@ -733,6 +741,7 @@ export default function App() {
 
       {searching && <SearchPalette onClose={() => setSearching(false)} />}
       {syncing && <SyncPanel onClose={() => setSyncing(false)} />}
+      {remoteSync && <RemotePanel onClose={() => setRemoteSync(false)} />}
       {auditing && <AuditPanel onClose={() => setAuditing(false)} />}
       {querying && <QueryPanel onClose={() => setQuerying(false)} />}
       {history && <VersionHistory onClose={() => setHistory(false)} />}
