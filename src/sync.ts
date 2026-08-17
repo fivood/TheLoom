@@ -8,6 +8,7 @@
  */
 import type { Project } from './types';
 import { normalizeProject } from './util';
+import { decryptBytes, encryptBytes, fromBase64, gzip, toBase64 } from './crypto';
 
 const CONFIG_KEY = 'theloom-sync-v1';
 
@@ -59,28 +60,6 @@ function deriveKeys(room: string, pass: string): Promise<Keys> {
   return keyCache.get(cacheKey)!;
 }
 
-async function gzip(data: Uint8Array, mode: 'gzip' | 'gunzip'): Promise<Uint8Array> {
-  const stream = new Blob([data as BlobPart]).stream().pipeThrough(
-    mode === 'gzip' ? new CompressionStream('gzip') : new DecompressionStream('gzip'),
-  );
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return btoa(s);
-}
-
-function fromBase64(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
 /**
  * 缩略图必须随密文一起走:接力的对端没有本机 IDB 缩略图库,
  * 桌面端更是连回填路径都没有(hydrateAssetThumbs 在 Tauri 下直接 return),
@@ -88,22 +67,12 @@ function fromBase64(b64: string): Uint8Array {
  */
 async function encryptProject(project: Project, key: CryptoKey): Promise<string> {
   const plain = await gzip(new TextEncoder().encode(JSON.stringify(project)), 'gzip');
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain as BufferSource));
-  const out = new Uint8Array(iv.length + ct.length);
-  out.set(iv);
-  out.set(ct, iv.length);
-  return toBase64(out);
+  return toBase64(await encryptBytes(plain, key));
 }
 
 async function decryptProject(payload: string, key: CryptoKey): Promise<Project> {
-  const bytes = fromBase64(payload);
-  const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: bytes.slice(0, 12) },
-    key,
-    bytes.slice(12) as BufferSource,
-  );
-  const json = new TextDecoder().decode(await gzip(new Uint8Array(plain), 'gunzip'));
+  const plain = await decryptBytes(fromBase64(payload), key);
+  const json = new TextDecoder().decode(await gzip(plain, 'gunzip'));
   const p = JSON.parse(json) as Project;
   if (!p || p.version !== 1) throw new Error('云端数据格式不正确');
   return normalizeProject(p);
