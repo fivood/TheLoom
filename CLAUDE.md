@@ -200,7 +200,7 @@ A 级四项已修复(见「最近变更」UX 批),以下为评估中确认但未
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
-## 最近变更(UX 评估 A 级修复 · 未发版)
+## 最近变更(v0.54.1 UX 评估 A 级修复)
 
 2026-08-20 全量 UX 走查(29 张截图实机点验)确认的 4 个 A 级问题已全部修复,B / C 级见「UX 评估待办」:
 
