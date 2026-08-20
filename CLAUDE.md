@@ -20,8 +20,8 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.41.0`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.41.0`(R22 正式示例);**路线图 R17→R22 除 R21 外全部完成**,R21(本地化与配音)经用户决定暂缓;Unreal 可选;v1.0.0 留待多轮真实项目测试后
+- 已发布版本:`v0.54.3`(package.json / tauri.conf.json / Cargo.toml 同步)
+- 当前基线:`v0.54.3`(品牌图标全新替换 + 发版复查修复);**路线图 R17→R22 除 R21 外全部完成**,R21(本地化与配音)经用户决定暂缓;Unreal 可选;v1.0.0 留待多轮真实项目测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
 - 已交付的能力(截至 v0.41.0):
   - **v0.41.0 R22 《老伦敦寻人记》正式示例** ✅ — `examples/old-london/`:原稿 `source.md` + `build.mts` 生成器 → 文件夹格式项目(1 卷 4 章 12 场景 1.2 万字 / 15 实体 / 5 伏笔 / 5 弧线 / 7 时间线事件 / 25 节点解谜流程 / 4 结局 / 3 回归测试);`verify.mts` 跑小说通道验收,`trace.mts` 核对流程走向;端到端串起闸门 → 自包含包 → 脱机验收 → 编译 / DOCX → 三端一致
@@ -198,6 +198,22 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(v0.54.3 品牌图标全新替换 + 发版复查修复)
+
+**图标替换**:`logo_theloom.svg`(512×512 全彩织机 + 白色圆角底)成为唯一图标源 → `public/logo.svg`(favicon / 顶栏);`scripts/gen-icons.mjs` 重写(去掉单色重着色与 `#eceae6` 铺底,直接按 density 栅格化;maskable 缩到 78% 安全区四周填白);重新生成 PWA 192/512/maskable + apple-touch-icon + 根目录 `app-icon.png`(1024);`npx tauri icon` 重新生成 `src-tauri/icons/` 全套 57 个文件(ico / icns / PNG / StoreLogo / iOS / Android)。
+
+**发版复查(v0.54.1/0.54.2 回归风险审计)发现并修复**:
+- 沉浸写作**空提示语选项块往返丢选项**(v0.54.2 B4 引入):渲染成纯 ▸ 行后 `parseMarkdown` 把第一个选项误吞为提示语,2 选项变 1。修复:全 ▸ 行按「无提示语选项块」解析(`immersive.ts`),补 3 条回归测试;触发条件是空提示语选项块 + 沉浸模式任意敲键(每次输入全量回写)
+- `useEscape` 栈序隐患:effect 依赖含 `onEscape` 闭包,下层弹层重渲染会把回调重新 push 到栈顶抢 Esc。修复:回调存 ref、栈条目稳定化、依赖收窄为 `[active]`
+- toast 撤销隐患:原走全局 `undo()`,删除后 6.5s 内又做别的操作会撤错对象,且 800ms 合并窗口可能连前一步一起回滚。修复:删除前 `structuredClone` 快照 + 记位置,「撤销」经 `update` 插回原位(id 去重);Ctrl+Z 兜底仍在
+- `sharp` 在 v0.51.0 被移除但 `scripts/gen-icons.mjs` 仍在用(靠 node_modules 残留才能跑):加回 devDependencies
+- 审计确认无问题项:FlowEditor dirty 过滤(position/remove/add/replace)、字数口径改 `\S` 计是有意的四处统一
+- 验证:`npm test` 586 项通过,`npm run build` 通过;大纲 / 时间线删除 + 撤销 toast 经浏览器实机点验(browser-use)
+
+## 最近变更(v0.54.2 UX 走查收尾)
+
+B / C 级共 12 项一次修完(见 RELEASE_NOTES):删 MOBI / Excel 虚假文案、Alt+↑↓ 快捷键文案修正、斜杠菜单放宽到全部文本块;专注模式选项块渲染 ▸ 行 + 对称回写(B4,后在 v0.54.3 补空提示语边界)、连续稿条件 / 指令收小签、地图 inspector 空态标题;轻量 toast 系统(`src/toast.ts` + `ToastHost`)、大纲删行 / 时间线删事件改「执行 + toast 撤销」、FlowEditor dirty 只在内容变化时标、工具栏溢出菜单、顶栏工具菜单两列、FDX 导出按流程 / 文档勾选范围。`npm test` 583 项通过。
 
 ## 最近变更(v0.54.1 UX 评估 A 级修复)
 

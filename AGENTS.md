@@ -8,11 +8,12 @@
 
 - 网页版(Cloudflare Pages)+ Windows 桌面版(Tauri 2),黑白灰浅色 UI
 - 数据默认存本地:网页版 localStorage,桌面版可绑定本地文件夹(Obsidian 兼容)
-- 多项目槽位、撤销/重做(50 步)、端到端加密的接力式云协作
+- 多项目槽位、撤销/重做(50 步)、外链网盘同步(S3 兼容,端到端加密;云房间已于 v0.54.0 下线)
 
-## 当前进度与下一计划(2026-07-18)
+## 当前进度与下一计划(2026-08-20)
 
-- 已发布:`v0.28.0 / R13 专业稿件导入与章节编译`
+- 已发布:`v0.54.3 / 品牌图标全新替换 + 发版复查修复`
+- 已完成:`v0.54.0 跨项目灵感库 + 开篇动线 + 云房间下线`、`v0.54.1/v0.54.2 UX 走查 A/B/C 级修复`
 - 已完成:`R11-1 命名模板对象与安全实例迁移`
 - 已完成:`R11-2 资源 / 文档 / 地图模板与统一模板管理器`
 - 已完成:`R11-W 完整写作工作台`;详细设计见 `docs/R11W_WRITING_WORKBENCH.md`
@@ -28,8 +29,8 @@
   4. ✅ 按卷章勾选场景并编译 Markdown / TXT / Final Draft
   5. ✅ 桌面新建默认选目录、每槽位独立绑定与可选仅文件夹存储
 - 模型只拥有白名单只读工具,永远不直接操作 store;修改必须是带基线指纹的白名单提案,在项目副本上验证、用户预览确认后单次 `commit`
-- 当前基线:`v0.28.0 / R13 首批`
-- 最近验证:`npm test` 579 项通过,`npm run build` 通过,`cargo test --lib` 3 项通过;长稿导入 / 章节编译由自动化覆盖,网页端新建项目流程已在浏览器实际点验
+- 当前基线:`v0.54.3`
+- 最近验证:`npm test` 586 项通过,`npm run build` 通过;大纲 / 时间线删除 + toast 撤销、新图标渲染已在浏览器实际点验
 
 ## 模块清单(8 + 2)
 
@@ -89,7 +90,7 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 - **富文本对白**:`**粗**` / `*斜*` / `~~删~~` 行内标记,带 B/I/S 工具栏
 - 检查工具(演出/体检面板:孤儿节点、分支缺口、未定义变量、空对白、悬挂附件、重复技术名、字数统计)
 - 导出(JSON 备份、流程→Markdown 剧本、文档→Markdown 剧本)
-- 多人协作(端到端加密云房间)
+- 外链网盘同步(S3 兼容,端到端加密;云房间已于 v0.54.0 下线)
 - 通用附件(`AttachmentEditor` 已接入:流程节点 / 实体 / 资料卡 / 时间线事件)
 - 资源库 + 文档视图
 - **文件夹式 Navigator 树**(`Folder`,已覆盖流程 / 实体 / 资源 / 文档 / 资料,支持多级目录与移动)
@@ -108,6 +109,24 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 6. ~~版本历史 + 回滚~~ ✅
 7. ~~Conflict Search 增强~~ ✅(重复技术名、损坏资产)
 8. ~~Excel/FinalDraft 互通~~ ✅;矢量地点编辑、多窗口计划 R14
+
+## 最近变更(v0.54.3)
+
+品牌图标全新替换 + 发版复查发现的修复:
+
+**图标替换**
+- `logo_theloom.svg`(512×512 全彩织机图案 + 白色圆角底)成为唯一图标源 → `public/logo.svg`(favicon / 顶栏)
+- `scripts/gen-icons.mjs` 重写:去掉单色重着色 + `#eceae6` 铺底,直接按 density 栅格化全彩 SVG;maskable 缩到 78% 安全区并四周填白
+- 重新生成 `pwa-192/512.png`、`pwa-maskable-512.png`、`apple-touch-icon.png`、根目录 `app-icon.png`(1024)
+- `npx tauri icon` 重新生成 `src-tauri/icons/` 全套(ico / icns / PNG / Windows StoreLogo / iOS / Android)
+
+**复查修复**
+- 沉浸写作空提示语选项块往返丢选项:`immersive.ts` `parseMarkdown` 增全 ▸ 行分支(整段 ▸ = 无提示语选项块,不再把第一个选项误吞为提示语);`immersive.test.ts` 补 3 条回归
+- `useEscape` 共享栈加固:回调存 ref、栈条目稳定化、effect 依赖收窄为 `[active]`,重渲染换新闭包不会把旧层重新顶到栈顶
+- toast 撤销改定向快照恢复:大纲删行 / 时间线删事件先 `structuredClone` 快照再删,「撤销」经 `update` 插回原位(id 去重),不再走全局 `undo()` 以免撤错对象;Ctrl+Z 全局撤销依旧兜底
+- `sharp` 加回 devDependencies(`gen-icons.mjs` 在全新安装环境可跑)
+
+- 验证:`npm test` 586 项通过,`npm run build` 通过;大纲 / 时间线删除 + 撤销 toast 经浏览器实机点验
 
 ## 最近变更(R14-UX)
 
