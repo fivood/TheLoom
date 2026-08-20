@@ -20,8 +20,8 @@
 
 ### 当前基线
 
-- 已发布版本:`v0.54.3`(package.json / tauri.conf.json / Cargo.toml 同步)
-- 当前基线:`v0.54.3`(品牌图标全新替换 + 发版复查修复);**路线图 R17→R22 除 R21 外全部完成**,R21(本地化与配音)经用户决定暂缓;Unreal 可选;v1.0.0 留待多轮真实项目测试后
+- 已发布版本:网页 `v0.54.4` / 桌面 `v0.54.3`(package.json / tauri.conf.json / Cargo.toml 已同步到 0.54.4,仅网页推送未打 tag,下次桌面发版可直接打 v0.54.4 tag)
+- 当前基线:网页 `v0.54.4`(PWA 与移动端体验修复);**路线图 R17→R22 除 R21 外全部完成**,R21(本地化与配音)经用户决定暂缓;Unreal 可选;v1.0.0 留待多轮真实项目测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
 - 已交付的能力(截至 v0.41.0):
   - **v0.41.0 R22 《老伦敦寻人记》正式示例** ✅ — `examples/old-london/`:原稿 `source.md` + `build.mts` 生成器 → 文件夹格式项目(1 卷 4 章 12 场景 1.2 万字 / 15 实体 / 5 伏笔 / 5 弧线 / 7 时间线事件 / 25 节点解谜流程 / 4 结局 / 3 回归测试);`verify.mts` 跑小说通道验收,`trace.mts` 核对流程走向;端到端串起闸门 → 自包含包 → 脱机验收 → 编译 / DOCX → 三端一致
@@ -198,6 +198,20 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(v0.54.4 PWA / 移动端走查修复 · 仅网页端)
+
+**A 级:移动壳云同步面板不可用**:RemotePanel 内联宽 560px 超出手机视口、`.palette` 无 `max-width` 兜底且 60vh + `overflow:hidden` 裁掉底部操作区,「我」页唯一跨端入口在手机上完全够不着。修复:`styles.css` `.palette` 加 `max-width: calc(100vw - 24px)`(兜住全部内联固定宽 520–780px 面板)、`.sync-body` 内部可滚(`flex:1; min-height:0; overflow-y:auto`)、`.app-mobile .palette-backdrop/.palette` 改近全屏工作表(padding-top 12px + safe-area、`max-height` 跟随 `--vvh` 键盘变量)。
+
+**联动与体验**:
+- `RemotePanel`:拉取确认后先 `createSnapshot('拉取前自动 …')` 再替换 —— 移动端无版本历史入口也无 Ctrl+Z,快照是唯一后悔药;确认文案同步更新;提示区明示远端只有**一个**项目对象(对应当前槽位,换作品覆盖);远端状态附本机上次同步时间
+- `MobileMe`「快记」统计改灵感库可见卡片数(原误数风暴板便签;桌面风暴板移动端本不展示)
+- `inbox.ts` `saveInbox` 镜像写 IDB(启动 hydration 的 `theloom-*` 缺失补齐逻辑天然覆盖 `theloom-inbox-v1`,localStorage 被清后可从 IDB 恢复)
+- `assetSync.ts` `probeRemote` 改 8 路分批并发(原逐条 HEAD 串行,弱网下资源多时探测慢);`assetSync.test.ts` 补跨批次回归
+- `App.tsx`:Onboarding 加 `!mobileShell` 门控 —— 桌面引导按钮 `setTab` 在移动壳无可见效果,空弹一次徒增困惑
+- `MobileWrite` last-doc 键改 `theloom-mobile-last-doc:{slotId}`,多项目切换不再把场景位置记串;「归位」effect 依赖补 `currentSlotId`
+- 云房间时代残留文案清理:PwaBanner iOS 提示、`pwa.ts` 头注释、`vite.config.ts` NetworkOnly 注释、AiPanel 密钥说明统一改外链网盘口径
+- 验证:`npm test` 587 项通过,`npm run build` 通过(PWA 产物正常);browser-use 实机点验:移动壳激活 / Onboarding 不弹 / 面板几何(`maxHeight = vvh − 24px`)与底部按钮在视口内 / IDB 镜像生效 / 快记计数正确 / last-doc 槽位键格式正确
 
 ## 最近变更(v0.54.3 品牌图标全新替换 + 发版复查修复)
 

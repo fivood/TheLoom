@@ -12,7 +12,7 @@
 
 ## 当前进度与下一计划(2026-08-20)
 
-- 已发布:`v0.54.3 / 品牌图标全新替换 + 发版复查修复`
+- 已发布:`v0.54.4 / PWA 与移动端体验修复`(仅网页端推送,未打 tag,桌面版维持 v0.54.3 不重新打包)
 - 已完成:`v0.54.0 跨项目灵感库 + 开篇动线 + 云房间下线`、`v0.54.1/v0.54.2 UX 走查 A/B/C 级修复`
 - 已完成:`R11-1 命名模板对象与安全实例迁移`
 - 已完成:`R11-2 资源 / 文档 / 地图模板与统一模板管理器`
@@ -29,8 +29,8 @@
   4. ✅ 按卷章勾选场景并编译 Markdown / TXT / Final Draft
   5. ✅ 桌面新建默认选目录、每槽位独立绑定与可选仅文件夹存储
 - 模型只拥有白名单只读工具,永远不直接操作 store;修改必须是带基线指纹的白名单提案,在项目副本上验证、用户预览确认后单次 `commit`
-- 当前基线:`v0.54.3`
-- 最近验证:`npm test` 586 项通过,`npm run build` 通过;大纲 / 时间线删除 + toast 撤销、新图标渲染已在浏览器实际点验
+- 当前基线:网页 `v0.54.4` / 桌面 `v0.54.3`(下次桌面发版可直接打 v0.54.4 tag)
+- 最近验证:`npm test` 587 项通过,`npm run build` 通过;移动壳 / 云同步面板几何 / 灵感库 IDB 镜像已在浏览器实际点验
 
 ## 模块清单(8 + 2)
 
@@ -109,6 +109,22 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 6. ~~版本历史 + 回滚~~ ✅
 7. ~~Conflict Search 增强~~ ✅(重复技术名、损坏资产)
 8. ~~Excel/FinalDraft 互通~~ ✅;矢量地点编辑、多窗口计划 R14
+
+## 最近变更(v0.54.4)
+
+PWA / 移动端走查修复(仅网页端发布):
+
+**A 级:移动壳云同步面板不可用 → 已修**
+- `styles.css`:`.palette` 加 `max-width: calc(100vw - 24px)`(兜住全部内联固定宽面板);`.sync-body` 加 `flex:1; min-height:0; overflow-y:auto`;`.app-mobile` 内面板改近全屏工作表(padding-top 12px + `max-height` 跟随 `--vvh`)
+
+**联动与体验**
+- `RemotePanel`:拉取确认后先 `createSnapshot('拉取前自动 …')` 再替换(移动端无版本历史入口,快照是唯一后悔药);提示区明示远端单项目对象/槽位语义;远端状态附本机上次同步时间
+- `MobileMe`:「快记」统计改灵感库可见卡片数(原误数风暴板便签)
+- `inbox.ts`:`saveInbox` 镜像写 IDB,启动 hydration 的 `theloom-*` 补齐逻辑可恢复被清的 localStorage
+- `assetSync.ts`:`probeRemote` 改 8 路分批并发(弱网下资源多时探测提速);`assetSync.test.ts` 补跨批次回归
+- `App.tsx`:Onboarding 加 `!mobileShell` 门控,移动壳不再弹桌面向引导
+- `MobileWrite`:last-doc 键按槽位(`theloom-mobile-last-doc:{slotId}`),切项目不再记串
+- 陈旧文案清理:PwaBanner iOS 提示 / `pwa.ts` / `vite.config.ts` / AiPanel 里云房间时代残留改为外链网盘口径
 
 ## 最近变更(v0.54.3)
 
