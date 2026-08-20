@@ -29,7 +29,7 @@
   5. ✅ 桌面新建默认选目录、每槽位独立绑定与可选仅文件夹存储
 - 模型只拥有白名单只读工具,永远不直接操作 store;修改必须是带基线指纹的白名单提案,在项目副本上验证、用户预览确认后单次 `commit`
 - 当前基线:`v0.28.0 / R13 首批`
-- 最近验证:`npm test` 292 项通过,`npm run build` 通过,`cargo test --lib` 3 项通过;长稿导入 / 章节编译由自动化覆盖,网页端新建项目流程已在浏览器实际点验
+- 最近验证:`npm test` 579 项通过,`npm run build` 通过,`cargo test --lib` 3 项通过;长稿导入 / 章节编译由自动化覆盖,网页端新建项目流程已在浏览器实际点验
 
 ## 模块清单(8 + 2)
 
@@ -108,6 +108,17 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 6. ~~版本历史 + 回滚~~ ✅
 7. ~~Conflict Search 增强~~ ✅(重复技术名、损坏资产)
 8. ~~Excel/FinalDraft 互通~~ ✅;矢量地点编辑、多窗口计划 R14
+
+## 最近变更(R14-UX)
+
+UX 评估 4 个 A 级问题修复:
+
+- **A1 分屏布局崩坏**:`App.tsx` 分屏两 pane 内容统一包 `.pane-module` wrapper;`styles.css` 在 `.content-pane` 上加 `container-type: inline-size`(与既有 `.side-list` 容器查询先例一致),新增 `@container (max-width: 1100px)`(侧栏收窄 + 工具栏单行横滚)与 `@container (max-width: 768px)`(三栏纵向堆叠)两块规则;≤768px 媒体查询的选择器改为 `.content-pane > .pane-module > ...`
+- **A2 字数口径统一**:`util.ts` `documentWordCount` 改为非空白字符(`\S`)计数,`audit.ts` 文档行改用同一函数;导航 / inspector / 专注模式 / 体检四处口径一致
+- **A3 Esc 行为一致**:`useEscape.ts` 重写为共享栈(window 单监听,多层叠加只关最顶层);`Dialog.tsx` 迁入栈;20 余个 palette 面板 + 顶栏工具 / 最近下拉 + 专注模式 + 演出模式全部经 `useEscape` 挂 Esc 关闭
+- **A4 流程画布初始视口**:`FlowEditor.tsx` 默认 `fitViewOptions={ minZoom: 0.6, maxZoom: 1, padding: 0.12 }`,打开流程即可读
+- 顺手修复 Ctrl+\ stale closure(`App.tsx` 加 `tabRef`,副面板默认模块跟随当前 tab)
+- 全部经 Playwright 实机点验(临时 Chrome profile);`npm test` 579 项通过,`npm run build` 通过
 
 ## 最近变更(R1-2)
 

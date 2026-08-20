@@ -17,10 +17,12 @@ import {
   type AiImportPreview, type ExtractScenario,
 } from '../ai/extract';
 import SecretInput from './SecretInput';
+import { useEscape } from '../hooks/useEscape';
 
 /* ---------- AI 设置 ---------- */
 
 export function AiSettingsModal({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const [cfg, setCfg] = useState<LlmConfig>(() => loadLlmConfig());
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -165,6 +167,7 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
 /* ---------- AI 长文抽取 ---------- */
 
 export function AiExtractModal({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const update = useLoom((s) => s.update);
   const go = useNav((s) => s.go);

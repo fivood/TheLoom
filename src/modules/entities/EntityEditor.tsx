@@ -11,6 +11,7 @@ import AttachmentEditor from '../../components/AttachmentEditor';
 import TechNameField from '../../components/TechNameField';
 import FieldListEditor from '../../components/FieldListEditor';
 import ColorPicker from '../../components/ColorPicker';
+import { useEscape } from '../../hooks/useEscape';
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
@@ -24,6 +25,7 @@ export default function EntityEditor({ entityId, onClose }: { entityId: string; 
   const entity = project.entities.find((e) => e.id === entityId) ?? null;
   const avatarRef = useRef<HTMLInputElement>(null);
   const refs = useMemo(() => (entity ? findEntityRefs(project, entity) : []), [project, entity]);
+  useEscape(true, onClose);
 
   if (!entity) {
     // 实体被外部删除时优雅退出

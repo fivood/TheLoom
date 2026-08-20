@@ -12,8 +12,10 @@ import {
   type QueryObjectType,
 } from '../query';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 export default function QueryPanel({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((state) => state.project);
   const addSavedQuery = useLoom((state) => state.addSavedQuery);
   const updateSavedQuery = useLoom((state) => state.updateSavedQuery);

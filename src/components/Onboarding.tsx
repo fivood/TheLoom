@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLoom } from '../store';
 import type { WorkspacePreset } from '../types';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 /**
  * 首启新手引导:先选「写什么」(决定工作台布局),再选起点(空白 / 示例 / AI)。
@@ -27,6 +28,7 @@ const MODES: { key: WorkspacePreset; label: string; desc: string }[] = [
 ];
 
 export default function Onboarding({ onContinueBlank, onLoadSample, onClose }: Props) {
+  useEscape(true, () => { markOnboarded(); onClose(); });
   const [mode, setMode] = useState<WorkspacePreset>('novel');
   const pick = (fn: () => void) => {
     useLoom.getState().update((p) => { p.workspacePreset = mode; });

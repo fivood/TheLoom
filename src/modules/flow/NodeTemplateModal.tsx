@@ -5,9 +5,11 @@ import type { EntityTemplateField, FlowNodeType } from '../../types';
 import { FLOW_NODE_LABEL } from '../../types';
 import type { EntityFieldType } from '../../types';
 import { defaultNodeTemplate, resolveTemplateFields } from '../../templates';
+import { useEscape } from '../../hooks/useEscape';
 
 /** 按节点类型编辑模板字段 + 约束(编辑该类型的默认命名模板;保存后实例自动补齐新增字段) */
 export default function NodeTemplateModal({ initialType, onClose }: { initialType: FlowNodeType; onClose: () => void }) {
+  useEscape(true, onClose);
   const setDefaultTemplate = useLoom((s) => s.setDefaultTemplate);
   const [type, setType] = useState<FlowNodeType>(initialType);
   const readTpl = (t: FlowNodeType): EntityTemplateField[] =>

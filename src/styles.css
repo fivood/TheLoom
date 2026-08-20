@@ -334,7 +334,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .content { flex: 1; min-height: 0; min-width: 0; display: flex; overflow: hidden; }
 
 /* R14-3 分屏:两个 content-pane 并列;每个 pane 内部布局与非分屏时一致 */
-.content > .content-pane { flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.content > .content-pane { flex: 1; min-width: 0; display: flex; overflow: hidden; container-type: inline-size; }
+/* 模块内容统一套一层 .pane-module:分屏时 pane 宽度远小于视口,
+   视口媒体查询帮不上忙,栏宽自适应要靠 pane 级容器查询(见本文件末尾两处 @container) */
+.pane-module { flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; }
 /* flex-shrink 必须为 1,且给副面板留出 280px:否则在比「上次拖拽时」更窄的窗口里,
    主面板不收缩会把副面板挤成 0,连带把右缘的拖拽柄推到视口外,再也拖不回来 */
 .content-split > .content-pane-primary {
@@ -4826,20 +4829,20 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .content-split > .content-pane { flex: 1 1 0; }
   .content-split > .content-pane-primary { flex: 1 1 0; }
   /* 模块内部布局:窄屏纵向堆叠(导航树 / 内容 / 检查器) */
-  .content-pane { flex-direction: column; }
-  .content-pane > .side-list {
+  .content-pane > .pane-module { flex-direction: column; }
+  .content-pane > .pane-module > .side-list {
     width: 100%;
     max-height: 34vh;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
-  .content-pane > .inspector {
+  .content-pane > .pane-module > .inspector {
     width: 100%;
     max-height: 36vh;
     border-left: 0;
     border-top: 1px solid var(--border);
   }
-  .content-pane > .pane-col { flex: 1 1 0; }
+  .content-pane > .pane-module > .pane-col { flex: 1 1 0; }
 }
 
 /* ---------- 移动端专用壳(碎片时间写作) ---------- */
@@ -5141,6 +5144,49 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .sidebar::-webkit-scrollbar { display: none; }
   .sidebar .nav-btn { flex-shrink: 0; }
   .sidebar .nav-btn span { white-space: nowrap; }
+}
+
+/*
+ * 分屏 pane 级适配:视口还宽,但单个 pane 已经窄了 —— 视口媒体查询这时全部失效,
+ * 两侧栏(260+320)会把中间列挤没(工具栏逐字竖排、流程画布宽度归零)。
+ * 用 .content-pane 上的容器查询,把上面媒体查询里「模块布局相关」的规则按 pane 宽度重放一遍:
+ * ≤1100px 两侧收窄 + 工具栏单行横滚;≤768px 三栏改上下堆叠。
+ */
+@container (max-width: 1100px) {
+  .pane-module > .side-list { width: var(--pane-nav, 200px); min-width: 0; flex-shrink: 1; }
+  .pane-module > .inspector { width: var(--pane-inspector, 240px); min-width: 0; flex-shrink: 1; }
+  .pane-module > .pane-col { min-width: 300px; }
+  .pane-module .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 8px 12px;
+  }
+  .pane-module .toolbar::-webkit-scrollbar { display: none; }
+  .pane-module .toolbar > *, .pane-module .tool-actions > * { flex-shrink: 0; white-space: nowrap; }
+  .pane-module .tool-actions { flex-wrap: nowrap; margin-left: 0; }
+  .pane-module .toolbar .hint { display: none; }
+  .pane-module .side-list { overflow: hidden; }
+  .pane-module .side-head { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .pane-module .side-head::-webkit-scrollbar { display: none; }
+  .pane-module .side-head > * { flex-shrink: 0; white-space: nowrap; }
+}
+
+@container (max-width: 768px) {
+  .pane-module { flex-direction: column; }
+  .pane-module > .side-list {
+    width: 100%;
+    max-height: 34%;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pane-module > .inspector {
+    width: 100%;
+    max-height: 36%;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .pane-module > .pane-col { flex: 1 1 0; min-width: 0; }
 }
 
 /* ---------- 软键盘适配(配合 useKeyboardInset) ---------- */

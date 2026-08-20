@@ -8,6 +8,7 @@ import {
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { alertDialog, confirmDialog, promptText } from '../../dialog';
+import { useEscape } from '../../hooks/useEscape';
 import { countSubNodes, resolveSub, sanitizeTechnicalName, walkFlowNodes } from '../../util';
 import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
@@ -608,7 +609,9 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             zoomOnDoubleClick={false}
             deleteKeyCode={['Delete', 'Backspace']}
             fitView
-            fitViewOptions={focusNodeId ? { nodes: [{ id: focusNodeId }], maxZoom: 1.1, padding: 2 } : undefined}
+            fitViewOptions={focusNodeId
+              ? { nodes: [{ id: focusNodeId }], maxZoom: 1.1, padding: 2 }
+              : { minZoom: 0.6, maxZoom: 1, padding: 0.12 }}
             minZoom={0.15}
             proOptions={{ hideAttribution: true }}
           >
@@ -1171,6 +1174,7 @@ function CrossFlowFields({ data, isCall, flows, onPatch }: {
  */
 function FlowEntriesModal({ flow, onClose }: { flow: Flow; onClose: () => void }) {
   const updateFlow = useLoom((s) => s.updateFlow);
+  useEscape(true, onClose);
   const entries = flow.entries ?? [];
   // 只有顶层叙事节点能作入口(子流程内部节点不能被外部直接进入)
   const candidates = flow.nodes.filter((n) => !ANNOTATION_TYPES.has(n.type));

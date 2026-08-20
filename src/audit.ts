@@ -1,6 +1,6 @@
 import type { FlowNode, Project, SubFlow } from './types';
 import { ANNOTATION_TYPES } from './types';
-import { findDuplicateTechnicalNames } from './util';
+import { documentWordCount, findDuplicateTechnicalNames } from './util';
 import type { NavTarget } from './search';
 import { buildScriptScope } from './script';
 import { specsForEntity } from './templates';
@@ -67,11 +67,7 @@ export function projectStats(p: Project): ProjectStats {
   const outlineWords = p.outlineRows.reduce((s, r) =>
     s + countWords(r.title) + countWords(r.main) + Object.values(r.cells).reduce((x, c) => x + countWords(c), 0), 0);
   const researchWords = p.researchCards.reduce((s, c) => s + countWords(c.title) + countWords(c.content), 0);
-  const documentWords = p.documents.reduce((s, d) =>
-    s + countWords(d.name) + countWords(d.notes) + d.blocks.reduce((x, b) =>
-      x + countWords(b.text) + countWords(b.instruction) + countWords(b.condition)
-        + (b.choices?.reduce((y, c) => y + countWords(c.label), 0) ?? 0)
-        + (b.items?.reduce((y, item) => y + countWords(item), 0) ?? 0), 0), 0);
+  const documentWords = p.documents.reduce((s, d) => s + documentWordCount(d), 0);
 
   return {
     flows,

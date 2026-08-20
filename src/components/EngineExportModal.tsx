@@ -21,6 +21,7 @@ import { RUNTIME_AVAILABLE, RUNTIME_SOURCE } from '../engine/runtimeSource';
 import { loadAssetBlob } from '../assetFiles';
 import { makeZip } from '../interop/zip';
 import { formatSize } from '../util';
+import { useEscape } from '../hooks/useEscape';
 
 /** 未保存为命名配置时用的临时配置 */
 const DRAFT_ID = '__draft__';
@@ -51,6 +52,7 @@ const SOURCE_LABEL: Record<BaselineSource, string> = {
 };
 
 export default function EngineExportModal({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const slotId = useLoom((s) => s.currentSlotId);
   const folder = useLoom((s) => s.folder);

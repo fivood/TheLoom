@@ -11,6 +11,7 @@ import { syncAssets } from '../remote/assetSync';
 import { loadInbox, saveInbox } from '../inbox';
 import Icon from './Icon';
 import SecretInput from './SecretInput';
+import { useEscape } from '../hooks/useEscape';
 
 /**
  * 外链网盘(S3 兼容)同步面板。
@@ -18,6 +19,7 @@ import SecretInput from './SecretInput';
  * 也跟着走,且不经过本项目的服务器。
  */
 export default function RemotePanel({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const [cfg, setCfg] = useState<RemoteConfig>(loadRemoteConfig);
   const [busy, setBusy] = useState<'push' | 'pull' | 'test' | null>(null);
   const [status, setStatus] = useState('');

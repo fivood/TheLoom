@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { AvailableUpdate } from '../updater';
 import { clearUpdateDeferral, deferUpdate, relaunchApp } from '../updater';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 export type UpdateDialogState =
   | { kind: 'available'; update: AvailableUpdate }
@@ -61,6 +62,14 @@ export default function UpdateDialog({ state, onClose }: { state: UpdateDialogSt
     await update?.close().catch(() => undefined);
     onClose();
   };
+
+  useEscape(true, () => {
+    if (state.kind !== 'available') {
+      onClose();
+    } else if (phase === 'ready' || phase === 'failed') {
+      void postpone();
+    }
+  });
 
   const restart = async () => {
     try {

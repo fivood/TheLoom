@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { alertDialog, promptText } from '../../dialog';
+import { useEscape } from '../../hooks/useEscape';
 import { flowFingerprint } from '../../flowTest';
 import { resolveSub } from '../../util';
 import type { Entity, EventWait, Flow, FlowEdge, FlowNode, FlowParam, SubFlow, VariableType } from '../../types';
@@ -75,6 +76,7 @@ export default function Player({ flow, path, startNodeId, onClose }: {
   startNodeId?: string;
   onClose: () => void;
 }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const slotId = useLoom((s) => s.currentSlotId);
   const entities = project.entities;

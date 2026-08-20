@@ -4,6 +4,7 @@ import { useLoom } from '../store';
 import type { EntityFieldType, EntityTemplateField, ObjectTemplate, TemplateModule } from '../types';
 import { ENTITY_KIND_LABEL, FLOW_NODE_LABEL, TEMPLATE_MODULE_LABEL } from '../types';
 import { uid } from '../util';
+import { useEscape } from '../hooks/useEscape';
 
 const MODULES = Object.keys(TEMPLATE_MODULE_LABEL) as TemplateModule[];
 
@@ -15,6 +16,7 @@ function templateBadge(t: ObjectTemplate): string {
 
 /** R11 模板管理器:全模块命名模板的创建 / 重命名 / 字段 / 继承 / 删除 */
 export default function TemplateManager({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const templates = useLoom((s) => s.project.templates) ?? [];
   const addTemplate = useLoom((s) => s.addTemplate);
   const updateTemplate = useLoom((s) => s.updateTemplate);

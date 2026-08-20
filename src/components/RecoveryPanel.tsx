@@ -6,6 +6,7 @@ import {
 import { isTauri } from '../storage';
 import { confirmDialog } from '../dialog';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 function downloadRaw(filename: string, content: string) {
   const blob = new Blob([content], { type: 'application/json' });
@@ -18,6 +19,7 @@ function downloadRaw(filename: string, content: string) {
 }
 
 export default function RecoveryPanel({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((state) => state.project);
   const backup = useLoom((state) => state.recoveryBackup);
   const quarantine = useLoom((state) => state.quarantinedProject);

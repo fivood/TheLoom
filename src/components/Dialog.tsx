@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDialog } from '../dialog';
+import { useEscape } from '../hooks/useEscape';
 
 export default function DialogHost() {
   const current = useDialog((s) => s.current);
@@ -33,15 +34,17 @@ export default function DialogHost() {
     }
   }, [current]);
 
+  useEscape(!!current, () => {
+    if (!current) return;
+    if (current.kind === 'prompt') close(null);
+    else if (current.kind === 'confirm') close(false);
+    else close(true);
+  });
+
   useEffect(() => {
     if (!current) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        if (current.kind === 'prompt') close(null);
-        else if (current.kind === 'confirm') close(false);
-        else close(true);
-      } else if (e.key === 'Enter' && current.kind !== 'prompt') {
+      if (e.key === 'Enter' && current.kind !== 'prompt') {
         e.preventDefault();
         close(true);
       }

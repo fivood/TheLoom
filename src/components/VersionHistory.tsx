@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useLoom } from '../store';
 import { confirmDialog } from '../dialog';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 export default function VersionHistory({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const snapshots = useLoom((s) => s.snapshots);
   const { createSnapshot, restoreSnapshot, deleteSnapshot } = useLoom();
   const [name, setName] = useState('');

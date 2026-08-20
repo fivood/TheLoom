@@ -9,6 +9,7 @@ import { parseEpub } from '../interop/epubImport';
 import { parseDocx } from '../interop/docxImport';
 import type { Document } from '../types';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 type Mode = 'fdx' | 'manuscript';
 
@@ -23,6 +24,7 @@ interface Props {
  * fdx  = 生成一份新文档(不覆盖现有,分类 = 剧本草稿)。
  */
 export default function ImportPreview({ mode, file, onClose }: Props) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const replaceProject = useLoom((s) => s.replaceProject);
   const update = useLoom((s) => s.update);

@@ -5,12 +5,14 @@ import { confirmDialog } from '../dialog';
 import type { ColorPalette } from '../types';
 import { PALETTE } from '../types';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 /**
  * 配色表管理:创建 / 编辑 / 导入 zimg JSON / 激活 / 删除。
  * 从工具菜单打开;激活后,所有 ColorPicker 就用它的颜色。
  */
 export default function PaletteManager({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const { addPalette, updatePalette, removePalette, setActivePalette } = useLoom();
   const palettes = project.palettes ?? [];

@@ -8,6 +8,7 @@ import { folderHasProject, isTauri, loadFromFolder, pickFolder, revealFolder, sa
 import Icon from './Icon';
 import ImportProjectDialog from './ImportProjectDialog';
 import { WORKSPACE_PRESET_HINT, WORKSPACE_PRESET_LABEL } from '../workspace';
+import { useEscape } from '../hooks/useEscape';
 import type { WorkspacePreset } from '../types';
 
 /**
@@ -42,6 +43,7 @@ export default function ProjectMenu() {
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
+  useEscape(open, () => setOpen(false));
 
   const onImport = async (file: File) => {
     setCheckingImport(true);

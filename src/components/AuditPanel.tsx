@@ -4,8 +4,10 @@ import { auditProject, projectStats } from '../audit';
 import { useNav } from '../search';
 import { ISSUE_SCOPE_LABEL, ISSUE_SEVERITY_LABEL, type IssueScope, type IssueSeverity } from '../issues';
 import { useAiPanelBus } from '../ai/panelBus';
+import { useEscape } from '../hooks/useEscape';
 
 export default function AuditPanel({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const stats = useMemo(() => projectStats(project), [project]);
   /**

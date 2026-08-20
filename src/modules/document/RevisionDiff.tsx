@@ -3,6 +3,7 @@ import { useLoom } from '../../store';
 import Icon from '../../components/Icon';
 import type { DocBlock, DocSnapshot, Document } from '../../types';
 import { diffLines, diffStats, docLines } from '../../revision';
+import { useEscape } from '../../hooks/useEscape';
 
 const CURRENT = '__current__';
 
@@ -11,6 +12,7 @@ export default function RevisionDiff({ doc, initialLeftId, onClose }: {
   initialLeftId?: string;
   onClose: () => void;
 }) {
+  useEscape(true, onClose);
   const entities = useLoom((s) => s.project.entities);
   const allSnapshots = useLoom((s) => s.project.docSnapshots);
   const ordered = useMemo(

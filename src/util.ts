@@ -432,13 +432,14 @@ export function normalizeProject(p: Project): Project {
   return p;
 }
 
-/** 文档字数:正文 + 表达式 + 选项 + 列表项(与文档统计口径一致) */
+/** 文档字数:正文 + 表达式 + 选项 + 列表项,非空白字符计(与写作进度的「含标点字符」口径一致) */
 export function documentWordCount(d: Document): number {
+  const count = (s: string | undefined) => s?.match(/\S/gu)?.length ?? 0;
   let words = 0;
   for (const b of d.blocks) {
-    words += b.text.length + (b.instruction?.length ?? 0) + (b.condition?.length ?? 0)
-      + (b.choices?.reduce((s, c) => s + c.label.length, 0) ?? 0)
-      + (b.items?.reduce((s, item) => s + item.length, 0) ?? 0);
+    words += count(b.text) + count(b.instruction) + count(b.condition)
+      + (b.choices?.reduce((s, c) => s + count(c.label), 0) ?? 0)
+      + (b.items?.reduce((s, item) => s + count(item), 0) ?? 0);
   }
   return words;
 }

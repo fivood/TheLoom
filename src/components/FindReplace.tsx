@@ -3,12 +3,14 @@ import { useLoom } from '../store';
 import { useNav } from '../search';
 import Icon from './Icon';
 import { findDocMatches, replaceInDocs, type ReplaceMatch } from '../revision';
+import { useEscape } from '../hooks/useEscape';
 
 const FIELD_LABEL: Record<ReplaceMatch['field'], string> = {
   text: '正文', item: '列表项', choice: '选项', condition: '条件', instruction: '指令',
 };
 
 export default function FindReplace({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const update = useLoom((s) => s.update);
   const go = useNav((s) => s.go);

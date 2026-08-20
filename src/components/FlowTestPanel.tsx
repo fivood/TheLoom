@@ -4,6 +4,7 @@ import { useNav } from '../search';
 import { confirmDialog, promptText } from '../dialog';
 import { flowFingerprint, findTestFlow, isTestStale, runAllFlowTests, type FlowTestResult } from '../flowTest';
 import type { FlowTest } from '../types';
+import { useEscape } from '../hooks/useEscape';
 
 /**
  * R19-4 场景化回归测试面板。
@@ -12,6 +13,7 @@ import type { FlowTest } from '../types';
  * 看覆盖率、补断言,以及提示哪些测试因为流程被改过而可能已过时。
  */
 export default function FlowTestPanel({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const update = useLoom((s) => s.update);
   const go = useNav((s) => s.go);

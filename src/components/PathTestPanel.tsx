@@ -5,6 +5,7 @@ import Icon from './Icon';
 import type { Flow } from '../types';
 import { simulateFlow } from '../simulate';
 import { pathReportIssues, type ProjectIssue } from '../issues';
+import { useEscape } from '../hooks/useEscape';
 
 /**
  * R7 路径测试报告:批量遍历当前流程的全部分支,
@@ -12,6 +13,7 @@ import { pathReportIssues, type ProjectIssue } from '../issues';
  * 遍历是确定性枚举(检定按成功/失败双分支),同一流程报告永远一致。
  */
 export default function PathTestPanel({ flow, onClose }: { flow: Flow; onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const go = useNav((s) => s.go);
 

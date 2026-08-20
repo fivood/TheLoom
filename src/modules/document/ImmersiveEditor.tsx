@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLoom } from '../../store';
+import { useEscape } from '../../hooks/useEscape';
 import { blocksToText, textToBlocks } from '../../immersive';
 import type { Document } from '../../types';
 
@@ -10,11 +11,12 @@ import type { Document } from '../../types';
  * 之后以本地 state 为准,每次输入回写成块。`textToBlocks` 拿上一版 blocks 按次序
  * 保住 id / unitId / 说话人,所以批注与流程联动不会因为在这里写字而断掉。
  */
-export default function ImmersiveEditor({ doc }: { doc: Document }) {
+export default function ImmersiveEditor({ doc, onExit }: { doc: Document; onExit?: () => void }) {
   const entities = useLoom((s) => s.project.entities);
   const updateDocument = useLoom((s) => s.updateDocument);
   const [text, setText] = useState(() => blocksToText(doc.blocks, entities));
   const ref = useRef<HTMLTextAreaElement>(null);
+  useEscape(!!onExit, () => onExit?.());
 
   // 换场景才重新播种;同一场景内不受回写影响
   useEffect(() => {

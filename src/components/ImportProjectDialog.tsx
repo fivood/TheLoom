@@ -2,6 +2,7 @@ import type { ImportInspection, StorageUsage } from '../diagnostics';
 import { LOCAL_STORAGE_WARNING_BYTES } from '../diagnostics';
 import { countSubNodes } from '../util';
 import Icon from './Icon';
+import { useEscape } from '../hooks/useEscape';
 
 export default function ImportProjectDialog({ inspection, storageUsage, onCancel, onConfirm }: {
   inspection: ImportInspection;
@@ -9,6 +10,7 @@ export default function ImportProjectDialog({ inspection, storageUsage, onCancel
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  useEscape(true, onCancel);
   const project = inspection.project;
   const nodes = project.flows.reduce((total, flow) =>
     total + flow.nodes.length + flow.nodes.reduce((sum, node) => sum + countSubNodes(node.data.sub), 0), 0);

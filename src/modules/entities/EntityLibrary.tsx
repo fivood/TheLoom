@@ -18,12 +18,14 @@ import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 import EntityEditor from './EntityEditor';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
+import { useEscape } from '../../hooks/useEscape';
 
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
 
 /** 按类型的字段模板编辑器(编辑该类型的默认命名模板;保存后实例自动补齐新增字段) */
 function TemplateModal({ initialKind, onClose }: { initialKind: EntityKind; onClose: () => void }) {
+  useEscape(true, onClose);
   const setDefaultTemplate = useLoom((s) => s.setDefaultTemplate);
   const [kind, setKind] = useState<EntityKind>(initialKind);
   const readTpl = (k: EntityKind): EntityTemplateField[] =>

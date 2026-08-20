@@ -144,6 +144,26 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - ~~演出 / 流程节点内直接播放挂接的音视频资源~~ —— **明确不做**(2026-08-15 决定)。产品专注文本流程(写作 / 游戏剧本 / 剧本导入引擎),音视频在 TheLoom 里只是「挂接物」:记录节点与资源的对应关系并交给引擎,播放由引擎负责。据此已删除 `fileToVideoThumb`(视频首帧封面,39 行);资源库里的 `<audio>` / `<video>` 预览保留,那是确认「挂对了文件」的手段,不是播放集成
 - Localization UI 文案层(与 R12 项目内容本地化解耦,可先做)
 
+### UX 评估待办(2026-08-20 全量走查,B / C 级未排期)
+
+A 级四项已修复(见「最近变更」UX 批),以下为评估中确认但未动的项:
+
+**B 级 · 误导性文案 / 能力不一致**
+- **B1 MOBI/Excel 虚假广告**:拖拽遮罩(App.tsx:750)/ HelpPanel / tooltip 宣称支持「MOBI · Excel」,实际 `MANUSCRIPT_EXT` 只认 md/txt/epub/docx/fdx,文件选择器 accept 也不含;要么接 `mobiImport` 要么删文案
+- **B2 帮助快捷键表与实现不符**:HelpPanel 写「Alt+↑↓ 移动场景」,实际是 BlocksEditor 里移动**块**(BlocksEditor.tsx:236),场景级无此快捷键
+- **B3 斜杠菜单触发条件与提示不符**:提示说「空段首输入 /」,实际只在正文类型块生效(BlocksEditor.tsx:94);建议放宽到所有空块或改提示
+- **B4 专注模式结构块与正文无视觉区分**:immersive.ts:40 选项块只显示提示语不显示选项内容;按段落序号对齐身份,专注模式里增删空行会导致块身份错位、静默丢选项;建议结构行加不可编辑标记或弱化样式
+- **B5 连续稿视图混入脚本表达式**:条件 / 指令块以原始表达式排版,通读出戏;建议默认折叠或淡化非叙事块
+- **B6 文档模块两条快捷键提示并存且措辞不一**:工具栏右侧与底部各一条,保留底部(信息更全)
+- **B7 地图 inspector 空态「自定义字段」无归属**:未选中对象时直接出现(MapEditor.tsx:628,实为地图级字段),加「地图属性」小标题即可
+
+**C 级 · 体验摩擦**
+- **C1 无非阻断反馈**:全应用无 toast,成功类操作零反馈、失败全走 alertDialog;建议加轻量 toast,轻量删除确认可改「执行 + toast 带撤销」
+- **C2 「正在保存…」被视图操作稀释**:流程画布缩放 / 平移触发防抖持久化,状态灯频闪;viewport 持久化应走静默通道
+- **C3 工具栏拥挤**:文档工具栏 1440px 已爆满、流程工具栏 20 个按钮两行;建议低频动作收「⋯」溢出菜单
+- **C4 工具菜单 20 项一列到底**:900px 高度贴底,无折叠 / 搜索;可两列排布或合并「导出 / 导入」为二级菜单
+- **C5 fdx 导出无范围选择**:全项目合并导出,想导单条流程需绕行 Markdown;导出对话框加范围勾选(章节编译勾选 UI 可复用)
+
 暂不扩展多人同时协作;当前已有的接力式云协作维持现状,优先完成单人小说 / 游戏剧本工作流。
 
 ### 小说项目资料
@@ -179,6 +199,17 @@ R10-A 全六批已发布为 v0.25.0。R10-A6 收尾要点:AI 抽取模态与完�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(UX 评估 A 级修复 · 未发版)
+
+2026-08-20 全量 UX 走查(29 张截图实机点验)确认的 4 个 A 级问题已全部修复,B / C 级见「UX 评估待办」:
+
+- **A1 分屏布局崩坏**:`App.tsx` 分屏两 pane 内容统一包 `.pane-module` wrapper;`styles.css` 在 `.content-pane` 上加 `container-type: inline-size`(沿用 `.side-list` 容器查询先例),新增 `@container (max-width: 1100px)`(侧栏收窄 + 工具栏单行横滚)与 `@container (max-width: 768px)`(三栏纵向堆叠);≤768px 媒体查询选择器改为 `.content-pane > .pane-module > ...`。修复右 pane React Flow 画布空白(容器无尺寸)与文档工具栏竖排挤压
+- **A2 字数口径统一**:`util.ts` `documentWordCount` 从原始 `.length` 改为非空白字符(`\S`)计数,与规划默认「含标点字符」口径一致;`audit.ts` 文档行改用同一函数(不再计入 name/notes)。导航 / inspector / 专注模式 / 体检四处同场景同数字(示例场景 257 字);`countWords` 保留给流程 / 大纲 / 资料行与导入预检
+- **A3 Esc 行为一致**:`useEscape.ts` 重写为共享栈(window 单监听,多层叠加只关最顶层,修复 Dialog 叠在面板上时一次 Esc 关两层的隐患);`Dialog.tsx` Escape 迁入栈(Enter 逻辑保留);20 余个 palette 面板 + 顶栏工具 / 最近下拉 + ProjectMenu + 专注模式(新增 `onExit` prop)+ 演出模式 + FlowEditor 入口弹窗全部接入
+- **A4 流程画布初始视口**:`FlowEditor.tsx` 默认 `fitViewOptions={ minZoom: 0.6, maxZoom: 1, padding: 0.12 }`(只约束 fit 操作,不影响用户手动缩放到 0.15),打开流程即可读
+- 顺手修复 Ctrl+\ 副面板 stale closure(`App.tsx` 加 `tabRef`,副面板默认模块跟随当前 tab)
+- 验证:全部经 Playwright 实机点验(临时 Chrome profile,不污染真实数据);`npm test` 579 项通过,`npm run build` 通过
 
 ## 最近变更(v0.54.0 灵感库 + 开篇动线 + 云房间下线)
 

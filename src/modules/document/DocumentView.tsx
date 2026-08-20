@@ -470,7 +470,7 @@ export default function DocumentView() {
         {focusMode ? (
           selected ? (
             <div className="doc-editor doc-focus-editor">
-              <ImmersiveEditor doc={selected} />
+              <ImmersiveEditor doc={selected} onExit={() => setFocusMode(false)} />
             </div>
           ) : (
             <div className="empty-hint" style={{ margin: 'auto' }}>点击左侧场景后进入专注模式</div>

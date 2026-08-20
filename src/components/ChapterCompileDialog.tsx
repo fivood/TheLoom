@@ -11,6 +11,7 @@ import {
   verifyDocxExport,
   type DocxManuscriptPreset,
 } from '../interop/docxExport';
+import { useEscape } from '../hooks/useEscape';
 
 type ExportFormat = CompileFormat | 'docx';
 
@@ -23,6 +24,7 @@ const FORMAT_LABEL: Record<ExportFormat, string> = {
 
 /** R13-5 章节编译:勾选文档 + 选格式 → 编译并下载 */
 export default function ChapterCompileDialog({ onClose }: { onClose: () => void }) {
+  useEscape(true, onClose);
   const project = useLoom((s) => s.project);
   const [format, setFormat] = useState<ExportFormat>('md');
   const [includePath, setIncludePath] = useState(true);

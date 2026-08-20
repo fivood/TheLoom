@@ -11,6 +11,7 @@ import {
 } from './storage';
 import { describeNavTarget, useNav } from './search';
 import { confirmDialog, alertDialog } from './dialog';
+import { useEscape } from './hooks/useEscape';
 import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
 import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
 import SearchPalette from './components/SearchPalette';
@@ -145,6 +146,8 @@ export default function App() {
   const checkingUpdateRef = useRef(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
+  useEscape(toolsOpen, () => setToolsOpen(false));
+  useEscape(recentOpen, () => setRecentOpen(false));
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
   // 手机 / 小平板一律走移动壳:桌面三栏布局在这些尺寸上无法使用(判定见 useIsMobile)
@@ -221,6 +224,8 @@ export default function App() {
   const otherTabs = TABS.filter((item) => !primaryTabKeys.has(item.key));
 
   // 全局撤销/重做快捷键;焦点在输入框时交给浏览器原生文本撤销
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F1') { e.preventDefault(); setHelp(true); return; }
@@ -230,7 +235,7 @@ export default function App() {
       if (k === 'k') { e.preventDefault(); setSearching(true); return; }
       if (e.key === '\\') {
         e.preventDefault();
-        setSecondaryTab((cur) => cur ? null : (tab === 'documents' ? 'flow' : 'documents'));
+        setSecondaryTab((cur) => cur ? null : (tabRef.current === 'documents' ? 'flow' : 'documents'));
         return;
       }
       const t = e.target as HTMLElement;
@@ -660,9 +665,11 @@ export default function App() {
 
         <div className={`content ${secondaryTab ? 'content-split' : ''}`} key={revision}>
           <div className="content-pane content-pane-primary">
-            <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
-              {renderTabContent(tab)}
-            </Suspense>
+            <div className="pane-module">
+              <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
+                {renderTabContent(tab)}
+              </Suspense>
+            </div>
             {secondaryTab && <PaneHandle varName="--pane-split" side="right" />}
           </div>
           {secondaryTab && (
@@ -687,9 +694,11 @@ export default function App() {
                 <button className="ghost icon-btn" title="关闭副面板" onClick={() => setSecondaryTab(null)}>×</button>
               </div>
               <div className="pane-inner">
-                <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
-                  {renderTabContent(secondaryTab)}
-                </Suspense>
+                <div className="pane-module">
+                  <Suspense fallback={<div className="empty-hint" style={{ margin: 'auto' }}>加载中…</div>}>
+                    {renderTabContent(secondaryTab)}
+                  </Suspense>
+                </div>
               </div>
             </div>
           )}
