@@ -7,10 +7,13 @@ import BlocksEditor, { emptyBlock } from '../modules/document/BlocksEditor';
 import Icon from '../components/Icon';
 import { loadInbox, markUsed, saveInbox, visibleIdeas, type IdeaCard } from '../inbox';
 
-const LAST_DOC_KEY = 'theloom-mobile-last-doc';
+/** 按槽位记:多项目共用一个 key 会在切项目后把别的作品的场景记串 */
+function lastDocKey(): string {
+  return `theloom-mobile-last-doc:${useLoom.getState().currentSlotId}`;
+}
 
 function readLastDocId(): string | null {
-  try { return localStorage.getItem(LAST_DOC_KEY); } catch { return null; }
+  try { return localStorage.getItem(lastDocKey()); } catch { return null; }
 }
 
 /** 上次写的场景 → 最近改过的场景;都不在了返回 null */
@@ -26,6 +29,7 @@ export default function MobileWrite() {
   const folders = useLoom((s) => s.project.folders);
   const categories = useLoom((s) => s.project.documentCategories);
   const progress = useLoom((s) => s.project.writingProgress);
+  const currentSlotId = useLoom((s) => s.currentSlotId);
   const addDocument = useLoom((s) => s.addDocument);
   const updateDocument = useLoom((s) => s.updateDocument);
   const [selectedId, setSelectedId] = useState<string | null>(() => pickFallbackId(documents));
@@ -41,10 +45,10 @@ export default function MobileWrite() {
   useEffect(() => {
     if (doc || documents.length === 0) return;
     setSelectedId(pickFallbackId(documents));
-  }, [doc, documents]);
+  }, [doc, documents, currentSlotId]);
 
   useEffect(() => {
-    try { if (doc) localStorage.setItem(LAST_DOC_KEY, doc.id); } catch { /* 忽略 */ }
+    try { if (doc) localStorage.setItem(lastDocKey(), doc.id); } catch { /* 忽略 */ }
   }, [doc?.id]);
 
   // 按卷 / 章树序排,而不是按修改时间 —— 后者会让当前场景在打字时不断跳到列表顶

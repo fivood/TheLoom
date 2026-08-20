@@ -61,7 +61,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'theloom-images' },
           },
-          // 协作房间接口:网络优先,SW 不缓存房间密文,保持端到端加密边界
+          // 外链网盘同步与桌面更新 API:网络独占,SW 不缓存任何用户数据
           {
             urlPattern: ({ url }) => url.pathname.includes('/functions/') || url.pathname.includes('/api/'),
             handler: 'NetworkOnly',

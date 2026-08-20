@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLoom, exportProject } from '../store';
 import { documentWordCount } from '../util';
 import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgress';
+import { loadInbox, visibleIdeas } from '../inbox';
 import RemotePanel from '../components/RemotePanel';
 import { confirmDialog } from '../dialog';
 
@@ -16,6 +17,8 @@ export default function MobileMe() {
   const loadSampleProject = useLoom((s) => s.loadSampleProject);
   const newSlot = useLoom((s) => s.newSlot);
   const [remoteSync, setRemoteSync] = useState(false);
+  // 「快记」统计的是灵感库(移动端快记 tab 写的地方),而不是桌面风暴板的便签
+  const ideaCount = useMemo(() => visibleIdeas(loadInbox()).length, []);
 
   /** 载入示例:当前项目已有内容时开新槽位,绝不覆盖 */
   const onLoadSample = async () => {
@@ -52,7 +55,7 @@ export default function MobileMe() {
         <div className="m-me-stats" style={{ marginTop: 12 }}>
           <div><strong>{project.documents.length}</strong><span>场景</span></div>
           <div><strong>{project.entities.length}</strong><span>设定</span></div>
-          <div><strong>{project.brainstormNotes.length}</strong><span>快记</span></div>
+          <div><strong>{ideaCount}</strong><span>快记</span></div>
         </div>
       </div>
       <div className="m-me-row">

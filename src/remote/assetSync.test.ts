@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Asset, Project } from '../types';
-import { planAssetSync, referencedAssets } from './assetSync';
+import { planAssetSync, probeRemote, referencedAssets } from './assetSync';
+import { headObject } from './s3';
+import type { RemoteConfig } from './remoteSync';
+
+vi.mock('./s3', () => ({ headObject: vi.fn() }));
 
 function project(assets: Partial<Asset>[]): Project {
   return { assets: assets as Asset[] } as Project;
@@ -47,5 +51,26 @@ describe('资源同步计划', () => {
     const plan = planAssetSync(refs, new Set(), new Set());
     expect(plan.upload).toHaveLength(0);
     expect(plan.download).toHaveLength(0);
+  });
+});
+
+describe('远端资源探测', () => {
+  it('跨多个并发批次仍能完整返回远端已有的哈希', async () => {
+    const mockHead = vi.mocked(headObject);
+    mockHead.mockClear();
+    // 落盘文件名取 hash 前 16 位:序号放首位,后面补零才能在 key 里区分开
+    mockHead.mockImplementation(async (_cfg, key: string) =>
+      /asset-[05b]0{15}\.png$/.test(key) ? { etag: 'e', size: 1, lastModified: 0 } : null);
+    // 12 个资源 > 单批 8,正好跨两个批次
+    const refs = Array.from({ length: 12 }, (_, i) => ({
+      hash: i.toString(16).padEnd(64, '0'), ext: 'png',
+    }));
+    const present = await probeRemote({} as RemoteConfig, refs);
+    expect([...present].sort()).toEqual([
+      '0'.repeat(64),
+      `5${'0'.repeat(63)}`,
+      `b${'0'.repeat(63)}`,
+    ]);
+    expect(mockHead).toHaveBeenCalledTimes(12);
   });
 });

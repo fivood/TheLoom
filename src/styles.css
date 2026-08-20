@@ -1579,6 +1579,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 .palette {
   width: 640px;
+  /* 窄屏(手机壳 / 窄窗口)收进视口:多个面板是内联固定宽(520–780px),不加会横向溢出 */
+  max-width: calc(100vw - 24px);
   max-height: 60vh;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1788,7 +1790,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   font-weight: 700;
 }
 .sync-head .spacer { flex: 1; }
-.sync-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+/* 内容超出面板限高时内部滚动,而不是被 .palette 的 overflow:hidden 直接裁掉底部按钮 */
+.sync-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow-y: auto; }
 .sync-body label { font-size: 12px; color: var(--text-faint); display: block; margin-bottom: 4px; }
 .sync-body input { width: 100%; }
 .sync-actions { display: flex; gap: 8px; }
@@ -4976,8 +4979,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .m-note-item {
   padding: 12px; border-radius: 10px; font-size: 14px; line-height: 1.55;
   white-space: pre-wrap;
-  /* 便签底色是内容数据(固定浅色系)。浅色主题整块填充 + readableInk 反色;
-     深色主题改为面板底 + 左侧色条(见 MobileNote.noteStyle),两者都由内联样式给出。 */
+  /* 便签样式跟随主题变量,深浅色统一 */
   border: 1px solid var(--chip-border);
   background: var(--bg-panel);
   color: var(--text);
@@ -5062,6 +5064,14 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* 操作条自身就贴在编辑区底部,不要再留额外内边距,否则它与 tab 栏之间空出一条缝 */
 .app-mobile .m-write-editor { padding-bottom: 0; }
 .app-mobile .doc-focus-bar { bottom: -1px; }
+
+/*
+ * 移动壳里的 palette 面板(云同步等)改近全屏工作表:
+ * 桌面端 padding-top 90px + 60vh 限高在手机上会把表单和底部按钮裁没,
+ * 高度跟随 visualViewport(--vvh),键盘弹起时面板也不被盖住。
+ */
+.app-mobile .palette-backdrop { padding-top: calc(12px + env(safe-area-inset-top)); }
+.app-mobile .palette { max-height: calc(var(--vvh, 100vh) - 24px); }
 
 /* 「我的」页:云同步 / 项目切换 */
 .m-me-section { font-size: 12px; color: var(--text-faint); margin: 4px 0 -4px; }

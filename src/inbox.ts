@@ -1,4 +1,5 @@
 import { uid } from './util';
+import { idbSet } from './webdb';
 
 /**
  * 灵感库:跨项目的点子收件箱。
@@ -45,7 +46,12 @@ export function loadInbox(): IdeaCard[] {
 }
 
 export function saveInbox(cards: IdeaCard[]): void {
-  try { localStorage.setItem(KEY, JSON.stringify(cards)); } catch { /* 配额满时静默 */ }
+  try {
+    const json = JSON.stringify(cards);
+    localStorage.setItem(KEY, json);
+    // 与项目 JSON 同策略镜像进 IDB:localStorage 被浏览器清掉后,启动 hydration 会从 IDB 补回
+    void idbSet(KEY, json);
+  } catch { /* 配额满时静默 */ }
 }
 
 /**

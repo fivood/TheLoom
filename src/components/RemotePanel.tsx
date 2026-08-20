@@ -81,11 +81,13 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
   const doPull = async () => {
     const ok = await confirmDialog({
       title: '用远端版本替换当前项目?',
-      message: '当前项目会被远端内容覆盖。可用 Ctrl+Z 撤销,或先在「版本历史」存一个快照。',
+      message: '当前项目会被远端内容覆盖。拉取前会自动存一个快照,反悔了可在桌面端「历史」面板还原。',
       danger: true,
       confirmText: '拉取并替换',
     });
     if (!ok) return;
+    // 移动端没有版本历史入口也没有 Ctrl+Z,拉取前先存快照是唯一的后悔药
+    useLoom.getState().createSnapshot(`拉取前自动 ${new Date().toLocaleString()}`);
     setBusy('pull');
     setStatus('正在下载并解密…');
     try {
@@ -110,9 +112,10 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
     setBusy('test');
     try {
       const s = await remoteStatus(cfg);
+      const local = cfg.lastSyncAt ? `(本机上次同步:${new Date(cfg.lastSyncAt).toLocaleString()})` : '';
       setStatus(!s.exists ? '远端还没有项目。'
-        : s.changed ? `远端有更新(${new Date(s.at).toLocaleString()}),建议先拉取。`
-          : '远端与本机上次同步一致。');
+        : s.changed ? `远端有更新(${new Date(s.at).toLocaleString()}),建议先拉取。${local}`
+          : `远端与本机上次同步一致。${local}`);
     } catch (e) {
       setStatus(`查询失败:${e instanceof Error ? e.message : String(e)}`);
     }
@@ -133,6 +136,7 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
             数据存进<b>你自己的对象存储</b>(Cloudflare R2 / Backblaze B2 / MinIO / 阿里云 OSS 等),
             端到端加密,不经过本项目服务器。没有 20MB 上限,<b>资源原文件也一起同步</b>。
             <br />网页版需先在桶上配置 CORS(允许本站 origin 与 GET/PUT/HEAD、暴露 ETag);桌面版无此要求。
+            <br />远端只存<b>一个</b>项目对象,对应当前打开的项目槽位;换一部作品再上传会覆盖远端。
           </div>
 
           <div className="field">

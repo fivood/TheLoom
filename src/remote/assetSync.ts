@@ -53,11 +53,17 @@ function keyOf(ref: HashedAsset): string {
   return `assets/${assetFileName(ref.hash, ref.ext)}`;
 }
 
-/** 探明哪些资源远端已有(HEAD 不取正文,只花一个往返) */
+/** 探明哪些资源远端已有(HEAD 不取正文,只花一个往返)。按批并发:资源多时
+ * 串行一个个等往返,蜂窝网络下同步前的等待会非常明显 */
+const PROBE_POOL = 8;
 export async function probeRemote(cfg: RemoteConfig, refs: HashedAsset[]): Promise<Set<string>> {
   const present = new Set<string>();
-  for (const ref of refs) {
-    if (await headObject(cfg, keyOf(ref))) present.add(ref.hash);
+  for (let i = 0; i < refs.length; i += PROBE_POOL) {
+    const batch = refs.slice(i, i + PROBE_POOL);
+    const results = await Promise.all(
+      batch.map(async (ref) => ({ hash: ref.hash, ok: await headObject(cfg, keyOf(ref)) })),
+    );
+    for (const r of results) if (r.ok) present.add(r.hash);
   }
   return present;
 }

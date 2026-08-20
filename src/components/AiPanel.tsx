@@ -132,7 +132,7 @@ export function AiSettingsModal({ onClose }: { onClose: () => void }) {
               <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
                 {cfg.credentialStored
                   ? '已保存在系统安全凭据库，前端和项目文件均不包含明文'
-                  : '桌面版保存到系统安全凭据库；网页版只保存在当前浏览器，不随项目或云协作同步'}
+                  : '桌面版保存到系统安全凭据库；网页版只保存在当前浏览器，不随项目或外链网盘同步'}
                 {cfg.credentialStored && (
                   <button
                     className="ghost"

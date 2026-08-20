@@ -711,7 +711,7 @@ export default function App() {
       {overview && <OverviewPanel onClose={() => setOverview(false)} />}
       {storageMgr && <StorageManager onClose={() => setStorageMgr(false)} />}
       {help && <HelpPanel onClose={() => setHelp(false)} />}
-      {onboarding && (
+      {onboarding && !mobileShell && (
         <Onboarding
           onContinueBlank={() => { setTab(useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents'); }}
           onLoadSample={() => {

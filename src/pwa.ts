@@ -2,7 +2,7 @@
  * PWA 运行时(P1):
  *   - 仅网页模式注册 Service Worker(桌面 Tauri 版跳过)
  *   - 管理「可安装」「有新版本」「可离线」三个状态,供顶部横幅消费
- *   - 协作房间请求由 SW 配置为 NetworkOnly,SW 不缓存房间密文
+ *   - 外链网盘同步与桌面更新 API 由 SW 配置为 NetworkOnly,用户数据不进缓存
  */
 import { useSyncExternalStore } from 'react';
 import { isTauri } from './storage';
