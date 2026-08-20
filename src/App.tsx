@@ -29,14 +29,15 @@ import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog'
 import RecoveryPanel from './components/RecoveryPanel';
 import PwaBanner from './components/PwaBanner';
 import DialogHost from './components/Dialog';
+import ToastHost from './components/ToastHost';
 import ImportPreview from './components/ImportPreview';
 import FindReplace from './components/FindReplace';
 import EngineExportModal from './components/EngineExportModal';
+import FdxExportDialog from './components/FdxExportDialog';
 import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
-import { paragraphsToFdx, documentToParagraphs, flowToParagraphs } from './interop/fdx';
 import { WORKSPACE_PRIMARY_TABS, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
@@ -133,6 +134,7 @@ export default function App() {
   }, [toolRequest]);
   const [findReplace, setFindReplace] = useState(false);
   const [engineExport, setEngineExport] = useState(false);
+  const [fdxExport, setFdxExport] = useState(false);
   const [aiExtract, setAiExtract] = useState(false);
   // 导入队列:一次拖入多个文件时逐个走预检,关掉当前预检自动推进到下一个
   const [importQueue, setImportQueue] = useState<ImportJob[]>([]);
@@ -300,7 +302,7 @@ export default function App() {
     void hydrateFromIdb();
   }, []);
 
-  // 拖拽文件到窗口:按扩展名路由到长稿 / Excel / Final Draft 导入预检
+  // 拖拽文件到窗口:按扩展名路由到长稿 / Final Draft 导入预检
   useEffect(() => {
     const MANUSCRIPT_EXT = /\.(md|markdown|txt|epub|docx)$/i;
     const hasFiles = (e: DragEvent) => e.dataTransfer?.types?.includes('Files') ?? false;
@@ -501,7 +503,7 @@ export default function App() {
             {toolsOpen && (
               <>
                 <div className="backdrop" onClick={() => setToolsOpen(false)} />
-                <div className="tools-menu">
+                <div className="tools-menu tools-menu-main">
                   {!isTauri && (
                     <>
                       <button
@@ -589,21 +591,10 @@ export default function App() {
                   >
                     <Icon name="braces" size={14} /> 引擎包 .zip
                   </button>
-                  <button onClick={() => {
-                    setToolsOpen(false);
-                    // 全流程 + 全文档合并为一份 fdx
-                    const allParas = [
-                      ...project.flows.flatMap((f) => flowToParagraphs(f, project.entities)),
-                      ...project.documents.flatMap((d) => documentToParagraphs(d, project.entities)),
-                    ];
-                    const xml = paragraphsToFdx(allParas, project.name);
-                    const blob = new Blob([xml], { type: 'application/xml' });
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `${project.name || 'theloom'}.fdx`;
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                  }}>
+                  <button
+                    title="勾选参与的流程与文档,合并导出为 Final Draft .fdx"
+                    onClick={() => { setToolsOpen(false); setFdxExport(true); }}
+                  >
                     <Icon name="doc" size={14} /> Final Draft .fdx
                   </button>
                   <button
@@ -732,6 +723,7 @@ export default function App() {
       )}
       {findReplace && <FindReplace onClose={() => setFindReplace(false)} />}
       {engineExport && <EngineExportModal onClose={() => setEngineExport(false)} />}
+      {fdxExport && <FdxExportDialog onClose={() => setFdxExport(false)} />}
       {importFile && (
         <ImportPreview
           key={`${importQueue.length}-${importFile.file.name}`}
@@ -756,12 +748,13 @@ export default function App() {
           <div className="drop-overlay-card">
             <Icon name="upload" size={28} />
             <div>松手导入稿件</div>
-            <div className="drop-overlay-hint">TXT · Markdown · EPUB · DOCX · MOBI · Excel · Final Draft</div>
+            <div className="drop-overlay-hint">TXT · Markdown · EPUB · DOCX · Final Draft</div>
           </div>
         </div>
       )}
       <PwaBanner />
       <DialogHost />
+      <ToastHost />
     </div>
   );
 }

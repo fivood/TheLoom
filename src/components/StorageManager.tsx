@@ -3,6 +3,7 @@ import { useLoom } from '../store';
 import { alertDialog, confirmDialog, promptText } from '../dialog';
 import Icon from './Icon';
 import { useEscape } from '../hooks/useEscape';
+import { toast } from '../toast';
 import { listStoredFiles } from '../assetFiles';
 import { isTauri, revealFolder } from '../storage';
 import { makeZip } from '../interop/zip';
@@ -130,7 +131,7 @@ export default function StorageManager({ onClose }: { onClose: () => void }) {
     setBusy('正在打包全部槽位…');
     try {
       await backupSlotsToZip(slotStats);
-      await alertDialog('已下载 zip 备份;可放到 U 盘 / 网盘保存或用于新机器恢复。');
+      toast('已下载 zip 备份,可放到 U 盘 / 网盘保存或用于新机器恢复');
     } catch (e) {
       await alertDialog(`备份失败:${e instanceof Error ? e.message : String(e)}`);
     } finally { setBusy(null); }
@@ -166,7 +167,7 @@ export default function StorageManager({ onClose }: { onClose: () => void }) {
         req.onerror = () => rej(new Error(req.error?.message ?? 'deleteDatabase failed'));
         req.onblocked = () => rej(new Error('IndexedDB 被其他标签页占用,请先关闭其他 TheLoom 标签'));
       });
-      await alertDialog(`已清除 ${files.length} 个资源原文件。`);
+      toast(`已清除 ${files.length} 个资源原文件`);
       setRefresh((n) => n + 1);
     } catch (e) {
       await alertDialog(`清除失败:${e instanceof Error ? e.message : String(e)}`);

@@ -158,6 +158,8 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   const [pathTesting, setPathTesting] = useState(false);
   const [flowTesting, setFlowTesting] = useState(false);
   const [editingEntries, setEditingEntries] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEscape(moreOpen, () => setMoreOpen(false));
   const [editingTpl, setEditingTpl] = useState<FlowNodeType | null>(null);
   const slotId = useLoom((s) => s.currentSlotId);
   const [bp, setBp] = useState<Set<string>>(() => loadBreakpoints(slotId, flow.id));
@@ -255,12 +257,14 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // 只有改动落库内容的变化才回写:select / dimensions 只是视图态,
+  // 标 dirty 会让 fitView、缩放控件等纯视图操作也触发一次全项目保存(「正在保存」频闪)
   const onNodesChange = useCallback((changes: NodeChange<LoomNode>[]) => {
-    dirty.current = true;
+    if (changes.some((c) => c.type === 'position' || c.type === 'remove' || c.type === 'add' || c.type === 'replace')) dirty.current = true;
     setNodes((ns) => applyNodeChanges(changes, ns));
   }, []);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    dirty.current = true;
+    if (changes.some((c) => c.type === 'remove' || c.type === 'add' || c.type === 'replace')) dirty.current = true;
     setEdges((es) => applyEdgeChanges(changes, es));
   }, []);
   const onConnect = useCallback((conn: Connection) => {
@@ -516,56 +520,69 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
             title="从选中节点(或本层起点)开始播放流程"
             onClick={() => { writeBack(); setPlaying(true); }}
           ><Icon name="play" size={14} /> 演出</button>
-          <button
-            title="把当前流程导出为剧本式 Markdown(Shift+点击导出全部流程)"
-            onClick={(e) => {
-              writeBack();
-              const p = useLoom.getState().project;
-              if (e.shiftKey) {
-                downloadMarkdown(`${p.name || '项目'}-剧本.md`, projectToMarkdown(p));
-              } else {
-                const f = p.flows.find((x) => x.id === flow.id) ?? flow;
-                downloadMarkdown(`${f.name}-剧本.md`, flowToMarkdown(f, p.entities));
-              }
-            }}
-          ><Icon name="script" size={14} /> 导出剧本</button>
-          <button
-            title="生成(或打开)与此流程共享叙事单元的剧本视图文档:文档里改内容,节点即时同步"
-            onClick={() => {
-              writeBack();
-              const p = useLoom.getState().project;
-              const f = p.flows.find((x) => x.id === flow.id) ?? flow;
-              const unitIds = new Set<string>();
-              walkFlowNodes(f.nodes, (n) => { if (typeof n.data.unitId === 'string') unitIds.add(n.data.unitId); });
-              const existing = p.documents.find((d) =>
-                d.id === f.documentId || d.linkedFlowId === f.id || d.blocks.some((b) => b.unitId && unitIds.has(b.unitId)));
-              if (existing) {
-                if (existing.linkedFlowId !== f.id || f.documentId !== existing.id) {
-                  useLoom.getState().update((p2) => {
-                    const linkedDoc = p2.documents.find((d) => d.id === existing.id);
-                    const linkedFlow = p2.flows.find((x) => x.id === f.id);
-                    if (linkedDoc) linkedDoc.linkedFlowId = f.id;
-                    if (linkedFlow) linkedFlow.documentId = existing.id;
-                  });
-                }
-                useNav.getState().go({ tab: 'documents', docId: existing.id });
-                return;
-              }
-              const doc = flowToDocument(f, p.units ?? []);
-              doc.linkedFlowId = f.id;
-              useLoom.getState().update((p2) => {
-                p2.documents.push(doc);
-                const linkedFlow = p2.flows.find((x) => x.id === f.id);
-                if (linkedFlow) linkedFlow.documentId = doc.id;
-                if (doc.category && !p2.documentCategories.includes(doc.category)) p2.documentCategories.push(doc.category);
-              });
-              useNav.getState().go({ tab: 'documents', docId: doc.id });
-            }}
-          ><Icon name="doc" size={14} /> 查看为剧本</button>
-          <button
-            title="批量遍历所有分支:节点覆盖率、不可达分支、死循环、无出口卡死;结果可复现"
-            onClick={() => { writeBack(); setPathTesting(true); }}
-          ><Icon name="check" size={14} /> 路径测试</button>
+          {/* C3:低频动作收进溢出菜单,工具栏不再两行 */}
+          <div className="tools-wrap">
+            <button title="更多:导出剧本 / 剧本视图 / 路径测试" onClick={() => setMoreOpen((o) => !o)}>⋯</button>
+            {moreOpen && (
+              <>
+                <div className="backdrop" onClick={() => setMoreOpen(false)} />
+                <div className="tools-menu">
+                  <button
+                    title="把当前流程导出为剧本式 Markdown(Shift+点击导出全部流程)"
+                    onClick={(e) => {
+                      setMoreOpen(false);
+                      writeBack();
+                      const p = useLoom.getState().project;
+                      if (e.shiftKey) {
+                        downloadMarkdown(`${p.name || '项目'}-剧本.md`, projectToMarkdown(p));
+                      } else {
+                        const f = p.flows.find((x) => x.id === flow.id) ?? flow;
+                        downloadMarkdown(`${f.name}-剧本.md`, flowToMarkdown(f, p.entities));
+                      }
+                    }}
+                  ><Icon name="script" size={14} /> 导出剧本</button>
+                  <button
+                    title="生成(或打开)与此流程共享叙事单元的剧本视图文档:文档里改内容,节点即时同步"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      writeBack();
+                      const p = useLoom.getState().project;
+                      const f = p.flows.find((x) => x.id === flow.id) ?? flow;
+                      const unitIds = new Set<string>();
+                      walkFlowNodes(f.nodes, (n) => { if (typeof n.data.unitId === 'string') unitIds.add(n.data.unitId); });
+                      const existing = p.documents.find((d) =>
+                        d.id === f.documentId || d.linkedFlowId === f.id || d.blocks.some((b) => b.unitId && unitIds.has(b.unitId)));
+                      if (existing) {
+                        if (existing.linkedFlowId !== f.id || f.documentId !== existing.id) {
+                          useLoom.getState().update((p2) => {
+                            const linkedDoc = p2.documents.find((d) => d.id === existing.id);
+                            const linkedFlow = p2.flows.find((x) => x.id === f.id);
+                            if (linkedDoc) linkedDoc.linkedFlowId = f.id;
+                            if (linkedFlow) linkedFlow.documentId = existing.id;
+                          });
+                        }
+                        useNav.getState().go({ tab: 'documents', docId: existing.id });
+                        return;
+                      }
+                      const doc = flowToDocument(f, p.units ?? []);
+                      doc.linkedFlowId = f.id;
+                      useLoom.getState().update((p2) => {
+                        p2.documents.push(doc);
+                        const linkedFlow = p2.flows.find((x) => x.id === f.id);
+                        if (linkedFlow) linkedFlow.documentId = doc.id;
+                        if (doc.category && !p2.documentCategories.includes(doc.category)) p2.documentCategories.push(doc.category);
+                      });
+                      useNav.getState().go({ tab: 'documents', docId: doc.id });
+                    }}
+                  ><Icon name="doc" size={14} /> 查看为剧本</button>
+                  <button
+                    title="批量遍历所有分支:节点覆盖率、不可达分支、死循环、无出口卡死;结果可复现"
+                    onClick={() => { setMoreOpen(false); writeBack(); setPathTesting(true); }}
+                  ><Icon name="check" size={14} /> 路径测试</button>
+                </div>
+              </>
+            )}
+          </div>
           </div>
         </div>
         {crumbs.length > 1 && (

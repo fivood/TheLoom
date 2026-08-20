@@ -10,6 +10,7 @@ import { parseDocx } from '../interop/docxImport';
 import type { Document } from '../types';
 import Icon from './Icon';
 import { useEscape } from '../hooks/useEscape';
+import { toast } from '../toast';
 
 type Mode = 'fdx' | 'manuscript';
 
@@ -99,12 +100,14 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
       p.documents.push(doc);
       if (!p.documentCategories.includes('剧本草稿')) p.documentCategories.push('剧本草稿');
     });
+    toast(`已导入为文档「${doc.name}」(${fdx.sceneCount} 场景)`);
     onClose();
   };
 
   const applyManuscriptDoc = () => {
     if (!manuscript) return;
     update((p) => { applyManuscript(p, manuscript); });
+    toast(`已导入 ${manuscript.sceneCount} 个场景到文档模块`);
     onClose();
   };
 

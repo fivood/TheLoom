@@ -33,11 +33,16 @@ export function blockToText(b: DocBlock, entities: Entity[]): string {
       return name ? `${name}：${b.text}` : b.text;
     }
     case 'note': return b.text.split('\n').map((l) => `// ${l}`).join('\n');
-    // choice / condition / instruction 是剧本结构,沉浸模式不改写它们的语义,
-    // 原样显示文字以免作者以为内容丢了(回写时按 index 保留原块)
+    // condition / instruction 是剧本结构,沉浸模式不改写它们的语义,
+    // 原样显示表达式以免作者以为内容丢了(回写时按 index 保留原块)
     case 'condition': return b.condition ?? '';
     case 'instruction': return b.instruction ?? '';
-    case 'choice': return b.text;
+    // 选项块把选项文本也渲染成 ▸ 行:只显示提示语时,整段看起来像一行多余的话,
+    // 作者随手删掉就静默丢掉全部选项
+    case 'choice': {
+      const labels = (b.choices ?? []).map((c) => `▸ ${c.label}`);
+      return [b.text, ...labels].filter((l) => l !== '').join('\n');
+    }
     default: return b.text;
   }
 }
@@ -66,6 +71,9 @@ function parseMarkdown(chunk: string): Partial<DocBlock> | undefined {
   if (lines.every((l) => l.startsWith('//'))) {
     return { type: 'note', text: lines.map((l) => l.replace(/^\/\/\s?/, '')).join('\n') };
   }
+  if (lines.length > 1 && lines.slice(1).every((l) => l.startsWith('▸'))) {
+    return { type: 'choice', text: lines[0], choices: lines.slice(1).map((l) => ({ id: uid(), label: l.replace(/^▸\s?/, '') })) };
+  }
   return undefined;
 }
 
@@ -85,6 +93,10 @@ export function textToBlocks(text: string, prev: DocBlock[], entities: Entity[])
     if (md) {
       const b: DocBlock = { id: old?.id ?? uid(), type: 'paragraph', text: '', ...md } as DocBlock;
       if (old?.unitId) b.unitId = old.unitId;
+      // 选项按次序沿用原 choice id,选项上挂着的引用不会因改写而断
+      if (b.type === 'choice' && old?.type === 'choice' && old.choices && b.choices) {
+        b.choices = b.choices.map((c, i) => ({ ...c, id: old.choices![i]?.id ?? c.id }));
+      }
       return b;
     }
 

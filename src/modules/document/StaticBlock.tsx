@@ -2,8 +2,8 @@ import { RichText } from '../../components/RichText';
 import type { DocBlock, Entity } from '../../types';
 import Icon from '../../components/Icon';
 
-/** 只读的文章式块渲染:文档正文全篇视图与连续稿共用 */
-export default function StaticBlock({ b, entities }: { b: DocBlock; entities: Entity[] }) {
+/** 只读的文章式块渲染:文档正文全篇视图与连续稿共用;compact = 连续稿通读,条件 / 指令收成一枚小签 */
+export default function StaticBlock({ b, entities, compact }: { b: DocBlock; entities: Entity[]; compact?: boolean }) {
   switch (b.type) {
     case 'paragraph':
       return b.text
@@ -39,9 +39,13 @@ export default function StaticBlock({ b, entities }: { b: DocBlock; entities: En
         </div>
       );
     case 'condition':
-      return <div className="ms-meta-block">◇ {b.condition || '(空条件)'}</div>;
+      return compact
+        ? <div className="ms-meta-block ms-meta-compact" title={b.condition || ''}>◇ 条件</div>
+        : <div className="ms-meta-block">◇ {b.condition || '(空条件)'}</div>;
     case 'instruction':
-      return <div className="ms-meta-block"><Icon name="bolt" size={11} /> {b.instruction || '(空指令)'}</div>;
+      return compact
+        ? <div className="ms-meta-block ms-meta-compact" title={b.instruction || ''}><Icon name="bolt" size={11} /> 指令</div>
+        : <div className="ms-meta-block"><Icon name="bolt" size={11} /> {b.instruction || '(空指令)'}</div>;
     case 'note':
       return <div className="ms-note">✎ {b.text}</div>;
     default:

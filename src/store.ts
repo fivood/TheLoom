@@ -12,6 +12,7 @@ import { renameEntityField, renameIdentifier, renameSeenTarget } from './script/
 import { getSavedFolder, isTauri, loadFromFolder, saveToFolder, setSavedFolder } from './storage';
 import { clearProjectBrowserBlobs, loadAssetThumb, storeAssetThumb, stripAssetThumbs } from './assetFiles';
 import { confirmDialog, alertDialog } from './dialog';
+import { toast } from './toast';
 import { sampleProject } from './sample';
 import {
   clearProjectRecovery, clearQuarantinedProject, parseProjectData, readProjectWithRecovery,
@@ -1276,6 +1277,7 @@ export function exportProject(p: Project) {
   a.download = `${p.name || 'theloom'}.loom.json`;
   a.click();
   URL.revokeObjectURL(url);
+  toast('已导出 JSON 备份');
 }
 
 export function importProject(file: File): Promise<Project> {

@@ -111,14 +111,32 @@ React Flow(`@xyflow/react`)。本地画布状态防抖 350ms 回写 store;卸载
 
 ## 最近变更(R14-UX)
 
-UX 评估 4 个 A 级问题修复:
+UX 评估 4 个 A 级 + 7 个 B 级问题修复(A 级已随 v0.54.1 发布):
 
+**A 级(v0.54.1)**
 - **A1 分屏布局崩坏**:`App.tsx` 分屏两 pane 内容统一包 `.pane-module` wrapper;`styles.css` 在 `.content-pane` 上加 `container-type: inline-size`(与既有 `.side-list` 容器查询先例一致),新增 `@container (max-width: 1100px)`(侧栏收窄 + 工具栏单行横滚)与 `@container (max-width: 768px)`(三栏纵向堆叠)两块规则;≤768px 媒体查询的选择器改为 `.content-pane > .pane-module > ...`
 - **A2 字数口径统一**:`util.ts` `documentWordCount` 改为非空白字符(`\S`)计数,`audit.ts` 文档行改用同一函数;导航 / inspector / 专注模式 / 体检四处口径一致
 - **A3 Esc 行为一致**:`useEscape.ts` 重写为共享栈(window 单监听,多层叠加只关最顶层);`Dialog.tsx` 迁入栈;20 余个 palette 面板 + 顶栏工具 / 最近下拉 + 专注模式 + 演出模式全部经 `useEscape` 挂 Esc 关闭
 - **A4 流程画布初始视口**:`FlowEditor.tsx` 默认 `fitViewOptions={ minZoom: 0.6, maxZoom: 1, padding: 0.12 }`,打开流程即可读
 - 顺手修复 Ctrl+\ stale closure(`App.tsx` 加 `tabRef`,副面板默认模块跟随当前 tab)
-- 全部经 Playwright 实机点验(临时 Chrome profile);`npm test` 579 项通过,`npm run build` 通过
+
+**B 级(v0.54.2)**
+- B1 删 MOBI / Excel 虚假文案(功能 v0.51.0 已移除):拖拽遮罩 / HelpPanel / 导入长稿 tooltip / README
+- B2 HelpPanel 快捷键表 Alt+↑↓ 改为「文档编辑器里上下移动当前块」
+- B3 斜杠菜单放宽到全部文本块(BlocksEditor `SLASH_MENU_TYPES` 白名单)
+- B4 专注模式选项块渲染 ▸ 选项行 + 对称回写(choice id 按序保留),`immersive.ts`
+- B5 连续稿条件 / 指令收成「◇ 条件 / ⚡ 指令」小签(`StaticBlock` compact prop,表达式进 title)
+- B6 写作模式去掉工具栏快捷键提示,只留底部栏
+- B7 地图 inspector 空态加「地图属性」标题
+
+**C 级(v0.54.2)**
+- C1 轻量 toast 系统(`src/toast.ts` + `ToastHost`,带撤销动作);导出 / 导入 / 清理成功反馈改 toast;大纲删行、时间线删事件改「执行 + toast 撤销」
+- C2 FlowEditor 只有 position / remove / add / replace 变化才标 dirty,纯视图操作不再触发保存指示
+- C3 流程 / 文档工具栏低频动作各收进一个 ⋯ 溢出菜单
+- C4 顶栏工具菜单 `tools-menu-main` ≥700px 两列 grid
+- C5 `FdxExportDialog`:fdx 导出按流程 / 文档分组勾选范围
+
+- 全部经 Playwright 实机点验(临时 Chrome profile);`npm test` 583 项通过,`npm run build` 通过
 
 ## 最近变更(R1-2)
 

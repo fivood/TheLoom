@@ -35,7 +35,7 @@ export default function ImmersiveEditor({ doc, onExit }: { doc: Document; onExit
       className="immersive-text"
       value={text}
       spellCheck={false}
-      placeholder={'就在这里写。\n\n空行分段;# 标题、> 引用、- 列表、**粗** *斜* 都按 Markdown 生效。'}
+      placeholder={'就在这里写。\n\n空行分段;# 标题、> 引用、- 列表、**粗** *斜* 都按 Markdown 生效;选项块的每个选项是一行 ▸。'}
       onChange={(e) => onChange(e.target.value)}
     />
   );

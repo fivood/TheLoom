@@ -22,6 +22,7 @@ import { loadAssetBlob } from '../assetFiles';
 import { makeZip } from '../interop/zip';
 import { formatSize } from '../util';
 import { useEscape } from '../hooks/useEscape';
+import { toast } from '../toast';
 
 /** 未保存为命名配置时用的临时配置 */
 const DRAFT_ID = '__draft__';
@@ -283,6 +284,7 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
       }
       const zip = await makeZip(result.files);
       download(zip, `${project.name || 'theloom'}-引擎包.zip`);
+      toast(`引擎包已导出(${result.files.length} 个文件)`);
       setLastBundle(result);
       await rememberBaseline();
     } finally {
@@ -306,6 +308,7 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
         new Blob([JSON.stringify(delta, null, 2)], { type: 'application/json' }),
         `${project.name || 'theloom'}-增量.json`,
       );
+      toast(`增量包已导出(${total} 处变化)`);
       await rememberBaseline();
     } finally {
       setBusy(false);

@@ -33,7 +33,7 @@ TheLoom 是一款面向写作者与叙事设计师的本地优先创作工具,�
 
 ### 专业稿件导入与章节编译
 
-工具菜单可直接导入 TXT、Markdown、EPUB、DOCX 与 MOBI / AZW3 长稿，先预览识别出的卷、章、场景和警告，再一次性写入文档模块；导入只新增内容、不覆盖既有对象，并可用一次 Ctrl+Z 整体撤销。TXT 支持常见中英文卷章标题与中文旧编码，Markdown 支持 frontmatter、三级标题和代码围栏，EPUB 按书脊顺序读取 XHTML，DOCX 按标题样式还原层级，MOBI / AZW3 零依赖解析 PalmDoc 与 HUFF/CDIC 压缩、按分页符切章（无结构大部头自动退回「第X章」文本切分），书名作者取自 EXTH 元数据。
+工具菜单可直接导入 TXT、Markdown、EPUB 与 DOCX 长稿，先预览识别出的卷、章、场景和警告，再一次性写入文档模块；导入只新增内容、不覆盖既有对象，并可用一次 Ctrl+Z 整体撤销。TXT 支持常见中英文卷章标题与中文旧编码，Markdown 支持 frontmatter、三级标题和代码围栏，EPUB 按书脊顺序读取 XHTML，DOCX 按标题样式还原层级。
 
 章节编译可按卷 / 章勾选场景，实时统计文档数、字符数和输出大小，并导出 Markdown、纯文本或 Final Draft `.fdx` 投稿稿件。
 

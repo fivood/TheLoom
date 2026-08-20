@@ -18,6 +18,7 @@ import RevisionDiff from './RevisionDiff';
 import Inspector from '../../components/Inspector';
 import DocumentStructureDialog from './DocumentStructureDialog';
 import { useToolBus } from '../../toolBus';
+import { useEscape } from '../../hooks/useEscape';
 import {
   countDocumentReferences,
   mergeAdjacentDocuments,
@@ -43,6 +44,8 @@ export default function DocumentView() {
   const go = useNav((s) => s.go);
 
   const [catFilter, setCatFilter] = useState<string | 'all'>('all');
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEscape(moreOpen, () => setMoreOpen(false));
   const [revFilter, setRevFilter] = useState<'all' | 'none' | number>('all');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(documents[0]?.id ?? null);
@@ -413,18 +416,27 @@ export default function DocumentView() {
             onClick={() => setFocusMode(true)}
           >专注</button>
           <button className="ghost" onClick={() => setStructureToolsOpen(true)}>长篇工具</button>
-          {!isInteractive && (
-            <button
-              className="ghost"
-              title="导入 TXT / Markdown / EPUB / DOCX / MOBI 长稿,自动拆卷 / 章 / 场景"
-              onClick={() => useToolBus.getState().open('manuscriptImport')}
-            ><Icon name="upload" size={13} /> 导入长稿</button>
-          )}
-          <button
-            className="ghost"
-            title="按卷 / 章勾选场景,编译为 Word / Markdown / TXT / Final Draft 成品稿"
-            onClick={() => useToolBus.getState().open('chapterCompile')}
-          ><Icon name="script" size={13} /> 成稿导出</button>
+          {/* C3:低频的导入 / 导出收进溢出菜单 */}
+          <div className="tools-wrap">
+            <button className="ghost" title="导入长稿 / 成稿导出" onClick={() => setMoreOpen((o) => !o)}>⋯</button>
+            {moreOpen && (
+              <>
+                <div className="backdrop" onClick={() => setMoreOpen(false)} />
+                <div className="tools-menu">
+                  {!isInteractive && (
+                    <button
+                      title="导入 TXT / Markdown / EPUB / DOCX 长稿,自动拆卷 / 章 / 场景"
+                      onClick={() => { setMoreOpen(false); useToolBus.getState().open('manuscriptImport'); }}
+                    ><Icon name="upload" size={13} /> 导入长稿</button>
+                  )}
+                  <button
+                    title="按卷 / 章勾选场景,编译为 Word / Markdown / TXT / Final Draft 成品稿"
+                    onClick={() => { setMoreOpen(false); useToolBus.getState().open('chapterCompile'); }}
+                  ><Icon name="script" size={13} /> 成稿导出</button>
+                </div>
+              </>
+            )}
+          </div>
           <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
             <option value="all">全部分类</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -457,13 +469,13 @@ export default function DocumentView() {
             onChange={(e) => setQuery(e.target.value)}
             style={{ width: 260 }}
           />
-          <span className="hint">
-            {mode === 'manuscript'
-              ? '按卷 / 章顺序通读全文'
-              : mode === 'structure'
-                ? '整理块类型、流程参与方式与顺序'
-                : 'Enter 新段，Shift+Enter 换行，空段首输入 / 切换块类型'}
-          </span>
+          {mode !== 'writing' && (
+            <span className="hint">
+              {mode === 'manuscript'
+                ? '按卷 / 章顺序通读全文'
+                : '整理块类型、流程参与方式与顺序'}
+            </span>
+          )}
         </div>
         )}
 

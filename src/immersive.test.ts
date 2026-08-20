@@ -87,4 +87,50 @@ describe('沉浸写作 块 ↔ 纯文本', () => {
     expect(round[0].condition).toBe('trust > 5');
     expect(round[1].instruction).toBe('trust += 1');
   });
+
+  it('选项块渲染出 ▸ 选项行,往返保住选项 id 与 unitId', () => {
+    const prev = [
+      b({
+        id: 'q1', type: 'choice', text: '如何回复?', unitId: 'u1',
+        choices: [{ id: 'ch1', label: '回敬一句' }, { id: 'ch2', label: '装没看见' }],
+      }),
+    ];
+    const text = blocksToText(prev, ENTS);
+    expect(text).toBe('如何回复?\n▸ 回敬一句\n▸ 装没看见');
+    const round = textToBlocks(text, prev, ENTS);
+    expect(round[0].id).toBe('q1');
+    expect(round[0].unitId).toBe('u1');
+    expect(round[0].choices?.map((c) => [c.id, c.label])).toEqual([['ch1', '回敬一句'], ['ch2', '装没看见']]);
+  });
+
+  it('选项行可增删:删一行丢对应选项,加一行建新选项', () => {
+    const prev = [
+      b({
+        id: 'q1', type: 'choice', text: '如何回复?',
+        choices: [{ id: 'ch1', label: '回敬一句' }, { id: 'ch2', label: '装没看见' }],
+      }),
+    ];
+    const edited = textToBlocks('如何回复?\n▸ 回敬一句\n▸ 只发一个问号', prev, ENTS);
+    expect(edited[0].choices?.map((c) => [c.id, c.label])).toEqual([['ch1', '回敬一句'], [expect.any(String), '只发一个问号']]);
+  });
+
+  it('删掉全部 ▸ 行只改提示语,选项静默保留不丢', () => {
+    const prev = [
+      b({
+        id: 'q1', type: 'choice', text: '如何回复?',
+        choices: [{ id: 'ch1', label: '回敬一句' }],
+      }),
+    ];
+    const edited = textToBlocks('怎么回?', prev, ENTS);
+    expect(edited[0].type).toBe('choice');
+    expect(edited[0].text).toBe('怎么回?');
+    expect(edited[0].choices).toEqual([{ id: 'ch1', label: '回敬一句' }]);
+  });
+
+  it('纯文本新写选项块:首行提示语 + ▸ 行', () => {
+    const out = textToBlocks('去还是不去?\n▸ 去\n▸ 不去', [], ENTS);
+    expect(out[0].type).toBe('choice');
+    expect(out[0].text).toBe('去还是不去?');
+    expect(out[0].choices?.map((c) => c.label)).toEqual(['去', '不去']);
+  });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { confirmDialog, promptText } from '../../dialog';
+import { toast } from '../../toast';
 import { DOC_STATUS_LABEL, PALETTE } from '../../types';
 import { activePaletteColors, folderPath, linearizeByFolders } from '../../util';
 import { useNav } from '../../search';
@@ -115,8 +116,11 @@ export default function OutlineGrid() {
                   <button className="ghost icon-btn" title="下移" disabled={i === rows.length - 1} onClick={() => moveOutlineRow(r.id, 1)}>↓</button>
                   <button className="ghost icon-btn" title="在下方插入行" onClick={() => addOutlineRow(r.id)}>＋</button>
                   <button
-                    className="ghost icon-btn" title="删除行"
-                    onClick={async () => { if (await confirmDialog({ message: `删除第 ${r.no || i + 1} 行?`, danger: true, confirmText: '删除' })) removeOutlineRow(r.id); }}
+                    className="ghost icon-btn" title="删除行(可撤销)"
+                    onClick={() => {
+                      removeOutlineRow(r.id);
+                      toast(`已删除第 ${r.no || i + 1} 行`, { actionLabel: '撤销', onAction: () => useLoom.getState().undo() });
+                    }}
                   >×</button>
                 </td>
                 <td className="col-narrow">

@@ -625,11 +625,14 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
           <ShapeInspector shape={selShape} layers={map.layers ?? []} onChange={(p) => patchShape(selShape.id, p)} onDelete={() => removeShape(selShape.id)} />
         ) : (
           <>
-            <ObjectTemplateSection
-              module="map"
-              object={map}
-              onFieldsChange={(fields) => patch((m) => { m.fields = fields; })}
-            />
+            <div className="field">
+              <label>地图属性</label>
+              <ObjectTemplateSection
+                module="map"
+                object={map}
+                onFieldsChange={(fields) => patch((m) => { m.fields = fields; })}
+              />
+            </div>
             <div className="empty-hint">
               切换工具栏模式并点画布来添加。<br /><br />
               <b>标记 / 区域</b>:关联实体 / 时间线<br />

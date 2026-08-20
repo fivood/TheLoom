@@ -12,6 +12,7 @@ import {
   type DocxManuscriptPreset,
 } from '../interop/docxExport';
 import { useEscape } from '../hooks/useEscape';
+import { toast } from '../toast';
 
 type ExportFormat = CompileFormat | 'docx';
 
@@ -138,6 +139,7 @@ export default function ChapterCompileDialog({ onClose }: { onClose: () => void 
       a.download = `${safeName}-${format === 'docx' ? (docxPreset === 'submission' ? '投稿稿' : '编辑审阅稿') : '编译'}.${extension}`;
       a.click();
       URL.revokeObjectURL(a.href);
+      toast(`已下载 ${a.download}`);
       onClose();
     } catch (error) {
       setExportError(error instanceof Error ? error.message : String(error));

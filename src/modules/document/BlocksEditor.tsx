@@ -13,6 +13,7 @@ import StaticBlock from './StaticBlock';
 const COMMON_TYPES: DocBlockType[] = ['paragraph', 'action', 'dialogue'];
 const MORE_TYPES: DocBlockType[] = ['heading', 'subheading', 'quote', 'list', 'choice', 'condition', 'instruction', 'note'];
 const GAME_TYPES: DocBlockType[] = ['choice', 'condition', 'instruction'];
+const SLASH_MENU_TYPES: ReadonlySet<DocBlockType> = new Set(['paragraph', 'action', 'dialogue', 'subheading', 'heading', 'quote', 'note']);
 
 export function emptyBlock(type: DocBlockType): DocBlock {
   const b: DocBlock = { id: uid(), type, text: '' };
@@ -91,7 +92,7 @@ export default function BlocksEditor({
   }, [flows]);
 
   const activeBlock = doc.blocks.find((b) => b.id === activeBlockId);
-  const slashQuery = activeBlock?.type === 'paragraph' && activeBlock.text.startsWith('/')
+  const slashQuery = activeBlock && SLASH_MENU_TYPES.has(activeBlock.type) && activeBlock.text.startsWith('/')
     ? activeBlock.text.slice(1).trim().toLowerCase()
     : null;
   const slashMatches = slashQuery === null

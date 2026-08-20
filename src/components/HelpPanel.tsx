@@ -116,7 +116,7 @@ const SECTIONS: Section[] = [
           <tr><td><kbd>Ctrl+Shift+K</kbd></td><td>项目总览(浏览项目结构)</td></tr>
           <tr><td><kbd>Ctrl+\</kbd></td><td>分屏(主副两模块并列)</td></tr>
           <tr><td><kbd>Ctrl+Z / Ctrl+Y</kbd></td><td>撤销 / 重做(50 步,连续输入自动合并)</td></tr>
-          <tr><td><kbd>Alt+↑ / Alt+↓</kbd></td><td>文档里移动场景(卷章树内)</td></tr>
+          <tr><td><kbd>Alt+↑ / Alt+↓</kbd></td><td>文档编辑器里上下移动当前块</td></tr>
           <tr><td><kbd>/ 空段首</kbd></td><td>斜杠菜单切换块类型</td></tr>
           <tr><td><kbd>Enter / Shift+Enter</kbd></td><td>新段 / 换行</td></tr>
           <tr><td><kbd>Ctrl+Enter</kbd></td><td>批注 / 对话框:提交</td></tr>
@@ -133,7 +133,7 @@ const SECTIONS: Section[] = [
       <>
         <p><b>写小说</b>:文档模块建卷章树 → 三视图切换起草 / 结构 / 连读 → 规划里用关系图 / 弧线 / 伏笔梳理 → 成稿导出生成投稿稿 / 编辑审阅稿 DOCX，或编译 md / txt / fdx</p>
         <p><b>写互动剧本</b>:实体建人物 → 文档写对白 + 选项 → 生成流程 → 加变量 / 条件 / 检定 → 演出验证 → 路径测试查覆盖 → 引擎包 zip 交付 Godot / Unity</p>
-        <p><b>从长稿导入</b>:工具菜单 →「TXT / Markdown / EPUB / DOCX / MOBI 稿件」预检后一次事务式写入卷章</p>
+        <p><b>从长稿导入</b>:工具菜单 →「长稿导入」支持 TXT / Markdown / EPUB / DOCX,预检后一次事务式写入卷章</p>
         <p><b>从材料 AI 生成</b>:工具菜单 →「AI 设置」配 Key →「完整项目导入」输入多份材料 → 计划审阅 → 生成 → 预检导入(小说 / 互动剧本两种)</p>
       </>
     ),

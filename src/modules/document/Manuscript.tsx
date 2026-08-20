@@ -16,7 +16,7 @@ const StaticScene = memo(
   function StaticScene({ doc, entities }: { doc: Document; entities: Entity[]; namesKey: string }) {
     return (
       <div className="ms-static">
-        {doc.blocks.map((b) => <StaticBlock key={b.id} b={b} entities={entities} />)}
+        {doc.blocks.map((b) => <StaticBlock key={b.id} b={b} entities={entities} compact />)}
       </div>
     );
   },

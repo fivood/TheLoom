@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { confirmDialog, promptText } from '../../dialog';
+import { toast } from '../../toast';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import Inspector from '../../components/Inspector';
 import type { TimelineEvent } from '../../types';
@@ -318,7 +319,10 @@ export default function Timeline() {
                 onChange={(c) => patchEvent(selected.id, { color: c })}
               />
             </div>
-            <button className="danger" onClick={async () => { if (await confirmDialog({ message: `删除事件「${selected.title}」?`, danger: true, confirmText: '删除' })) removeEvent(selected.id); }}>
+            <button className="danger" onClick={() => {
+              removeEvent(selected.id);
+              toast(`已删除事件「${selected.title}」`, { actionLabel: '撤销', onAction: () => useLoom.getState().undo() });
+            }}>
               删除事件
             </button>
             <AttachmentEditor ownerId={selected.id} />
