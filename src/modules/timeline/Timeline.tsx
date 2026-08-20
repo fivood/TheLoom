@@ -320,8 +320,17 @@ export default function Timeline() {
               />
             </div>
             <button className="danger" onClick={() => {
+              // 撤销不走全局 undo:先快照,点「撤销」时定向插回原位,避免撤错对象
+              const snapshot = structuredClone(selected);
+              const index = events.findIndex((e) => e.id === selected.id);
               removeEvent(selected.id);
-              toast(`已删除事件「${selected.title}」`, { actionLabel: '撤销', onAction: () => useLoom.getState().undo() });
+              toast(`已删除事件「${snapshot.title}」`, {
+                actionLabel: '撤销',
+                onAction: () => update((p) => {
+                  if (p.timelineEvents.some((e) => e.id === snapshot.id)) return;
+                  p.timelineEvents.splice(Math.min(Math.max(index, 0), p.timelineEvents.length), 0, snapshot);
+                }),
+              });
             }}>
               删除事件
             </button>

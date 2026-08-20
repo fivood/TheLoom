@@ -103,6 +103,39 @@ describe('沉浸写作 块 ↔ 纯文本', () => {
     expect(round[0].choices?.map((c) => [c.id, c.label])).toEqual([['ch1', '回敬一句'], ['ch2', '装没看见']]);
   });
 
+  it('无提示语的选项块往返不吃掉第一个选项', () => {
+    const prev = [
+      b({
+        id: 'q1', type: 'choice', text: '', unitId: 'u1',
+        choices: [{ id: 'ch1', label: '去' }, { id: 'ch2', label: '不去' }],
+      }),
+    ];
+    const text = blocksToText(prev, ENTS);
+    expect(text).toBe('▸ 去\n▸ 不去');
+    const round = textToBlocks(text, prev, ENTS);
+    expect(round[0].id).toBe('q1');
+    expect(round[0].unitId).toBe('u1');
+    expect(round[0].text).toBe('');
+    expect(round[0].choices?.map((c) => [c.id, c.label])).toEqual([['ch1', '去'], ['ch2', '不去']]);
+  });
+
+  it('无提示语且只有一个选项的选项块往返不降级成段落', () => {
+    const prev = [
+      b({ id: 'q1', type: 'choice', text: '', choices: [{ id: 'ch1', label: '唯一选项' }] }),
+    ];
+    const round = textToBlocks(blocksToText(prev, ENTS), prev, ENTS);
+    expect(round[0].type).toBe('choice');
+    expect(round[0].text).toBe('');
+    expect(round[0].choices?.map((c) => [c.id, c.label])).toEqual([['ch1', '唯一选项']]);
+  });
+
+  it('纯文本新写无提示语选项块:全 ▸ 行', () => {
+    const out = textToBlocks('▸ 去\n▸ 不去', [], ENTS);
+    expect(out[0].type).toBe('choice');
+    expect(out[0].text).toBe('');
+    expect(out[0].choices?.map((c) => c.label)).toEqual(['去', '不去']);
+  });
+
   it('选项行可增删:删一行丢对应选项,加一行建新选项', () => {
     const prev = [
       b({

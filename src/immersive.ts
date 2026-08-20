@@ -71,6 +71,10 @@ function parseMarkdown(chunk: string): Partial<DocBlock> | undefined {
   if (lines.every((l) => l.startsWith('//'))) {
     return { type: 'note', text: lines.map((l) => l.replace(/^\/\/\s?/, '')).join('\n') };
   }
+  // 全 ▸ 行 = 无提示语的选项块:不能把第一行当提示语,否则往返会吃掉一个选项
+  if (lines.every((l) => l.startsWith('▸'))) {
+    return { type: 'choice', text: '', choices: lines.map((l) => ({ id: uid(), label: l.replace(/^▸\s?/, '') })) };
+  }
   if (lines.length > 1 && lines.slice(1).every((l) => l.startsWith('▸'))) {
     return { type: 'choice', text: lines[0], choices: lines.slice(1).map((l) => ({ id: uid(), label: l.replace(/^▸\s?/, '') })) };
   }

@@ -118,8 +118,18 @@ export default function OutlineGrid() {
                   <button
                     className="ghost icon-btn" title="删除行(可撤销)"
                     onClick={() => {
+                      // 撤销不走全局 undo:先快照,点「撤销」时定向插回原位,
+                      // 避免删除后又做了别的操作时撤错对象
+                      const snapshot = structuredClone(r);
+                      const index = i;
                       removeOutlineRow(r.id);
-                      toast(`已删除第 ${r.no || i + 1} 行`, { actionLabel: '撤销', onAction: () => useLoom.getState().undo() });
+                      toast(`已删除第 ${r.no || i + 1} 行`, {
+                        actionLabel: '撤销',
+                        onAction: () => useLoom.getState().update((p) => {
+                          if (p.outlineRows.some((x) => x.id === snapshot.id)) return;
+                          p.outlineRows.splice(Math.min(index, p.outlineRows.length), 0, snapshot);
+                        }),
+                      });
                     }}
                   >×</button>
                 </td>
