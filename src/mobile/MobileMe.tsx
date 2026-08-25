@@ -4,9 +4,10 @@ import { documentWordCount } from '../util';
 import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgress';
 import { loadInbox, visibleIdeas } from '../inbox';
 import RemotePanel from '../components/RemotePanel';
+import ThemeToggle from '../components/ThemeToggle';
+import Icon from '../components/Icon';
 import { confirmDialog } from '../dialog';
 
-/** 移动端「我的」:字数 / 场景 / 设定统计、保存状态、云同步、切项目、切回完整版 */
 export default function MobileMe() {
   const project = useLoom((s) => s.project);
   const folder = useLoom((s) => s.folder);
@@ -17,10 +18,8 @@ export default function MobileMe() {
   const loadSampleProject = useLoom((s) => s.loadSampleProject);
   const newSlot = useLoom((s) => s.newSlot);
   const [remoteSync, setRemoteSync] = useState(false);
-  // 「快记」统计的是灵感库(移动端快记 tab 写的地方),而不是桌面风暴板的便签
   const ideaCount = useMemo(() => visibleIdeas(loadInbox()).length, []);
 
-  /** 载入示例:当前项目已有内容时开新槽位,绝不覆盖 */
   const onLoadSample = async () => {
     const dirty = project.documents.length > 0 || project.entities.length > 0
       || project.outlineRows.length > 0 || project.timelinePoints.length > 0;
@@ -45,6 +44,15 @@ export default function MobileMe() {
 
   return (
     <div className="m-me">
+      {/* 极简顶栏 */}
+      <div className="m-clean-topbar">
+        <div className="m-top-title-wrap">
+          <Icon name="user" size={17} />
+          <span className="m-top-title">{project.name || '我的'}</span>
+        </div>
+        <ThemeToggle />
+      </div>
+
       <div className="m-me-card">
         <div className="m-me-name">{project.name || '未命名项目'}</div>
         <div className="m-me-stats">

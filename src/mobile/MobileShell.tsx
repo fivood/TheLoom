@@ -19,23 +19,17 @@ const TABS: { key: MTab; label: string; icon: IconName }[] = [
   { key: 'me', label: '我的', icon: 'user' },
 ];
 
-/** 移动端专用壳:4 个底部 tab,聚焦碎片时间写作与快记 */
 export default function MobileShell() {
-  const project = useLoom((s) => s.project);
   const [tab, setTab] = useState<MTab>('write');
   useKeyboardInset();
 
   return (
     <>
-      <div className="m-shell-head">
-        <span className="m-shell-title">{project.name || '未命名项目'}</span>
-        <ThemeToggle />
-      </div>
       <div className="m-view">
         {tab === 'write' && <MobileWrite />}
-        {tab === 'note' && <MobileNote />}
+        {tab === 'note' && <MobileNote onOpenWrite={() => setTab('write')} />}
         {tab === 'ref' && <MobileRef />}
-        {tab === 'browse' && <MobileBrowse />}
+        {tab === 'browse' && <MobileBrowse onOpenWrite={() => setTab('write')} />}
         {tab === 'me' && <MobileMe />}
       </div>
       <nav className="m-tabbar">

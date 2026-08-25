@@ -44,6 +44,10 @@ export default function BlocksEditor({
   const workspacePreset = useLoom((s) => s.project.workspacePreset);
   const updateDocument = useLoom((s) => s.updateDocument);
   const addEntity = useLoom((s) => s.addEntity);
+  const undo = useLoom((s) => s.undo);
+  const redo = useLoom((s) => s.redo);
+  const canUndo = useLoom((s) => s.canUndo ?? false);
+  const canRedo = useLoom((s) => s.canRedo ?? false);
   const isNovel = workspacePreset === 'novel';
   const moreTypes = isNovel ? MORE_TYPES.filter((t) => !GAME_TYPES.includes(t)) : MORE_TYPES;
   const slashTypes = [...COMMON_TYPES, ...moreTypes];
@@ -558,12 +562,25 @@ export default function BlocksEditor({
         })}
       </div>
 
-      {/* 专注(移动端)变体没有逐块侧栏与插入栏,这里给当前块补一条紧凑操作条,
-          否则手机上只能改已有块的文字,既加不了块也换不了类型 */}
+      {/* 专注(移动端)变体:Obsidian 风格贴键盘极简辅助条 */}
       {variant === 'focus' && activeBlock && (
         <div className="doc-focus-bar">
-          {/* 左半可横向滚动,右半的块操作固定不滚 —— 手机上整条一起滚会把删除按钮推出屏幕 */}
           <div className="doc-focus-scroll">
+            <button
+              className="ghost icon-btn"
+              type="button"
+              title="撤销 (Ctrl+Z)"
+              disabled={!canUndo}
+              onClick={() => undo()}
+            >↶</button>
+            <button
+              className="ghost icon-btn"
+              type="button"
+              title="重做 (Ctrl+Y)"
+              disabled={!canRedo}
+              onClick={() => redo()}
+            >↷</button>
+            <span className="doc-focus-sep" />
             <button
               className="ghost doc-focus-kind"
               type="button"
@@ -572,7 +589,12 @@ export default function BlocksEditor({
             >{DOC_BLOCK_LABEL[activeBlock.type]} ▾</button>
             <span className="doc-focus-sep" />
             {COMMON_TYPES.map((type) => (
-              <button key={type} className="ghost" type="button" onClick={() => insertBlock(type)}>
+              <button
+                key={type}
+                className="ghost"
+                type="button"
+                onClick={() => insertBlock(type)}
+              >
                 ＋{DOC_BLOCK_LABEL[type]}
               </button>
             ))}
@@ -597,6 +619,12 @@ export default function BlocksEditor({
               disabled={doc.blocks.length <= 1}
               onClick={() => removeBlock(activeBlock.id)}
             ><Icon name="trash" size={14} /></button>
+            <button
+              className="ghost icon-btn doc-focus-kb-btn"
+              type="button"
+              title="收起键盘"
+              onClick={() => { (document.activeElement as HTMLElement)?.blur(); }}
+            >⌨️</button>
           </div>
         </div>
       )}

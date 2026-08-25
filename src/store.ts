@@ -1341,3 +1341,7 @@ export async function hydrateFromIdb(): Promise<void> {
     void requestPersistentStorage().catch(() => {});
   } catch { /* hydration 失败不影响启动 */ }
 }
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { __loom_store__?: typeof useLoom }).__loom_store__ = useLoom;
+}

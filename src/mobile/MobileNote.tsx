@@ -1,18 +1,14 @@
 import { useMemo, useState } from 'react';
 import { confirmDialog } from '../dialog';
 import {
-  addIdea, editIdea, loadInbox, removeIdea, saveInbox, visibleIdeas, type IdeaCard,
+  addIdea, editIdea, loadInbox, removeIdea, saveInbox, visibleIdeas, type IdeaCard, markUsed,
 } from '../inbox';
 import Icon from '../components/Icon';
+import ThemeToggle from '../components/ThemeToggle';
+import { uid, useLoom } from '../store';
+import type { Document } from '../types';
 
-/**
- * 移动端快记:零摩擦捕获想法。
- *
- * 写进**跨项目的灵感库**,而不是当前项目的风暴板 —— 点子产生时往往还不知道
- * 属于哪部作品,塞进当前项目等于替你做了一个可能错的归属决定。
- * 到桌面端再从灵感库「取用」到具体项目(转为便签 / 场景 / 大纲行)。
- */
-export default function MobileNote() {
+export default function MobileNote({ onOpenWrite }: { onOpenWrite?: () => void }) {
   const [cards, setCards] = useState<IdeaCard[]>(loadInbox);
   const [draft, setDraft] = useState('');
   const [query, setQuery] = useState('');
@@ -29,7 +25,7 @@ export default function MobileNote() {
 
   const capture = () => {
     if (!draft.trim()) return;
-    commit(addIdea(cards, draft));
+    commit(addIdea(cards, draft.trim()));
     setDraft('');
   };
 
@@ -42,29 +38,81 @@ export default function MobileNote() {
     if (ok) commit(removeIdea(cards, c.id));
   };
 
+  const convertToScene = (c: IdeaCard) => {
+    const title = c.text.split('\n')[0].trim().slice(0, 20) || '灵感场景';
+    const d: Document = {
+      id: uid(),
+      name: title,
+      category: useLoom.getState().project.documentCategories[0] ?? '未分类',
+      blocks: [{ id: uid(), type: 'paragraph', text: c.text, flowRole: 'none' }],
+      notes: '',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    useLoom.getState().addDocument(d);
+    const p = useLoom.getState().project;
+    const next = markUsed(cards, c.id, useLoom.getState().currentSlotId, p.name || '未命名项目');
+    commit(next);
+    try { localStorage.setItem(`theloom-mobile-last-doc:${useLoom.getState().currentSlotId}`, d.id); } catch { /* 忽略 */ }
+    onOpenWrite?.();
+  };
+
+  const copyText = (text: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+    } catch { /* 忽略 */ }
+  };
+
   const visibleCount = visibleIdeas(cards).length;
 
   return (
     <div className="m-note">
-      <div className="m-note-capture">
+      {/* 极简顶栏 */}
+      <div className="m-clean-topbar">
+        <div className="m-top-title-wrap">
+          <Icon name="bulb" size={17} />
+          <span className="m-top-title">灵感快记</span>
+          <span className="m-top-badge">{visibleCount}</span>
+        </div>
+        <ThemeToggle />
+      </div>
+
+      {/* 秒开即写无边框输入区 */}
+      <div className="m-note-capture-card">
         <textarea
+          className="m-note-textarea"
           value={draft}
           rows={3}
           placeholder="记下一个想法、一句台词、一个情节…"
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+              e.preventDefault();
+              capture();
+            }
+          }}
         />
-        <button className="primary" disabled={!draft.trim()} onClick={capture}>记下</button>
+        <div className="m-note-capture-foot">
+          <span className="m-note-tip">跨项目存储 · 手机与桌面同步</span>
+          <button className="primary m-note-submit" disabled={!draft.trim()} onClick={capture}>
+            记下
+          </button>
+        </div>
       </div>
+
+      {/* 灵感便签流 */}
       <div className="m-note-list">
-        <div className="m-section-label">灵感库({visibleCount})· 跨项目</div>
-        {visibleCount > 6 && (
-          <input
-            className="m-note-search"
-            value={query}
-            placeholder="搜索想法…"
-            onChange={(e) => setQuery(e.target.value)}
-          />
+        {visibleCount > 5 && (
+          <div className="m-note-search-wrap">
+            <input
+              className="m-note-search"
+              value={query}
+              placeholder="搜索灵感…"
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
         )}
+
         {list.map((c) => (
           editingId === c.id ? (
             <div key={c.id} className="m-note-edit">
@@ -79,7 +127,7 @@ export default function MobileNote() {
             </div>
           ) : (
             <div key={c.id} className="m-note-item">
-              <button
+              <div
                 className="m-note-text"
                 title="点击修改"
                 onClick={() => { setEditingId(c.id); setEditText(c.text); }}
@@ -88,19 +136,39 @@ export default function MobileNote() {
                 {c.usedIn?.length ? (
                   <span className="m-idea-used">已用于 {c.usedIn.map((u) => u.projectName).join('、')}</span>
                 ) : null}
-              </button>
-              <button
-                className="ghost icon-btn m-note-del"
-                aria-label="删除"
-                onClick={() => void onRemove(c)}
-              ><Icon name="trash" size={14} /></button>
+              </div>
+              <div className="m-note-actions">
+                <button
+                  className="ghost icon-btn"
+                  title="转为正文场景"
+                  onClick={() => convertToScene(c)}
+                >
+                  <Icon name="doc" size={13} />
+                  <span>写成场景</span>
+                </button>
+                <button
+                  className="ghost icon-btn"
+                  title="复制文字"
+                  onClick={() => copyText(c.text)}
+                >
+                  <Icon name="copy" size={13} />
+                </button>
+                <button
+                  className="ghost icon-btn m-del"
+                  title="删除"
+                  aria-label="删除"
+                  onClick={() => void onRemove(c)}
+                >
+                  <Icon name="trash" size={13} />
+                </button>
+              </div>
             </div>
           )
         ))}
-        {visibleCount > 0 && list.length === 0 && <div className="hint">没有匹配的想法。</div>}
+        {visibleCount > 0 && list.length === 0 && <div className="hint" style={{ textAlign: 'center', padding: 20 }}>没有匹配的想法</div>}
         {visibleCount === 0 && (
-          <div className="hint">
-            还没有灵感。这里记的点子不属于任何项目,到桌面端可以取用到某部作品里。
+          <div className="hint" style={{ textAlign: 'center', padding: '36px 20px' }}>
+            还没有灵感。这里记下的点子不属于任何项目，可以在写作时随时插进场景，或点击「写成场景」直接开篇。
           </div>
         )}
       </div>

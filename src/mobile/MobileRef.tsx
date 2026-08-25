@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 import { uid, useLoom } from '../store';
 import Icon, { KIND_ICON } from '../components/Icon';
+import ThemeToggle from '../components/ThemeToggle';
 import { confirmDialog } from '../dialog';
-import type { Entity, EntityKind } from '../types';
+import type { Entity, EntityField, EntityKind } from '../types';
 
 const KIND_LABEL: Record<EntityKind, string> = {
   character: '角色', location: '地点', item: '物品', faction: '阵营', concept: '设定',
 };
 const KIND_ORDER: EntityKind[] = ['character', 'location', 'item', 'faction', 'concept'];
 
-/** 移动端设定:速查 + 就地新建 / 改名 / 改简介(字段与关系仍在桌面端编辑) */
 export default function MobileRef() {
   const entities = useLoom((s) => s.project.entities);
   const addEntity = useLoom((s) => s.addEntity);
@@ -20,15 +20,17 @@ export default function MobileRef() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const [draftSummary, setDraftSummary] = useState('');
+  const [draftNotes, setDraftNotes] = useState('');
+  const [draftFields, setDraftFields] = useState<EntityField[]>([]);
   const [creating, setCreating] = useState<EntityKind | null>(null);
 
-  // 搜索覆盖名称 / 简介 / 自定义字段值 —— 写到一半查「那个客栈叫什么」多半只记得半个词
   const matched = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return entities;
     return entities.filter((e) =>
       e.name.toLowerCase().includes(q)
       || (e.summary ?? '').toLowerCase().includes(q)
+      || (e.notes ?? '').toLowerCase().includes(q)
       || (e.fields ?? []).some((f) =>
         f.label.toLowerCase().includes(q) || String(f.value ?? '').toLowerCase().includes(q)));
   }, [entities, query]);
@@ -48,6 +50,8 @@ export default function MobileRef() {
     setEditingId(e.id);
     setDraftName(e.name);
     setDraftSummary(e.summary ?? '');
+    setDraftNotes(e.notes ?? '');
+    setDraftFields(structuredClone(e.fields ?? []));
   };
 
   const startCreate = (kind: EntityKind) => {
@@ -55,6 +59,8 @@ export default function MobileRef() {
     setCreating(kind);
     setDraftName('');
     setDraftSummary('');
+    setDraftNotes('');
+    setDraftFields([]);
   };
 
   const commit = () => {
@@ -68,12 +74,17 @@ export default function MobileRef() {
         color: '#d8d6d0',
         emoji: '',
         summary: draftSummary.trim(),
-        fields: [],
-        notes: '',
+        fields: draftFields,
+        notes: draftNotes.trim(),
         createdAt: Date.now(),
       });
     } else if (editingId) {
-      updateEntity(editingId, { name, summary: draftSummary.trim() });
+      updateEntity(editingId, {
+        name,
+        summary: draftSummary.trim(),
+        notes: draftNotes.trim(),
+        fields: draftFields,
+      });
     }
     setEditingId(null);
     setCreating(null);
@@ -92,18 +103,56 @@ export default function MobileRef() {
 
   const editor = (
     <div className="m-ref-edit">
-      <input
-        value={draftName}
-        autoFocus
-        placeholder="名称"
-        onChange={(ev) => setDraftName(ev.target.value)}
-      />
-      <textarea
-        value={draftSummary}
-        rows={3}
-        placeholder="一句话简介"
-        onChange={(ev) => setDraftSummary(ev.target.value)}
-      />
+      <label className="m-ref-label">
+        <span>名称</span>
+        <input
+          value={draftName}
+          autoFocus
+          placeholder="名称"
+          onChange={(ev) => setDraftName(ev.target.value)}
+        />
+      </label>
+      <label className="m-ref-label">
+        <span>一句话简介</span>
+        <textarea
+          value={draftSummary}
+          rows={2}
+          placeholder="一句话简介…"
+          onChange={(ev) => setDraftSummary(ev.target.value)}
+        />
+      </label>
+
+      {/* 自定义字段 */}
+      {draftFields.length > 0 && (
+        <div className="m-ref-fields-section">
+          <span className="m-ref-section-title">属性字段</span>
+          {draftFields.map((f, i) => (
+            <div key={f.id} className="m-ref-field-row">
+              <span className="m-ref-field-label">{f.label}</span>
+              <input
+                className="m-ref-field-val"
+                value={f.value ?? ''}
+                placeholder="值…"
+                onChange={(ev) => {
+                  const val = ev.target.value;
+                  setDraftFields((fs) => fs.map((x, idx) => idx === i ? { ...x, value: val } : x));
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <label className="m-ref-label">
+        <span>详细设定与背景 (Notes)</span>
+        <textarea
+          value={draftNotes}
+          rows={4}
+          placeholder="详细背景设定、外貌特征、经历…"
+          onChange={(ev) => setDraftNotes(ev.target.value)}
+        />
+      </label>
+
       <div className="m-ref-edit-row">
         {editingId && (
           <button
@@ -123,21 +172,37 @@ export default function MobileRef() {
 
   return (
     <div className="m-ref">
-      {entities.length > 6 && (
-        <input
-          className="m-ref-search"
-          value={query}
-          placeholder="搜索角色 / 地点 / 设定…"
-          onChange={(e) => setQuery(e.target.value)}
-        />
+      {/* 极简顶栏 */}
+      <div className="m-clean-topbar">
+        <div className="m-top-title-wrap">
+          <Icon name="book" size={17} />
+          <span className="m-top-title">设定库</span>
+          <span className="m-top-badge">{entities.length}</span>
+        </div>
+        <ThemeToggle />
+      </div>
+
+      {entities.length > 5 && (
+        <div className="m-ref-search-wrap">
+          <input
+            className="m-ref-search"
+            value={query}
+            placeholder="搜索角色 / 地点 / 设定 / 属性…"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
       )}
 
-      {/* 手机上也能建设定 —— 否则必须先回桌面建好才有得看 */}
+      {/* 快捷新建分类 */}
       <div className="m-ref-new">
         {KIND_ORDER.map((k) => (
-          <button key={k} className="ghost" onClick={() => startCreate(k)}>＋{KIND_LABEL[k]}</button>
+          <button key={k} className="ghost m-ref-new-chip" onClick={() => startCreate(k)}>
+            <Icon name={KIND_ICON[k]} size={13} />
+            <span>＋{KIND_LABEL[k]}</span>
+          </button>
         ))}
       </div>
+
       {creating && (
         <div className="m-ref-group">
           <div className="m-ref-kind">新建{KIND_LABEL[creating]}</div>
@@ -147,26 +212,41 @@ export default function MobileRef() {
 
       {groups.map(([kind, list]) => (
         <div key={kind} className="m-ref-group">
-          <div className="m-ref-kind">{KIND_LABEL[kind]}({list.length})</div>
+          <div className="m-ref-kind">{KIND_LABEL[kind]} ({list.length})</div>
           {list.map((e) => (
             editingId === e.id ? (
               <div key={e.id}>{editor}</div>
             ) : (
               <button key={e.id} className="m-ref-item" onClick={() => startEdit(e)}>
-                <span className="m-ref-head">
-                  <Icon name={KIND_ICON[e.kind]} size={14} />
+                <div className="m-ref-head">
+                  <Icon name={KIND_ICON[e.kind]} size={15} />
                   <strong>{e.name}</strong>
-                </span>
-                {e.summary && <span className="m-ref-summary">{e.summary}</span>}
+                  {e.fields && e.fields.length > 0 && (
+                    <span className="m-ref-field-count">{e.fields.length} 属性</span>
+                  )}
+                </div>
+                {e.summary && <div className="m-ref-summary">{e.summary}</div>}
+                {e.fields && e.fields.length > 0 && (
+                  <div className="m-ref-chips">
+                    {e.fields.slice(0, 3).map((f) => (
+                      <span key={f.id} className="m-ref-chip">
+                        {f.label}: {f.value || '—'}
+                      </span>
+                    ))}
+                    {e.fields.length > 3 && <span className="m-ref-chip-more">+{e.fields.length - 3}</span>}
+                  </div>
+                )}
               </button>
             )
           ))}
         </div>
       ))}
 
-      {entities.length > 0 && matched.length === 0 && <div className="hint">没有匹配的设定。</div>}
+      {entities.length > 0 && matched.length === 0 && <div className="hint" style={{ textAlign: 'center', padding: 20 }}>没有匹配的设定</div>}
       {entities.length === 0 && !creating && (
-        <div className="hint">还没有设定。用上面的按钮建一个,或在桌面端「实体」模块里补齐字段与关系。</div>
+        <div className="hint" style={{ textAlign: 'center', padding: '36px 20px' }}>
+          还没有设定。点击上方按钮快速创建角色、地点或设定。
+        </div>
       )}
     </div>
   );

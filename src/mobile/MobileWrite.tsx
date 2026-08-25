@@ -5,9 +5,10 @@ import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgres
 import type { Document } from '../types';
 import BlocksEditor, { emptyBlock } from '../modules/document/BlocksEditor';
 import Icon from '../components/Icon';
+import ThemeToggle from '../components/ThemeToggle';
+import { confirmDialog, promptText } from '../dialog';
 import { loadInbox, markUsed, saveInbox, visibleIdeas, type IdeaCard } from '../inbox';
 
-/** 按槽位记:多项目共用一个 key 会在切项目后把别的作品的场景记串 */
 function lastDocKey(): string {
   return `theloom-mobile-last-doc:${useLoom.getState().currentSlotId}`;
 }
@@ -16,14 +17,12 @@ function readLastDocId(): string | null {
   try { return localStorage.getItem(lastDocKey()); } catch { return null; }
 }
 
-/** 上次写的场景 → 最近改过的场景;都不在了返回 null */
 function pickFallbackId(documents: Document[]): string | null {
   const saved = readLastDocId();
   if (saved && documents.some((d) => d.id === saved)) return saved;
   return [...documents].sort((a, b) => b.updatedAt - a.updatedAt)[0]?.id ?? null;
 }
 
-/** 移动端写作:冷启动直达上次的场景,专注写作,可在场景间切换 */
 export default function MobileWrite() {
   const documents = useLoom((s) => s.project.documents);
   const folders = useLoom((s) => s.project.folders);
@@ -32,26 +31,27 @@ export default function MobileWrite() {
   const currentSlotId = useLoom((s) => s.currentSlotId);
   const addDocument = useLoom((s) => s.addDocument);
   const updateDocument = useLoom((s) => s.updateDocument);
+  const removeDocument = useLoom((s) => s.removeDocument);
+
   const [selectedId, setSelectedId] = useState<string | null>(() => pickFallbackId(documents));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [ideasOpen, setIdeasOpen] = useState(false);
   const [inbox, setInbox] = useState<IdeaCard[]>(loadInbox);
 
-  const doc = documents.find((d) => d.id === selectedId) ?? null;
+  const doc = documents.find((d) => d.id === selectedId) ?? documents[0] ?? null;
 
-  // 选中的场景不存在时重新归位:载入示例 / 切换项目 / 删除当前场景后
-  // documents 才到位,只在挂载时初始化会永远停在「未选择场景」
   useEffect(() => {
-    if (doc || documents.length === 0) return;
-    setSelectedId(pickFallbackId(documents));
-  }, [doc, documents, currentSlotId]);
+    if (documents.length > 0 && (!selectedId || !documents.some((d) => d.id === selectedId))) {
+      const fallback = pickFallbackId(documents) ?? documents[0]?.id ?? null;
+      if (fallback) setSelectedId(fallback);
+    }
+  }, [documents, selectedId, currentSlotId]);
 
   useEffect(() => {
     try { if (doc) localStorage.setItem(lastDocKey(), doc.id); } catch { /* 忽略 */ }
   }, [doc?.id]);
 
-  // 按卷 / 章树序排,而不是按修改时间 —— 后者会让当前场景在打字时不断跳到列表顶
   const ordered = useMemo(
     () => linearizeByFolders(documents, folders, 'document'),
     [documents, folders],
@@ -65,7 +65,6 @@ export default function MobileWrite() {
       || folderPath(d.folderId, folders).toLowerCase().includes(q));
   }, [ordered, query, folders]);
 
-  // 今日新增与连续天数:writingProgress 一直在记录,只是移动端从来没接出来
   const stats = useMemo(() => {
     const mode = progress?.countMode ?? 'characters';
     const bodyOnly = progress?.bodyOnly ?? false;
@@ -82,10 +81,6 @@ export default function MobileWrite() {
 
   const recentIdeas = useMemo(() => visibleIdeas(inbox).slice(0, 12), [inbox]);
 
-  /**
-   * 把一条灵感插进当前场景末尾。灵感库是跨项目的,所以插入后记一笔去向
-   * (标记「已用于本项目」),但**不删卡片** —— 同一个点子可能还要用在别处。
-   */
   const insertIdea = (card: IdeaCard) => {
     if (!doc) return;
     updateDocument(doc.id, (d) => {
@@ -100,10 +95,11 @@ export default function MobileWrite() {
     setIdeasOpen(false);
   };
 
-  const createScene = () => {
+  const createScene = (folderId?: string) => {
     const d: Document = {
       id: uid(),
       name: '新场景',
+      folderId,
       category: categories[0] ?? '未分类',
       blocks: [emptyBlock('paragraph')],
       notes: '',
@@ -115,99 +111,176 @@ export default function MobileWrite() {
     setPickerOpen(false);
   };
 
+  const renameScene = async (d: Document, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = await promptText({ message: '修改场景名称', defaultValue: d.name });
+    if (next && next.trim() && next !== d.name) {
+      updateDocument(d.id, (doc) => { doc.name = next.trim(); });
+    }
+  };
+
+  const deleteScene = async (d: Document, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = await confirmDialog({
+      title: `删除场景「${d.name}」?`,
+      message: '该场景的正文块将一并删除。',
+      danger: true,
+    });
+    if (!ok) return;
+    removeDocument(d.id);
+  };
+
   return (
     <div className="m-write">
-      <div className="m-write-head">
-        <button className="m-doc-picker" onClick={() => setPickerOpen((o) => !o)} title="切换场景">
-          <Icon name="chevronDown" size={14} />
-          <span className="m-doc-main">
-            <span className="m-doc-name">{doc ? doc.name : '未选择场景'}</span>
-            {chapter && <span className="m-doc-chapter">{chapter}</span>}
-          </span>
-          {doc && <span className="m-doc-words">{documentWordCount(doc)}字</span>}
+      {/* 极简 Obsidian 级单行顶栏 */}
+      <div className="m-clean-topbar">
+        <button
+          className="ghost icon-btn m-top-btn"
+          onClick={() => setPickerOpen(true)}
+          title="场景目录"
+          aria-label="场景目录"
+        >
+          <Icon name="folder" size={18} />
         </button>
-        <button className="ghost icon-btn" onClick={createScene} title="新建场景" aria-label="新建场景">
-          <Icon name="plus" size={16} />
-        </button>
+
+        <div className="m-top-stats">
+          {doc ? (
+            <span>
+              <strong>{documentWordCount(doc)}</strong> 字
+              {stats.today > 0 && <span className="m-top-today"> · 今日 +{stats.today}</span>}
+            </span>
+          ) : (
+            <span>未选择场景</span>
+          )}
+        </div>
+
+        <div className="m-top-actions">
+          {doc && (
+            <>
+              <button
+                className="ghost icon-btn m-nav-step-btn"
+                disabled={!prevDoc}
+                title={prevDoc ? `上一场:${prevDoc.name}` : '第一场'}
+                onClick={() => prevDoc && setSelectedId(prevDoc.id)}
+              >‹</button>
+              <button
+                className="ghost icon-btn m-nav-step-btn"
+                disabled={!nextDoc}
+                title={nextDoc ? `下一场:${nextDoc.name}` : '最后一场'}
+                onClick={() => nextDoc && setSelectedId(nextDoc.id)}
+              >›</button>
+            </>
+          )}
+          <button
+            className={`ghost icon-btn m-idea-icon-btn ${ideasOpen ? 'on' : ''}`}
+            onClick={() => setIdeasOpen((o) => !o)}
+            title="灵感抽屉"
+            aria-label="灵感抽屉"
+          >
+            <Icon name="bulb" size={17} />
+            {recentIdeas.length > 0 && <span className="m-idea-badge">{recentIdeas.length}</span>}
+          </button>
+          <ThemeToggle />
+        </div>
       </div>
 
-      {doc && (
-        <div className="m-write-bar">
-          <button
-            className="ghost icon-btn"
-            disabled={!prevDoc}
-            title={prevDoc ? `上一场:${prevDoc.name}` : '已是第一场'}
-            aria-label="上一场"
-            onClick={() => prevDoc && setSelectedId(prevDoc.id)}
-          >‹</button>
-          <button
-            className="ghost icon-btn"
-            disabled={!nextDoc}
-            title={nextDoc ? `下一场:${nextDoc.name}` : '已是最后一场'}
-            aria-label="下一场"
-            onClick={() => nextDoc && setSelectedId(nextDoc.id)}
-          >›</button>
-          <span className="m-write-progress">
-            今日 <strong>{stats.today}</strong>
-            {stats.streak > 0 && <> · 连续 <strong>{stats.streak}</strong> 天</>}
-          </span>
-          <button
-            className={`ghost m-idea-btn ${ideasOpen ? 'on' : ''}`}
-            onClick={() => setIdeasOpen((o) => !o)}
-            disabled={recentIdeas.length === 0}
-            title="灵感抽屉"
-          >灵感 {recentIdeas.length}</button>
+      {/* 灵感抽屉 */}
+      {ideasOpen && doc && (
+        <div className="m-idea-sheet">
+          <div className="m-sheet-head">
+            <span>灵感库 ({recentIdeas.length}) · 点一条插到末尾</span>
+            <button className="ghost icon-btn" onClick={() => setIdeasOpen(false)}>×</button>
+          </div>
+          <div className="m-sheet-body">
+            {recentIdeas.map((n) => (
+              <button key={n.id} className="m-idea-item" onClick={() => insertIdea(n)}>
+                {n.text}
+              </button>
+            ))}
+            {recentIdeas.length === 0 && <div className="hint">灵感库是空的，可在「快记」中添加想法。</div>}
+          </div>
         </div>
       )}
 
-      {ideasOpen && doc && (
-        <div className="m-idea-drawer">
-          <div className="m-section-label">点一条插到这一场末尾</div>
-          {recentIdeas.map((n) => (
-            <button key={n.id} className="m-idea-item" onClick={() => insertIdea(n)}>
-              {n.text}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* 场景目录侧滑抽屉 (Scene Drawer) */}
       {pickerOpen && (
-        <div className="m-doc-list">
-          {ordered.length > 8 && (
-            <input
-              className="m-doc-search"
-              value={query}
-              placeholder="搜索场景 / 章节…"
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          )}
-          {visible.map((d) => {
-            const path = folderPath(d.folderId, folders);
-            return (
-              <button
-                key={d.id}
-                className={`m-doc-item ${d.id === selectedId ? 'on' : ''}`}
-                onClick={() => { setSelectedId(d.id); setPickerOpen(false); setQuery(''); }}
-              >
-                <span className="m-doc-item-main">
-                  <span className="m-doc-item-name">{d.name}</span>
-                  {path && <span className="m-doc-item-path">{path}</span>}
-                </span>
-                <span className="m-doc-item-words">{documentWordCount(d)}字</span>
-              </button>
-            );
-          })}
-          {visible.length === 0 && <div className="hint" style={{ padding: '10px 12px' }}>没有匹配的场景。</div>}
-          <button className="m-doc-item m-doc-new" onClick={createScene}>＋ 新建场景</button>
+        <div className="m-drawer-backdrop" onClick={() => setPickerOpen(false)}>
+          <div className="m-drawer-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="m-drawer-head">
+              <div className="m-drawer-title">
+                <Icon name="doc" size={16} />
+                <span>场景目录 ({ordered.length})</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="primary-ghost" onClick={() => createScene()}>＋ 新场景</button>
+                <button className="ghost icon-btn" onClick={() => setPickerOpen(false)}>×</button>
+              </div>
+            </div>
+
+            {ordered.length > 5 && (
+              <div className="m-drawer-search-wrap">
+                <input
+                  className="m-drawer-search"
+                  value={query}
+                  placeholder="搜索场景 / 章节…"
+                  autoFocus
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="m-drawer-list">
+              {visible.map((d) => {
+                const path = folderPath(d.folderId, folders);
+                const isActive = d.id === selectedId;
+                return (
+                  <div
+                    key={d.id}
+                    className={`m-drawer-item ${isActive ? 'active' : ''}`}
+                    onClick={() => { setSelectedId(d.id); setPickerOpen(false); setQuery(''); }}
+                  >
+                    <div className="m-drawer-item-main">
+                      <span className="m-drawer-item-name">{d.name}</span>
+                      {path && <span className="m-drawer-item-path">{path}</span>}
+                    </div>
+                    <div className="m-drawer-item-meta">
+                      <span className="m-drawer-item-words">{documentWordCount(d)}字</span>
+                      <button
+                        className="ghost icon-btn m-drawer-action"
+                        title="重命名"
+                        onClick={(ev) => renameScene(d, ev)}
+                      ><Icon name="pencil" size={13} /></button>
+                      <button
+                        className="ghost icon-btn m-drawer-action m-del"
+                        title="删除"
+                        onClick={(ev) => deleteScene(d, ev)}
+                      ><Icon name="trash" size={13} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+              {visible.length === 0 && <div className="hint" style={{ padding: 20, textAlign: 'center' }}>没有匹配的场景</div>}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* 写作正文稿纸 (Obsidian-Style Novel Sheet) */}
       {doc ? (
         <div className="m-write-editor">
+          {chapter && <div className="m-scene-chapter-tag">{chapter}</div>}
+          <input
+            className="m-scene-title-input"
+            value={doc.name}
+            placeholder="场景标题"
+            onChange={(e) => updateDocument(doc.id, (d) => { d.name = e.target.value; })}
+          />
           <BlocksEditor doc={doc} variant="focus" />
         </div>
       ) : (
         <div className="m-empty">
           <p>还没有场景。写下第一个片段,碎片时间也能往前推一点。</p>
-          <button className="primary" onClick={createScene}>写第一个场景</button>
+          <button className="primary" onClick={() => createScene()}>写第一个场景</button>
         </div>
       )}
     </div>

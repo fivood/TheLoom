@@ -9,7 +9,7 @@ export type IconName =
   | 'palette' | 'check'
   | 'sun' | 'moon' | 'monitor' | 'split' | 'more' | 'help' | 'arrowLeft' | 'compare' | 'chevronDown' | 'chevronRight'
   | 'cards' | 'lock' | 'unlock' | 'eye' | 'folderOpen' | 'comment' | 'warn' | 'ban' | 'bolt' | 'gear'
-  | 'star' | 'starFilled' | 'pencil' | 'sparkle' | 'flagCheck' | 'close';
+  | 'star' | 'starFilled' | 'pencil' | 'sparkle' | 'flagCheck' | 'close' | 'copy';
 
 /** 实体类型 → 图标 */
 export const KIND_ICON: Record<EntityKind, IconName> = {
@@ -312,6 +312,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
   close: <path d="M6 6l12 12M18 6 6 18" />,
   chevronDown: <path d="M6 9.5 12 15.5l6-6" />,
   chevronRight: <path d="M9.5 6 15.5 12l-6 6" />,
+  copy: (
+    <>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 16, strokeWidth = 1.7, className, style }: {

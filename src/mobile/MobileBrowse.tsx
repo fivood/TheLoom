@@ -1,50 +1,44 @@
 import { useMemo, useState } from 'react';
 import { uid, useLoom } from '../store';
 import Icon from '../components/Icon';
+import ThemeToggle from '../components/ThemeToggle';
 import { readableInk } from '../theme';
 import { confirmDialog, promptText } from '../dialog';
-import type { OutlineRow, TimelineEvent } from '../types';
+import type { Document, OutlineRow, TimelineEvent } from '../types';
 
 type View = 'outline' | 'timeline';
 
-/** 新建剧情线 / 轨道时的默认灰阶,与示例项目同一套 */
 const LANE_COLORS = ['#1b1b19', '#565550', '#8e8d86', '#aaa9a1'];
 
 function nextColor(used: number): string {
   return LANE_COLORS[used % LANE_COLORS.length];
 }
 
-/**
- * 移动端查阅与编辑:大纲与时间线的竖排形态。
- *
- * 桌面端这两个模块都是宽表格(大纲 = 章节 × 剧情线,时间线 = 轨道 × 时间点),
- * 在手机上横着看没有意义。这里把它们**按主轴展开成竖排**:
- * 大纲以章节为单位,把各剧情线折进章节卡片;时间线以时间点为单位,把各轨道的事件折进去。
- *
- * 编辑采用即时提交(与文档块编辑器同惯例,store 的 commit 自带 800ms 合并),
- * 所以没有「保存」按钮 —— 手机上少一次点击,也不会因为切走而丢内容。
- */
-export default function MobileBrowse() {
+export default function MobileBrowse({ onOpenWrite }: { onOpenWrite?: () => void }) {
   const [view, setView] = useState<View>('outline');
 
   return (
     <div className="m-browse">
-      <div className="m-seg">
-        <button className={view === 'outline' ? 'on' : ''} onClick={() => setView('outline')}>
-          <Icon name="grid" size={14} /> 大纲
-        </button>
-        <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>
-          <Icon name="clock" size={14} /> 时间线
-        </button>
+      {/* 极简顶栏 */}
+      <div className="m-clean-topbar">
+        <div className="m-seg">
+          <button className={view === 'outline' ? 'on' : ''} onClick={() => setView('outline')}>
+            <Icon name="grid" size={14} /> 大纲
+          </button>
+          <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>
+            <Icon name="clock" size={14} /> 时间线
+          </button>
+        </div>
+        <ThemeToggle />
       </div>
-      {view === 'outline' ? <OutlineList /> : <TimelineList />}
+      {view === 'outline' ? <OutlineList onOpenWrite={onOpenWrite} /> : <TimelineList />}
     </div>
   );
 }
 
 /* ---------------- 大纲 ---------------- */
 
-function OutlineList() {
+function OutlineList({ onOpenWrite }: { onOpenWrite?: () => void }) {
   const rows = useLoom((s) => s.project.outlineRows);
   const columns = useLoom((s) => s.project.outlineColumns);
   const addOutlineRow = useLoom((s) => s.addOutlineRow);
@@ -78,6 +72,26 @@ function OutlineList() {
     addOutlineColumn({ id: uid(), title: title.trim(), color: nextColor(columns.length) });
   };
 
+  const writeChapter = (r: OutlineRow, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const docs = useLoom.getState().project.documents;
+    let target = docs.find((d) => d.name === r.title || (r.title && d.name.includes(r.title)));
+    if (!target) {
+      target = {
+        id: uid(),
+        name: r.title ? `${r.no ? `ACT ${r.no} · ` : ''}${r.title}` : `第 ${r.no || 1} 场`,
+        category: useLoom.getState().project.documentCategories[0] ?? '未分类',
+        blocks: [{ id: uid(), type: 'paragraph', text: r.main || '', flowRole: 'none' }],
+        notes: '',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      useLoom.getState().addDocument(target);
+    }
+    try { localStorage.setItem(`theloom-mobile-last-doc:${useLoom.getState().currentSlotId}`, target.id); } catch { /* 忽略 */ }
+    onOpenWrite?.();
+  };
+
   const onRemove = async (r: OutlineRow) => {
     const ok = await confirmDialog({
       title: `删除「${r.title || '未命名章节'}」?`,
@@ -91,48 +105,51 @@ function OutlineList() {
 
   return (
     <>
-      <div className="m-browse-actions">
-        <button className="ghost" onClick={addRow}>＋ 章节</button>
+      <div className="m-browse-bar">
+        <button className="primary-ghost" onClick={addRow}>＋ 章节</button>
         <button className="ghost" onClick={() => void addLane()}>＋ 剧情线</button>
+        <span style={{ flex: 1 }} />
+        {rows.length > 5 && (
+          <input
+            className="m-browse-search"
+            value={query}
+            placeholder="搜索大纲…"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        )}
       </div>
-
-      {rows.length > 6 && (
-        <input
-          className="m-browse-search"
-          value={query}
-          placeholder="搜索章节 / 剧情…"
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      )}
-
-      {rows.length === 0 && (
-        <div className="hint">还没有大纲。点「＋ 章节」建第一章;剧情线是纵向的分栏(主角线 / 感情线…),按需添加。</div>
-      )}
 
       <div className="m-outline-list">
         {visible.map((r) => {
-          const open = openId === r.id;
-          // 收起时只展示填了内容的剧情线,否则手机上全是空标签
+          const isOpen = openId === r.id;
           const filled = columns.filter((c) => (r.cells?.[c.id] ?? '').trim());
           return (
-            <div key={r.id} className={`m-outline-row ${open ? 'open' : ''}`}>
-              <button className="m-outline-head" onClick={() => setOpenId(open ? null : r.id)}>
+            <div key={r.id} className={`m-outline-card ${isOpen ? 'open' : ''}`}>
+              <div className="m-outline-head" onClick={() => setOpenId(isOpen ? null : r.id)}>
                 {r.no && <span className="m-outline-no">{r.no}</span>}
-                <strong>{r.title || '未命名章节'}</strong>
+                <strong className="m-outline-title">{r.title || '未命名章节'}</strong>
                 {r.time && <span className="m-outline-time">{r.time}</span>}
-                <span className="m-outline-caret">{open ? '▾' : '▸'}</span>
-              </button>
+                <button
+                  className="ghost icon-btn m-outline-write-btn"
+                  title="写此章正文"
+                  onClick={(e) => writeChapter(r, e)}
+                >
+                  <Icon name="doc" size={12} />
+                  <span>写此章</span>
+                </button>
+                <span className="m-outline-arrow">{isOpen ? '▾' : '▸'}</span>
+              </div>
 
-              {open ? (
-                <div className="m-edit">
-                  <div className="m-edit-row2">
+              {isOpen ? (
+                <div className="m-outline-edit">
+                  <div className="m-outline-row-2">
                     <label>
-                      <span>章节号</span>
-                      <input value={r.no} onChange={(e) => updateOutlineRow(r.id, { no: e.target.value })} />
+                      <span>序号</span>
+                      <input value={r.no} placeholder="如:1 / 序" onChange={(e) => updateOutlineRow(r.id, { no: e.target.value })} />
                     </label>
                     <label>
-                      <span>故事时间</span>
-                      <input value={r.time} onChange={(e) => updateOutlineRow(r.id, { time: e.target.value })} />
+                      <span>时间</span>
+                      <input value={r.time} placeholder="如:16:09" onChange={(e) => updateOutlineRow(r.id, { time: e.target.value })} />
                     </label>
                   </div>
                   <label>
@@ -159,6 +176,7 @@ function OutlineList() {
                   <div className="m-edit-foot">
                     <button className="ghost m-del" onClick={() => void onRemove(r)}>删除本章</button>
                     <span style={{ flex: 1 }} />
+                    <button className="primary-ghost" onClick={() => writeChapter(r)}>✍️ 写本章正文</button>
                     <button className="ghost" onClick={() => setOpenId(null)}>收起</button>
                   </div>
                 </div>
@@ -176,7 +194,7 @@ function OutlineList() {
             </div>
           );
         })}
-        {rows.length > 0 && visible.length === 0 && <div className="hint">没有匹配的章节。</div>}
+        {rows.length > 0 && visible.length === 0 && <div className="hint" style={{ textAlign: 'center', padding: 20 }}>没有匹配的章节。</div>}
       </div>
     </>
   );

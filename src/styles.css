@@ -4910,160 +4910,213 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .content-pane > .pane-module > .pane-col { flex: 1 1 0; }
 }
 
-/* ---------- 移动端专用壳(碎片时间写作) ---------- */
+/* ---------- 移动端专用壳(Obsidian 级清爽写作体验) ---------- */
 .app-mobile { flex-direction: column !important; padding: 0 !important; gap: 0 !important; }
 .app-mobile .main, .app-mobile .sidebar { display: none; }
 
-.m-shell-head {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px calc(10px + env(safe-area-inset-top));
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+.m-clean-topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-panel);
+  flex-shrink: 0; min-height: 48px;
 }
-.m-shell-title {
-  flex: 1; font-weight: 600; font-size: 15px;
+.m-top-title-wrap { display: flex; align-items: center; gap: 6px; }
+.m-top-title { font-weight: 600; font-size: 15px; color: var(--text); }
+.m-top-badge {
+  font-size: 11px; padding: 1px 6px; border-radius: 10px;
+  background: var(--border-light); color: var(--text-dim); font-weight: 500;
+}
+.m-top-stats {
+  flex: 1; text-align: center; font-size: 13px; color: var(--text-dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.m-view { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.m-top-stats strong { color: var(--text); font-weight: 600; }
+.m-top-today { font-size: 11px; color: var(--text-faint); margin-left: 2px; }
+.m-top-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.m-top-actions .icon-btn { min-width: 36px; min-height: 36px; padding: 0; }
+.m-idea-icon-btn { position: relative; }
+.m-idea-badge {
+  position: absolute; top: 2px; right: 2px;
+  background: var(--focus); color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 1;
+  padding: 2px 4px; border-radius: 8px; min-width: 14px; text-align: center;
+}
+
+.m-view {
+  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
+  overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch;
+}
 .m-tabbar {
   display: flex; flex-shrink: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-light);
   padding: 4px 2px calc(4px + env(safe-area-inset-bottom));
   background: var(--bg-panel);
 }
 .m-tabbar button {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 7px 0; border-radius: 10px; background: none; border: 0;
+  padding: 6px 0; border-radius: 10px; background: none; border: 0;
   color: var(--text-dim); font-size: 11px; cursor: pointer;
 }
 .m-tabbar button.on { color: var(--focus); font-weight: 600; }
 .m-tabbar button span { line-height: 1; }
 
 .m-write { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.m-write-head {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+.m-write-editor {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 16px 20px 16px;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
-.m-doc-picker {
-  flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
-  background: none; border: 0; padding: 6px 8px; border-radius: 8px;
-  cursor: pointer; text-align: left; color: var(--text);
+.m-scene-chapter-tag {
+  font-size: 12px; color: var(--text-faint); margin-bottom: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.m-doc-picker:active { background: var(--bg-hover); }
-.m-doc-name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.m-doc-words { color: var(--text-faint); font-size: 12px; flex-shrink: 0; }
-.m-doc-list {
-  border-bottom: 1px solid var(--border); max-height: 46vh; overflow-y: auto;
-  background: var(--bg-panel); flex-shrink: 0;
+.m-scene-title-input {
+  width: 100%; border: 0; outline: none; background: transparent;
+  font-size: 22px !important; font-weight: 700; line-height: 1.35;
+  color: var(--text); padding: 2px 0 14px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
 }
-.m-doc-item {
-  display: flex; justify-content: space-between; align-items: center; width: 100%;
-  padding: 13px 14px; background: none; border: 0; border-bottom: 1px solid var(--border);
-  text-align: left; cursor: pointer; color: var(--text);
-}
-.m-doc-item.on { background: var(--accent-soft); }
-.m-doc-item-name { font-size: 14px; }
-.m-doc-item-words { color: var(--text-faint); font-size: 12px; }
-.m-doc-new { color: var(--focus); font-weight: 600; justify-content: center; border-bottom: 0; }
-.m-write-editor { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; }
-.m-empty {
-  margin: auto; text-align: center; padding: 28px; color: var(--text-dim);
-  display: flex; flex-direction: column; gap: 14px; align-items: center; max-width: 320px;
-}
-.m-empty p { margin: 0; line-height: 1.6; }
+.m-scene-title-input::placeholder { color: var(--text-faint); font-weight: 400; }
 
-.m-section-label { font-size: 12px; color: var(--text-faint); padding: 10px 12px 6px; }
-.m-note-capture { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.m-note-capture textarea { width: 100%; }
-.m-note-list { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+/* 场景目录抽屉 (Scene Drawer) */
+.m-drawer-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex; flex-direction: column; justify-content: flex-end;
+  animation: fadeIn 0.15s ease-out;
+}
+.m-drawer-panel {
+  background: var(--bg-panel);
+  border-radius: 16px 16px 0 0;
+  max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.25);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.m-drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px; border-bottom: 1px solid var(--border-light);
+}
+.m-drawer-title { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; }
+.m-drawer-search-wrap { padding: 8px 16px; border-bottom: 1px solid var(--border-light); }
+.m-drawer-search { width: 100%; padding: 8px 12px; font-size: 15px; }
+.m-drawer-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px; }
+.m-drawer-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-radius: 10px; margin-bottom: 4px;
+  cursor: pointer; transition: background 0.1s;
+}
+.m-drawer-item:active { background: var(--bg-hover); }
+.m-drawer-item.active { background: var(--accent-soft); font-weight: 600; }
+.m-drawer-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-drawer-item-name { font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-drawer-item-path { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-drawer-item-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.m-drawer-item-words { font-size: 12px; color: var(--text-faint); margin-right: 2px; }
+.m-drawer-action { min-width: 30px !important; min-height: 30px !important; padding: 0 !important; }
+
+/* 灵感抽屉浮层 */
+.m-idea-sheet {
+  position: fixed; bottom: calc(60px + env(safe-area-inset-bottom));
+  left: 12px; right: 12px; max-height: 48vh; z-index: 50;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: 0 10px 36px rgba(0,0,0,0.22);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.m-sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border-light); font-size: 13px; font-weight: 600;
+}
+.m-sheet-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px; }
+
+/* 快记秒开卡片与流 */
+.m-note { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.m-note-capture-card {
+  margin: 12px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border-light); background: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.m-note-textarea {
+  width: 100%; border: 0 !important; outline: none; background: transparent;
+  font-size: 15px !important; line-height: 1.6; color: var(--text);
+  resize: none; padding: 0; margin-bottom: 8px;
+}
+.m-note-capture-foot { display: flex; align-items: center; justify-content: space-between; }
+.m-note-tip { font-size: 11px; color: var(--text-faint); }
+.m-note-submit { min-height: 34px !important; padding: 0 16px !important; font-size: 13px; border-radius: 8px; }
+.m-note-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.m-note-search-wrap { margin-bottom: 4px; }
+.m-note-search { width: 100%; padding: 8px 12px; font-size: 14px; }
 .m-note-item {
-  padding: 12px; border-radius: 10px; font-size: 14px; line-height: 1.55;
-  white-space: pre-wrap;
-  /* 便签样式跟随主题变量,深浅色统一 */
-  border: 1px solid var(--chip-border);
-  background: var(--bg-panel);
-  color: var(--text);
+  padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6;
+  border: 1px solid var(--border-light); background: var(--bg-panel);
+  display: flex; flex-direction: column; gap: 8px;
 }
+.m-note-text { font-size: 14.5px; color: var(--text); white-space: pre-wrap; cursor: pointer; }
+.m-note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; border-top: 1px solid var(--border-light); padding-top: 6px; }
+.m-note-actions button { min-height: 30px !important; padding: 0 8px !important; font-size: 12px; gap: 4px; }
 
-.m-ref { padding: 0 12px 12px; }
-.m-ref-group { margin-top: 8px; }
-.m-ref-kind { font-size: 12px; color: var(--text-faint); margin-bottom: 4px; }
-.m-ref-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; background: var(--bg-panel); }
-.m-ref-head { display: flex; align-items: center; gap: 6px; font-size: 14px; }
-.m-ref-summary { margin: 5px 0 0; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+/* 设定页与自定义字段 */
+.m-ref { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0 12px 16px; overflow-y: auto; }
+.m-ref-search-wrap { margin: 8px 0; }
+.m-ref-search { width: 100%; padding: 8px 12px; font-size: 14px; }
+.m-ref-new-chip { min-height: 32px !important; padding: 0 10px !important; font-size: 12px; border-radius: 8px; gap: 4px; }
+.m-ref-label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-faint); margin-bottom: 6px; }
+.m-ref-label input, .m-ref-label textarea { width: 100%; }
+.m-ref-fields-section { margin: 8px 0; padding: 8px; background: var(--bg-hover); border-radius: 8px; }
+.m-ref-section-title { font-size: 11px; font-weight: 600; color: var(--text-faint); margin-bottom: 6px; display: block; }
+.m-ref-field-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.m-ref-field-label { width: 70px; font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
+.m-ref-field-val { flex: 1; font-size: 13px !important; min-height: 32px !important; }
+.m-ref-head { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.m-ref-field-count { font-size: 11px; color: var(--text-faint); margin-left: auto; }
+.m-ref-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.m-ref-chip { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--border-light); color: var(--text-dim); }
+.m-ref-chip-more { font-size: 11px; color: var(--text-faint); padding: 1px 4px; }
 
-.m-me { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-.m-me-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--bg-panel); }
-.m-me-name { font-weight: 600; font-size: 16px; margin-bottom: 14px; }
-.m-me-stats { display: flex; gap: 12px; }
-.m-me-stats > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.m-me-stats strong { font-size: 20px; }
-.m-me-stats span { font-size: 11px; color: var(--text-faint); }
-.m-me-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); }
-.m-me-full { padding: 13px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); cursor: pointer; font-size: 14px; }
+/* 大纲查阅与写本章 */
+.m-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.m-browse-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.m-browse-bar button { min-height: 34px !important; padding: 0 12px !important; font-size: 13px; }
+.m-outline-list { padding: 0 12px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; overflow-y: auto; }
+.m-outline-card { border: 1px solid var(--border-light); border-radius: 12px; background: var(--bg-panel); padding: 12px; }
+.m-outline-head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.m-outline-title { font-size: 15px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-outline-write-btn { min-height: 28px !important; padding: 0 8px !important; font-size: 11px; gap: 3px; flex-shrink: 0; }
+.m-outline-arrow { color: var(--text-faint); font-size: 13px; margin-left: 2px; }
+.m-outline-edit { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.m-outline-row-2 { display: flex; gap: 8px; }
+.m-outline-row-2 label { flex: 1; }
 
-/* ---------- 移动端触摸适配 ---------- */
-
-/* 场景选择器:搜索框 + 章节路径 */
-.m-doc-search {
-  margin: 8px 12px; width: calc(100% - 24px);
-  padding: 9px 12px; font-size: 16px;
-}
-.m-doc-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; text-align: left; }
-.m-doc-item-path { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* 专注变体的块操作条:手机上唯一的增删块 / 换类型入口,吸底常驻 */
+/* Obsidian 贴键盘极简单行辅助条 */
 .doc-focus-bar {
-  position: sticky; bottom: 0; z-index: 3;
-  display: flex; align-items: center; gap: 6px;
-  margin-top: 10px; padding: 8px;
-  border-top: 1px solid var(--border);
+  position: sticky; bottom: 0; z-index: 30;
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-light);
   background: var(--bg-panel);
+  min-height: 42px;
 }
-/* 类型 + 插入:可横向滚动 */
 .doc-focus-scroll {
   flex: 1 1 auto; min-width: 0;
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 4px;
   overflow-x: auto; scrollbar-width: none;
 }
 .doc-focus-scroll::-webkit-scrollbar { display: none; }
 .doc-focus-scroll > * { flex-shrink: 0; }
-/* 块操作:固定在右侧,永远不被滚出屏幕 */
-.doc-focus-actions { flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
-.doc-focus-kind { max-width: 116px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.doc-focus-sep { width: 1px; align-self: stretch; background: var(--border); }
-.doc-focus-bar button { min-height: 40px; padding: 0 12px; white-space: nowrap; }
-.doc-focus-bar .icon-btn { padding: 0 8px; }
-.doc-focus-bar button:disabled { opacity: 0.4; }
-
-/*
- * 触摸设备(粗指针)与窄屏统一放大 —— 两个条件都要:
- * 粗指针覆盖横屏平板等宽视口触摸设备,窄屏覆盖上报 fine 指针的安卓浏览器。
- * - 字号 ≥16px 是 iOS Safari 聚焦输入框时不缩放页面的硬门槛,写作工具尤其不能被缩放打断
- * - 点击目标抬到 ~44px,原来顶栏 33x25 / 块控件 22x19 在手指下几乎点不中
- * 只作用于 pointer: coarse,鼠标端布局完全不变
- */
-@media (pointer: coarse), (max-width: 768px) {
-  /* !important 是必要的:组件级的 .doc-speaker-row input { font-size: 12px } 这类
-     规则特异性更高,而 16px 在触摸设备上是「聚焦不缩放」的硬门槛,必须压过它们 */
-  input, textarea, select { font-size: 16px !important; }
-  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
-  select { min-height: 40px; }
-
-  button, [role="button"], summary { min-height: 40px; }
-  .icon-btn { min-width: 40px; min-height: 40px; }
-  .topbar button, .m-tabbar button { min-height: 44px; }
-
-  /* 行内的小尺寸控件按内容留白抬高,不强行撑满整行 */
-  .doc-block-tools button, .navigator-favorite, .doc-block-kind { min-height: 36px; min-width: 36px; }
-
-  /* 粗指针下没有 hover,常隐的行内工具改为常显 */
-  .doc-block-side .doc-block-tools { opacity: 1; }
-}
-
-/* 操作条自身就贴在编辑区底部,不要再留额外内边距,否则它与 tab 栏之间空出一条缝 */
-.app-mobile .m-write-editor { padding-bottom: 0; }
-.app-mobile .doc-focus-bar { bottom: -1px; }
+.doc-focus-actions { flex-shrink: 0; display: flex; align-items: center; gap: 3px; }
+.doc-focus-kind { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-focus-sep { width: 1px; height: 18px; background: var(--border-light); margin: 0 2px; }
+.doc-focus-bar button { min-height: 34px !important; padding: 0 8px !important; font-size: 13px; border-radius: 6px; }
+.doc-focus-bar .icon-btn { min-width: 32px !important; min-height: 32px !important; padding: 0 !important; font-size: 14px; }
+.doc-focus-kb-btn { font-size: 16px; }
 
 /*
  * 移动壳里的 palette 面板(云同步等)改近全屏工作表:
@@ -5073,61 +5126,42 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .app-mobile .palette-backdrop { padding-top: calc(12px + env(safe-area-inset-top)); }
 .app-mobile .palette { max-height: calc(var(--vvh, 100vh) - 24px); }
 
-/* 「我的」页:云同步 / 项目切换 */
+/* 「我的」页 */
+.m-me { padding: 12px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow-y: auto; }
+.m-me-card { border: 1px solid var(--border-light); border-radius: 14px; padding: 16px; background: var(--bg-panel); }
+.m-me-name { font-weight: 600; font-size: 16px; margin-bottom: 14px; color: var(--text); }
+.m-me-stats { display: flex; gap: 12px; }
+.m-me-stats > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.m-me-stats strong { font-size: 20px; color: var(--text); }
+.m-me-stats span { font-size: 11px; color: var(--text-faint); }
+.m-me-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); padding: 4px 2px; }
+.m-me-full {
+  padding: 13px; border: 1px solid var(--border-light); border-radius: 12px;
+  background: var(--bg-panel); color: var(--text); cursor: pointer; font-size: 14px; text-align: center;
+  min-height: 44px;
+}
+.m-me-full:active { background: var(--bg-hover); }
 .m-me-section { font-size: 12px; color: var(--text-faint); margin: 4px 0 -4px; }
 .m-me-slots { display: flex; flex-direction: column; gap: 6px; }
 .m-me-slot {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; border: 1px solid var(--border-light); border-radius: 10px;
   background: var(--bg-panel); font-size: 14px; text-align: left; cursor: pointer;
 }
 .m-me-slot.on { border-color: var(--focus); font-weight: 600; }
 .m-me-slot span:last-child { color: var(--text-faint); font-size: 12px; flex-shrink: 0; }
 
 
-/* ---------- 移动端:进度 / 灵感抽屉 / 快记编辑 / 设定搜索 ---------- */
-
-.m-doc-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
-.m-doc-chapter { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* 场景切换 + 今日进度 + 灵感入口 */
-.m-write-bar {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 12px; flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
+/*
+ * 触摸设备(粗指针)与窄屏统一字号与点击区域:
+ * - 字号 ≥16px 是 iOS Safari 聚焦输入框时不自动放大页面的硬门槛
+ * - 点击目标保持舒适触控尺寸
+ */
+@media (pointer: coarse), (max-width: 768px) {
+  input:not(.m-ref-field-val), textarea:not(.m-ref-field-val), select { font-size: 16px !important; }
+  .m-clean-topbar button, .m-tabbar button { min-height: 44px; }
+  .doc-focus-bar button { min-height: 36px; }
 }
-.m-write-bar .icon-btn { font-size: 20px; line-height: 1; }
-.m-write-bar button:disabled { opacity: 0.35; }
-.m-write-progress { flex: 1; text-align: center; font-size: 12px; color: var(--text-dim); }
-.m-write-progress strong { color: var(--text); font-size: 13px; }
-.m-idea-btn { font-size: 12px; padding: 0 10px; border: 1px solid var(--border-light); border-radius: 8px; }
-.m-idea-btn.on { border-color: var(--focus); font-weight: 600; }
-
-.m-idea-drawer {
-  flex-shrink: 0; max-height: 40vh; overflow-y: auto;
-  border-bottom: 1px solid var(--border); background: var(--bg-panel);
-}
-.m-idea-item {
-  display: block; width: 100%; text-align: left;
-  padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border);
-  background: none; color: var(--text); font-size: 13px; line-height: 1.5; cursor: pointer;
-}
-.m-idea-item:active { background: var(--bg-hover); }
-
-/* 快记:整条可点进入编辑,右侧删除 */
-.m-note-search, .m-ref-search { width: 100%; margin-bottom: 8px; }
-.m-note-item { display: flex; align-items: flex-start; gap: 6px; }
-.m-note-text {
-  flex: 1; min-width: 0; text-align: left;
-  background: none; border: 0; padding: 0; cursor: pointer;
-  color: inherit; font: inherit; line-height: 1.55; white-space: pre-wrap;
-}
-.m-note-del { flex-shrink: 0; opacity: 0.5; }
-.m-note-edit {
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 10px; border: 1px solid var(--focus); border-radius: 10px; background: var(--bg-card);
-}
-.m-note-edit-row { display: flex; gap: 8px; justify-content: flex-end; }
 
 /*
  * 移动壳内的块类型菜单改为吸底面板。
