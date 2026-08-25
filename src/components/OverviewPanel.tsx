@@ -14,13 +14,13 @@ import type { Folder, FolderModule, Project } from '../types';
 interface ObjectLite { id: string; name: string; folderId?: string }
 
 const MODULE_LABEL: Record<FolderModule, string> = {
-  flow: '流程', document: '文档', entity: '实体', asset: '资源', research: '资料',
+  flow: '流程', document: '文档', entity: '实体', asset: '资源', research: '资料', map: '地图',
 };
 const MODULE_TO_TAB: Record<FolderModule, NavTab> = {
-  flow: 'flow', document: 'documents', entity: 'entities', asset: 'assets', research: 'research',
+  flow: 'flow', document: 'documents', entity: 'entities', asset: 'assets', research: 'research', map: 'map',
 };
-const MODULE_ICON: Record<FolderModule, 'flow' | 'doc' | 'cards' | 'image' | 'archive'> = {
-  flow: 'flow', document: 'doc', entity: 'cards', asset: 'image', research: 'archive',
+const MODULE_ICON: Record<FolderModule, 'flow' | 'doc' | 'cards' | 'image' | 'archive' | 'mappin'> = {
+  flow: 'flow', document: 'doc', entity: 'cards', asset: 'image', research: 'archive', map: 'mappin',
 };
 
 /** 每种模块的对象取名(不同模块字段不同) */
@@ -29,6 +29,7 @@ function collectObjects(project: Project, module: FolderModule): ObjectLite[] {
   if (module === 'document') return project.documents.map((d) => ({ id: d.id, name: d.name, folderId: d.folderId }));
   if (module === 'entity') return project.entities.map((e) => ({ id: e.id, name: e.name, folderId: e.folderId }));
   if (module === 'asset') return project.assets.map((a) => ({ id: a.id, name: a.name, folderId: a.folderId }));
+  if (module === 'map') return project.maps.map((m) => ({ id: m.id, name: m.name, folderId: m.folderId }));
   return project.researchCards.map((c) => ({ id: c.id, name: c.title, folderId: c.folderId }));
 }
 
@@ -53,8 +54,8 @@ function buildTree(folders: Folder[], objects: ObjectLite[]) {
   return { byParent, objectsByFolder };
 }
 
-const OBJECT_NAV_KEY: Record<FolderModule, 'flowId' | 'docId' | 'entityId' | 'assetId' | 'cardId'> = {
-  flow: 'flowId', document: 'docId', entity: 'entityId', asset: 'assetId', research: 'cardId',
+const OBJECT_NAV_KEY: Record<FolderModule, 'flowId' | 'docId' | 'entityId' | 'assetId' | 'cardId' | 'mapId'> = {
+  flow: 'flowId', document: 'docId', entity: 'entityId', asset: 'assetId', research: 'cardId', map: 'mapId',
 };
 
 export default function OverviewPanel({ onClose }: { onClose: () => void }) {
@@ -64,7 +65,7 @@ export default function OverviewPanel({ onClose }: { onClose: () => void }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
 
-  const modules = useMemo(() => (['flow', 'document', 'entity', 'asset', 'research'] as FolderModule[]).map((m) => {
+  const modules = useMemo(() => (['flow', 'document', 'entity', 'asset', 'map', 'research'] as FolderModule[]).map((m) => {
     const folders = project.folders.filter((f) => f.module === m);
     const objects = collectObjects(project, m);
     return { module: m, folders, objects, tree: buildTree(folders, objects) };

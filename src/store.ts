@@ -1164,6 +1164,7 @@ export const useLoom = create<LoomState>((set, get) => {
         for (const asset of p.assets) if (asset.folderId === fid) asset.folderId = undefined;
         for (const document of p.documents) if (document.folderId === fid) document.folderId = undefined;
         for (const card of p.researchCards) if (card.folderId === fid) card.folderId = undefined;
+        for (const map of p.maps) if (map.folderId === fid) map.folderId = undefined;
       };
       for (const fid of toDelete) clear(fid);
     }),

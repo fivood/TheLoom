@@ -92,7 +92,7 @@ export function applyBatchEdit(project: Project, module: FolderModule, ids: stri
       if (touchDocument) item.updatedAt = Date.now();
       changed++;
     }
-  } else {
+  } else if (module === 'research') {
     for (const item of project.researchCards) {
       if (!wanted.has(item.id)) continue;
       applyCommon(item, patch);
@@ -100,6 +100,16 @@ export function applyBatchEdit(project: Project, module: FolderModule, ids: stri
       if (patch.researchPinned !== undefined) item.pinned = patch.researchPinned;
       if (patch.addTags !== undefined || patch.removeTags !== undefined) {
         item.tags = applyTags(item.tags, patch.addTags, patch.removeTags);
+      }
+      changed++;
+    }
+  } else if (module === 'map') {
+    for (const item of project.maps) {
+      if (!wanted.has(item.id)) continue;
+      applyCommon(item, patch);
+      if (patch.templateId !== undefined) {
+        item.templateId = patch.templateId || undefined;
+        templateChanged = true;
       }
       changed++;
     }

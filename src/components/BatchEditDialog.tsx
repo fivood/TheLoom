@@ -16,6 +16,7 @@ const MODULE_LABEL: Record<FolderModule, string> = {
   asset: '资源',
   document: '文档',
   research: '资料',
+  map: '地图',
 };
 
 const TEMPLATE_MODULE: Partial<Record<FolderModule, 'entity' | 'asset' | 'document'>> = {

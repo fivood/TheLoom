@@ -402,12 +402,13 @@ export default function EntityLibrary() {
                         );
                       }
                       if (fType === 'entity' || fType === 'entities') {
-                        const names = fieldRefIds(val, fType)
-                          .map((id) => entities.find((x) => x.id === id)?.name ?? '?')
-                          .join('、');
                         return (
-                          <td key={col.label} className="hint" title="在 inspector 中编辑引用字段">
-                            {names || '—'}
+                          <td key={col.label} style={{ minWidth: 140 }}>
+                            <EntityRefEditor
+                              type={fType}
+                              value={val}
+                              onChange={(v) => setVal(v)}
+                            />
                           </td>
                         );
                       }

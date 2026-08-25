@@ -1,7 +1,8 @@
 import type { Project } from '../types';
 import { normalizeProject } from '../util';
 import { decryptBytes, deriveAesKey, encryptBytes, gzip } from '../crypto';
-import { getObject, headObject, putObject, type S3Config } from './s3';
+import type { S3Config } from './s3';
+import { getObject, headObject, putObject, remoteScope, targetReady, type RemoteProvider } from './backend';
 import { mergeInbox, type IdeaCard } from '../inbox';
 
 /**
@@ -18,8 +19,18 @@ const PROJECT_KEY = 'project.enc';
 const CONFIG_KEY = 'theloom-remote-v1';
 
 export interface RemoteConfig extends S3Config {
+  /** 后端;缺省为 s3(老配置没有这个字段) */
+  provider?: RemoteProvider;
+  /** OneDrive 的 Azure 应用 ID(公开客户端,不是密钥) */
+  clientId?: string;
   /** 端到端加密口令;只存本机,永不上传 */
   pass: string;
+  /** 自动同步开关(默认关) */
+  auto?: boolean;
+  /** 开自动同步时绑定的项目槽位;换作品后不自动推,免得覆盖远端的另一本 */
+  autoSlotId?: string;
+  /** 上次同步时的资源指纹,变了才跑原文件同步 */
+  assetSig?: string;
   /** 上次同步时远端对象的 ETag,用来判断别人有没有写过 */
   lastEtag: string;
   lastSyncAt: number;
@@ -27,6 +38,7 @@ export interface RemoteConfig extends S3Config {
 
 export function loadRemoteConfig(): RemoteConfig {
   const blank: RemoteConfig = {
+    provider: 's3', clientId: '',
     endpoint: '', region: 'auto', bucket: '', accessKeyId: '', secretAccessKey: '',
     prefix: 'theloom/', pass: '', lastEtag: '', lastSyncAt: 0,
   };
@@ -42,13 +54,14 @@ export function saveRemoteConfig(cfg: RemoteConfig): void {
 }
 
 export function remoteConfigured(cfg: RemoteConfig): boolean {
-  return !!(cfg.endpoint && cfg.bucket && cfg.accessKeyId && cfg.secretAccessKey && cfg.pass);
+  return targetReady(cfg) && !!cfg.pass;
 }
 
-/** 密钥作用域绑定桶与前缀:同一口令在不同桶派生出不同密钥 */
-function keyFor(cfg: RemoteConfig): Promise<CryptoKey> {
-  return deriveAesKey(`theloom:${cfg.bucket}/${cfg.prefix ?? ''}`, cfg.pass);
+/** 密钥作用域绑定后端与前缀:同一口令在不同桶 / 不同网盘派生出不同密钥 */
+export function remoteKey(cfg: RemoteConfig): Promise<CryptoKey> {
+  return deriveAesKey(remoteScope(cfg), cfg.pass);
 }
+const keyFor = remoteKey;
 
 export class RemoteConflict extends Error {
   constructor(readonly remoteEtag: string | null, readonly remoteAt: number) {

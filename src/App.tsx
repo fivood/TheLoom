@@ -16,6 +16,8 @@ import { findAvailableUpdate, shouldAutoPromptUpdate } from './updater';
 import { LOCAL_STORAGE_WARNING_BYTES } from './diagnostics';
 import SearchPalette from './components/SearchPalette';
 import RemotePanel from './components/RemotePanel';
+import { redirectPending as oneDriveRedirectPending } from './remote/onedrive';
+import { startAutoSync } from './remote/autoSync';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
@@ -111,7 +113,8 @@ export default function App() {
     try { localStorage.setItem(TAB_MEMORY_KEY, tab); } catch { /* 忽略 */ }
   }, [tab]);
   const [searching, setSearching] = useState(false);
-  const [remoteSync, setRemoteSync] = useState(false);
+  // OneDrive 登录跳回来时直接开面板,授权码由面板消费
+  const [remoteSync, setRemoteSync] = useState(oneDriveRedirectPending);
   const [auditing, setAuditing] = useState(false);
   const [querying, setQuerying] = useState(false);
   const [history, setHistory] = useState(false);
@@ -131,7 +134,9 @@ export default function App() {
     useToolBus.getState().consume();
     if (kind === 'chapterCompile') setChapterCompile(true);
     else if (kind === 'manuscriptImport') importManuscriptRef.current?.click();
+    else if (kind === 'remoteSync') setRemoteSync(true);
   }, [toolRequest]);
+  useEffect(() => startAutoSync(), []);
   const [findReplace, setFindReplace] = useState(false);
   const [engineExport, setEngineExport] = useState(false);
   const [fdxExport, setFdxExport] = useState(false);

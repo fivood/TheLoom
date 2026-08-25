@@ -1,7 +1,7 @@
 import type { Project } from '../types';
 import { assetFileName, loadAssetBlob, storeAssetFile, type AssetFileRef } from '../assetFiles';
 import { decryptBytes, encryptBytes } from '../crypto';
-import { getObject, headObject, putObject } from './s3';
+import { getObject, headObject, putObject } from './backend';
 import type { RemoteConfig } from './remoteSync';
 
 /**

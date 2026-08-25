@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLoom } from '../store';
 import { confirmDialog } from '../dialog';
-import { deriveAesKey } from '../crypto';
-import { testConnection } from '../remote/s3';
+import { testConnection } from '../remote/backend';
+import * as onedrive from '../remote/onedrive';
 import {
   RemoteConflict, loadRemoteConfig, pullFromRemote, pushToRemote, remoteConfigured,
-  remoteStatus, saveRemoteConfig, syncInbox, type RemoteConfig,
+  remoteKey, remoteStatus, saveRemoteConfig, syncInbox, type RemoteConfig,
 } from '../remote/remoteSync';
 import { syncAssets } from '../remote/assetSync';
+import { assetSignature } from '../remote/autoRules';
+import { noteSynced } from '../remote/autoSync';
 import { loadInbox, saveInbox } from '../inbox';
 import Icon from './Icon';
 import SecretInput from './SecretInput';
@@ -25,6 +27,7 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState('');
   const folder = useLoom((s) => s.folder);
+  const currentSlotId = useLoom((s) => s.currentSlotId);
   const assets = useLoom((s) => s.project.assets);
   const withBytes = assets.filter((a) => a.hash).length;
 
@@ -34,7 +37,28 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
     saveRemoteConfig(next);
   };
 
-  const ready = remoteConfigured(cfg);
+  const od = cfg.provider === 'onedrive';
+  const [signedIn, setSignedIn] = useState(onedrive.signedIn);
+  const ready = remoteConfigured(cfg) && (!od || signedIn);
+
+  // 从微软登录页跳回来时,URL 上带着授权码,在这里换成令牌
+  useEffect(() => {
+    onedrive.completeAuth()
+      .then((r) => { if (r === 'ok') { setSignedIn(true); setStatus('OneDrive 已登录。'); } })
+      .catch((e: unknown) => setStatus(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  const doLogin = async () => {
+    const id = (cfg.clientId ?? '').trim();
+    if (!id) { setStatus('请先填写应用 ID。'); return; }
+    await onedrive.beginAuth(id);
+  };
+
+  const doLogout = () => {
+    onedrive.signOut();
+    setSignedIn(false);
+    setStatus('已退出 OneDrive 登录(本机数据不受影响)。');
+  };
 
   const runTest = async () => {
     setBusy('test');
@@ -51,12 +75,13 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
     try {
       const project = useLoom.getState().project;
       const res = await pushToRemote(cfg, project, force);
-      const key = await deriveAesKey(`theloom:${cfg.bucket}/${cfg.prefix ?? ''}`, cfg.pass);
+      const key = await remoteKey(cfg);
       const a = await syncAssets(cfg, project, folder, key,
         (done, total, label) => setProgress(total ? `${label} ${done}/${total}` : ''));
       // 灵感库跨项目,与项目并行同步;按 id 并集合并,不需要冲突判定
       saveInbox(await syncInbox(cfg, loadInbox()));
-      patch({ lastEtag: res.etag ?? '', lastSyncAt: res.at });
+      patch({ lastEtag: res.etag ?? '', lastSyncAt: res.at, assetSig: assetSignature(project) });
+      noteSynced(project.updatedAt);
       setProgress('');
       setStatus(`已上传。资源:传 ${a.uploaded} / 跳过 ${a.skipped}`
         + (a.failed.length ? ` / 失败 ${a.failed.length}` : ''));
@@ -94,11 +119,12 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
       const got = await pullFromRemote(cfg);
       if (!got) { setStatus('远端还没有项目,先上传一次。'); setBusy(null); return; }
       useLoom.getState().replaceProject(got.project);
-      const key = await deriveAesKey(`theloom:${cfg.bucket}/${cfg.prefix ?? ''}`, cfg.pass);
+      const key = await remoteKey(cfg);
       const a = await syncAssets(cfg, got.project, folder, key,
         (done, total, label) => setProgress(total ? `${label} ${done}/${total}` : ''));
       saveInbox(await syncInbox(cfg, loadInbox()));
-      patch({ lastEtag: got.etag ?? '', lastSyncAt: got.at });
+      patch({ lastEtag: got.etag ?? '', lastSyncAt: got.at, assetSig: assetSignature(got.project) });
+      noteSynced(got.project.updatedAt);
       setProgress('');
       setStatus(`已拉取。资源:取 ${a.downloaded} / 跳过 ${a.skipped}`
         + (a.failed.length ? ` / 失败 ${a.failed.length}` : ''));
@@ -127,18 +153,63 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
       <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
         <div className="sync-head">
           <Icon name="cloud" size={14} />
-          <span>外链网盘同步(S3 兼容)</span>
+          <span>外链网盘同步</span>
           <span className="spacer" />
           <button className="ghost icon-btn" onClick={onClose}>×</button>
         </div>
         <div className="sync-body">
-          <div className="player-tip">
-            数据存进<b>你自己的对象存储</b>(Cloudflare R2 / Backblaze B2 / MinIO / 阿里云 OSS 等),
-            端到端加密,不经过本项目服务器。没有 20MB 上限,<b>资源原文件也一起同步</b>。
-            <br />网页版需先在桶上配置 CORS(允许本站 origin 与 GET/PUT/HEAD、暴露 ETag);桌面版无此要求。
-            <br />远端只存<b>一个</b>项目对象,对应当前打开的项目槽位;换一部作品再上传会覆盖远端。
+          <div className="field">
+            <label>存放位置</label>
+            <select
+              value={cfg.provider ?? 's3'}
+              onChange={(e) => patch({ provider: e.target.value as 's3' | 'onedrive', lastEtag: '' })}
+            >
+              <option value="s3">S3 兼容存储(R2 / B2 / MinIO / OSS)</option>
+              <option value="onedrive">OneDrive</option>
+            </select>
           </div>
 
+          <div className="player-tip">
+            数据端到端加密后存进<b>你自己的网盘</b>,不经过本项目服务器。没有 20MB 上限,
+            <b>资源原文件也一起同步</b>。
+            <br />远端只存<b>一个</b>项目对象,对应当前打开的项目槽位;换一部作品再上传会覆盖远端。
+            {od ? (
+              <>
+                <br />只申请 <b>应用文件夹</b>权限,写在 OneDrive 的
+                「应用/TheLoom」下,碰不到你的其他文件。切换后端相当于换了一个仓库,需重新上传一次。
+              </>
+            ) : (
+              <>
+                <br />网页版需先在桶上配置 CORS(允许本站 origin 与 GET/PUT/HEAD、暴露 ETag);桌面版无此要求。
+              </>
+            )}
+          </div>
+
+          {od ? (
+            <>
+              <div className="field">
+                <label>应用 ID(Azure 应用注册的 Application ID)</label>
+                <input
+                  value={cfg.clientId ?? ''}
+                  placeholder="00000000-0000-0000-0000-000000000000"
+                  onChange={(e) => patch({ clientId: e.target.value.trim() })}
+                />
+              </div>
+              <div className="hint">
+                在 Azure 门户「应用注册」建一个应用,平台选 <b>单页应用程序(SPA)</b>,
+                重定向 URI 填 <code>{onedrive.redirectUri()}</code>,把 Application ID 粘到上面。
+                这不是密钥,可以公开。
+              </div>
+              <div className="sync-actions" style={{ marginTop: 8 }}>
+                <button className="ghost" onClick={doLogin} disabled={busy !== null}>
+                  {signedIn ? '重新登录' : '登录 OneDrive'}
+                </button>
+                {signedIn && <button className="ghost" onClick={doLogout}>退出登录</button>}
+                <span className="hint" style={{ marginLeft: 8 }}>{signedIn ? '已登录' : '未登录'}</span>
+              </div>
+            </>
+          ) : (
+          <>
           <div className="field">
             <label>Endpoint</label>
             <input
@@ -168,9 +239,11 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
               onChange={(v) => patch({ secretAccessKey: v.trim() })}
             />
           </div>
+          </>
+          )}
           <div className="field-row2">
             <div className="field">
-              <label>桶内路径</label>
+              <label>{od ? '应用文件夹内路径' : '桶内路径'}</label>
               <input value={cfg.prefix ?? ''} placeholder="theloom/" onChange={(e) => patch({ prefix: e.target.value })} />
             </div>
             <div className="field">
@@ -184,12 +257,27 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="hint">
-            密钥与口令只存本机,不上传。口令与「桶 + 路径」共同派生密钥 ——
-            换桶或改路径后需用同一口令才能解开原有数据。本项目共 {withBytes} 个资源带原文件。
+            密钥、令牌与口令只存本机,不上传。口令与「{od ? '网盘' : '桶'} + 路径」共同派生密钥 ——
+            换{od ? '后端' : '桶'}或改路径后需用同一口令才能解开原有数据。本项目共 {withBytes} 个资源带原文件。
           </div>
 
           {status && <div className="player-tip" style={{ marginTop: 8 }}>{status}</div>}
           {progress && <div className="hint">{progress}</div>}
+
+          <label className="hint" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
+            <input
+              type="checkbox"
+              style={{ width: 'auto' }}
+              checked={!!cfg.auto}
+              disabled={!ready}
+              onChange={(e) => patch({ auto: e.target.checked, autoSlotId: e.target.checked ? currentSlotId : '' })}
+            />
+            <span>
+              自动同步:停手 30 秒后自动上传,回到窗口时检查远端。
+              <b>只自动上传,不自动替换</b> —— 远端有更新只提示,拉取仍要你点。
+              只对开启时的这部作品生效,换作品不会自动覆盖远端。
+            </span>
+          </label>
 
           <div className="sync-actions">
             <button className="ghost" disabled={!ready || busy !== null} onClick={runTest}>

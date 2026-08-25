@@ -74,6 +74,7 @@ export function normalizeProject(p: Project): Project {
   cleanAssignments(p.assets, 'asset');
   cleanAssignments(p.documents, 'document');
   cleanAssignments(p.researchCards, 'research');
+  cleanAssignments(p.maps, 'map');
   // R14 地图图层与矢量形状:旧项目 / 缺字段自动补默认图层,并把已有 markers/regions/shapes 迁入
   const validShapeType = new Set(['polyline', 'rect', 'ellipse', 'text']);
   const validPoint = (pt: unknown): pt is { x: number; y: number } =>

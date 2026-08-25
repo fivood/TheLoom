@@ -519,6 +519,11 @@ export interface MapShape {
 export interface MapDoc {
   id: ID;
   name: string;
+  favorite?: boolean;
+  /** 所属地图文件夹 id;空 = 未分组 */
+  folderId?: ID;
+  /** Navigator 树内手动排序序号 */
+  order?: number;
   /** R11:模板分配与自定义字段 */
   templateId?: ID;
   fields?: EntityField[];
@@ -764,7 +769,7 @@ export interface Document {
 
 /* ---------- 文件夹(Navigator 树) ---------- */
 
-export type FolderModule = 'flow' | 'entity' | 'asset' | 'document' | 'research';
+export type FolderModule = 'flow' | 'entity' | 'asset' | 'document' | 'research' | 'map';
 
 export type DocumentFolderRole = 'volume' | 'chapter' | 'section';
 

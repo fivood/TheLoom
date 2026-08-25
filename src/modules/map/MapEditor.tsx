@@ -9,6 +9,8 @@ import ObjectTemplateSection from '../../components/ObjectTemplateSection';
 import ColorPicker from '../../components/ColorPicker';
 import Inspector from '../../components/Inspector';
 
+import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
+
 type Mode = 'view' | 'marker' | 'region' | 'shape-polyline' | 'shape-rect' | 'shape-ellipse' | 'shape-text';
 type Selection =
   | { kind: 'marker'; id: string }
@@ -48,14 +50,28 @@ export default function MapEditor() {
     }
   }, [navSeq]);
 
-  const addMap = () => {
+  const createMap = (folderId?: string) => {
     const id = uid();
-    update((p) => { p.maps.push({ id, name: `新地图 ${p.maps.length + 1}`, markers: [], regions: [] }); });
+    update((p) => {
+      p.maps.push({
+        id,
+        name: `新地图 ${p.maps.length + 1}`,
+        folderId,
+        markers: [],
+        regions: [],
+      });
+    });
     setActiveId(id);
   };
-  const renameMap = async (id: string, current: string) => {
-    const name = await promptText({ message: '地图名称', defaultValue: current });
-    if (name) update((p) => { const m = p.maps.find((x) => x.id === id); if (m) m.name = name; });
+  const updateMap = (id: string, patch: Partial<MapDoc>) => {
+    update((p) => {
+      const m = p.maps.find((x) => x.id === id);
+      if (m) Object.assign(m, patch);
+    });
+  };
+  const renameMap = async (map: MapDoc) => {
+    const name = await promptText({ message: '地图名称', defaultValue: map.name });
+    if (name && name !== map.name) updateMap(map.id, { name });
   };
   const deleteMap = async (id: string) => {
     if (!await confirmDialog({ message: '删除该地图及全部标记与区域?', danger: true, confirmText: '删除' })) return;
@@ -65,33 +81,39 @@ export default function MapEditor() {
 
   return (
     <>
-      <div className="side-list">
-        <div className="side-head">
-          <span>地图</span>
-          <button className="ghost icon-btn" onClick={addMap} title="新建地图">＋</button>
-        </div>
-        <div className="items">
-          {maps.map((m) => (
-            <div
-              key={m.id}
-              className={`side-item ${activeId === m.id ? 'active' : ''}`}
-              onClick={() => setActiveId(m.id)}
-              onDoubleClick={() => renameMap(m.id, m.name)}
-              title="双击重命名"
-            >
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
-              <button className="ghost icon-btn" onClick={(e) => { e.stopPropagation(); deleteMap(m.id); }} title="删除">×</button>
-            </div>
-          ))}
-        </div>
-      </div>
+      <NavigatorTree
+        module="map"
+        title="地图"
+        items={maps}
+        selectedId={activeId}
+        getLabel={(m) => m.name}
+        getDetail={(m) => (m.markers.length || m.regions.length ? `${m.markers.length} 标记 · ${m.regions.length} 区域` : undefined)}
+        onSelect={setActiveId}
+        onItemDoubleClick={renameMap}
+        onMove={(id, folderId) => updateMap(id, { folderId })}
+        onMoveMany={(ids, folderId) => update((p) => {
+          const set = new Set(ids);
+          for (const m of p.maps) if (set.has(m.id)) { m.folderId = folderId; delete m.order; }
+        })}
+        onReorder={(_parentId, orderedIds) => update((p) => {
+          const map = new Map(orderedIds.map((id, i) => [id, i]));
+          for (const m of p.maps) if (map.has(m.id)) m.order = map.get(m.id);
+        })}
+        onCreate={() => createMap()}
+        onCreateInFolder={(folderId) => createMap(folderId)}
+        createLabel="新建地图"
+        emptyLabel="还没有地图"
+        renderItemActions={(m) => (
+          <button className="ghost icon-btn" title="删除地图" onClick={(e) => { e.stopPropagation(); deleteMap(m.id); }}>×</button>
+        )}
+      />
 
       {active ? (
         <MapCanvas key={active.id} map={active} initialMarker={pendingMarker} />
       ) : (
         <div className="pane-col">
           <div className="empty-hint" style={{ marginTop: 80 }}>
-            还没有地图<br />点击左上角「＋」新建<br /><br />
+            还没有地图<br />点击左侧「＋」新建<br /><br />
             推荐流程:在 Inkarnate / Azgaar / Wonderdraft 里画完导出 PNG,<br />上传到这里作为底图,再叠加地点标记与阵营领地
           </div>
         </div>
@@ -625,6 +647,14 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
           <ShapeInspector shape={selShape} layers={map.layers ?? []} onChange={(p) => patchShape(selShape.id, p)} onDelete={() => removeShape(selShape.id)} />
         ) : (
           <>
+            <div className="field">
+              <label>文件夹</label>
+              <FolderSelect
+                module="map"
+                value={map.folderId}
+                onChange={(folderId) => patch((m) => { m.folderId = folderId; })}
+              />
+            </div>
             <div className="field">
               <label>地图属性</label>
               <ObjectTemplateSection

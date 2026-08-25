@@ -51,6 +51,8 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
 
 const stickyTypes = { sticky: Sticky };
 
+let stickyClipboard: { nodes: StickyNode[]; edges: Edge[] } | null = null;
+
 function Canvas() {
   const notes = useLoom((s) => s.project.brainstormNotes);
   const storedEdges = useLoom((s) => s.project.brainstormEdges);
@@ -65,6 +67,9 @@ function Canvas() {
     storedEdges.map((e) => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed } })),
   );
 
+  const latest = useRef({ nodes, edges });
+  useEffect(() => { latest.current = { nodes, edges }; }, [nodes, edges]);
+
   const dirty = useRef(false);
   useEffect(() => {
     if (!dirty.current) return;
@@ -77,6 +82,67 @@ function Canvas() {
     }, 350);
     return () => clearTimeout(t);
   }, [nodes, edges]);
+
+  const copySelection = () => {
+    const picked = latest.current.nodes.filter((n) => n.selected);
+    if (picked.length === 0) return 0;
+    const ids = new Set(picked.map((n) => n.id));
+    stickyClipboard = {
+      nodes: structuredClone(picked),
+      edges: structuredClone(latest.current.edges.filter((e) => ids.has(e.source) && ids.has(e.target))),
+    };
+    return picked.length;
+  };
+
+  const pasteClipboard = (offset = 30) => {
+    if (!stickyClipboard || stickyClipboard.nodes.length === 0) return 0;
+    const idMap = new Map<string, string>();
+    for (const n of stickyClipboard.nodes) idMap.set(n.id, uid());
+    const newNodes: StickyNode[] = stickyClipboard.nodes.map((n) => ({
+      ...structuredClone(n),
+      id: idMap.get(n.id)!,
+      position: { x: n.position.x + offset, y: n.position.y + offset },
+      selected: true,
+    }));
+    const newEdges: Edge[] = stickyClipboard.edges.map((e) => ({
+      ...structuredClone(e),
+      id: uid(),
+      source: idMap.get(e.source)!,
+      target: idMap.get(e.target)!,
+      markerEnd: { type: MarkerType.ArrowClosed },
+    }));
+    dirty.current = true;
+    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), ...newNodes]);
+    setEdges((es) => [...es, ...newEdges]);
+    return newNodes.length;
+  };
+
+  const duplicateSelection = () => {
+    const keep = stickyClipboard;
+    const n = copySelection();
+    if (n > 0) pasteClipboard(30);
+    stickyClipboard = keep ?? stickyClipboard;
+    return n;
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if (typing) return;
+      const key = e.key.toLowerCase();
+      if (key === 'c') {
+        if (copySelection() > 0) e.preventDefault();
+      } else if (key === 'v') {
+        if (pasteClipboard() > 0) e.preventDefault();
+      } else if (key === 'd') {
+        if (duplicateSelection() > 0) e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const onNodesChange = useCallback((changes: NodeChange<StickyNode>[]) => {
     dirty.current = true;
@@ -207,7 +273,7 @@ function Canvas() {
             ))}
           </div>
         )}
-        <span className="hint">双击空白处新建便签 · 拖动边缘连线 · Delete 删除</span>
+        <span className="hint">双击空白处新建便签 · 拖动边缘连线 · Ctrl+C/V 复制 · Delete 删除</span>
       </div>
       {inboxOpen && (
         <div className="inbox-strip">
