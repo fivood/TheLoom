@@ -13,6 +13,7 @@ import { countSubNodes, resolveSub, sanitizeTechnicalName, walkFlowNodes } from 
 import { flowToDocument } from '../document/convert';
 import Inspector from '../../components/Inspector';
 import PathTestPanel from '../../components/PathTestPanel';
+import { recastPasted } from '../../flowClipboard';
 import { alignNodes, distributeNodes, type AlignHow } from '../../flowLayout';
 import { encapsulateSelection } from '../../flowEncapsulate';
 import type { FlowNode as FlowNodeShape } from '../../types';
@@ -328,30 +329,13 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
   };
 
   /**
-   * 粘贴:重新分配 id 并整体偏移,内部连线按新 id 重接。
-   * 技术名不复制 —— 它是项目内唯一的,复制过来必然重复。
+   * 粘贴:身份重铸在 flowClipboard.ts(纯函数,可单测),这里只管选中态与写回。
    */
   const pasteClipboard = (offset = 40) => {
     if (!nodeClipboard || nodeClipboard.nodes.length === 0) return 0;
-    const idMap = new Map<string, string>();
-    for (const n of nodeClipboard.nodes) idMap.set(n.id, uid());
-    const newNodes: LoomNode[] = nodeClipboard.nodes.map((n) => {
-      const data = structuredClone(n.data);
-      delete data.technicalName;
-      return {
-        ...structuredClone(n),
-        id: idMap.get(n.id)!,
-        position: { x: n.position.x + offset, y: n.position.y + offset },
-        data,
-        selected: true,
-      };
-    });
-    const newEdges: Edge[] = nodeClipboard.edges.map((e) => ({
-      ...structuredClone(e),
-      id: uid(),
-      source: idMap.get(e.source)!,
-      target: idMap.get(e.target)!,
-    }));
+    const recast = recastPasted(nodeClipboard.nodes, nodeClipboard.edges, offset, uid);
+    const newNodes: LoomNode[] = recast.nodes.map((n) => ({ ...n, selected: true }));
+    const newEdges: Edge[] = recast.edges;
     dirty.current = true;
     setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), ...newNodes]);
     setEdges((es) => [...es, ...newEdges]);
@@ -939,6 +923,18 @@ export default function FlowEditor() {
   }, [navSeq]);
 
   const active = flows.find((f) => f.id === activeId) ?? flows[0] ?? null;
+  /**
+   * 换项目 / 删流程后 activeId 指向不存在的流程,active 回落到第一个 ——
+   * 但 path 还停在旧流程的子层级,resolveSub 解不出来,于是面包屑照常显示、
+   * 画布却是空的。识别到回落就把层级与聚焦一起归零。
+   */
+  useEffect(() => {
+    if (active && active.id !== activeId) {
+      setActiveId(active.id);
+      setPath([]);
+      setFocusNodeId(undefined);
+    }
+  }, [active?.id, activeId]);
   useEffect(() => {
     if (!active) return;
     const target = path.length > 0

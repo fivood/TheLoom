@@ -26,6 +26,12 @@ export default function ArcBoard({ focusEntityId, onConsumeFocus }: {
     }
   }, [focusEntityId]);
 
+  // 换项目 / 拉取 / 删角色之后 selectedId 会指向不存在的角色,面板停在空白且无提示
+  useEffect(() => {
+    if (characters.length === 0) return;
+    if (!selectedId || !characters.some((e) => e.id === selectedId)) setSelectedId(characters[0].id);
+  }, [characters, selectedId]);
+
   const selected = characters.find((e) => e.id === selectedId) ?? null;
   const stages = selected ? arcStagesOf(project, selected.id) : [];
   const chapters = useMemo(

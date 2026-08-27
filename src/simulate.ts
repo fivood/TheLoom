@@ -1,6 +1,7 @@
 import type { Entity, FlowEdge, FlowNode, SubFlow, Variable } from './types';
 import { ANNOTATION_TYPES } from './types';
 import { resolveSub } from './util';
+import { selectOutgoing } from './flowWalk';
 import {
   applyInstructions, buildEntityProps, coerceVar, evalCondition,
   type EvalCtx, type VarValue,
@@ -163,36 +164,16 @@ export function simulateFlow(
         cur = container(curP).nodes.find((n) => n.id === fragId);
       }
       const c = container(curP);
-      let edges = cur ? c.edges.filter((e) => e.source === cur!.id) : [];
-      if (exitId) {
-        const named = edges.filter((e) => e.sourceHandle === `exit:${exitId}`);
-        edges = named.length > 0 ? named : edges.filter((e) => !e.sourceHandle);
-        exitId = null;
-      } else if (cur?.type === 'fragment') {
-        edges = edges.filter((e) => !e.sourceHandle);
-      }
-      if (cur?.type === 'condition') {
-        const result = evalCondition(cur.data.text, s.vars, ctx);
-        if (result !== null) {
-          const want = result ? 'true' : 'false';
-          const picked = edges.filter((e) => e.sourceHandle === want);
-          edges = picked.length > 0 ? picked : [];
-        }
-        // null:无法求值 → 保留全部引脚(等价于双向分叉)
-      }
-      if (cur?.type === 'check') {
-        const passed = s.checks.get(cur.id) ?? false;
-        const want = passed ? 'success' : 'fail';
-        const picked = edges.filter((e) => e.sourceHandle === want);
-        edges = picked.length > 0 ? picked : [];
-      }
-      const rawCount = edges.length;
-      const usable = edges.filter((e) =>
-        !(e.once && s.taken.has(e.id)) &&
-        (!e.condition || evalCondition(e.condition, s.vars, ctx) !== false),
-      );
-      const nonFallback = usable.filter((e) => !e.fallback);
-      const finalUsable = nonFallback.length > 0 ? nonFallback : usable;
+      const all = cur ? c.edges.filter((e) => e.source === cur!.id) : [];
+      const { usable: finalUsable, rawCount } = selectOutgoing(all, {
+        exitId,
+        nodeType: cur?.type,
+        condResult: cur?.type === 'condition' ? evalCondition(cur.data.text, s.vars, ctx) : undefined,
+        checkPassed: cur ? s.checks.get(cur.id) ?? false : false,
+        isTaken: (id) => s.taken.has(id),
+        edgeAllowed: (cond) => evalCondition(cond, s.vars, ctx) !== false,
+      });
+      exitId = null;
       if (firstLayer && rawCount > 0 && finalUsable.length === 0) stuckHere = true;
       firstLayer = false;
       if (finalUsable.length > 0) {

@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import {
   assetExt, assetFileName, computeOrphans, deleteAssetThumbs, hashBlob, isAssetStored, listAssetThumbKeys,
-  loadAssetThumb, projectBrowserBlobKeysToClear, resetThumbCacheForTest, storeAssetThumb, stripAssetThumbs,
+  loadAssetThumb, projectBrowserBlobKeysToClear, cleanupBlockers, resetThumbCacheForTest, storeAssetThumb, stripAssetThumbs,
   type StoredAssetFile,
 } from './assetFiles';
 
@@ -150,5 +150,83 @@ describe('R8 资源缩略图:IndexedDB 往返', () => {
     await deleteAssetThumbs([h]);
     expect(await loadAssetThumb(h)).toBeNull();
     expect(await listAssetThumbKeys()).not.toContain(h);
+  });
+});
+
+describe('判不准就拒绝清理', () => {
+  const store = new Map<string, string>();
+  const fake = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => { store.set(k, v); },
+    clear: () => store.clear(),
+  };
+  beforeEach(() => {
+    store.clear();
+    vi.stubGlobal('localStorage', fake);
+  });
+
+  it('缺哪个槽位就拦哪个;当前槽位不算(它的正文由调用方直接传入)', () => {
+    fake.setItem('theloom-slots-v1', JSON.stringify([{ id: 'cur' }, { id: 'other' }, { id: 'gone' }]));
+    fake.setItem('theloom-project-other', '{}');
+    expect(cleanupBlockers('cur')).toEqual(['项目槽位 gone 的正文还没读到']);
+  });
+
+  it('全部读得到时放行', () => {
+    fake.setItem('theloom-slots-v1', JSON.stringify([{ id: 'cur' }, { id: 'b' }]));
+    fake.setItem('theloom-project-b', '{}');
+    expect(cleanupBlockers('cur')).toEqual([]);
+  });
+
+  it('没有槽位表 = 只有当前一个项目,放行', () => {
+    expect(cleanupBlockers('cur')).toEqual([]);
+  });
+
+  it('槽位表损坏时拒绝 —— 判不准就不能删,删字节不可撤销', () => {
+    fake.setItem('theloom-slots-v1', 'not json');
+    expect(cleanupBlockers('cur')).toHaveLength(1);
+  });
+
+  it('本地存储读不出来时拒绝 —— 那正是最危险的情形,引用文本同样读不到', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('SecurityError'); },
+    });
+    expect(cleanupBlockers('cur')).toEqual(['本地存储当前不可读']);
+  });
+});
+
+describe('缩略图剥离只认「事务已提交」', () => {
+  const projectWith = (hash: string) => ({
+    assets: [{ id: 'a1', hash, thumbnail: 'data:image/png;base64,AAA' }],
+  } as unknown as import('./types').Project);
+
+  beforeEach(() => resetThumbCacheForTest());
+
+  it('正常写入并提交后才允许剥离', async () => {
+    const h = 'commit-ok';
+    await storeAssetThumb(null, h, 'data:image/png;base64,AAA');
+    expect(stripAssetThumbs(projectWith(h)).assets[0].thumbnail).toBeUndefined();
+  });
+
+  it('请求成功但事务中止时不得剥离 —— 剥离不可逆,缩略图无法重建', async () => {
+    // 模拟「put 请求已成功、提交阶段却失败」(配额超限就是这样)。
+    // 必须等 success 真的派发过再中止 —— 直接 abort 会让请求本身也失败,
+    // 那样连「请求成功即标记」的旧写法都能侥幸通过,测试就白写了。
+    // 用 addEventListener 而不是 onsuccess:后者会被 idbRequest 覆盖掉。
+    const origPut = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<typeof origPut>) {
+      const req = origPut.apply(this, args);
+      const tx = this.transaction;
+      req.addEventListener('success', () => tx.abort(), { once: true });
+      return req;
+    };
+    const h = 'commit-aborted';
+    try {
+      await storeAssetThumb(null, h, 'data:image/png;base64,AAA');
+    } finally {
+      IDBObjectStore.prototype.put = origPut;
+    }
+    // 没真正落库 → 必须保持内联
+    expect(await loadAssetThumb(h)).toBeNull();
+    expect(stripAssetThumbs(projectWith(h)).assets[0].thumbnail).toBe('data:image/png;base64,AAA');
   });
 });

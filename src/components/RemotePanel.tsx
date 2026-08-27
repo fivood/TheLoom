@@ -16,6 +16,14 @@ import SecretInput from './SecretInput';
 import { useEscape } from '../hooks/useEscape';
 
 /**
+ * OneDrive 后端暂时隐藏(2026-08-27)。代码与测试都在,挡住的是微软那边:
+ * 个人微软账号落在「Microsoft Services」伪租户里,那里禁用应用注册,要用就得
+ * 先自建一个 Entra 租户 —— 为「少管一个服务」付这个代价不值。
+ * 改回 true 即恢复,不需要动别的地方。用法见 docs/ONEDRIVE.md。
+ */
+const ONEDRIVE_ENABLED = false;
+
+/**
  * 外链网盘(S3 兼容)同步面板。
  * 与「协作」面板的区别:数据在用户自己的桶里,没有 20MB 上限,资源原文件
  * 也跟着走,且不经过本项目的服务器。
@@ -37,12 +45,16 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
     saveRemoteConfig(next);
   };
 
-  const od = cfg.provider === 'onedrive';
+  const od = ONEDRIVE_ENABLED && cfg.provider === 'onedrive';
   const [signedIn, setSignedIn] = useState(onedrive.signedIn);
   const ready = remoteConfigured(cfg) && (!od || signedIn);
 
   // 从微软登录页跳回来时,URL 上带着授权码,在这里换成令牌
   useEffect(() => {
+    // 隐藏期间遇到存着 onedrive 的旧配置,改回 s3 —— 否则界面显示 S3 字段却按
+    // OneDrive 同步,是最难查的那种不一致
+    if (!ONEDRIVE_ENABLED && cfg.provider === 'onedrive') patch({ provider: 's3', lastEtag: '' });
+    if (!ONEDRIVE_ENABLED) return;
     onedrive.completeAuth()
       .then((r) => { if (r === 'ok') { setSignedIn(true); setStatus('OneDrive 已登录。'); } })
       .catch((e: unknown) => setStatus(e instanceof Error ? e.message : String(e)));
@@ -153,21 +165,23 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
       <div className="palette sync-panel" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
         <div className="sync-head">
           <Icon name="cloud" size={14} />
-          <span>外链网盘同步</span>
+          <span>外链网盘同步(S3 兼容)</span>
           <span className="spacer" />
           <button className="ghost icon-btn" onClick={onClose}>×</button>
         </div>
         <div className="sync-body">
-          <div className="field">
-            <label>存放位置</label>
-            <select
-              value={cfg.provider ?? 's3'}
-              onChange={(e) => patch({ provider: e.target.value as 's3' | 'onedrive', lastEtag: '' })}
-            >
-              <option value="s3">S3 兼容存储(R2 / B2 / MinIO / OSS)</option>
-              <option value="onedrive">OneDrive</option>
-            </select>
-          </div>
+          {ONEDRIVE_ENABLED && (
+            <div className="field">
+              <label>存放位置</label>
+              <select
+                value={cfg.provider ?? 's3'}
+                onChange={(e) => patch({ provider: e.target.value as 's3' | 'onedrive', lastEtag: '' })}
+              >
+                <option value="s3">S3 兼容存储(R2 / B2 / MinIO / OSS)</option>
+                <option value="onedrive">OneDrive</option>
+              </select>
+            </div>
+          )}
 
           <div className="player-tip">
             数据端到端加密后存进<b>你自己的网盘</b>,不经过本项目服务器。没有 20MB 上限,

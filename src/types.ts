@@ -527,7 +527,17 @@ export interface MapDoc {
   /** R11:模板分配与自定义字段 */
   templateId?: ID;
   fields?: EntityField[];
-  /** 底图:dataURL(网页版内嵌)或 asset:map-{id}.png(桌面文件夹模式) */
+  /**
+   * 底图的内容哈希,字节存在 R8 资源库里(网页 IndexedDB / 桌面项目文件夹)。
+   * 这是新项目的存法 —— 底图动辄几 MB,内联进 project.json 会连带撑大
+   * 每一条快照、每一次云端推送。
+   */
+  imageHash?: string;
+  imageExt?: string;
+  /**
+   * 旧版内联底图(dataURL)。仍然可读,打开地图时会自动搬进资源库;
+   * **搬运确认成功后才清除**,搬不动就保持内联,绝不先删后传。
+   */
   image?: string;
   imageWidth?: number;
   imageHeight?: number;
@@ -873,12 +883,14 @@ export interface ForeshadowRef {
 }
 
 /** 伏笔状态(由埋设 / 回收记录推导,abandoned 为手动标记) */
-export type ForeshadowStatus = 'idea' | 'planted' | 'resolved' | 'abandoned';
+export type ForeshadowStatus = 'idea' | 'planted' | 'resolved' | 'unplanted' | 'abandoned';
 
 export const FORESHADOW_STATUS_LABEL: Record<ForeshadowStatus, string> = {
   idea: '未埋设',
   planted: '待回收',
   resolved: '已回收',
+  /** 有回收、没埋设 —— 台账要抓的正是这种,不能混进「已回收」里 */
+  unplanted: '缺埋设',
   abandoned: '已弃用',
 };
 

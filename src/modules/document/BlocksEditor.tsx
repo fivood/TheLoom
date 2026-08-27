@@ -8,23 +8,15 @@ import { promptText } from '../../dialog';
 import type { DocBlock, DocBlockType, Document } from '../../types';
 import { DOC_BLOCK_LABEL } from '../../types';
 import { walkFlowNodes } from '../../util';
+import { convertBlock, emptyBlock } from '../../documentOperations';
 import StaticBlock from './StaticBlock';
+
+export { emptyBlock };
 
 const COMMON_TYPES: DocBlockType[] = ['paragraph', 'action', 'dialogue'];
 const MORE_TYPES: DocBlockType[] = ['heading', 'subheading', 'quote', 'list', 'choice', 'condition', 'instruction', 'note'];
 const GAME_TYPES: DocBlockType[] = ['choice', 'condition', 'instruction'];
 const SLASH_MENU_TYPES: ReadonlySet<DocBlockType> = new Set(['paragraph', 'action', 'dialogue', 'subheading', 'heading', 'quote', 'note']);
-
-export function emptyBlock(type: DocBlockType): DocBlock {
-  const b: DocBlock = { id: uid(), type, text: '' };
-  if (type === 'paragraph') b.flowRole = 'none';
-  if (type === 'choice') b.choices = [{ id: uid(), label: '' }];
-  if (type === 'condition') b.condition = '';
-  if (type === 'instruction') b.instruction = '';
-  if (type === 'subheading') b.level = 3;
-  if (type === 'list') { b.items = ['']; b.ordered = false; }
-  return b;
-}
 
 export default function BlocksEditor({
   doc,
@@ -164,11 +156,7 @@ export default function BlocksEditor({
     patchDoc((d) => {
       const index = d.blocks.findIndex((b) => b.id === blockId);
       if (index < 0) return;
-      const current = d.blocks[index];
-      const next = emptyBlock(type);
-      next.id = current.id;
-      next.text = current.text.startsWith('/') ? '' : current.text;
-      d.blocks[index] = next;
+      d.blocks[index] = convertBlock(d.blocks[index], type);
     });
     setActiveBlockId(blockId);
     setPendingFocusId(blockId);
@@ -346,6 +334,7 @@ export default function BlocksEditor({
       return (
         <ScriptInput
           mode="condition"
+          inputId={b.id}
           value={b.condition ?? ''}
           onChange={(value) => patchBlock(b.id, { condition: value })}
           rows={1}
@@ -357,6 +346,7 @@ export default function BlocksEditor({
       return (
         <ScriptInput
           mode="instruction"
+          inputId={b.id}
           value={b.instruction ?? ''}
           onChange={(value) => patchBlock(b.id, { instruction: value })}
           rows={1}

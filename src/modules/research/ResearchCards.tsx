@@ -11,6 +11,9 @@ import { activePaletteColors } from '../../util';
 import ColorPicker from '../../components/ColorPicker';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 
+/** 删掉分类后卡片的去处;必须是分类表里真实存在的一项 */
+const UNCATEGORIZED = '未分类';
+
 export default function ResearchCards() {
   const cards = useLoom((s) => s.project.researchCards);
   const categories = useLoom((s) => s.project.researchCategories);
@@ -39,10 +42,17 @@ export default function ResearchCards() {
   }, [cards]);
 
   const filtered = useMemo(() => {
+    // 大小写与首尾空格的处理跟文档 / 资源两个模块对齐 —— 同一个词在不同模块
+    // 搜出不同结果最难解释
+    const q = query.trim().toLowerCase();
     const list = cards.filter((c) =>
       (catFilter === 'all' || c.category === catFilter) &&
       (!tagFilter || c.tags.includes(tagFilter)) &&
-      (!query || c.title.includes(query) || c.content.includes(query) || c.tags.some((t) => t.includes(query))),
+      (!q ||
+        c.title.toLowerCase().includes(q) ||
+        c.content.toLowerCase().includes(q) ||
+        c.source.toLowerCase().includes(q) ||
+        c.tags.some((t) => t.toLowerCase().includes(q))),
     );
     return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt - a.createdAt);
   }, [cards, catFilter, tagFilter, query]);
@@ -57,7 +67,7 @@ export default function ResearchCards() {
     const c: ResearchCard = {
       id: uid(), title: '新资料卡片', content: '',
       folderId: selected?.folderId,
-      category: catFilter === 'all' ? (categories[0] ?? '未分类') : catFilter,
+      category: catFilter === 'all' ? (categories[0] ?? UNCATEGORIZED) : catFilter,
       tags: [], color: cols[cards.length % cols.length] ?? PALETTE[0],
       source: '', pinned: false, createdAt: Date.now(),
     };
@@ -75,13 +85,18 @@ export default function ResearchCards() {
   const removeCategory = async (name: string) => {
     const used = cards.filter((c) => c.category === name).length;
     if (!await confirmDialog({
-      message: used > 0 ? `分类「${name}」下有 ${used} 张卡片,删除后它们将变为「未分类」。继续?` : `删除分类「${name}」?`,
+      message: used > 0 ? `分类「${name}」下有 ${used} 张卡片,删除后它们将变为「${UNCATEGORIZED}」。继续?` : `删除分类「${name}」?`,
       danger: true,
       confirmText: '删除',
     })) return;
     update((p) => {
       p.researchCategories = p.researchCategories.filter((c) => c !== name);
-      for (const c of p.researchCards) if (c.category === name) c.category = '未分类';
+      for (const c of p.researchCards) if (c.category === name) c.category = UNCATEGORIZED;
+      // 「未分类」得是分类表里真实存在的一项,否则筛选下拉不给这个选项,
+      // 这批卡片看起来就像凭空消失了(inspector 那边有兜底,工具栏没有)
+      if (used > 0 && !p.researchCategories.includes(UNCATEGORIZED)) {
+        p.researchCategories.push(UNCATEGORIZED);
+      }
     });
     if (catFilter === name) setCatFilter('all');
   };
@@ -124,7 +139,7 @@ export default function ResearchCards() {
               {allTags.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
             </select>
           )}
-          <input placeholder="搜索标题、内容或标签…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 240 }} />
+          <input placeholder="搜索标题、内容、来源或标签…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 240 }} />
           {tagFilter && <span className="tag active clickable" onClick={() => setTagFilter(null)}>#{tagFilter} ×</span>}
           <span className="hint">动笔前把设定、考据、灵感来源都归档到这里</span>
         </div>

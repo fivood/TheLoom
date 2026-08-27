@@ -15,6 +15,7 @@ import {
   type EvalCtx, type VarValue,
 } from '../../script';
 import { mulberry32, randomSeed, resumeRng, rollD6 } from '../../rng';
+import { selectOutgoing } from '../../flowWalk';
 import {
   clearPlaySave, loadBreakpoints, loadPlaySave, storePlaySave, type PlaySave,
 } from '../../playSaves';
@@ -223,30 +224,16 @@ export default function Player({ flow, path, startNodeId, onClose }: {
         cur = container(curP).nodes.find((n) => n.id === fragId);
       }
       const c = container(curP);
-      let edges = cur ? c.edges.filter((e) => e.source === cur!.id) : [];
-      if (exitId) {
-        const named = edges.filter((e) => e.sourceHandle === `exit:${exitId}`);
-        edges = named.length > 0 ? named : edges.filter((e) => !e.sourceHandle);
-        exitId = null;
-      } else if (cur?.type === 'fragment') {
-        // 子路径自然结束(未经出口)→ 走默认引脚
-        edges = edges.filter((e) => !e.sourceHandle);
-      }
-      if (cur?.type === 'condition') edges = filterCondEdges(edges, cur, vv, evalCtx);
-      if (cur?.type === 'check') {
-        const passed = checkResults.current.get(cur.id) ?? false;
-        const want = passed ? 'success' : 'fail';
-        const picked = edges.filter((e) => e.sourceHandle === want);
-        edges = picked.length > 0 ? picked : [];
-      }
-      // 选项级过滤:一次性已选、出现条件不满足的选项隐藏
-      const usable = edges.filter((e) =>
-        !(e.once && takenEdges.current.has(e.id)) &&
-        (!e.condition || evalCondition(e.condition, vv, evalCtx) !== false),
-      );
-      // 兜底分支:有其他可用候选时遮蔽 fallback 边
-      const nonFallback = usable.filter((e) => !e.fallback);
-      const finalUsable = nonFallback.length > 0 ? nonFallback : usable;
+      const edges = cur ? c.edges.filter((e) => e.source === cur!.id) : [];
+      const { usable: finalUsable } = selectOutgoing(edges, {
+        exitId,
+        nodeType: cur?.type,
+        condResult: cur?.type === 'condition' ? evalCondition(cur.data.text, vv, evalCtx) : undefined,
+        checkPassed: cur ? checkResults.current.get(cur.id) ?? false : false,
+        isTaken: (id) => takenEdges.current.has(id),
+        edgeAllowed: (cond) => evalCondition(cond, vv, evalCtx) !== false,
+      });
+      exitId = null;
       if (finalUsable.length > 0) {
         return {
           path: curP,
@@ -270,13 +257,6 @@ export default function Player({ flow, path, startNodeId, onClose }: {
     return { path: curP, choices: [] };
   };
 
-  const filterCondEdges = (edges: FlowEdge[], node: FlowNode, vv: Record<string, VarValue>, ctx: EvalCtx): FlowEdge[] => {
-    const result = evalCondition(node.data.text, vv, ctx);
-    if (result === null) return edges; // 无法求值 → 手动选择
-    const want = result ? 'true' : 'false';
-    const picked = edges.filter((e) => e.sourceHandle === want);
-    return picked.length > 0 ? picked : [];
-  };
 
   /**
    * R19-2:弹出一个调用帧回到调用点。

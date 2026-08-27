@@ -93,7 +93,7 @@ export default function MobileRef() {
   const onRemove = async (e: Entity) => {
     const ok = await confirmDialog({
       title: `删除「${e.name}」?`,
-      message: '相关的关系、弧线与引用也会一并清理。',
+      message: '关系与角色弧线会一并删除。说话人、POV、地点、时间线与地图上的引用会留下来,可在桌面端体检里逐条处理。',
       danger: true,
     });
     if (!ok) return;

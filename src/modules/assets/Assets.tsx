@@ -9,6 +9,7 @@ import { ASSET_KIND_ICON, ASSET_KIND_LABEL } from '../../types';
 import { classifyAsset, fileToImageThumb, formatSize } from '../../util';
 import {
   assetExt, collectReferencedTexts, computeOrphans, deleteAssetThumbs, deleteStoredFiles, getAssetUrl,
+  cleanupBlockers,
   hashBlob, invalidateAssetUrl, isAssetStored, listAssetThumbKeys, listStoredFiles, storeAssetFile, storeAssetThumb,
 } from '../../assetFiles';
 import Inspector from '../../components/Inspector';
@@ -232,6 +233,17 @@ export default function Assets() {
       stored = await listStoredFiles(folder);
     } catch (e) {
       await alertDialog(`无法扫描原文件:${e instanceof Error ? e.message : e}`);
+      return;
+    }
+    // 读不全其他槽位的项目正文时直接拒绝:那会把别的作品还在用的原文件判成孤儿
+    const blind = cleanupBlockers(useLoom.getState().currentSlotId);
+    if (blind.length > 0) {
+      await alertDialog(
+        `暂时无法清理:${blind.join(';')}。\n\n`
+        + '清理靠「没有任何项目引用它」判定孤儿,读不全就会误删别的作品还在用的原文件,'
+        + '而删除字节不可撤销。\n\n刚打开应用时本地存储可能还在恢复,请稍等几秒再试;'
+        + '若一直如此,先在项目菜单里逐个打开这些作品,再回来清理。',
+      );
       return;
     }
     const referenced = collectReferencedTexts(useLoom.getState().project);

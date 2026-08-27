@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { DocBlock } from './types';
 import {
+  convertBlock,
   documentIdsInFolder,
   mergeAdjacentDocuments,
   nextAdjacentDocument,
@@ -189,5 +191,52 @@ describe('R18-1 卷章批量工具', () => {
     expect(project.folders.find((folder) => folder.id === 'folder-chapter-2')?.name).toBe('回声');
     expect(project.folders.find((folder) => folder.id === 'folder-volume-2')?.name).toBe('尾声卷');
     expect(project.folders.find((folder) => folder.id === 'folder-volume-1')?.name).toBe('未命名卷');
+  });
+});
+
+describe('换块类型', () => {
+  const block = (b: Partial<DocBlock>): DocBlock =>
+    ({ id: 'b1', type: 'paragraph', text: '', ...b } as DocBlock);
+
+  it('列表转段落不丢条目 —— 内容装在 items 里,只看 text 会丢光', () => {
+    const out = convertBlock(block({ type: 'list', items: ['甲', '乙', '丙'], ordered: true }), 'paragraph');
+    expect(out.text).toBe('甲\n乙\n丙');
+  });
+
+  it('段落转列表:正文进 items,不留在看不见的 text 上', () => {
+    const out = convertBlock(block({ text: '第一行\n第二行' }), 'list');
+    expect(out.items).toEqual(['第一行', '第二行']);
+    expect(out.text).toBe('');
+  });
+
+  it('条件 / 指令的表达式往返不丢', () => {
+    expect(convertBlock(block({ type: 'condition', condition: 'trust > 5' }), 'paragraph').text).toBe('trust > 5');
+    expect(convertBlock(block({ text: 'trust = 1' }), 'instruction').instruction).toBe('trust = 1');
+  });
+
+  it('选项块转段落时选项文本留在正文里', () => {
+    const out = convertBlock(
+      block({ type: 'choice', text: '怎么办', choices: [{ id: 'c1', label: '走' }, { id: 'c2', label: '留' }] }),
+      'paragraph',
+    );
+    expect(out.text).toBe('怎么办\n▸ 走\n▸ 留');
+  });
+
+  it('块 id 不变,斜杠命令不被当成正文带过去', () => {
+    const out = convertBlock(block({ id: 'keep-me', text: '/对白' }), 'dialogue');
+    expect(out.id).toBe('keep-me');
+    expect(out.text).toBe('');
+  });
+
+  it('同种叙事单元之间换类型保留 unitId,跨种类断开', () => {
+    // 对白与动作都是 line,重排版不该切断与流程节点的共享
+    expect(convertBlock(block({ type: 'dialogue', unitId: 'u1', speakerId: 'e1' }), 'action').unitId).toBe('u1');
+    // 段落默认 flowRole=none 不参与流程,链接理应断开
+    expect(convertBlock(block({ type: 'dialogue', unitId: 'u1' }), 'paragraph').unitId).toBeUndefined();
+    expect(convertBlock(block({ type: 'dialogue', unitId: 'u1' }), 'condition').unitId).toBeUndefined();
+  });
+
+  it('转成对白时保留说话人', () => {
+    expect(convertBlock(block({ type: 'action', speakerId: 'e1', text: '喂' }), 'dialogue').speakerId).toBe('e1');
   });
 });

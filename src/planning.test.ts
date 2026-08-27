@@ -124,6 +124,24 @@ describe('R4 伏笔状态', () => {
     }))).toBe('resolved');
     expect(foreshadowStatus(mk({ plants: [{ id: 'r1', docId: 's1' }], abandoned: true }))).toBe('abandoned');
   });
+
+  it('有回收没埋设单独成一档,不能混进「已回收」', () => {
+    // 两条真实路径:倒着规划(先定揭晓),以及删掉埋设所在的场景 ——
+    // unlinkDocumentReferences 会把那条 plant 过滤掉,状态不该因此变成「都办妥了」
+    expect(foreshadowStatus(mk({ payoffs: [{ id: 'r2', docId: 's3' }] }))).toBe('unplanted');
+    // 弃用仍然优先
+    expect(foreshadowStatus(mk({ payoffs: [{ id: 'r2', docId: 's3' }], abandoned: true }))).toBe('abandoned');
+  });
+
+  it('删掉埋设场景后,状态从「已回收」翻成「缺埋设」', () => {
+    const p = baseProject();
+    p.documents = [makeDoc('s1', '埋设场景'), makeDoc('s3', '回收场景')];
+    p.foreshadows = [mk({ plants: [{ id: 'r1', docId: 's1' }], payoffs: [{ id: 'r2', docId: 's3' }] })];
+    expect(foreshadowStatus(p.foreshadows[0])).toBe('resolved');
+    p.documents = p.documents.filter((d) => d.id !== 's1');
+    normalizeProject(p);
+    expect(foreshadowStatus(p.foreshadows![0])).toBe('unplanted');
+  });
 });
 
 describe('R4 normalizeProject 清理', () => {

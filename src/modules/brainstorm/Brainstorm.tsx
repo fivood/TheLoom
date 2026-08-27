@@ -144,12 +144,17 @@ function Canvas() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // 只有内容真的变了才标脏。select / dimensions 也算脏的话,点一下便签、
+  // 甚至挂载时的尺寸测量都会写一次全项目 —— 撤销栈里堆满按 Ctrl+Z 毫无反应的空步。
+  // 流程编辑器在 v0.54.2 修过同样的问题(C2),这里当时没跟上。
   const onNodesChange = useCallback((changes: NodeChange<StickyNode>[]) => {
-    dirty.current = true;
+    if (changes.some((c) => c.type === 'position' || c.type === 'remove' || c.type === 'add' || c.type === 'replace')) {
+      dirty.current = true;
+    }
     setNodes((ns) => applyNodeChanges(changes, ns));
   }, []);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    dirty.current = true;
+    if (changes.some((c) => c.type === 'remove' || c.type === 'add' || c.type === 'replace')) dirty.current = true;
     setEdges((es) => applyEdgeChanges(changes, es));
   }, []);
   const onConnect = useCallback((conn: Connection) => {

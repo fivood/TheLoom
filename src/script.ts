@@ -8,6 +8,7 @@ import { ScriptError } from './script/ast';
 import { parseExpression, parseInstructions } from './script/parser';
 import { evalExpr, runStmt, type Env } from './script/eval';
 import type { ScriptScope, ScriptType } from './script/check';
+import { renameIdentifier } from './script/rename';
 
 export type VarValue = boolean | number | string;
 
@@ -124,6 +125,22 @@ export function buildEntityProps(entities: EntityPropsSource[]): Record<string, 
 }
 
 /**
+ * 统计某个变量名被多少处脚本引用。
+ *
+ * 借 `renameIdentifier` 判断:它是词法感知的(跳过字符串字面量和 `.` 后的字段位),
+ * 所以「改一下看变不变」比正则匹配准。fn 原样返回,不改动项目。
+ */
+export function countScriptIdentifier(p: Project, name: string): number {
+  if (!name.trim()) return 0;
+  let hits = 0;
+  mapProjectScripts(p, (src) => {
+    if (renameIdentifier(src, name, `${name}__probe`) !== src) hits++;
+    return src;
+  });
+  return hits;
+}
+
+/**
  * 遍历并改写项目里的全部脚本文本(流程节点 / 各层边 / 文档块 / 叙事单元镜像)。
  * fn 返回新文本;未变化时保持原引用。重命名联动用。
  */
@@ -133,11 +150,33 @@ export function mapProjectScripts(p: Project, fn: (src: string) => string) {
     const next = fn(src);
     return next === src ? src : next;
   };
-  interface SubLike { nodes: { type: string; data: { text?: string; checkExpr?: string; sub?: SubLike } }[]; edges: { condition?: string; effect?: string }[] }
+  interface ArgLike { name: string; expr?: string }
+  interface SubLike {
+    nodes: {
+      type: string;
+      data: {
+        text?: string; checkExpr?: string; sub?: SubLike;
+        /** R19-2 跨流程:实参表达式与返回值 */
+        args?: ArgLike[]; returnExpr?: string; returnVar?: string;
+        /** R19-3 外部事件:实参表达式与回值变量 */
+        eventArgs?: ArgLike[]; eventResultVar?: string;
+      };
+    }[];
+    edges: { condition?: string; effect?: string }[];
+  }
   const walkSub = (sub: SubLike) => {
     for (const n of sub.nodes) {
       if (n.type === 'condition' || n.type === 'instruction') n.data.text = apply(n.data.text) ?? '';
       if (n.type === 'check') n.data.checkExpr = apply(n.data.checkExpr);
+      // 实参与返回值也是表达式,里面照样能写变量名。漏掉它们的后果是改名之后
+      // 这些位置仍指着旧名字,而且体检没检查这几个面 —— 哪里都不报错,只在
+      // 运行时静默取到 0 / null。
+      for (const a of n.data.args ?? []) a.expr = apply(a.expr);
+      for (const a of n.data.eventArgs ?? []) a.expr = apply(a.expr);
+      n.data.returnExpr = apply(n.data.returnExpr);
+      // 这两个存的是「写回哪个变量」的裸变量名,单标识符按表达式处理即可
+      n.data.returnVar = apply(n.data.returnVar);
+      n.data.eventResultVar = apply(n.data.eventResultVar);
       if (n.data.sub) walkSub(n.data.sub);
     }
     for (const e of sub.edges) {

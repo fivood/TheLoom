@@ -1,6 +1,59 @@
-import type { Document, DocumentFolderRole, Folder, Project } from './types';
+import type { DocBlock, DocBlockType, Document, DocumentFolderRole, Folder, Project } from './types';
 import { orderedDocumentFolders } from './documentStructure';
 import { documentWordCount, uid } from './util';
+
+/** 块类型 → 叙事单元种类;口径必须与 util.ts `syncNarrativeUnits` 里那张表一致 */
+const UNIT_KIND: Partial<Record<DocBlockType, string>> = {
+  heading: 'scene', action: 'line', dialogue: 'line',
+  choice: 'choice', condition: 'condition', instruction: 'instruction',
+};
+
+export function emptyBlock(type: DocBlockType): DocBlock {
+  const b: DocBlock = { id: uid(), type, text: '' };
+  if (type === 'paragraph') b.flowRole = 'none';
+  if (type === 'choice') b.choices = [{ id: uid(), label: '' }];
+  if (type === 'condition') b.condition = '';
+  if (type === 'instruction') b.instruction = '';
+  if (type === 'subheading') b.level = 3;
+  if (type === 'list') { b.items = ['']; b.ordered = false; }
+  return b;
+}
+
+/**
+ * 该类型的正文实际装在哪个字段。列表在 items、条件在 condition、指令在
+ * instruction、选项还带一串 choices —— 换类型时只看 text 会把内容丢光。
+ */
+export function blockText(b: DocBlock): string {
+  if (b.type === 'list') return (b.items ?? []).filter(Boolean).join('\n');
+  if (b.type === 'condition') return b.condition ?? '';
+  if (b.type === 'instruction') return b.instruction ?? '';
+  if (b.type === 'choice') {
+    return [b.text, ...(b.choices ?? []).map((c) => `▸ ${c.label}`)].filter(Boolean).join('\n');
+  }
+  return b.text;
+}
+
+/**
+ * 换块类型。两条不变量:
+ * ① 正文按各类型的实际承载字段搬运,不静默丢弃;
+ * ② 同种叙事单元之间(对白↔动作)保留 unitId,跨种类才断开 ——
+ *    否则流程侧留着旧内容,两边各走各的,而 R1 的前提是镜像不可能发散。
+ */
+export function convertBlock(current: DocBlock, type: DocBlockType): DocBlock {
+  const next = emptyBlock(type);
+  next.id = current.id;
+  const raw = blockText(current);
+  const text = raw.startsWith('/') ? '' : raw;
+  if (type === 'list') next.items = text ? text.split('\n') : [''];
+  else if (type === 'condition') next.condition = text;
+  else if (type === 'instruction') next.instruction = text;
+  else next.text = text;
+  if (type === 'dialogue' && current.speakerId) next.speakerId = current.speakerId;
+  if (current.unitId && UNIT_KIND[type] && UNIT_KIND[type] === UNIT_KIND[current.type]) {
+    next.unitId = current.unitId;
+  }
+  return next;
+}
 
 export interface SplitDocumentResult {
   originalId: string;

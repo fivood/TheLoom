@@ -7,7 +7,7 @@ import type { Foreshadow, ForeshadowStatus } from '../../types';
 import { FORESHADOW_STATUS_LABEL } from '../../types';
 import Icon from '../../components/Icon';
 
-const STATUS_ORDER: ForeshadowStatus[] = ['idea', 'planted', 'resolved', 'abandoned'];
+const STATUS_ORDER: ForeshadowStatus[] = ['idea', 'planted', 'resolved', 'unplanted', 'abandoned'];
 
 export default function ForeshadowLedger({ focusId, onConsumeFocus }: {
   focusId: string | null;
@@ -39,7 +39,7 @@ export default function ForeshadowLedger({ focusId, onConsumeFocus }: {
   const docName = (docId: string) => project.documents.find((d) => d.id === docId)?.name ?? '(已删除)';
 
   const counts = useMemo(() => {
-    const c: Record<ForeshadowStatus, number> = { idea: 0, planted: 0, resolved: 0, abandoned: 0 };
+    const c: Record<ForeshadowStatus, number> = { idea: 0, planted: 0, resolved: 0, unplanted: 0, abandoned: 0 };
     for (const f of foreshadows) c[foreshadowStatus(f)] += 1;
     return c;
   }, [foreshadows]);

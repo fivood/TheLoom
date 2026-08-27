@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { confirmDialog } from '../../dialog';
+import { countScriptIdentifier } from '../../script';
 import type { ExternalEvent, VariableType } from '../../types';
 import Icon from '../../components/Icon';
 
@@ -88,7 +89,15 @@ export default function Variables() {
                 <td>
                   <button
                     className="ghost icon-btn"
-                    onClick={async () => { if (await confirmDialog({ message: `删除变量 ${v.name}?`, danger: true, confirmText: '删除' })) removeVariable(v.id); }}
+                    onClick={async () => {
+                      // 变量是靠名字被脚本引用的,删掉之后引用它的表达式会失效。
+                      // 先说清有多少处 —— 下面删外部事件时早就这么提示了
+                      const used = countScriptIdentifier(useLoom.getState().project, v.name);
+                      const message = used > 0
+                        ? `删除变量 ${v.name}?\n\n有 ${used} 处脚本引用它,删除后这些表达式会失效,并在体检里报「未定义变量」。`
+                        : `删除变量 ${v.name}?`;
+                      if (await confirmDialog({ message, danger: true, confirmText: '删除' })) removeVariable(v.id);
+                    }}
                   >×</button>
                 </td>
               </tr>

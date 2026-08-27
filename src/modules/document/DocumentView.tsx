@@ -80,6 +80,15 @@ export default function DocumentView() {
     setAnnoDraft('');
   }, [selectedId]);
 
+  // 换项目槽位 / 载入示例 / 云端拉取之后,selectedId 可能指向的是另一部作品的场景,
+  // 界面会停在空白且没有任何提示。documents 变化后重新归位(MobileWrite 同款)
+  useEffect(() => {
+    if (documents.length === 0) return;
+    if (!selectedId || !documents.some((d) => d.id === selectedId)) {
+      setSelectedId(documents[0].id);
+    }
+  }, [documents, selectedId]);
+
   const revisionsInUse = useMemo(() => {
     const set = new Set<number>();
     for (const d of documents) if (typeof d.revision === 'number') set.add(d.revision);
@@ -584,8 +593,12 @@ export default function DocumentView() {
                   danger: true,
                   confirmText: '删除并解除引用',
                 })) return;
+                // 落到树序上的相邻场景,而不是把人丢回空白面板
+                const order = manuscriptDocs.length ? manuscriptDocs : documents;
+                const at = order.findIndex((d) => d.id === selected.id);
+                const neighbor = order[at + 1] ?? order[at - 1] ?? null;
                 removeDocument(selected.id);
-                setSelectedId(null);
+                setSelectedId(neighbor?.id ?? null);
               }}
             ><Icon name="trash" size={14} /></button>
           </div>

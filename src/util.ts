@@ -81,6 +81,10 @@ export function normalizeProject(p: Project): Project {
     !!pt && typeof pt === 'object'
     && Number.isFinite((pt as { x: unknown }).x) && Number.isFinite((pt as { y: unknown }).y);
   for (const map of p.maps) {
+    // 底图哈希:非法值剔除。注意**不碰 image** —— 内联那份是搬进资源库之前
+    // 唯一的底图,清掉就没了
+    if (typeof map.imageHash !== 'string' || !/^[0-9a-f]{64}$/.test(map.imageHash)) delete map.imageHash;
+    if (typeof map.imageExt !== 'string' || !/^[a-z0-9]{1,8}$/.test(map.imageExt)) delete map.imageExt;
     if (!Array.isArray(map.layers)) map.layers = [];
     map.layers = map.layers.filter((l) => l && typeof l.id === 'string' && typeof l.name === 'string');
     // 归一化 order / 布尔字段

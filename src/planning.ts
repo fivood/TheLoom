@@ -8,6 +8,10 @@ import { documentChapterIdentity } from './documentStructure';
 
 export function foreshadowStatus(f: Foreshadow): ForeshadowStatus {
   if (f.abandoned) return 'abandoned';
+  // 回收了却没埋设:倒着规划时会出现,删掉埋设所在的场景也会掉进这里
+  // (unlinkDocumentReferences 会过滤掉那条 plant)。归进「已回收」等于把
+  // 台账最该抓的错误藏起来
+  if (f.payoffs.length > 0 && f.plants.length === 0) return 'unplanted';
   if (f.payoffs.length > 0) return 'resolved';
   if (f.plants.length > 0) return 'planted';
   return 'idea';

@@ -1,5 +1,10 @@
 # OneDrive 同步设置
 
+> **当前已隐藏(2026-08-27)。** 界面上没有「存放位置」下拉,只有 S3 兼容存储。
+> 挡住的不是代码,是微软那边:个人微软账号落在「Microsoft Services」伪租户里,
+> 那里禁用应用注册,要用就得先自建一个 Entra 租户。
+> 恢复方法:把 `src/components/RemotePanel.tsx` 里的 `ONEDRIVE_ENABLED` 改回 `true`。
+
 外链网盘同步支持两种后端:S3 兼容存储(R2 / B2 / MinIO / OSS)与 OneDrive。
 两者共用同一套端到端加密与冲突判定,区别只在文件存在哪。
 

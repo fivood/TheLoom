@@ -2040,6 +2040,23 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   width: 100%;
   height: 100%;
 }
+/* 无底图时给一张淡格纸,提示「这里可以直接画」而不是「这里坏了」 */
+.map-canvas-blank {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px;
+  background-color: var(--bg-card);
+}
+.map-blank-hint {
+  position: absolute;
+  inset: auto 0 12px 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-faint);
+  pointer-events: none;
+}
 
 /* ---------- 时间线 ---------- */
 
@@ -3438,6 +3455,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .fs-status { font-size: 11px; padding: 1px 7px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-dim); white-space: nowrap; }
 .fs-status-planted { background: var(--note-border); color: var(--note-fg); border-color: var(--note-border-strong); }
 .fs-status-resolved { background: var(--focus); color: var(--selected-fg); border-color: var(--focus); }
+.fs-status-unplanted { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
 .fs-status-abandoned { color: var(--text-faint); text-decoration: line-through; }
 
 /* 登场统计 */

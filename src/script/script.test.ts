@@ -4,7 +4,8 @@ import { parseExpression, parseInstructions } from './parser';
 import { checkCondition, checkInstructions, checkNumberExpr, type ScriptScope } from './check';
 import { evalExpr, runStmt, type Env } from './eval';
 import { renameEntityField, renameIdentifier, renameSeenTarget } from './rename';
-import { applyInstructions, evalCondition, evalNumber } from '../script';
+import { applyInstructions, countScriptIdentifier, evalCondition, evalNumber, mapProjectScripts } from '../script';
+import type { Project } from '../types';
 
 function env(vars: Env['vars'] = {}, entityProps: Env['entityProps'] = {}, seenSet: string[] = []): Env {
   return { vars, entityProps, seen: (tn) => seenSet.includes(tn) };
@@ -170,5 +171,54 @@ describe('rename 联动重写', () => {
   it('seen 目标:只改 seen/unseen 的字符串参数', () => {
     expect(renameSeenTarget("seen('n1') && unseen(\"n1\") && x == 'n1'", 'n1', 'n2'))
       .toBe("seen('n2') && unseen(\"n2\") && x == 'n1'");
+  });
+});
+
+describe('脚本面清单:跨流程与外部事件', () => {
+  /** 变量名不止出现在条件 / 指令里,实参、返回值、回值变量同样是脚本面 */
+  const projectWithCallFlow = () => ({
+    version: 1,
+    flows: [{
+      id: 'f1', name: '主线', edges: [],
+      nodes: [
+        {
+          id: 'n1', type: 'call', position: { x: 0, y: 0 },
+          data: {
+            title: '', text: '',
+            args: [{ name: 'dc', expr: 'trust + 2' }],
+            returnVar: 'trust',
+          },
+        },
+        { id: 'n2', type: 'return', position: { x: 0, y: 0 }, data: { title: '', text: '', returnExpr: 'trust > 3' } },
+        {
+          id: 'n3', type: 'event', position: { x: 0, y: 0 },
+          data: { title: '', text: '', eventArgs: [{ name: 'level', expr: 'trust' }], eventResultVar: 'trust' },
+        },
+      ],
+    }],
+    documents: [], entities: [], variables: [], units: [],
+  } as unknown as Project);
+
+  it('改名会跟进实参 / 返回值 / 回值变量', () => {
+    const p = projectWithCallFlow();
+    mapProjectScripts(p, (s) => renameIdentifier(s, 'trust', 'faith'));
+    const [call, ret, event] = p.flows[0].nodes;
+    expect(call.data.args![0].expr).toBe('faith + 2');
+    expect(call.data.returnVar).toBe('faith');
+    expect(ret.data.returnExpr).toBe('faith > 3');
+    expect(event.data.eventArgs![0].expr).toBe('faith');
+    expect(event.data.eventResultVar).toBe('faith');
+  });
+
+  it('实参名是被调方的参数名,不能被调用方的变量改名波及', () => {
+    const p = projectWithCallFlow();
+    mapProjectScripts(p, (s) => renameIdentifier(s, 'dc', 'difficulty'));
+    expect(p.flows[0].nodes[0].data.args![0].name).toBe('dc');
+    expect(p.flows[0].nodes[2].data.eventArgs![0].name).toBe('level');
+  });
+
+  it('引用计数覆盖这些新面', () => {
+    expect(countScriptIdentifier(projectWithCallFlow(), 'trust')).toBe(5);
+    expect(countScriptIdentifier(projectWithCallFlow(), 'nobody')).toBe(0);
   });
 });

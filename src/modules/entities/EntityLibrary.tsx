@@ -566,7 +566,14 @@ export default function EntityLibrary() {
             <button
               className="danger"
               onClick={async () => {
-                if (await confirmDialog({ message: `删除实体「${selected.name}」?`, danger: true, confirmText: '删除' })) {
+                // 与删除场景一致:先说清会波及什么,再让人决定
+                const lines = refs.slice(0, 6).map((r) => `• ${r.module} · ${r.kind}:${r.title}`);
+                const hidden = Math.max(0, refs.length - lines.length);
+                const refText = lines.length > 0
+                  ? `\n\n它被 ${refs.length} 处引用:\n${lines.join('\n')}${hidden ? `\n• 另有 ${hidden} 处` : ''}`
+                    + '\n\n关系与角色弧线会一并删除;说话人、POV、地点、时间线与地图上的引用会留下来,可在体检里逐条处理。'
+                  : '';
+                if (await confirmDialog({ message: `删除实体「${selected.name}」?${refText}`, danger: true, confirmText: '删除' })) {
                   removeEntity(selected.id);
                   setSelectedId(null);
                 }

@@ -105,11 +105,13 @@ function suggestionsAt(src: string, caret: number, scope: ScriptScope): { items:
  * R6 脚本输入框:语法高亮(叠层)+ 类型诊断(波浪线 + 列表)+ 自动补全。
  * 条件 / 检定数字 / 指令三种模式,共享同一作用域(变量 + 实体字段 + 节点技术名)。
  */
-export default function ScriptInput({ value, onChange, mode, rows = 2, placeholder }: {
+export default function ScriptInput({ value, onChange, mode, rows = 2, placeholder, inputId }: {
   value: string;
   onChange: (v: string) => void;
   mode: ScriptMode;
   rows?: number;
+  /** 供文档块插入后自动聚焦定位(data-doc-input) */
+  inputId?: string;
   placeholder?: string;
 }) {
   const scope = useScriptScope();
@@ -169,6 +171,7 @@ export default function ScriptInput({ value, onChange, mode, rows = 2, placehold
           {'\n'}
         </pre>
         <textarea
+        data-doc-input={inputId}
           ref={taRef}
           rows={rows}
           value={value}

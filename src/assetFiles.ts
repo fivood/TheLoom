@@ -91,9 +91,28 @@ function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+/**
+ * 等事务真正提交,而不只是等请求成功。
+ *
+ * IndexedDB 的 `request.onsuccess` 早于 `transaction.oncomplete`,提交阶段仍可能
+ * 中止(最现实的是配额超限)。写入路径必须等到 complete 才能宣称「存住了」——
+ * 否则 `thumbsInDb` 会记下一个其实没落库的哈希,`stripAssetThumbs` 据此剥掉内联
+ * 缩略图,而剥离不可逆(没有任何代码会从原文件重建)。
+ */
+export function txDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error ?? new Error('IndexedDB 事务已中止'));
+    tx.onerror = () => reject(tx.error ?? new Error('IndexedDB 事务出错'));
+  });
+}
+
 async function idbPut(hash: string, blob: Blob): Promise<void> {
   const db = await openDb();
-  await idbRequest(db.transaction(STORE, 'readwrite').objectStore(STORE).put(blob, hash));
+  const tx = db.transaction(STORE, 'readwrite');
+  const done = txDone(tx);
+  tx.objectStore(STORE).put(blob, hash);
+  await done;
 }
 
 async function idbGet(hash: string): Promise<Blob | null> {
@@ -145,7 +164,11 @@ export async function storeAssetThumb(folder: string | null, hash: string, dataU
   if (folder || !hash || !dataUrl) return;
   try {
     const db = await openDb();
-    await idbRequest(db.transaction(THUMB_STORE, 'readwrite').objectStore(THUMB_STORE).put(dataUrl, hash));
+    const tx = db.transaction(THUMB_STORE, 'readwrite');
+    // 必须等事务提交再标记:请求成功不等于写进去了(见 txDone)
+    const done = txDone(tx);
+    tx.objectStore(THUMB_STORE).put(dataUrl, hash);
+    await done;
     thumbsInDb.add(hash);
   } catch { /* 存不进去就不标记,缩略图继续内联在项目里 */ }
 }
@@ -292,6 +315,42 @@ export function computeOrphans(stored: StoredAssetFile[], referencedTexts: strin
 /** 收集本机所有可能引用资源哈希的文本:一切 theloom-* localStorage 值 + 当前项目 JSON */
 export function collectReferencedTexts(currentProject: Project): string[] {
   return [JSON.stringify(currentProject), ...collectLocalStorageTexts()];
+}
+
+/**
+ * 孤儿判定的前提是「读得到每个槽位的项目正文」。少读到一个槽位,它引用的原文件
+ * 就会被判成没人要而删掉,**而删字节不可撤销**。所以判不准时宁可整个拒绝清理。
+ *
+ * 一律**失败即拒绝**:读不到本地存储恰恰是最危险的情形 —— 那时引用文本同样读不到,
+ * 于是除当前项目外的资源全都会被判成孤儿。放行等于批准一次全量误删。
+ *
+ * 真实触发场景:启动时 IDB → localStorage 的补齐还没跑完就点了清理,
+ * 或者浏览器把存储清了一部分。当前槽位不在此列 —— 它的项目 JSON
+ * 由调用方直接传入,不依赖 localStorage。
+ *
+ * @returns 阻止清理的原因;空数组才可以清理
+ */
+export function cleanupBlockers(currentSlotId: string): string[] {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem('theloom-slots-v1');
+  } catch {
+    return ['本地存储当前不可读'];
+  }
+  // 没有槽位表 = 只有当前这一个项目,调用方已直接传入它的正文
+  if (!raw) return [];
+  let slots: unknown;
+  try {
+    slots = JSON.parse(raw);
+  } catch {
+    return ['项目槽位表损坏,无法确认还有哪些作品在用这些文件'];
+  }
+  if (!Array.isArray(slots)) return ['项目槽位表格式异常'];
+  return slots
+    .map((s) => (s as { id?: unknown })?.id)
+    .filter((id): id is string => typeof id === 'string' && id !== currentSlotId)
+    .filter((id) => !localStorage.getItem(`theloom-project-${id}`))
+    .map((id) => `项目槽位 ${id} 的正文还没读到`);
 }
 
 function collectLocalStorageTexts(): string[] {

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { fileToDataUrl } from './util';
+import { assetExt, getAssetUrl, hashBlob, invalidateAssetUrl, loadAssetBlob, storeAssetFile } from '../../assetFiles';
+import { dataUrlMime, hasBaseImage, needsImageMigration } from '../../mapImage';
 import { useNav } from '../../search';
 import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import type { MapDoc, MapMarker, MapRegion, MapShape, MapShapeType, MapLayer } from '../../types';
@@ -125,6 +127,7 @@ export default function MapEditor() {
 function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string | null }) {
   const project = useLoom((s) => s.project);
   const update = useLoom((s) => s.update);
+  const folder = useLoom((s) => s.folder);
   const entities = project.entities;
   const points = project.timelinePoints;
 
@@ -150,10 +153,65 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
     if (x) m(x);
   });
 
+  /** 底图的可显示地址:资源库取对象 URL,旧项目直接用内联 dataURL */
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (map.imageHash) {
+      setImageUrl(null);
+      getAssetUrl(folder, { hash: map.imageHash, ext: map.imageExt }).then((u) => { if (alive) setImageUrl(u); });
+    } else {
+      setImageUrl(map.image ?? null);
+    }
+    return () => { alive = false; };
+  }, [map.imageHash, map.imageExt, map.image, folder]);
+
+  /**
+   * 旧项目的内联底图搬进资源库。
+   * **先存字节、读回确认,再删内联** —— 顺序反过来就是一次不可逆的丢图
+   * (v0.44.1 的缩略图事故就是这么来的)。搬不动就保持原样,下次再试。
+   */
+  useEffect(() => {
+    if (!needsImageMigration(map)) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const blob = await (await fetch(map.image!)).blob();
+        const hash = await hashBlob(blob);
+        const ext = assetExt('', dataUrlMime(map.image!) || blob.type);
+        await storeAssetFile(folder, hash, ext, blob);
+        if (!await loadAssetBlob(folder, { hash, ext })) return; // 读不回来就不动内联那份
+        if (!alive) return;
+        patch((m) => { m.imageHash = hash; m.imageExt = ext; delete m.image; });
+      } catch { /* 搬不动就维持内联,不影响使用 */ }
+    })();
+    return () => { alive = false; };
+  }, [map.id, map.image, map.imageHash, folder]);
+
+  /**
+   * 底图字节走 R8 资源库(内容寻址),项目里只留哈希。
+   * 存不进去就整个放弃并告知 —— 不能落下一个指向空气的哈希。
+   */
   const uploadImage = async (file: File) => {
     try {
       const { dataUrl, width, height } = await fileToDataUrl(file);
-      patch((m) => { m.image = dataUrl; m.imageWidth = width; m.imageHeight = height; });
+      const hash = await hashBlob(file);
+      const ext = assetExt(file.name, file.type);
+      try {
+        await storeAssetFile(folder, hash, ext, file);
+      } catch (e) {
+        await alertDialog(`底图保存失败:${e instanceof Error ? e.message : e}`);
+        return;
+      }
+      invalidateAssetUrl(hash);
+      setImageUrl(dataUrl);
+      patch((m) => {
+        m.imageHash = hash;
+        m.imageExt = ext;
+        delete m.image;
+        m.imageWidth = width;
+        m.imageHeight = height;
+      });
     } catch { await alertDialog('无法读取该图片'); }
   };
 
@@ -351,18 +409,24 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
   };
 
   const exportPng = async () => {
-    if (!map.image) { await alertDialog('先上传底图'); return; }
-    const svg = svgRef.current!;
+    const svg = svgRef.current;
+    if (!svg) return;
     const w = map.imageWidth ?? 1600, h = map.imageHeight ?? 900;
     const svgClone = svg.cloneNode(true) as SVGSVGElement;
     // 序列化 svg 与底图叠加渲染到 canvas
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
-    const bg = new Image();
-    bg.src = map.image;
-    await new Promise<void>((r, j) => { bg.onload = () => r(); bg.onerror = () => j(new Error('底图加载失败')); });
-    ctx.drawImage(bg, 0, 0, w, h);
+    if (imageUrl) {
+      const bg = new Image();
+      bg.src = imageUrl;
+      await new Promise<void>((r, j) => { bg.onload = () => r(); bg.onerror = () => j(new Error('底图加载失败')); });
+      ctx.drawImage(bg, 0, 0, w, h);
+    } else {
+      // 无底图也能导出:白纸上的标记与区域本身就是一张关系示意图
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+    }
     const svgStr = new XMLSerializer().serializeToString(svgClone);
     const svgImg = new Image();
     svgImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
@@ -399,7 +463,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
           )}
           <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
           <button onClick={() => imgFileRef.current?.click()}>
-            <Icon name="image" /> {map.image ? '替换底图' : '上传底图'}
+            <Icon name="image" /> {hasBaseImage(map) ? '替换底图' : '上传底图'}
           </button>
           <input
             ref={imgFileRef}
@@ -432,14 +496,20 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
         </div>
 
         <div className="map-canvas-wrap">
-          {!map.image && (
-            <div className="empty-hint" style={{ padding: 60 }}>
-              还没有底图。<br />点击工具栏「上传底图」选一张 PNG/JPG,<br />来自 Inkarnate 导出、手绘扫描或 Azgaar 生成都行。
-            </div>
-          )}
-          {map.image && (
-            <div className="map-canvas" style={{ aspectRatio: aspect }}>
-              <img src={map.image} alt="" draggable={false} />
+          {/*
+            没有底图也照常给出画布。要求先有一张图才能动手,等于把这个模块锁死在
+            「先去 Inkarnate 画一张」之后 —— 而多数时候作者要的只是「哪些地点、
+            彼此什么位置关系」,空白纸上摆标记就够用,美术可以以后再补。
+          */}
+          <div className={`map-canvas${hasBaseImage(map) ? '' : ' map-canvas-blank'}`} style={{ aspectRatio: aspect }}>
+            {imageUrl
+              ? <img src={imageUrl} alt="" draggable={false} />
+              : (
+                <div className="map-blank-hint">
+                  空白底图 · 可直接摆放地点标记<br />
+                  需要美术时点工具栏「上传底图」(Inkarnate / Azgaar 导出、手绘扫描都行)
+                </div>
+              )}
               <svg
                 ref={svgRef}
                 viewBox={`0 0 ${S} ${S}`}
@@ -633,8 +703,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
                     : <ellipse cx={(x1 + x2) / 2 * S} cy={(y1 + y2) / 2 * S} rx={w / 2} ry={h / 2} fill="none" stroke="#1b1b19" strokeDasharray="6 4" strokeWidth={2} pointerEvents="none" />;
                 })()}
               </svg>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
