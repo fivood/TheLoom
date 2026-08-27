@@ -174,13 +174,16 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-/* 深色主题:侧栏加深一档并反白 logo */
+/*
+ * 深色主题:侧栏加深一档。
+ * logo **不做反色** —— 那条规则是 logo 还是黑白线稿时写的;换成全彩之后
+ * invert 会把品牌蓝 #0041ff 翻成黄色 #ffbe00。标识在两种主题下必须一致。
+ */
 :root[data-theme-mode=dark] .sidebar { background: #161413; border-color: #161413; }
 :root[data-theme-mode=dark] .sidebar .logo {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
 }
-:root[data-theme-mode=dark] .sidebar .logo img { filter: invert(1); }
 .nav-btn {
   width: 50px;
   height: 50px;
