@@ -15,6 +15,15 @@ import { mergeInbox, type IdeaCard } from '../inbox';
  * 多设备同一秒写入分不出先后;ETag 是内容指纹,变了就是别人写过。
  */
 
+/**
+ * 整包加密同步(`project.enc`)已被 folderSync 的逐文件明文格式取代:
+ * 那套支持多作品并存、冲突落到文件粒度,而这套全局只有一个对象。
+ *
+ * 暂时留着不删 —— 新路子还没在真机上跑过一轮,留一条能回退的路。
+ * **等手机端确认能正常拉取之后,把 pushToRemote / pullFromRemote /
+ * remoteStatus / RemoteConflict 连同它们的测试一起删掉。**
+ * 灵感库(inbox.enc)不在此列,它跨作品、没有文件夹表示,继续走加密整包。
+ */
 const PROJECT_KEY = 'project.enc';
 const CONFIG_KEY = 'theloom-remote-v1';
 

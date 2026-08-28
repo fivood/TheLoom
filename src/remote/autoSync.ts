@@ -4,15 +4,16 @@ import { toast } from '../toast';
 import { useToolBus } from '../toolBus';
 import { loadInbox, saveInbox } from '../inbox';
 import { syncAssets } from './assetSync';
+import { loadRemoteConfig, remoteConfigured, remoteKey, saveRemoteConfig, syncInbox } from './remoteSync';
 import {
-  RemoteConflict, loadRemoteConfig, pushToRemote, remoteConfigured, remoteKey,
-  remoteStatus, saveRemoteConfig, syncInbox,
-} from './remoteSync';
+  FolderConflict, UnnamedProject, listRemoteProjects, loadFingerprints, pushProjectFolder,
+  saveFingerprints,
+} from './folderSync';
 
 /**
  * 自动同步。两条触发:停手一段时间后推,回到窗口时查远端。
  *
- * **只自动推,不自动拉**。推是加内容,冲突有 ETag 挡着;拉是整份替换当前项目,
+ * **只自动推,不自动拉**。推是逐文件的,冲突按文件判定并拦下;拉是整份替换当前项目,
  * 那必须由人点头 —— 所以查到远端有更新时只弹 toast 提示,替换仍走面板。
  */
 
@@ -55,7 +56,8 @@ async function autoPush(): Promise<void> {
 
   busy = true;
   try {
-    const res = await pushToRemote(cfg, project);
+    const res = await pushProjectFolder(cfg, project, loadFingerprints(currentSlotId), { lastSyncAt: cfg.lastSyncAt });
+    saveFingerprints(currentSlotId, res.fingerprints);
     const sig = assetSignature(project);
     if (sig !== cfg.assetSig) {
       const key = await remoteKey(cfg);
@@ -63,14 +65,18 @@ async function autoPush(): Promise<void> {
     }
     saveInbox(await syncInbox(cfg, loadInbox()));
     // 重新读一次:配置面板可能在上传期间被改过
-    saveRemoteConfig({ ...loadRemoteConfig(), lastEtag: res.etag ?? '', lastSyncAt: res.at, assetSig: sig });
+    saveRemoteConfig({ ...loadRemoteConfig(), lastSyncAt: Date.now(), assetSig: sig });
     syncedAt = project.updatedAt;
     lastPushAt = Date.now();
   } catch (e) {
     lastPushAt = Date.now();
-    if (e instanceof RemoteConflict) {
+    if (e instanceof UnnamedProject) {
       paused = true;
-      toast('远端有其他设备的更新,自动上传已暂停', { actionLabel: '去处理', onAction: openPanel });
+      toast('这部作品还没起名字,自动上传已暂停(远端按作品名分目录)',
+        { actionLabel: '去处理', onAction: openPanel });
+    } else if (e instanceof FolderConflict) {
+      paused = true;
+      toast(`有 ${e.paths.length} 个文件在别处改过,自动上传已暂停`, { actionLabel: '去处理', onAction: openPanel });
     } else {
       toast(`自动上传失败:${e instanceof Error ? e.message : String(e)}`,
         { actionLabel: '打开同步', onAction: openPanel });
@@ -92,9 +98,11 @@ async function checkRemote(): Promise<void> {
   // 绑的不是当前这本,远端状态与眼前的项目无关,提示只会误导
   if (cfg.autoSlotId && cfg.autoSlotId !== useLoom.getState().currentSlotId) return;
   try {
-    const s = await remoteStatus(cfg);
-    if (s.changed) {
-      toast(`远端有更新(${new Date(s.at).toLocaleString()})`,
+    // 按作品名找远端那一份;它的最新对象时间晚于本机上次同步 = 别处推过
+    const name = useLoom.getState().project.name || '未命名项目';
+    const mine = (await listRemoteProjects(cfg)).find((p) => p.name === name);
+    if (mine && cfg.lastSyncAt && mine.updatedAt > cfg.lastSyncAt) {
+      toast(`远端「${name}」有更新(${new Date(mine.updatedAt).toLocaleString()})`,
         { actionLabel: '去拉取', onAction: openPanel });
     }
   } catch {

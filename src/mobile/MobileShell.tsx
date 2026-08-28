@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLoom } from '../store';
 import Icon, { type IconName } from '../components/Icon';
 import ThemeToggle from '../components/ThemeToggle';
@@ -23,6 +23,29 @@ export default function MobileShell() {
   const [tab, setTab] = useState<MTab>('write');
   useKeyboardInset();
 
+  /**
+   * tab 栏把自己的高度报给 CSS(`--m-tabbar-h`)。
+   *
+   * 弹层是 fixed 定位、按 `--vvh` 算高度的,不减掉 tab 栏就会有一截压在它底下 ——
+   * 同步面板的操作按钮正好落在那一截里,滚到底也看不见。
+   * 不写死数值:键盘弹起时 tab 栏整个隐藏(高度 0),那时弹层理应用满剩余高度。
+   */
+  const tabbarRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = tabbarRef.current;
+    if (!el) return;
+    const write = () => {
+      document.documentElement.style.setProperty('--m-tabbar-h', `${Math.round(el.getBoundingClientRect().height)}px`);
+    };
+    write();
+    const ro = new ResizeObserver(write);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty('--m-tabbar-h');
+    };
+  }, []);
+
   return (
     <>
       <div className="m-view">
@@ -32,7 +55,7 @@ export default function MobileShell() {
         {tab === 'browse' && <MobileBrowse onOpenWrite={() => setTab('write')} />}
         {tab === 'me' && <MobileMe />}
       </div>
-      <nav className="m-tabbar">
+      <nav className="m-tabbar" ref={tabbarRef}>
         {TABS.map((t) => (
           <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>
             <Icon name={t.icon} size={20} />

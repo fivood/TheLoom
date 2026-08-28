@@ -5145,7 +5145,14 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
  * 高度跟随 visualViewport(--vvh),键盘弹起时面板也不被盖住。
  */
 .app-mobile .palette-backdrop { padding-top: calc(12px + env(safe-area-inset-top)); }
-.app-mobile .palette { max-height: calc(var(--vvh, 100vh) - 24px); }
+/*
+ * 高度要同时扣掉上方留白与下方的 tab 栏 —— 只减 24px 的话,面板底部会有一截
+ * 压在 tab 栏底下,滚到底也够不着(同步面板的操作按钮就落在那一截里)。
+ * `--m-tabbar-h` 由 MobileShell 实测上报;键盘弹起时 tab 栏隐藏,该值变 0。
+ */
+.app-mobile .palette {
+  max-height: calc(var(--vvh, 100vh) - 24px - var(--m-tabbar-h, 0px));
+}
 
 /* 「我的」页 */
 .m-me { padding: 12px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow-y: auto; }
@@ -5333,6 +5340,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* 键盘打开时收起 tab 栏,把高度让给正文;操作条仍然贴在键盘上沿 */
 :root[data-kb="1"] .app-mobile .m-tabbar { display: none; }
+/*
+ * tab 栏一藏,弹层就该用满剩余高度。这里必须由 CSS 归零:
+ * ResizeObserver 对 display:none 的元素不触发,MobileShell 那边的实测值刷不下来。
+ * !important 是为了压过 JS 写在 <html> 上的内联值 —— 这条规则就是要覆盖它。
+ */
+:root[data-kb="1"] { --m-tabbar-h: 0px !important; }
 /* tab 栏收起后,类型面板相应下移(只需让开操作条) */
 :root[data-kb="1"] .app-mobile .doc-blocks-focus .doc-slash-menu {
   bottom: calc(88px + env(safe-area-inset-bottom));
@@ -5518,4 +5531,19 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .inbox-card > em {
   flex-shrink: 0; font-style: normal; font-size: 11px; color: var(--text-faint);
+}
+
+/* 远端作品列表(外链网盘同步面板) */
+.remote-projects { display: flex; flex-direction: column; gap: 6px; }
+.remote-project {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-panel);
+}
+.remote-project-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.remote-project-main b { font-size: 13px; }
+.remote-project button { flex-shrink: 0; font-size: 12px; padding: 4px 8px; }
+@media (max-width: 560px) {
+  .remote-project { flex-wrap: wrap; }
+  .remote-project-main { flex-basis: 100%; }
 }

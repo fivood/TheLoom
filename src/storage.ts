@@ -704,14 +704,29 @@ export async function loadFromFolder(dir: string): Promise<LoadedFolderProject> 
   return projectFromFolderFiles(files);
 }
 
-export async function saveToFolder(dir: string, project: Project): Promise<void> {
+export interface FolderFile {
+  relPath: string;
+  content: string;
+  base64?: boolean;
+}
+
+/**
+ * 项目 → 文件夹文件清单(纯函数)。
+ *
+ * 桌面写盘(saveToFolder)与远端文件夹同步共用同一份 —— 两处各写一遍的话,
+ * 「一个项目在磁盘上长什么样」就会有两个说法,迟早分岔。
+ *
+ * @returns files 全部待写文件;managed 由本函数托管的相对路径(project.json 之外的),
+ * 调用方据此判断哪些旧文件该删。
+ */
+export function projectToFolderFiles(project: Project): { files: FolderFile[]; managed: string[] } {
   const entityFiles = assignFilenames(project.entities, (e) => e.name);
   const cardFiles = assignFilenames(project.researchCards, (c) => c.title);
   const docFiles = assignDocumentFilenames(project.documents, project.folders);
   const idToName = new Map(project.entities.map((e) => [e.id, e.name]));
 
   // project.json 里不重复存 md 化的内容,只留引用顺序无关的结构化数据
-  const files: { relPath: string; content: string; base64?: boolean }[] = [
+  const files: FolderFile[] = [
     { relPath: 'project.json', content: projectToFolderJson(project) },
   ];
   const keepMd: string[] = [];
@@ -739,7 +754,12 @@ export async function saveToFolder(dir: string, project: Project): Promise<void>
     keepMd.push(`documents/${name}`);
   }
 
-  const keep = new Set(keepMd);
+  return { files, managed: keepMd };
+}
+
+export async function saveToFolder(dir: string, project: Project): Promise<void> {
+  const { files, managed } = projectToFolderFiles(project);
+  const keep = new Set(managed);
   const known = knownManaged.get(dir) ?? new Set<string>();
   const deleteFiles = [...known].filter((p) => !keep.has(p));
   await invoke('save_project_dir', { dir, files, deleteFiles });

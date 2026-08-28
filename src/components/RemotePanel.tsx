@@ -4,9 +4,12 @@ import { confirmDialog } from '../dialog';
 import { testConnection } from '../remote/backend';
 import * as onedrive from '../remote/onedrive';
 import {
-  RemoteConflict, loadRemoteConfig, pullFromRemote, pushToRemote, remoteConfigured,
-  remoteKey, remoteStatus, saveRemoteConfig, syncInbox, type RemoteConfig,
+  loadRemoteConfig, remoteConfigured, remoteKey, saveRemoteConfig, syncInbox, type RemoteConfig,
 } from '../remote/remoteSync';
+import {
+  FolderConflict, UnnamedProject, listRemoteProjects, loadFingerprints, pullProjectFolder,
+  pushProjectFolder, saveFingerprints, type RemoteProjectEntry,
+} from '../remote/folderSync';
 import { syncAssets } from '../remote/assetSync';
 import { assetSignature } from '../remote/autoRules';
 import { noteSynced } from '../remote/autoSync';
@@ -38,6 +41,8 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
   const currentSlotId = useLoom((s) => s.currentSlotId);
   const assets = useLoom((s) => s.project.assets);
   const withBytes = assets.filter((a) => a.hash).length;
+
+  const [remoteProjects, setRemoteProjects] = useState<RemoteProjectEntry[] | null>(null);
 
   const patch = (p: Partial<RemoteConfig>) => {
     const next = { ...cfg, ...p };
@@ -80,32 +85,53 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
     setBusy(null);
   };
 
+  /**
+   * 上传:按文件夹格式逐文件推,而不是整包加密。
+   * 远端 `projects/{作品名}/` 下就是桌面版写在磁盘上的那套结构,
+   * 多部作品互不覆盖,改一个场景也只传那一个 .md。
+   */
   const doPush = async (force = false) => {
     setBusy('push');
-    setStatus('正在加密并上传…');
+    setStatus('正在上传…');
     setProgress('');
     try {
       const project = useLoom.getState().project;
-      const res = await pushToRemote(cfg, project, force);
+      const known = loadFingerprints(currentSlotId);
+      const res = await pushProjectFolder(cfg, project, known,
+        { lastSyncAt: force ? 0 : cfg.lastSyncAt, force },
+        (done: number, total: number) => setProgress(total ? `上传文件 ${done}/${total}` : ''));
+      saveFingerprints(currentSlotId, res.fingerprints);
+
       const key = await remoteKey(cfg);
       const a = await syncAssets(cfg, project, folder, key,
         (done, total, label) => setProgress(total ? `${label} ${done}/${total}` : ''));
-      // 灵感库跨项目,与项目并行同步;按 id 并集合并,不需要冲突判定
       saveInbox(await syncInbox(cfg, loadInbox()));
-      patch({ lastEtag: res.etag ?? '', lastSyncAt: res.at, assetSig: assetSignature(project) });
+      patch({ lastSyncAt: Date.now(), assetSig: assetSignature(project) });
       noteSynced(project.updatedAt);
       setProgress('');
-      setStatus(`已上传。资源:传 ${a.uploaded} / 跳过 ${a.skipped}`
+      setStatus(`已上传「${project.name}」:传 ${res.uploaded} / 跳过 ${res.skipped}`
+        + (res.removed ? ` / 删陈旧 ${res.removed}` : '')
+        + `。资源:传 ${a.uploaded} / 跳过 ${a.skipped}`
         + (a.failed.length ? ` / 失败 ${a.failed.length}` : ''));
+      void refreshRemoteList();
     } catch (e) {
-      if (e instanceof RemoteConflict) {
-        const ok = await confirmDialog({
-          title: '远端已被其他设备更新',
-          message: '继续上传会覆盖对方的版本。建议先「拉取」查看,确认无误再上传。\n\n仍要强制覆盖?',
-          danger: true,
-          confirmText: '强制覆盖',
-        });
+      if (e instanceof UnnamedProject) {
+        setStatus('这部作品还没起名字。远端按作品名分目录,叫「未命名项目」的会互相覆盖 ——'
+          + '请先在项目菜单里改个名再上传。');
         setBusy(null);
+        return;
+      }
+      if (e instanceof FolderConflict) {
+        const list = e.paths.slice(0, 8).map((p) => `• ${p}`).join('\n');
+        const more = e.paths.length > 8 ? `\n• 另有 ${e.paths.length - 8} 个` : '';
+        setBusy(null);
+        const ok = await confirmDialog({
+          title: '这些文件在别处改过',
+          message: `继续上传会覆盖它们的远端版本:\n\n${list}${more}\n\n`
+            + '建议先拉取查看。仍要用本机版本覆盖?',
+          danger: true,
+          confirmText: '覆盖',
+        });
         if (ok) return doPush(true);
         setStatus('已取消,远端未改动。');
         return;
@@ -115,49 +141,63 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
     setBusy(null);
   };
 
-  const doPull = async () => {
-    const ok = await confirmDialog({
-      title: '用远端版本替换当前项目?',
-      message: '当前项目会被远端内容覆盖。拉取前会自动存一个快照,反悔了可在桌面端「历史」面板还原。',
-      danger: true,
-      confirmText: '拉取并替换',
-    });
-    if (!ok) return;
-    // 移动端没有版本历史入口也没有 Ctrl+Z,拉取前先存快照是唯一的后悔药
-    useLoom.getState().createSnapshot(`拉取前自动 ${new Date().toLocaleString()}`);
+  /** 拉取指定作品;into='new' 时开一个新槽位,不动当前这本 */
+  const doPull = async (name: string, into: 'current' | 'new') => {
+    if (into === 'current') {
+      const ok = await confirmDialog({
+        title: `用远端的「${name}」替换当前项目?`,
+        message: '当前项目会被远端内容覆盖。拉取前会自动存一个快照,反悔了可在桌面端「历史」面板还原。',
+        danger: true,
+        confirmText: '拉取并替换',
+      });
+      if (!ok) return;
+      // 移动端没有版本历史入口也没有 Ctrl+Z,拉取前先存快照是唯一的后悔药
+      useLoom.getState().createSnapshot(`拉取前自动 ${new Date().toLocaleString()}`);
+    }
     setBusy('pull');
-    setStatus('正在下载并解密…');
+    setStatus('正在下载…');
     try {
-      const got = await pullFromRemote(cfg);
-      if (!got) { setStatus('远端还没有项目,先上传一次。'); setBusy(null); return; }
+      const got = await pullProjectFolder(cfg, name,
+        (done: number, total: number) => setProgress(total ? `下载文件 ${done}/${total}` : ''));
+      if (!got) { setStatus(`远端「${name}」下没有文件。`); setBusy(null); return; }
+      if (into === 'new' && !await useLoom.getState().newSlot('blank')) {
+        setStatus('新建项目槽位失败。'); setBusy(null); return;
+      }
       useLoom.getState().replaceProject(got.project);
+      const slotId = useLoom.getState().currentSlotId;
+      saveFingerprints(slotId, got.fingerprints);
+
       const key = await remoteKey(cfg);
       const a = await syncAssets(cfg, got.project, folder, key,
         (done, total, label) => setProgress(total ? `${label} ${done}/${total}` : ''));
       saveInbox(await syncInbox(cfg, loadInbox()));
-      patch({ lastEtag: got.etag ?? '', lastSyncAt: got.at, assetSig: assetSignature(got.project) });
+      patch({ lastSyncAt: Date.now(), assetSig: assetSignature(got.project) });
       noteSynced(got.project.updatedAt);
       setProgress('');
-      setStatus(`已拉取。资源:取 ${a.downloaded} / 跳过 ${a.skipped}`
+      setStatus(`已拉取「${got.project.name}」:${got.fileCount} 个文件。`
+        + `资源:取 ${a.downloaded} / 跳过 ${a.skipped}`
         + (a.failed.length ? ` / 失败 ${a.failed.length}` : ''));
     } catch (e) {
-      setStatus(`拉取失败:${e instanceof Error ? e.message : String(e)}(口令不对也会解不开)`);
+      setStatus(`拉取失败:${e instanceof Error ? e.message : String(e)}`);
     }
     setBusy(null);
   };
 
+  const refreshRemoteList = async () => {
+    try {
+      setRemoteProjects(await listRemoteProjects(cfg));
+    } catch (e) {
+      setRemoteProjects([]);
+      setStatus(`读取远端列表失败:${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   const checkRemote = async () => {
     setBusy('test');
-    try {
-      const s = await remoteStatus(cfg);
-      const local = cfg.lastSyncAt ? `(本机上次同步:${new Date(cfg.lastSyncAt).toLocaleString()})` : '';
-      setStatus(!s.exists ? '远端还没有项目。'
-        : s.changed ? `远端有更新(${new Date(s.at).toLocaleString()}),建议先拉取。${local}`
-          : `远端与本机上次同步一致。${local}`);
-    } catch (e) {
-      setStatus(`查询失败:${e instanceof Error ? e.message : String(e)}`);
-    }
+    setStatus('正在读取远端作品…');
+    await refreshRemoteList();
     setBusy(null);
+    setStatus('');
   };
 
   return (
@@ -297,15 +337,40 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
             <button className="ghost" disabled={!ready || busy !== null} onClick={runTest}>
               {busy === 'test' ? '检查中…' : '测试连接'}
             </button>
-            <button className="ghost" disabled={!ready || busy !== null} onClick={checkRemote}>查看远端状态</button>
-            <span style={{ flex: 1 }} />
-            <button className="ghost" disabled={!ready || busy !== null} onClick={doPull}>
-              {busy === 'pull' ? '拉取中…' : '拉取'}
+            <button className="ghost" disabled={!ready || busy !== null} onClick={checkRemote}>
+              {busy === 'test' ? '读取中…' : '查看远端作品'}
             </button>
+            <span style={{ flex: 1 }} />
             <button className="primary" disabled={!ready || busy !== null} onClick={() => doPush()}>
-              {busy === 'push' ? '上传中…' : '上传'}
+              {busy === 'push' ? '上传中…' : '上传本作品'}
             </button>
           </div>
+
+          {remoteProjects !== null && (
+            <div className="remote-projects">
+              <label>远端作品({remoteProjects.length})</label>
+              {remoteProjects.length === 0 && (
+                <div className="hint">远端还没有作品。点「上传本作品」推第一部上去。</div>
+              )}
+              {remoteProjects.map((p) => (
+                <div key={p.name} className="remote-project">
+                  <div className="remote-project-main">
+                    <b>{p.name}</b>
+                    <span className="hint">
+                      {p.fileCount} 个文件 · {Math.max(1, Math.round(p.bytes / 1024))} KB
+                      {p.updatedAt ? ` · ${new Date(p.updatedAt).toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                  <button className="ghost" disabled={busy !== null} onClick={() => doPull(p.name, 'new')}>
+                    拉到新槽位
+                  </button>
+                  <button className="ghost" disabled={busy !== null} onClick={() => doPull(p.name, 'current')}>
+                    覆盖当前
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
