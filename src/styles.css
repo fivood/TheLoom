@@ -5566,3 +5566,18 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .remote-project { flex-wrap: wrap; }
   .remote-project-main { flex-basis: 100%; }
 }
+
+/* 顶栏一键同步 */
+.sync-btn { position: relative; }
+.sync-btn.pending { color: var(--text); }
+.sync-btn.busy { opacity: 0.6; }
+.sync-dot {
+  position: absolute; top: 5px; right: 5px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--bg-panel);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sync-btn.busy > svg { animation: sync-spin 1.1s linear infinite; }
+}
+@keyframes sync-spin { to { transform: rotate(360deg); } }

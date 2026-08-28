@@ -18,6 +18,7 @@ import SearchPalette from './components/SearchPalette';
 import RemotePanel from './components/RemotePanel';
 import { redirectPending as oneDriveRedirectPending } from './remote/onedrive';
 import { startAutoSync } from './remote/autoSync';
+import { setupDesktopWindow } from './desktopWindow';
 import AuditPanel from './components/AuditPanel';
 import VersionHistory from './components/VersionHistory';
 import PaletteManager from './components/PaletteManager';
@@ -25,6 +26,7 @@ import TemplateManager from './components/TemplateManager';
 import ChapterCompileDialog from './components/ChapterCompileDialog';
 import PaneHandle, { initPaneWidths } from './components/PaneHandle';
 import ThemeToggle from './components/ThemeToggle';
+import SyncButton from './components/SyncButton';
 import { AiExtractModal, AiSettingsModal } from './components/AiPanel';
 import ProjectMenu from './components/ProjectMenu';
 import UpdateDialog, { type UpdateDialogState } from './components/UpdateDialog';
@@ -137,6 +139,8 @@ export default function App() {
     else if (kind === 'remoteSync') setRemoteSync(true);
   }, [toolRequest]);
   useEffect(() => startAutoSync(), []);
+  // 桌面窗口:恢复上次尺寸,首次按屏幕比例
+  useEffect(() => { void setupDesktopWindow(); }, []);
   const [findReplace, setFindReplace] = useState(false);
   const [engineExport, setEngineExport] = useState(false);
   const [fdxExport, setFdxExport] = useState(false);
@@ -500,6 +504,13 @@ export default function App() {
               {folder ? `已同步 · ${folder.split(/[\\/]/).pop()}` : '已自动保存到本地'}
             </span>
           )}
+          <button
+            className="ghost icon-btn"
+            title="项目总览:一屏看全各模块 (Ctrl+Shift+K)"
+            aria-label="项目总览"
+            onClick={() => setOverview(true)}
+          ><Icon name="grid" /></button>
+          <SyncButton />
           <ThemeToggle />
           <div className="tools-wrap">
             <button className="ghost icon-btn" onClick={() => setToolsOpen((o) => !o)} title="工具:文件 / 体检 / 历史 / 协作 / 导出" aria-label="工具菜单">
@@ -522,7 +533,7 @@ export default function App() {
                   )}
                   <div className="tools-label">检查</div>
                   <button
-                    title="一屏看全各模块的概览 (Ctrl+Shift+K)"
+                    title="一屏看全各模块的概览 (Ctrl+Shift+K);顶栏也有入口"
                     onClick={() => { setToolsOpen(false); setOverview(true); }}
                   >
                     <Icon name="grid" size={14} /> 项目总览

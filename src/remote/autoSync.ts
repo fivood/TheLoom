@@ -37,6 +37,57 @@ function openPanel(): void {
   useToolBus.getState().open('remoteSync');
 }
 
+export interface PushOutcome {
+  uploaded: number;
+  skipped: number;
+  removed: number;
+  assetsUp: number;
+  assetsSkipped: number;
+  assetsFailed: number;
+}
+
+/**
+ * 完整推送一次:项目文件 + 资源原文件 + 灵感库,并更新本机同步登记。
+ *
+ * 面板、顶栏按钮、自动同步三处共用 —— 各写一遍的话,「推一次到底做了哪些事」
+ * 就会有三个说法,而其中两处迟早会漏掉某一步。
+ *
+ * 冲突与未命名会原样抛出,由调用方决定怎么呈现(面板问要不要覆盖,
+ * 自动同步则暂停并提示)。
+ */
+export async function pushNow(opts: { force?: boolean } = {}): Promise<PushOutcome> {
+  const cfg = loadRemoteConfig();
+  const { project, currentSlotId, folder } = useLoom.getState();
+  const res = await pushProjectFolder(cfg, project, loadFingerprints(currentSlotId), {
+    lastSyncAt: opts.force ? 0 : cfg.lastSyncAt,
+    force: opts.force,
+  });
+  saveFingerprints(currentSlotId, res.fingerprints);
+
+  const sig = assetSignature(project);
+  let a = { uploaded: 0, skipped: 0, failed: [] as unknown[] };
+  if (sig !== cfg.assetSig) {
+    const key = await remoteKey(cfg);
+    a = await syncAssets(cfg, project, folder, key);
+  }
+  saveInbox(await syncInbox(cfg, loadInbox()));
+  // 重新读一次:配置面板可能在上传期间被改过
+  saveRemoteConfig({ ...loadRemoteConfig(), lastSyncAt: Date.now(), assetSig: sig });
+  noteSynced(project.updatedAt);
+  lastPushAt = Date.now();
+  return {
+    uploaded: res.uploaded, skipped: res.skipped, removed: res.removed,
+    assetsUp: a.uploaded, assetsSkipped: a.skipped, assetsFailed: a.failed.length,
+  };
+}
+
+/** 顶栏按钮用:当前这本有没有还没推上去的改动 */
+export function hasPendingChanges(): boolean {
+  const cfg = loadRemoteConfig();
+  if (!remoteConfigured(cfg)) return false;
+  return useLoom.getState().project.updatedAt > (cfg.lastSyncAt ?? 0);
+}
+
 async function autoPush(): Promise<void> {
   const cfg = loadRemoteConfig();
   const { project, currentSlotId } = useLoom.getState();
@@ -56,18 +107,7 @@ async function autoPush(): Promise<void> {
 
   busy = true;
   try {
-    const res = await pushProjectFolder(cfg, project, loadFingerprints(currentSlotId), { lastSyncAt: cfg.lastSyncAt });
-    saveFingerprints(currentSlotId, res.fingerprints);
-    const sig = assetSignature(project);
-    if (sig !== cfg.assetSig) {
-      const key = await remoteKey(cfg);
-      await syncAssets(cfg, project, useLoom.getState().folder, key);
-    }
-    saveInbox(await syncInbox(cfg, loadInbox()));
-    // 重新读一次:配置面板可能在上传期间被改过
-    saveRemoteConfig({ ...loadRemoteConfig(), lastSyncAt: Date.now(), assetSig: sig });
-    syncedAt = project.updatedAt;
-    lastPushAt = Date.now();
+    await pushNow();
   } catch (e) {
     lastPushAt = Date.now();
     if (e instanceof UnnamedProject) {

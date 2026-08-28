@@ -813,9 +813,11 @@ export function activePaletteColors(p: Project): string[] {
 }
 
 /**
- * 解析 zimg Color Palette 导出的 JSON:
- *   [{ name: "封面图.jpg", colors: ["#hex", ...] }, ...]
- * 也接受单个对象或纯 hex 数组作为宽容格式,失败返回空数组
+ * 解析配色表 JSON。三种写法都收,因为取色工具导出的形状各不相同:
+ *   ["#hex", ...]                                  纯颜色数组
+ *   { name: "配色名", colors: ["#hex", ...] }        单张
+ *   [{ name, colors }, ...]                        多张
+ * hex 带不带 `#` 都行,三位简写自动补全;解析失败返回空数组,不抛。
  */
 export function parsePaletteJson(text: string): { name: string; colors: string[] }[] {
   let raw: unknown;

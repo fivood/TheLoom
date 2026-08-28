@@ -8,7 +8,7 @@ import Icon from './Icon';
 import { useEscape } from '../hooks/useEscape';
 
 /**
- * 配色表管理:创建 / 编辑 / 导入 zimg JSON / 激活 / 删除。
+ * 配色表管理:创建 / 编辑 / 导入 JSON / 激活 / 删除。
  * 从工具菜单打开;激活后,所有 ColorPicker 就用它的颜色。
  */
 export default function PaletteManager({ onClose }: { onClose: () => void }) {
@@ -37,7 +37,7 @@ export default function PaletteManager({ onClose }: { onClose: () => void }) {
       const text = await file.text();
       const parsed = parsePaletteJson(text);
       if (parsed.length === 0) {
-        setImportStatus('未识别到有效颜色(需要 zimg 导出的 JSON 或 hex 数组)');
+        setImportStatus("未识别到有效颜色。需要 hex 数组,或带 colors 字段的对象/数组");
         return;
       }
       let added = 0;
@@ -119,7 +119,7 @@ export default function PaletteManager({ onClose }: { onClose: () => void }) {
               <label style={{ margin: 0, flex: 1 }}>项目配色表</label>
               <button className="ghost" onClick={createBlank}>＋ 新建</button>
               <button className="ghost" onClick={duplicateDefault} title="复制默认灰阶后再改">复制默认</button>
-              <button className="ghost" onClick={() => fileRef.current?.click()} title="导入 zimg Color Palette 导出的 JSON,或纯 hex 数组">
+              <button className="ghost" onClick={() => fileRef.current?.click()} title="导入配色 JSON:hex 数组、单张配色对象,或多张配色的数组">
                 <Icon name="upload" size={12} /> 导入 JSON
               </button>
               <input
@@ -134,9 +134,19 @@ export default function PaletteManager({ onClose }: { onClose: () => void }) {
 
             <div className="palette-list">
               {palettes.length === 0 && (
-                <div className="empty-hint" style={{ padding: 16 }}>
-                  还没有自定义配色。<br />
-                  可在 <a href="https://theloom.70015.net" onClick={(e) => e.preventDefault()} style={{ color: 'inherit', textDecoration: 'underline' }}>70015.net/palette</a> 从图片提取颜色导出 JSON,再导入这里。
+                <div className="empty-hint" style={{ padding: 16, textAlign: 'left' }}>
+                  还没有自定义配色。可以「新建」手动调,或「导入 JSON」。<br /><br />
+                  <span style={{ color: 'var(--text-faint)' }}>导入接受三种写法,hex 带不带 <code>#</code> 都行,三位简写会自动补全:</span>
+                  <pre style={{
+                    margin: '6px 0 0', padding: '8px 10px', fontSize: 11, lineHeight: 1.6,
+                    background: 'var(--bg-panel)', border: '1px solid var(--border)',
+                    borderRadius: 6, overflowX: 'auto', whiteSpace: 'pre',
+                  }}>{`["#1b1b19", "#b3564a", "#2f5d2f"]
+
+{"name": "雨夜", "colors": ["#1b1b19", "#565550"]}
+
+[{"name": "雨夜", "colors": ["#1b1b19"]},
+ {"name": "白日", "colors": ["#eceae6"]}]`}</pre>
                 </div>
               )}
               {palettes.map((pal) => (
