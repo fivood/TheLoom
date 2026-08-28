@@ -5338,6 +5338,25 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .app-mobile .m-write-editor { display: flex; flex-direction: column; }
 .app-mobile .m-write-editor > .doc-blocks { flex: 1 0 auto; }
 
+/*
+ * 块操作条的两处几何修正。
+ *
+ * ① sticky 贴的是**内边距盒**边缘,而编辑区有 padding-bottom —— 那段就成了
+ *    操作条下面一条抠不掉的空隙(实测 16px)。移动壳里底部留白交给操作条本身。
+ * ② safe-area 只该算一次。操作条上面压着 tab 栏,而 tab 栏已经算过 home 指示条了;
+ *    两边都加就等于凭空多出一截。只有键盘弹起、tab 栏隐藏时,操作条才真的贴屏幕底,
+ *    那时才需要自己让开。
+ */
+.app-mobile .m-write-editor { padding-bottom: 0; }
+.app-mobile .doc-focus-bar { padding-bottom: 4px; }
+:root[data-kb="1"] .app-mobile .doc-focus-bar {
+  padding-bottom: calc(4px + env(safe-area-inset-bottom));
+}
+/* 横向滚动区两端淡出:告诉人「还能滑」,而不是让按钮硬生生断在半截 */
+.app-mobile .doc-focus-scroll {
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
+}
+
 /* 键盘打开时收起 tab 栏,把高度让给正文;操作条仍然贴在键盘上沿 */
 :root[data-kb="1"] .app-mobile .m-tabbar { display: none; }
 /*
