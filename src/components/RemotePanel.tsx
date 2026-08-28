@@ -234,7 +234,8 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
               </>
             ) : (
               <>
-                <br />网页版需先在桶上配置 CORS(允许本站 origin 与 GET/PUT/HEAD、暴露 ETag);桌面版无此要求。
+                <br />网页版需先在桶上配置 CORS(允许本站 origin 与 GET/PUT/HEAD/DELETE、暴露 ETag);
+                桌面版走本机转发,不需要配 CORS。
               </>
             )}
           </div>

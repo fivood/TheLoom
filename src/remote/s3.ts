@@ -1,11 +1,15 @@
 import { encodePath, sha256Hex, signRequest } from './sigv4';
+import { isTauri } from '../storage';
 
 /**
  * S3 兼容存储的最小客户端(Cloudflare R2 / Backblaze B2 / MinIO / 阿里云 OSS …)。
  *
  * 只实现同步用得到的四个动作,不引 aws-sdk。网页与 Tauri 共用:
  * - **网页端需要在存储桶上配 CORS**(允许本站 origin、GET/PUT/HEAD/DELETE、
- *   暴露 ETag),否则浏览器直连会被拦;桌面端无此限制。
+ *   暴露 ETag),否则浏览器直连会被拦。
+ * - **桌面端走 Rust 侧转发**(`s3_http_request`),因此不需要配 CORS。
+ *   早先这里写的是「桌面端无此限制」—— 那是错的:Tauri 的 webview 一样受
+ *   CORS 约束,而它的 origin 不可能出现在用户桶的允许列表里。
  * - 默认 path-style(`endpoint/bucket/key`),R2 / MinIO 都用这种;
  *   AWS 正统是 virtual-host style,置 `pathStyle: false` 切换。
  */
@@ -29,6 +33,51 @@ export class S3Error extends Error {
 
 /** 大文件不做载荷哈希:HTTPS 已保证传输完整性,省一次全量读取 */
 const UNSIGNED = 'UNSIGNED-PAYLOAD';
+
+const b64 = {
+  encode(bytes: Uint8Array): string {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(s);
+  },
+  decode(text: string): Uint8Array {
+    const bin = atob(text);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  },
+};
+
+/**
+ * 桌面版绕开 webview 发请求。
+ *
+ * Tauri 的 webview 同样受 CORS 约束,而它的 origin(tauri://localhost)不可能
+ * 出现在用户自己桶的允许列表里 —— 现象就是「连不上」。AI 请求早就因为同样的
+ * 原因走 Rust 侧,这里沿用。签名仍在前端算,密钥不进 Rust。
+ */
+async function desktopSend(
+  method: string, url: string, headers: Record<string, string>, body?: Uint8Array,
+): Promise<Response> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  const res = await invoke<{ status: number; body: string; headers: [string, string][] }>(
+    's3_http_request',
+    {
+      request: {
+        method,
+        url,
+        headers: Object.entries(headers),
+        body: body ? b64.encode(body) : '',
+      },
+    },
+  );
+  const bytes = res.status === 204 || method === 'HEAD' ? null : b64.decode(res.body);
+  return new Response(bytes ? (bytes.slice().buffer as ArrayBuffer) : null, {
+    status: res.status,
+    headers: new Headers(res.headers),
+  });
+}
 
 function joinKey(cfg: S3Config, key: string): string {
   const prefix = (cfg.prefix ?? '').replace(/^\/+|\/+$/g, '');
@@ -85,11 +134,14 @@ async function send(
   // Host 由浏览器自己带,显式设置会被拒
   delete headers.Host;
 
-  const res = await fetch(query ? `${url}?${query}` : url, {
-    method,
-    headers,
-    body: body ? (body.slice().buffer as ArrayBuffer) : undefined,
-  });
+  const fullUrl = query ? `${url}?${query}` : url;
+  const res = isTauri
+    ? await desktopSend(method, fullUrl, headers, body)
+    : await fetch(fullUrl, {
+      method,
+      headers,
+      body: body ? (body.slice().buffer as ArrayBuffer) : undefined,
+    });
   if (!res.ok && res.status !== 404) {
     throw new S3Error(res.status, `${method} ${key} 失败:${res.status} ${await res.text().catch(() => '')}`.trim());
   }
@@ -192,7 +244,9 @@ export async function testConnection(cfg: S3Config): Promise<{ ok: true } | { ok
     // fetch 层直接抛 = 多半是 CORS 或 endpoint 拼错
     return {
       ok: false,
-      reason: '连不上。网页端需在桶上配置 CORS(允许本站 origin 与 GET/PUT/HEAD/DELETE、暴露 ETag);也请检查 endpoint 是否正确',
+      reason: isTauri
+        ? '连不上。请检查 endpoint 是否正确、本机网络是否通(桌面版走本机转发,不需要配 CORS)'
+        : '连不上。网页端需在桶上配置 CORS(允许本站 origin 与 GET/PUT/HEAD/DELETE、暴露 ETag);也请检查 endpoint 是否正确',
     };
   }
 }

@@ -123,6 +123,103 @@ fn validate_llm_target(provider: &str, raw: &str) -> Result<reqwest::Url, String
     }
 }
 
+/* ---------- S3 兼容存储转发 ---------- */
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct S3HttpRequest {
+    method: String,
+    url: String,
+    /// 已由前端签好名的请求头(SigV4 的 Authorization 等)
+    headers: Vec<(String, String)>,
+    /// 请求体,base64;GET / HEAD / DELETE 传空串
+    body: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct S3HttpResponse {
+    status: u16,
+    /// 响应体,base64(对象字节可能是二进制,不能按文本回传)
+    body: String,
+    headers: Vec<(String, String)>,
+}
+
+/**
+ * 桌面版的 S3 请求必须绕开 webview。
+ *
+ * webview 同样受 CORS 约束,而它的 origin(tauri://localhost)不可能出现在用户
+ * 桶的允许列表里 —— 现象就是「连不上」。AI 请求早就因为同样的原因走了 Rust 侧,
+ * 这里沿用那条路。
+ *
+ * 签名在前端算好后原样带过来:密钥不进 Rust,这里只负责发包。
+ */
+/// 校验与解码,与网络分开 —— 这样闸门可以单测,不必为一个测试引 async 运行时
+fn validate_s3_request(
+    request: &S3HttpRequest,
+) -> Result<(reqwest::Method, reqwest::Url, Vec<u8>), String> {
+    let url = validate_llm_url(&request.url)?;
+    let method = reqwest::Method::from_bytes(request.method.as_bytes())
+        .map_err(|_| "请求方法无效".to_string())?;
+    if !matches!(
+        method,
+        reqwest::Method::GET
+            | reqwest::Method::PUT
+            | reqwest::Method::HEAD
+            | reqwest::Method::DELETE
+    ) {
+        return Err("只允许 GET / PUT / HEAD / DELETE".into());
+    }
+    let body = base64::engine::general_purpose::STANDARD
+        .decode(&request.body)
+        .map_err(|e| format!("请求体不是合法 base64:{e}"))?;
+    if body.len() > 64 * 1024 * 1024 {
+        return Err("单个对象超过 64 MB".into());
+    }
+    Ok((method, url, body))
+}
+
+#[tauri::command]
+async fn s3_http_request(request: S3HttpRequest) -> Result<S3HttpResponse, String> {
+    let (method, url, body) = validate_s3_request(&request)?;
+
+    let mut headers = reqwest::header::HeaderMap::new();
+    for (name, value) in &request.headers {
+        let n = reqwest::header::HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| format!("请求头名称无效:{name}"))?;
+        let v = reqwest::header::HeaderValue::from_str(value)
+            .map_err(|_| format!("请求头值无效:{name}"))?;
+        headers.insert(n, v);
+    }
+
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(20))
+        .timeout(Duration::from_secs(180))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| e.to_string())?;
+    let res = client
+        .request(method, url)
+        .headers(headers)
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败:{e}"))?;
+
+    let status = res.status().as_u16();
+    let out_headers: Vec<(String, String)> = res
+        .headers()
+        .iter()
+        .filter_map(|(k, v)| v.to_str().ok().map(|s| (k.as_str().to_string(), s.to_string())))
+        .collect();
+    let bytes = res.bytes().await.map_err(|e| format!("读取响应失败:{e}"))?;
+    Ok(S3HttpResponse {
+        status,
+        body: base64::engine::general_purpose::STANDARD.encode(&bytes),
+        headers: out_headers,
+    })
+}
+
 #[tauri::command]
 async fn llm_http_request(request: LlmHttpRequest) -> Result<LlmHttpResponse, String> {
     if !LLM_PROVIDERS.contains(&request.provider.as_str()) {
@@ -691,6 +788,31 @@ mod tests {
     }
 
     #[test]
+    fn s3_request_validation_gates() {
+        let req = |m: &str, u: &str, b: &str| S3HttpRequest {
+            method: m.into(),
+            url: u.into(),
+            headers: vec![],
+            body: b.into(),
+        };
+        // 只放行同步用得到的四个动作;别的一律拒,免得这个命令变成通用转发器
+        assert!(validate_s3_request(&req("POST", "https://example.com/x", ""))
+            .unwrap_err()
+            .contains("只允许"));
+        // 远程必须 HTTPS(与 AI 请求共用同一套校验;本机 MinIO 走 http 才放行)
+        assert!(validate_s3_request(&req("GET", "http://example.com/x", "")).is_err());
+        assert!(validate_s3_request(&req("GET", "http://localhost:9000/x", "")).is_ok());
+        // 请求体必须是合法 base64,不合法就当场拒,而不是发出去半截
+        assert!(validate_s3_request(&req("PUT", "https://example.com/x", "不是 base64!!"))
+            .unwrap_err()
+            .contains("base64"));
+        // 正常请求放行,且 base64 能解回原字节
+        let (m, _, body) = validate_s3_request(&req("PUT", "https://example.com/x", "aGVsbG8=")).unwrap();
+        assert_eq!(m, reqwest::Method::PUT);
+        assert_eq!(body, b"hello");
+    }
+
+    #[test]
     fn asset_file_commands_roundtrip_and_guard() {
         let dir = std::env::temp_dir().join(format!("theloom-asset-test-{}", std::process::id()));
         let dir_s = dir.to_string_lossy().to_string();
@@ -843,6 +965,7 @@ pub fn run() {
             has_llm_secret,
             delete_llm_secret,
             llm_http_request,
+            s3_http_request,
             reveal_folder
         ])
         .run(tauri::generate_context!())
