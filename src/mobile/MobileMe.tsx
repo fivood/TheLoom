@@ -17,6 +17,7 @@ export default function MobileMe() {
   const switchSlot = useLoom((s) => s.switchSlot);
   const loadSampleProject = useLoom((s) => s.loadSampleProject);
   const newSlot = useLoom((s) => s.newSlot);
+  const update = useLoom((s) => s.update);
   const [remoteSync, setRemoteSync] = useState(false);
   const ideaCount = useMemo(() => visibleIdeas(loadInbox()).length, []);
 
@@ -54,7 +55,12 @@ export default function MobileMe() {
       </div>
 
       <div className="m-me-card">
-        <div className="m-me-name">{project.name || '未命名项目'}</div>
+        <input
+          className="m-me-name"
+          value={project.name}
+          placeholder="未命名项目"
+          onChange={(e) => update((p) => { p.name = e.target.value; })}
+        />
         <div className="m-me-stats">
           <div><strong>{totalWords}</strong><span>总字数</span></div>
           <div><strong>{today}</strong><span>今日新增</span></div>
@@ -79,22 +85,23 @@ export default function MobileMe() {
         外链网盘同步(自己的存储)
       </button>
 
+      <div className="m-me-section">项目</div>
+      <button className="m-me-full" onClick={() => void newSlot('blank')}>
+        新建空白项目
+      </button>
       {slots.length > 1 && (
-        <>
-          <div className="m-me-section">切换项目</div>
-          <div className="m-me-slots">
+        <div className="m-me-slots">
             {slots.map((s) => (
               <button
                 key={s.id}
                 className={`m-me-slot ${s.id === currentSlotId ? 'on' : ''}`}
                 onClick={() => { if (s.id !== currentSlotId) void switchSlot(s.id); }}
               >
-                <span>{s.name || '未命名项目'}</span>
+                <span>{(s.id === currentSlotId ? project.name : s.name) || '未命名项目'}</span>
                 <span>{s.id === currentSlotId ? '当前' : new Date(s.updatedAt).toLocaleDateString()}</span>
               </button>
             ))}
-          </div>
-        </>
+        </div>
       )}
 
       {/* 手机上原本没有任何载入示例的入口:跳过引导后就再也见不到,
