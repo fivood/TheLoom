@@ -20,6 +20,7 @@ import EntityEditor from './EntityEditor';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 import { CODEX_GROUP_LABEL, groupEntities, type CodexGroup, type CodexGroupBy } from './codexGroups';
 import { useEscape } from '../../hooks/useEscape';
+import Q from '../../components/Q';
 
 
 const KINDS = Object.keys(ENTITY_KIND_LABEL) as EntityKind[];
@@ -413,7 +414,9 @@ export default function EntityLibrary() {
             ))}
             {filtered.length === 0 && (
               <div className="empty-hint">
-                {entities.length === 0 ? '还没有设定。点击上方「＋ 分类」先摆出骨架,或用左侧「＋ 新建实体」直接写。' : '没有匹配的实体'}
+                {entities.length === 0
+                  ? <>还没有设定。点击上方<Q>＋ 分类</Q>先摆出骨架,或用左侧<Q>＋ 新建实体</Q>直接写。</>
+                  : '没有匹配的实体'}
               </div>
             )}
           </div>
@@ -527,7 +530,9 @@ export default function EntityLibrary() {
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={4 + fieldColumns.length} className="empty-hint" style={{ textAlign: 'center', padding: 24 }}>
-                      {entities.length === 0 ? '还没有实体。点击上方「＋ 新建实体」创建角色、地点或设定。' : '没有匹配的实体'}
+                      {entities.length === 0
+                        ? <>还没有实体。点击上方<Q>＋ 新建实体</Q>创建角色、地点或设定。</>
+                        : '没有匹配的实体'}
                     </td>
                   </tr>
                 )}

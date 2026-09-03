@@ -555,7 +555,9 @@ export default function NavigatorTree<T extends NavigatorItem>({
       <div className="items" onDragOver={(e) => { if (dragRef.current) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } }}>
         {renderTree(null, 0, new Set())}
         {!favoritesOnly && items.length === 0 && folders.length === 0 && (
-          <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部<Q>＋ {createLabel}</Q>新建{module === 'document' ? '；用「卷」组织成稿结构，用「文件夹」仅归档' : '，或「▤ 文件夹」建立分组'}</div>
+          <div className="empty-hint navigator-empty">{emptyLabel}<br />点击顶部<Q>＋ {createLabel}</Q>新建{module === 'document'
+            ? <>；用<Q>卷</Q>组织成稿结构，用<Q>文件夹</Q>仅归档</>
+            : <>，或<Q>▤ 文件夹</Q>建立分组</>}</div>
         )}
         {favoritesOnly && favoriteCount === 0 && (
           <div className="empty-hint navigator-empty">还没有收藏<br />点击条目右侧的星标即可加入收藏夹</div>

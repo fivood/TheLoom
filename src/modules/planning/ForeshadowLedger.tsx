@@ -6,6 +6,7 @@ import { foreshadowStatus, groupDocsByChapter } from '../../planning';
 import type { Foreshadow, ForeshadowStatus } from '../../types';
 import { FORESHADOW_STATUS_LABEL } from '../../types';
 import Icon from '../../components/Icon';
+import Q from '../../components/Q';
 
 const STATUS_ORDER: ForeshadowStatus[] = ['idea', 'planted', 'resolved', 'unplanted', 'abandoned'];
 
@@ -152,7 +153,9 @@ export default function ForeshadowLedger({ focusId, onConsumeFocus }: {
       </table>
       {shown.length === 0 && (
         <div className="empty-hint" style={{ padding: 24 }}>
-          {foreshadows.length === 0 ? '还没有伏笔。把「将来要兑现的暗示」记在这里,埋设与回收都关联到场景' : '这个状态下没有伏笔'}
+          {foreshadows.length === 0
+            ? <>还没有伏笔。把<Q>将来要兑现的暗示</Q>记在这里,埋设与回收都关联到场景</>
+            : '这个状态下没有伏笔'}
         </div>
       )}
     </div>
