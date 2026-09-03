@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { confirmDialog } from '../../dialog';
 import { useNav } from '../../search';
+import { useModuleName } from '../../moduleName';
 import { arcStagesOf, groupDocsByChapter } from '../../planning';
 import { folderPath } from '../../util';
 
@@ -12,6 +13,7 @@ export default function ArcBoard({ focusEntityId, onConsumeFocus }: {
   const project = useLoom((s) => s.project);
   const { addArcStage, updateArcStage, removeArcStage, update } = useLoom();
   const go = useNav((s) => s.go);
+  const entityModule = useModuleName('entities');
 
   const characters = useMemo(
     () => project.entities.filter((e) => e.kind === 'character'),
@@ -158,7 +160,7 @@ export default function ArcBoard({ focusEntityId, onConsumeFocus }: {
           </>
         ) : (
           <div className="empty-hint" style={{ margin: 'auto', textAlign: 'center' }}>
-            先在「实体」模块创建角色
+            先在「{entityModule}」模块创建角色
             <div style={{ marginTop: 8 }}>
               <button className="primary" onClick={() => go({ tab: 'entities' })}>去创建角色 →</button>
             </div>

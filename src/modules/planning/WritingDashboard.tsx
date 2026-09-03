@@ -194,34 +194,51 @@ export default function WritingDashboard() {
   const openDocument = (documentId: string, blockId?: string) =>
     go({ tab: 'documents', docId: documentId, blockId });
 
+  const countControls = (
+    <div className="writing-count-controls">
+      <label>
+        统计口径
+        <select
+          value={mode}
+          onChange={(event) => setProgress((state) => {
+            state.countMode = event.target.value as WritingCountMode;
+          })}
+        >
+          {Object.entries(COUNT_MODE_LABEL).map(([value, label]) =>
+            <option key={value} value={value}>{label}</option>)}
+        </select>
+      </label>
+      <label className="writing-body-toggle">
+        <input
+          type="checkbox"
+          checked={bodyOnly}
+          onChange={(event) => setProgress((state) => { state.bodyOnly = event.target.checked; })}
+        />
+        仅正文
+      </label>
+    </div>
+  );
+
+  if (project.documents.length === 0) {
+    return (
+      <div className="writing-dashboard">
+        <div className="empty-hint" style={{ margin: 'auto', textAlign: 'center', maxWidth: 460 }}>
+          写作进度按场景统计:标记「完成」的场景计入进度,每天的新增量会自动记账。
+          <div style={{ marginTop: 4 }}>现在还没有场景,先去写第一场。</div>
+          <div style={{ marginTop: 10 }}>
+            <button className="primary" onClick={() => go({ tab: 'documents' })}>去写第一场 →</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="writing-dashboard">
       <div className="writing-dashboard-head">
         <div>
           <h2>写作进度</h2>
           <p>场景标记「完成」后计入进度。目标可逐级设定，也可由子级自动汇总。</p>
-        </div>
-        <div className="writing-count-controls">
-          <label>
-            统计口径
-            <select
-              value={mode}
-              onChange={(event) => setProgress((state) => {
-                state.countMode = event.target.value as WritingCountMode;
-              })}
-            >
-              {Object.entries(COUNT_MODE_LABEL).map(([value, label]) =>
-                <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <label className="writing-body-toggle">
-            <input
-              type="checkbox"
-              checked={bodyOnly}
-              onChange={(event) => setProgress((state) => { state.bodyOnly = event.target.checked; })}
-            />
-            仅正文
-          </label>
         </div>
       </div>
 
@@ -266,7 +283,7 @@ export default function WritingDashboard() {
               <h3>目标树</h3>
               <p>进度只计「完成」场景，目标未设时由子级汇总</p>
             </div>
-            <span>{COUNT_MODE_LABEL[mode]}{bodyOnly ? ' · 仅正文' : ''}</span>
+            {countControls}
           </div>
           <div className="writing-target-tree">
             {folders.map((folder) => {

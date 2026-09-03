@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLoom } from '../../store';
 import { useNav } from '../../search';
+import { useModuleName } from '../../moduleName';
 import { groupDocsByChapter } from '../../planning';
 import { documentWordCount } from '../../util';
 import type { DocStatus, Document } from '../../types';
@@ -19,6 +20,7 @@ export default function SceneWall() {
   const project = useLoom((s) => s.project);
   const update = useLoom((s) => s.update);
   const go = useNav((s) => s.go);
+  const docModule = useModuleName('documents');
   const [statusFilter, setStatusFilter] = useState<DocStatus | 'all'>('all');
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -104,7 +106,12 @@ export default function SceneWall() {
         );
       })}
       {project.documents.length === 0 && (
-        <div className="empty-hint" style={{ padding: 24 }}>还没有场景文档。在「文档」模块用文件夹建卷 / 章,每个文档就是一个场景</div>
+        <div className="empty-hint" style={{ padding: 24, textAlign: 'center' }}>
+          还没有场景。在「{docModule}」模块用文件夹建卷 / 章,每个文档就是一个场景
+          <div style={{ marginTop: 8 }}>
+            <button className="primary" onClick={() => go({ tab: 'documents' })}>去写第一场 →</button>
+          </div>
+        </div>
       )}
     </div>
   );

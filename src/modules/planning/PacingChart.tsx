@@ -41,7 +41,14 @@ export default function PacingChart() {
   const points = useMemo(() => pacingPoints(project), [project]);
 
   if (points.length === 0) {
-    return <div className="empty-hint" style={{ margin: 'auto' }}>还没有场景文档,无法绘制节奏图</div>;
+    return (
+      <div className="empty-hint" style={{ margin: 'auto', textAlign: 'center' }}>
+        节奏图按场景字数与情节张力画曲线,先要有场景
+        <div style={{ marginTop: 8 }}>
+          <button className="primary" onClick={() => go({ tab: 'documents' })}>去写第一场 →</button>
+        </div>
+      </div>
+    );
   }
 
   const maxWords = Math.max(1, ...points.map((p) => p.words));

@@ -14,7 +14,11 @@ export default function AppearanceGrid() {
   if (matrix.rows.length === 0 || matrix.chapters.length === 0) {
     return (
       <div className="empty-hint" style={{ margin: 'auto' }}>
-        需要至少一个角色实体和一个场景文档。统计口径:说话 / 担任 POV / 正文提及角色名
+        登场矩阵按「说话 / 担任 POV / 正文提及」统计角色 × 章节,需要至少一个角色和一个场景
+        <div style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <button className="primary" onClick={() => go({ tab: 'entities' })}>去建角色 →</button>
+          <button className="ghost" onClick={() => go({ tab: 'documents' })}>去写场景 →</button>
+        </div>
       </div>
     );
   }

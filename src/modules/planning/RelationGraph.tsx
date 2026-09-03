@@ -9,6 +9,7 @@ import {
 import { uid, useLoom } from '../../store';
 import { promptText, confirmDialog } from '../../dialog';
 import { useNav } from '../../search';
+import { useModuleName } from '../../moduleName';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import { getThemeMode, subscribeThemeMode } from '../../theme';
@@ -116,6 +117,7 @@ function Canvas() {
   const project = useLoom((s) => s.project);
   const { addRelation, updateRelation, removeRelation, setRelationLayout } = useLoom();
   const go = useNav((s) => s.go);
+  const entityModule = useModuleName('entities');
   const [kinds, setKinds] = useState(DEFAULT_KINDS);
   const [selectedRelId, setSelectedRelId] = useState<string | null>(null);
 
@@ -255,7 +257,7 @@ function Canvas() {
         </ReactFlow>
         {project.entities.length === 0 && (
           <div className="empty-hint rel-empty">
-            先在「实体」模块创建角色,再回来梳理关系
+            先在「{entityModule}」模块创建角色,再回来梳理关系
             <div style={{ marginTop: 8 }}>
               <button className="primary" onClick={() => go({ tab: 'entities' })}>去创建角色 →</button>
             </div>
