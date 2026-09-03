@@ -32,16 +32,17 @@ const MODES: { key: WorkspacePreset; label: string; desc: string }[] = [
 ];
 
 export default function Onboarding({ onContinueBlank, onLoadSample, onClose }: Props) {
-  useEscape(true, () => { markOnboarded(); onClose(); });
   const [mode, setMode] = useState<WorkspacePreset>('novel');
-  const pick = (fn: () => void) => {
+  // 任何一条退出路径都写入所选布局:选了却因为「跳过」而丢失,是最容易让人以为没设置成功的情况
+  const pick = (fn?: () => void) => {
     useLoom.getState().update((p) => { p.workspacePreset = mode; });
     markOnboarded();
-    fn();
+    fn?.();
     onClose();
   };
+  useEscape(true, () => pick());
   return (
-    <div className="palette-backdrop" onClick={() => { markOnboarded(); onClose(); }}>
+    <div className="palette-backdrop" onClick={() => pick()}>
       <div className="palette onboarding" onClick={(e) => e.stopPropagation()}>
         <div className="onboarding-head">
           <h2>欢迎来到叙事织机</h2>
@@ -61,6 +62,9 @@ export default function Onboarding({ onContinueBlank, onLoadSample, onClose }: P
             </button>
           ))}
         </div>
+        <div className="onboarding-picked">
+          已选「{MODES.find((m) => m.key === mode)!.label}」布局 · 之后可在项目菜单 ▾ 里随时更换
+        </div>
         <div className="onboarding-cards">
           <button className="onboarding-card" onClick={() => pick(onContinueBlank)}>
             <Icon name="doc" size={22} />
@@ -74,8 +78,10 @@ export default function Onboarding({ onContinueBlank, onLoadSample, onClose }: P
           </button>
         </div>
         <div className="onboarding-foot">
-          <button className="ghost" onClick={() => { markOnboarded(); onClose(); }}>跳过引导</button>
-          <span className="hint">下次不再显示 · 布局随时可从项目菜单右上角切换</span>
+          <button className="primary" onClick={() => pick()}>
+            使用「{MODES.find((m) => m.key === mode)!.label}」布局并关闭
+          </button>
+          <span className="hint">下次不再显示 · 布局随时可从项目菜单 ▾ 更换</span>
         </div>
       </div>
     </div>

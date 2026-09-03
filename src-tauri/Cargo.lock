@@ -3719,7 +3719,7 @@ dependencies = [
 
 [[package]]
 name = "theloom"
-version = "0.62.2"
+version = "0.62.3"
 dependencies = [
  "base64 0.22.1",
  "keyring-core",

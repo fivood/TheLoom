@@ -2617,6 +2617,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* 小说预设:块侧栏平时完全隐形,只在悬停或光标所在块出现 */
 /* 剧本转场:右对齐单行 */
+.onboarding-picked { margin: 10px 0 2px; font-size: 12px; color: var(--text-dim); }
+
 .project-preset-pick { flex-direction: column; align-items: flex-start; gap: 2px; }
 .project-preset-hint { color: var(--text-faint); font-size: 11px; line-height: 1.5; }
 
