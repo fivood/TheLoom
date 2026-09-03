@@ -32,6 +32,7 @@ export function blockToText(b: DocBlock, entities: Entity[]): string {
       const name = speakerName(entities, b.speakerId);
       return name ? `${name}：${b.text}` : b.text;
     }
+    case 'transition': return `→ ${b.text}`;
     case 'note': return b.text.split('\n').map((l) => `// ${l}`).join('\n');
     // condition / instruction 是剧本结构,沉浸模式不改写它们的语义,
     // 原样显示表达式以免作者以为内容丢了(回写时按 index 保留原块)
@@ -58,6 +59,9 @@ function parseMarkdown(chunk: string): Partial<DocBlock> | undefined {
   if (h && lines.length === 1) {
     if (h[1] === '#') return { type: 'heading', text: h[2] };
     return { type: 'subheading', level: h[1].length === 2 ? 2 : 3, text: h[2] };
+  }
+  if (lines.length === 1 && /^→\s*/.test(lines[0])) {
+    return { type: 'transition', text: lines[0].replace(/^→\s*/, '') };
   }
   if (lines.every((l) => l.startsWith('>'))) {
     return { type: 'quote', text: lines.map((l) => l.replace(/^>\s?/, '')).join('\n') };

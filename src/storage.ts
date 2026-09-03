@@ -283,6 +283,8 @@ function blockStorageMarkdown(b: DocBlock, entities: Entity[]): string {
       const speaker = b.speakerId ? entities.find((entity) => entity.id === b.speakerId)?.name : undefined;
       return speaker ? `**${speaker}**:${b.text}` : b.text;
     }
+    case 'transition':
+      return `*→ ${b.text}*`;
     case 'quote':
       return b.text.split('\n').map((line) => `> ${line}`.trimEnd()).join('\n');
     case 'list':
@@ -337,6 +339,9 @@ function markedBlocks(body: string): DocBlock[] {
         break;
       case 'dialogue':
         block.text = raw.replace(/^\*\*[^*\n]+\*\*:\s?/, '');
+        break;
+      case 'transition':
+        block.text = raw.replace(/^\*?→\s*/, '').replace(/\*$/, '').trim();
         break;
       case 'quote':
         block.text = raw.split(/\r?\n/).map((line) => line.replace(/^>\s?/, '')).join('\n');

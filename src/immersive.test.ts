@@ -88,6 +88,16 @@ describe('沉浸写作 块 ↔ 纯文本', () => {
     expect(round[1].instruction).toBe('trust += 1');
   });
 
+  it('转场块在沉浸模式里是 → 开头的单行,往返不降级为段落', () => {
+    const prev = [b({ id: 't1', type: 'transition', text: 'CUT TO:' })];
+    const text = blocksToText(prev, ENTS);
+    expect(text).toBe('→ CUT TO:');
+    const round = textToBlocks(text, prev, ENTS);
+    expect(round[0].type).toBe('transition');
+    expect(round[0].text).toBe('CUT TO:');
+    expect(round[0].id).toBe('t1');
+  });
+
   it('选项块渲染出 ▸ 选项行,往返保住选项 id 与 unitId', () => {
     const prev = [
       b({

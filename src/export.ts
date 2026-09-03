@@ -201,6 +201,8 @@ function blockToLines(b: DocBlock, entities: Entity[]): string[] {
       const who = speakerName(b, entities);
       return who ? [`**${who}**:${b.text || '(空台词)'}`, ''] : [b.text || '(空对白)', ''];
     }
+    case 'transition':
+      return [`→ ${b.text || '(空转场)'}`, ''];
     case 'quote': {
       const lines = (b.text || '').split('\n').map((l) => `> ${l}`.trimEnd());
       return [...(lines.length ? lines : ['> (空引用)']), ''];

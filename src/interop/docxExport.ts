@@ -201,6 +201,8 @@ function addBlock(
   } else if (block.type === 'dialogue') {
     const speaker = entityName(project, block.speakerId);
     addParagraph(paragraphs, 'Dialogue', speaker ? `${speaker}：${block.text}` : block.text);
+  } else if (block.type === 'transition') {
+    addParagraph(paragraphs, 'Transition', block.text);
   } else if (block.type === 'quote') {
     addParagraph(paragraphs, 'ManuscriptQuote', block.text);
   } else if (block.type === 'list') {
@@ -344,6 +346,7 @@ function stylesXml(preset: DocxManuscriptPreset): string {
   ${style('Dialogue', '对白', 'ManuscriptBody', bodyP, baseRun)}
   ${style('SceneAnchor', '场景锚点', 'Normal', '<w:spacing w:before="160" w:after="80"/><w:keepNext/>', heading(token.sceneSize))}
   ${style('ManuscriptSubheading', '正文小标题', 'Normal', '<w:spacing w:before="160" w:after="80"/><w:keepNext/>', `${fonts}<w:b/><w:sz w:val="${token.bodySize}"/><w:szCs w:val="${token.bodySize}"/>${black}`)}
+  ${style('Transition', '转场', 'Normal', '<w:spacing w:before="120" w:after="120"/><w:jc w:val="right"/><w:keepNext/>', `${baseRun}<w:caps/>`)}
   ${style('ManuscriptQuote', '引用', 'Normal', `<w:spacing w:before="80" w:after="80" w:line="${token.bodyLine}" w:lineRule="auto"/><w:ind w:left="480" w:right="240"/>`, `${baseRun}<w:i/>`)}
   ${style('ManuscriptList', '列表正文', 'Normal', `<w:spacing w:before="0" w:after="${token.bodyAfter}" w:line="${token.bodyLine}" w:lineRule="auto"/>`, baseRun)}
   ${style('Metadata', '场景元数据', 'Normal', '<w:spacing w:before="0" w:after="100"/><w:keepNext/>', `${fonts}<w:sz w:val="${token.metaSize}"/><w:szCs w:val="${token.metaSize}"/>${gray}`)}

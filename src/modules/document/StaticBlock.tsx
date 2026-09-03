@@ -26,6 +26,8 @@ export default function StaticBlock({ b, entities, compact }: { b: DocBlock; ent
       return b.text
         ? <p className="ms-action"><RichText text={b.text} /></p>
         : <p className="ms-action doc-flow-empty">(空段落 · 点击编辑)</p>;
+    case 'transition':
+      return <p className="ms-transition">→ {b.text}</p>;
     case 'quote':
       return <blockquote className="ms-quote">{b.text}</blockquote>;
     case 'list':

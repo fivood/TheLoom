@@ -6,16 +6,15 @@ import { RichTextInput } from '../../components/RichText';
 import ScriptInput from '../../components/ScriptInput';
 import { promptText } from '../../dialog';
 import type { DocBlock, DocBlockType, Document } from '../../types';
-import { DOC_BLOCK_LABEL } from '../../types';
 import { walkFlowNodes } from '../../util';
 import { convertBlock, emptyBlock } from '../../documentOperations';
-import { isProsePreset } from '../../workspace';
+import { docBlockLabel, isProsePreset } from '../../workspace';
 import StaticBlock from './StaticBlock';
 
 export { emptyBlock };
 
 const COMMON_TYPES: DocBlockType[] = ['paragraph', 'action', 'dialogue'];
-const MORE_TYPES: DocBlockType[] = ['heading', 'subheading', 'quote', 'list', 'choice', 'condition', 'instruction', 'note'];
+const MORE_TYPES: DocBlockType[] = ['heading', 'subheading', 'quote', 'list', 'transition', 'choice', 'condition', 'instruction', 'note'];
 const GAME_TYPES: DocBlockType[] = ['choice', 'condition', 'instruction'];
 const SLASH_MENU_TYPES: ReadonlySet<DocBlockType> = new Set(['paragraph', 'action', 'dialogue', 'subheading', 'heading', 'quote', 'note']);
 
@@ -42,6 +41,7 @@ export default function BlocksEditor({
   const canUndo = useLoom((s) => s.canUndo ?? false);
   const canRedo = useLoom((s) => s.canRedo ?? false);
   const isNovel = isProsePreset(workspacePreset ?? 'universal');
+  const blockLabel = (type: DocBlockType) => docBlockLabel(workspacePreset ?? 'universal', type);
   const moreTypes = isNovel ? MORE_TYPES.filter((t) => !GAME_TYPES.includes(t)) : MORE_TYPES;
   const commonTypes: DocBlockType[] = workspacePreset === 'screenplay'
     ? ['heading', 'action', 'dialogue']
@@ -99,7 +99,7 @@ export default function BlocksEditor({
   const slashMatches = slashQuery === null
     ? []
     : slashTypes.filter((type) =>
-      DOC_BLOCK_LABEL[type].includes(slashQuery) || type.includes(slashQuery));
+      blockLabel(type).includes(slashQuery) || type.includes(slashQuery));
 
   useEffect(() => {
     setSlashIndex(0);
@@ -359,6 +359,19 @@ export default function BlocksEditor({
         />
       );
     }
+    if (b.type === 'transition') {
+      return (
+        <input
+          data-doc-input={b.id}
+          className="doc-transition"
+          value={b.text}
+          onFocus={() => setActiveBlockId(b.id)}
+          onChange={(e) => patchBlock(b.id, { text: e.target.value })}
+          onKeyDown={(e) => handleTextKey(e, b)}
+          placeholder="转场,如 CUT TO: / 淡出"
+        />
+      );
+    }
     if (b.type === 'subheading') {
       return (
         <div className="doc-subheading-row">
@@ -476,7 +489,7 @@ export default function BlocksEditor({
                 title="点击编辑，拖拽重排"
               >
                 <span className="doc-block-badges">
-                  <span className="doc-block-kind-inline">{DOC_BLOCK_LABEL[b.type]}</span>
+                  <span className="doc-block-kind-inline">{blockLabel(b.type)}</span>
                   {b.unitId && flowUnitIds.has(b.unitId) && <span className="doc-block-linked">⇄</span>}
                   {(annotationCounts?.get(b.id) ?? 0) > 0 && <span className="doc-block-anno"><Icon name="comment" size={11} />{annotationCounts!.get(b.id)}</span>}
                 </span>
@@ -507,7 +520,7 @@ export default function BlocksEditor({
                     setActiveBlockId(b.id);
                     setTypeMenuBlockId((id) => id === b.id ? null : b.id);
                   }}
-                >{DOC_BLOCK_LABEL[b.type]}</button>}
+                >{blockLabel(b.type)}</button>}
                 {b.unitId && flowUnitIds.has(b.unitId) && <span className="doc-block-linked">⇄</span>}
                 {(annotationCounts?.get(b.id) ?? 0) > 0 && <span className="doc-block-anno"><Icon name="comment" size={11} />{annotationCounts!.get(b.id)}</span>}
                 <div className="doc-block-tools">
@@ -545,7 +558,7 @@ export default function BlocksEditor({
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => changeBlockType(b.id, type)}
                       >
-                        <b>{DOC_BLOCK_LABEL[type]}</b>
+                        <b>{blockLabel(type)}</b>
                         <span>/{type}</span>
                       </button>
                     )) : <div className="hint">没有匹配的块类型</div>}
@@ -581,7 +594,7 @@ export default function BlocksEditor({
               type="button"
               title="更改当前块类型"
               onClick={() => setTypeMenuBlockId((id) => id === activeBlock.id ? null : activeBlock.id)}
-            >{DOC_BLOCK_LABEL[activeBlock.type]} ▾</button>
+            >{blockLabel(activeBlock.type)} ▾</button>
             {/* 小说预设:Enter 就是新段落,插入动作 / 对白是剧本需求,不占键盘上方那一条 */}
             {!isNovel && <>
               <span className="doc-focus-sep" />
@@ -592,7 +605,7 @@ export default function BlocksEditor({
                   type="button"
                   onClick={() => insertBlock(type)}
                 >
-                  ＋{DOC_BLOCK_LABEL[type]}
+                  ＋{blockLabel(type)}
                 </button>
               ))}
             </>}
@@ -634,7 +647,7 @@ export default function BlocksEditor({
           <div className="doc-more-types">
             {slashTypes.map((type) => (
               <button key={type} className="ghost" onClick={() => insertBlock(type)}>
-                {DOC_BLOCK_LABEL[type]}
+                {blockLabel(type)}
               </button>
             ))}
           </div>
@@ -644,7 +657,7 @@ export default function BlocksEditor({
       {variant !== 'focus' && !isNovel && <div className="doc-insert-bar">
         {commonTypes.map((type) => (
           <button key={type} className="ghost" onClick={() => insertBlock(type)}>
-            ＋ {DOC_BLOCK_LABEL[type]}
+            ＋ {blockLabel(type)}
           </button>
         ))}
         <button className={moreOpen ? 'primary' : 'ghost'} onClick={() => setMoreOpen((open) => !open)}>
@@ -655,7 +668,7 @@ export default function BlocksEditor({
           <div className="doc-more-types">
             {moreTypes.map((type) => (
               <button key={type} className="ghost" onClick={() => insertBlock(type)}>
-                {DOC_BLOCK_LABEL[type]}
+                {blockLabel(type)}
               </button>
             ))}
           </div>

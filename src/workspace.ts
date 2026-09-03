@@ -1,4 +1,5 @@
-import type { WorkspacePreset } from './types';
+import type { DocBlockType, WorkspacePreset } from './types';
+import { DOC_BLOCK_LABEL } from './types';
 import type { WritingStage } from './stage';
 
 export type WorkspaceTab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
@@ -59,6 +60,16 @@ export function presetHomeTab(preset: WorkspacePreset): WorkspaceTab {
   if (preset === 'codex') return 'entities';
   if (preset === 'nonfiction') return 'research';
   return 'documents';
+}
+
+/** 块名按预设改写:剧本里 heading 是「场景标题」而非小说的「场景锚点」 */
+const PRESET_BLOCK_LABEL: Partial<Record<WorkspacePreset, Partial<Record<DocBlockType, string>>>> = {
+  screenplay: { heading: '场景标题' },
+  trpg: { heading: '场景标题' },
+};
+
+export function docBlockLabel(preset: WorkspacePreset, type: DocBlockType): string {
+  return PRESET_BLOCK_LABEL[preset]?.[type] ?? DOC_BLOCK_LABEL[type];
 }
 
 const UNIVERSAL_LABELS: Record<WorkspaceTab, string> = {

@@ -18,6 +18,7 @@ export function blockLines(b: DocBlock, entityName: (id?: string) => string): st
     case 'choice': return [b.text || '(选项)', ...(b.choices ?? []).map((c) => `○ ${c.label}`)];
     case 'condition': return [`条件:${b.condition ?? ''}`];
     case 'instruction': return [`指令:${b.instruction ?? ''}`];
+    case 'transition': return [`→ ${b.text}`];
     case 'note': return [`// ${b.text}`];
   }
 }

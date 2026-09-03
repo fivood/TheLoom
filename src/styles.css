@@ -2616,6 +2616,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .doc-blocks-writing .doc-block-tools { flex-direction: row; }
 
 /* 小说预设:块侧栏平时完全隐形,只在悬停或光标所在块出现 */
+/* 剧本转场:右对齐单行 */
+.doc-transition { text-align: right; letter-spacing: 0.06em; }
+.ms-transition { text-align: right; letter-spacing: 0.06em; color: var(--text-dim); margin: 8px 0; }
+
 .doc-blocks-novel.doc-blocks-writing .doc-writing-block:not(:hover):not(.active) .doc-block-side { opacity: 0; }
 
 /* ---------- 专注模式(类 Obsidian) ---------- */

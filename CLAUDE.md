@@ -199,6 +199,18 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.62.1 转场块与预设感知块名)
+
+补上 v0.62.0 列的两个缺口:
+
+- **新增 `DocBlockType` 的 `'transition'`**。加一个块类型要动的地方比想象多,清单在此(漏一个就是静默丢内容):`types.ts` 三处(联合 / `DOC_BLOCK_LABEL` / `DOC_WRITING_TYPES`)、`BlocksEditor`(编辑器 + MORE_TYPES)、`StaticBlock`、`export.ts`、`immersive.ts` **双向**、`storage.ts` **双向**、`chapterCompile.ts`、`docxExport.ts`(顺带加了右对齐的 Transition 样式)、`fdx.ts` **双向**、`revision.ts`
+- **`revision.ts` 与 `storage.ts` 的 switch 是穷尽的**,漏了会编译报错;其余带 default 的地方不会报错,只会静默把转场块渲染成空 —— 靠 `'quote'` 全局 grep 逐个核对
+- Markdown 表示 `*→ CUT TO:*`(文件夹模式靠 `loom:block` 注释恢复类型,可读性优先);沉浸模式是 `→ CUT TO:` 单行
+- **FDX 的 Transition 此前导入成 `note` 块**(`[转场] …`),现在双向对应,`.fdx` 往返不再降级
+- **`docBlockLabel(preset, type)`**(`workspace.ts`):剧本 / TRPG 下 heading 显示「场景标题」。`BlocksEditor` 里 11 处 `DOC_BLOCK_LABEL[...]` 全换成局部 `blockLabel(...)`
+- 测试:storage 往返(断言 md 里确实是 `*→ …*`)+ immersive 往返(断言块 id 不变);合计 675 项
+- 未做:`writingProgress` 的 `BODY_TYPES` 不含转场(「淡出」不该算进正文字数)
+
 ## 最近变更(v0.62.0 四套新预设:剧本 / 设定集 / 纪实 / TRPG)
 
 预设 3 → 7。**关键是没有让 `isNovel` 判断继续增殖**:

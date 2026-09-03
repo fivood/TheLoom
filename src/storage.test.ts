@@ -139,6 +139,20 @@ category: 正文
     expect(restored.blocks).toEqual(doc.blocks);
   });
 
+  it('剧本转场块无损往返(Markdown 里是可读的 *→ …* 行)', () => {
+    const doc: Document = {
+      id: 'doc-screenplay', name: '第一场', category: '剧本', notes: '',
+      createdAt: 1, updatedAt: 2,
+      blocks: [
+        { id: 'b-act', type: 'action', text: '雨中的街口。' },
+        { id: 'b-tr', type: 'transition', text: 'CUT TO:' },
+      ],
+    };
+    const md = documentToMd(doc, []);
+    expect(md).toContain('*→ CUT TO:*');
+    expect(mdToDocument(`${doc.name}.md`, md, 0).blocks).toEqual(doc.blocks);
+  });
+
   it('正文 Markdown 是权威内容,Obsidian 修改可读正文后保留块身份与流程角色', () => {
     const doc: Document = {
       id: 'doc-authoring',

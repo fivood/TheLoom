@@ -83,6 +83,9 @@ export function documentToParagraphs(doc: Document, entities: Entity[]): FdxPara
         }
         break;
       }
+      case 'transition':
+        if (b.text) out.push({ type: 'Transition', text: b.text.toUpperCase() });
+        break;
       case 'quote':
         if (b.text) out.push({ type: 'Action', text: b.text.split('\n').map((l) => `> ${l}`).join('\n') });
         break;
@@ -228,7 +231,7 @@ export function paragraphsToBlocks(paragraphs: FdxParagraph[], nameToEntityId?: 
       push({ id: uid(), type: 'dialogue', text, speakerId });
       i = j;
     } else if (p.type === 'Transition') {
-      push({ id: uid(), type: 'note', text: `[转场] ${p.text}` });
+      push({ id: uid(), type: 'transition', text: p.text });
       i++;
     } else if (p.type === 'Action' || p.type === 'General' || p.type === 'Shot') {
       // 相邻 Action / General 合并成一个 action 块,减少块碎片

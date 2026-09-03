@@ -679,6 +679,7 @@ export type DocBlockType =
   | 'choice'       // 选项点 → hub + 多个带 label 的出边
   | 'condition'    // 条件分支 → condition 节点
   | 'instruction'  // 指令 → instruction 节点
+  | 'transition'   // 转场(剧本:CUT TO / 淡出),不进入流程
   | 'note';        // 注释 → 不进入流程
 
 export const DOC_BLOCK_LABEL: Record<DocBlockType, string> = {
@@ -692,11 +693,12 @@ export const DOC_BLOCK_LABEL: Record<DocBlockType, string> = {
   choice: '选项',
   condition: '条件',
   instruction: '指令',
+  transition: '转场',
   note: '注释',
 };
 
 /** 不进入流程的写作组织块(排除在 documentToFlow 之外) */
-export const DOC_WRITING_TYPES: ReadonlySet<DocBlockType> = new Set(['paragraph', 'subheading', 'quote', 'list', 'note']);
+export const DOC_WRITING_TYPES: ReadonlySet<DocBlockType> = new Set(['paragraph', 'subheading', 'quote', 'list', 'transition', 'note']);
 
 export type DocFlowRole = 'none' | 'beat' | 'node';
 

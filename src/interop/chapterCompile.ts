@@ -101,6 +101,9 @@ function renderDocTxt(project: Project, doc: Document, includeFolderPath: boolea
         parts.push(speaker ? `${speaker}:${b.text}` : b.text);
         break;
       }
+      case 'transition':
+        parts.push(`→ ${b.text}`);
+        break;
       case 'quote':
         parts.push(b.text.split('\n').map((l) => `> ${l}`).join('\n'));
         break;
