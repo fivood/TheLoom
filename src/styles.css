@@ -410,6 +410,9 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .pane-tab:hover { background: var(--bg-hover); color: var(--text); }
 .pane-tab.active { background: var(--focus); color: var(--focus-fg); }
+/* 已在主面板打开的模块不能再开一个:同模块两侧并存时跳转无处可去 */
+.pane-tab:disabled { opacity: 0.35; cursor: not-allowed; }
+.pane-tab:disabled:hover { background: transparent; color: var(--text-dim); }
 
 
 .ai-assistant {

@@ -42,6 +42,7 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
+import { jumpTargetPane, openInPrimary } from './panes';
 import { defaultSecondaryTab, hasStages, presetHomeTab, primaryTabsFor, stageHomeTab, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
 import { STAGE_HINT, STAGE_ICON, STAGE_LABEL, useStage, type WritingStage } from './stage';
 
@@ -184,11 +185,17 @@ export default function App() {
   // 搜索/反向引用跳转:切到目标模块,细节由模块自行消费
   const secondaryTabRef = useRef<Tab | null>(null);
   secondaryTabRef.current = secondaryTab;
+  /** 主面板切换模块的唯一入口;规则见 panes.ts */
+  const openPrimary = (next: Tab) => {
+    const after = openInPrimary({ tab: tabRef.current, secondary: secondaryTabRef.current }, next);
+    if (after.secondary !== secondaryTabRef.current) setSecondaryTab(after.secondary);
+    setTab(after.tab);
+  };
   useEffect(() => {
     if (navTarget) {
       // 副面板已经开着这个模块时不动主面板:分屏的用法就是「左边写、右边查」
-      const inSecondary = secondaryTabRef.current === navTarget.tab && tabRef.current !== navTarget.tab;
-      if (!inSecondary) setTab(navTarget.tab);
+      const inSecondary = jumpTargetPane({ tab: tabRef.current, secondary: secondaryTabRef.current }, navTarget.tab) === 'secondary';
+      if (!inSecondary) openPrimary(navTarget.tab);
       useNav.getState().setCurrentLabel(describeNavTarget(useLoom.getState().project, navTarget));
       if (Object.keys(navTarget).length === 1) useNav.getState().clear();
     }
@@ -424,7 +431,7 @@ export default function App() {
                 className={`nav-btn ${tab === t.key ? 'active' : ''}`}
                 onClick={() => {
                   useNav.getState().visit({ tab: t.key }, label);
-                  setTab(t.key);
+                  openPrimary(t.key);
                 }}
                 title={label}
               >
@@ -443,7 +450,7 @@ export default function App() {
               className={`nav-btn ${tab === t.key ? 'active' : ''}`}
               onClick={() => {
                 useNav.getState().visit({ tab: t.key }, label);
-                setTab(t.key);
+                openPrimary(t.key);
               }}
               title={label}
             >
@@ -471,7 +478,7 @@ export default function App() {
                     // 切阶段就是换工作面:按钮不把左侧带过去,看起来像没生效
                     const target = stageHomeTab(workspacePreset, key);
                     useNav.getState().visit({ tab: target }, workspaceTabLabel(workspacePreset, target));
-                    setTab(target);
+                    openPrimary(target);
                   }}
                 ><Icon name={STAGE_ICON[key]} size={15} /></button>
               ))}
@@ -735,7 +742,8 @@ export default function App() {
                       <button
                         key={t.key}
                         className={`pane-tab ${secondaryTab === t.key ? 'active' : ''}`}
-                        title={label}
+                        title={t.key === tab ? `${label}已在主面板打开(可用右侧互换按钮换边)` : label}
+                        disabled={t.key === tab}
                         onClick={() => setSecondaryTab(t.key)}
                       >
                         <Icon name={t.icon} size={15} /><span>{label}</span>
