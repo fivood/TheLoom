@@ -42,8 +42,8 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
-import { hasStages, presetHomeTab, primaryTabsFor, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
-import { STAGE_HINT, STAGE_LABEL, useStage, type WritingStage } from './stage';
+import { hasStages, presetHomeTab, primaryTabsFor, stageHomeTab, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
+import { STAGE_HINT, STAGE_ICON, STAGE_LABEL, useStage, type WritingStage } from './stage';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
 const FlowEditor = lazy(() => import('./modules/flow/FlowEditor'));
@@ -458,10 +458,18 @@ export default function App() {
               {(['write', 'revise', 'plan', 'codex'] as WritingStage[]).map((key) => (
                 <button
                   key={key}
-                  className={stage === key ? 'primary' : 'ghost'}
-                  title={STAGE_HINT[key]}
-                  onClick={() => setStage(key)}
-                >{STAGE_LABEL[key]}</button>
+                  className={`icon-btn ${stage === key ? 'primary' : 'ghost'}`}
+                  title={`${STAGE_LABEL[key]} · ${STAGE_HINT[key]}`}
+                  aria-label={STAGE_LABEL[key]}
+                  aria-pressed={stage === key}
+                  onClick={() => {
+                    setStage(key);
+                    // 切阶段就是换工作面:按钮不把左侧带过去,看起来像没生效
+                    const target = stageHomeTab(workspacePreset, key);
+                    useNav.getState().visit({ tab: target }, workspaceTabLabel(workspacePreset, target));
+                    setTab(target);
+                  }}
+                ><Icon name={STAGE_ICON[key]} size={15} /></button>
               ))}
             </div>
           )}

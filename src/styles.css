@@ -2604,6 +2604,9 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   background: var(--bg-panel);
 }
 .doc-mode-switch button { border: 0; }
+/* 顶栏阶段开关:图标按钮对齐顶栏其余图标按钮的 26px 高 */
+.stage-switch button { padding: 5px 9px; }
+.stage-switch button svg { display: block; }
 
 .doc-blocks-writing {
   max-width: 920px;

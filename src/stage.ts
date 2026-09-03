@@ -16,6 +16,14 @@ export const STAGE_LABEL: Record<WritingStage, string> = {
   codex: '设',
 };
 
+/** 阶段图标沿用它主要模块的图标:写=文档、改=版本对比、理=大纲、设=设定集 */
+export const STAGE_ICON: Record<WritingStage, 'doc' | 'compare' | 'grid' | 'cards'> = {
+  write: 'doc',
+  revise: 'compare',
+  plan: 'grid',
+  codex: 'cards',
+};
+
 export const STAGE_HINT: Record<WritingStage, string> = {
   write: '初稿:只留正文,工具按需展开',
   revise: '修订:查找替换、快照、版本差异与批注在手边',

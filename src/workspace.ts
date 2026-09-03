@@ -105,6 +105,12 @@ const STAGE_FIRST: Partial<Record<WritingStage, WorkspaceTab[]>> = {
   codex: ['entities', 'map', 'timeline', 'planning', 'research'],
 };
 
+/** 切到某个阶段时应该落在哪个模块:写 / 改回正文(游戏型是流程),理 / 设去该阶段的头一个模块 */
+export function stageHomeTab(preset: WorkspacePreset, stage: WritingStage): WorkspaceTab {
+  if (stage === 'write' || stage === 'revise') return presetHomeTab(preset);
+  return primaryTabsFor(preset, stage)[0];
+}
+
 /** 阶段开关对谁可见:通用预设本来就是完整导航,不需要再分阶段 */
 export function hasStages(preset: WorkspacePreset): boolean {
   return preset !== 'universal';

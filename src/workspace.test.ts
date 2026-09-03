@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Project } from './types';
 import { normalizeProject } from './util';
 import { WORKSPACE_PRESETS } from './types';
-import { WORKSPACE_PRIMARY_TABS, presetHomeTab, primaryTabsFor, workspaceTabLabel } from './workspace';
+import { WORKSPACE_PRIMARY_TABS, presetHomeTab, primaryTabsFor, stageHomeTab, workspaceTabLabel } from './workspace';
 
 describe('R17-4 项目工作区预设', () => {
   it('旧项目自动保持通用完整导航', () => {
@@ -62,5 +62,18 @@ describe('R17-4 项目工作区预设', () => {
       if (preset !== 'universal') expect(codex[0]).toBe('entities');
     }
     expect(primaryTabsFor('universal', 'codex')).toEqual(primaryTabsFor('universal', 'write'));
+  });
+
+  it('切阶段的落点:写 / 改回落点模块,理去大纲,设去设定集,且都在首层导航里', () => {
+    for (const preset of WORKSPACE_PRESETS) {
+      if (preset === 'universal') continue;
+      expect(stageHomeTab(preset, 'write')).toBe(presetHomeTab(preset));
+      expect(stageHomeTab(preset, 'revise')).toBe(presetHomeTab(preset));
+      expect(stageHomeTab(preset, 'plan')).toBe('outline');
+      expect(stageHomeTab(preset, 'codex')).toBe('entities');
+      for (const stage of ['write', 'revise', 'plan', 'codex'] as const) {
+        expect(primaryTabsFor(preset, stage)).toContain(stageHomeTab(preset, stage));
+      }
+    }
   });
 });
