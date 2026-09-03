@@ -450,7 +450,7 @@ export default function BlocksEditor({
 
   return (
     <>
-      <div className={`doc-blocks doc-blocks-flow doc-blocks-${variant}`}>
+      <div className={`doc-blocks doc-blocks-flow doc-blocks-${variant}${isNovel ? ' doc-blocks-novel' : ''}`}>
         {doc.blocks.map((b) => {
           if (variant === 'structure' && activeBlockId !== b.id) {
             return (
@@ -494,7 +494,7 @@ export default function BlocksEditor({
               onClick={() => setActiveBlockId(b.id)}
             >
               {variant !== 'focus' && <div className="doc-block-side">
-                <button
+                {!(isNovel && b.type === 'paragraph') && <button
                   className="doc-block-kind doc-kind-button"
                   type="button"
                   title="更改块类型"
@@ -502,7 +502,7 @@ export default function BlocksEditor({
                     setActiveBlockId(b.id);
                     setTypeMenuBlockId((id) => id === b.id ? null : b.id);
                   }}
-                >{DOC_BLOCK_LABEL[b.type]}</button>
+                >{DOC_BLOCK_LABEL[b.type]}</button>}
                 {b.unitId && flowUnitIds.has(b.unitId) && <span className="doc-block-linked">⇄</span>}
                 {(annotationCounts?.get(b.id) ?? 0) > 0 && <span className="doc-block-anno"><Icon name="comment" size={11} />{annotationCounts!.get(b.id)}</span>}
                 <div className="doc-block-tools">
@@ -577,17 +577,20 @@ export default function BlocksEditor({
               title="更改当前块类型"
               onClick={() => setTypeMenuBlockId((id) => id === activeBlock.id ? null : activeBlock.id)}
             >{DOC_BLOCK_LABEL[activeBlock.type]} ▾</button>
-            <span className="doc-focus-sep" />
-            {COMMON_TYPES.map((type) => (
-              <button
-                key={type}
-                className="ghost"
-                type="button"
-                onClick={() => insertBlock(type)}
-              >
-                ＋{DOC_BLOCK_LABEL[type]}
-              </button>
-            ))}
+            {/* 小说预设:Enter 就是新段落,插入动作 / 对白是剧本需求,不占键盘上方那一条 */}
+            {!isNovel && <>
+              <span className="doc-focus-sep" />
+              {COMMON_TYPES.map((type) => (
+                <button
+                  key={type}
+                  className="ghost"
+                  type="button"
+                  onClick={() => insertBlock(type)}
+                >
+                  ＋{DOC_BLOCK_LABEL[type]}
+                </button>
+              ))}
+            </>}
           </div>
           <div className="doc-focus-actions">
             <button
@@ -619,7 +622,21 @@ export default function BlocksEditor({
         </div>
       )}
 
-      {variant !== 'focus' && <div className="doc-insert-bar">
+      {variant !== 'focus' && isNovel && <div className="doc-insert-bar doc-insert-slim">
+        <button className={moreOpen ? 'primary' : 'ghost'} onClick={() => setMoreOpen((open) => !open)}>＋</button>
+        <span className="hint">Enter 新段 · Shift+Enter 换行 · / 切换类型 · Alt+↑↓ 移动</span>
+        {moreOpen && (
+          <div className="doc-more-types">
+            {[...COMMON_TYPES, ...moreTypes].map((type) => (
+              <button key={type} className="ghost" onClick={() => insertBlock(type)}>
+                {DOC_BLOCK_LABEL[type]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>}
+
+      {variant !== 'focus' && !isNovel && <div className="doc-insert-bar">
         {COMMON_TYPES.map((type) => (
           <button key={type} className="ghost" onClick={() => insertBlock(type)}>
             ＋ {DOC_BLOCK_LABEL[type]}

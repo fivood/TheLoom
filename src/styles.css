@@ -2615,6 +2615,9 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .doc-blocks-writing .doc-block.paragraph .doc-block-main textarea { white-space: pre-wrap; }
 .doc-blocks-writing .doc-block-tools { flex-direction: row; }
 
+/* 小说预设:块侧栏平时完全隐形,只在悬停或光标所在块出现 */
+.doc-blocks-novel.doc-blocks-writing .doc-writing-block:not(:hover):not(.active) .doc-block-side { opacity: 0; }
+
 /* ---------- 专注模式(类 Obsidian) ---------- */
 .doc-focus-pane { background: var(--bg); }
 .doc-focus-toolbar {

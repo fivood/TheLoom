@@ -5,7 +5,6 @@ import { dailyStatValue, writingDateKey, writingStreak } from '../writingProgres
 import type { Document } from '../types';
 import BlocksEditor, { emptyBlock } from '../modules/document/BlocksEditor';
 import Icon from '../components/Icon';
-import ThemeToggle from '../components/ThemeToggle';
 import { confirmDialog, promptText } from '../dialog';
 import { loadInbox, markUsed, saveInbox, visibleIdeas, type IdeaCard } from '../inbox';
 
@@ -180,7 +179,6 @@ export default function MobileWrite() {
             <Icon name="bulb" size={17} />
             {recentIdeas.length > 0 && <span className="m-idea-badge">{recentIdeas.length}</span>}
           </button>
-          <ThemeToggle />
         </div>
       </div>
 

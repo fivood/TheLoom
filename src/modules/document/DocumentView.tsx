@@ -27,6 +27,8 @@ import {
   splitDocumentAfterBlock,
 } from '../../documentOperations';
 
+const INSPECTOR_KEY = 'theloom-doc-inspector-v1';
+
 export default function DocumentView() {
   const project = useLoom((s) => s.project);
   const documents = useLoom((s) => s.project.documents);
@@ -59,6 +61,15 @@ export default function DocumentView() {
 
   const workspacePreset = project.workspacePreset ?? 'universal';
   const isNovel = workspacePreset === 'novel';
+  // 属性栏与专注模式的场景列表都是本机界面偏好,不入项目
+  const [inspectorOpen, setInspectorOpen] = useState(() => {
+    const saved = localStorage.getItem(INSPECTOR_KEY);
+    return saved ? saved === 'on' : !isNovel;
+  });
+  const [focusNavOpen, setFocusNavOpen] = useState(true);
+  useEffect(() => {
+    localStorage.setItem(INSPECTOR_KEY, inspectorOpen ? 'on' : 'off');
+  }, [inspectorOpen]);
   const isInteractive = workspacePreset === 'interactive';
 
   const navSeq = useNav((s) => s.seq);
@@ -352,7 +363,7 @@ export default function DocumentView() {
 
   return (
     <>
-      {!focusMode && <NavigatorTree
+      {(!focusMode || focusNavOpen) && <NavigatorTree
         module="document"
         title="文档"
         items={filtered}
@@ -408,6 +419,11 @@ export default function DocumentView() {
               </>
             )}
             <span style={{ flex: 1 }} />
+            <button
+              className="ghost"
+              title={focusNavOpen ? '收起场景列表' : '显示场景列表'}
+              onClick={() => setFocusNavOpen((open) => !open)}
+            >{focusNavOpen ? '收起列表' : '场景列表'}</button>
             <button className="ghost" onClick={() => setFocusMode(false)}>退出专注</button>
           </div>
         ) : (
@@ -424,14 +440,22 @@ export default function DocumentView() {
             title="隐藏导航与属性栏，专注正文"
             onClick={() => setFocusMode(true)}
           >专注</button>
-          <button className="ghost" onClick={() => setStructureToolsOpen(true)}>长篇工具</button>
-          {/* C3:低频的导入 / 导出收进溢出菜单 */}
+          <button
+            className="ghost"
+            title={inspectorOpen ? '收起右侧场景属性栏' : '显示右侧场景属性栏'}
+            onClick={() => setInspectorOpen((open) => !open)}
+          >{inspectorOpen ? '收起属性' : '属性'}</button>
+          {/* C3:低频的长篇工具 / 导入 / 导出 / 分类维护收进溢出菜单 */}
           <div className="tools-wrap">
-            <button className="ghost" title="导入长稿 / 成稿导出" onClick={() => setMoreOpen((o) => !o)}>⋯</button>
+            <button className="ghost" title="长篇工具 / 导入 / 导出 / 分类" onClick={() => setMoreOpen((o) => !o)}>⋯</button>
             {moreOpen && (
               <>
                 <div className="backdrop" onClick={() => setMoreOpen(false)} />
                 <div className="tools-menu">
+                  <button
+                    title="卷 / 章结构、场景拆分与合并"
+                    onClick={() => { setMoreOpen(false); setStructureToolsOpen(true); }}
+                  ><Icon name="book" size={13} /> 长篇工具</button>
                   {!isInteractive && (
                     <button
                       title="导入 TXT / Markdown / EPUB / DOCX 长稿,自动拆卷 / 章 / 场景"
@@ -442,19 +466,27 @@ export default function DocumentView() {
                     title="按卷 / 章勾选场景,编译为 Word / Markdown / TXT / Final Draft 成品稿"
                     onClick={() => { setMoreOpen(false); useToolBus.getState().open('chapterCompile'); }}
                   ><Icon name="script" size={13} /> 成稿导出</button>
+                  <button
+                    title="新建场景分类"
+                    onClick={() => { setMoreOpen(false); void addCategory(); }}
+                  ><Icon name="tag" size={13} /> 新建分类</button>
                 </div>
               </>
             )}
           </div>
-          <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
-            <option value="all">全部分类</option>
-            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
-          <button className="ghost" onClick={() => addCategory()} title="新建场景分类" style={{ fontSize: 12 }}>＋ 分类</button>
-          {catFilter !== 'all' && (
+          {/* 没有分类的项目(多数小说)不显示分类控件 */}
+          {(categories.length > 0 || catFilter !== 'all') && (
             <>
-              <button className="ghost" onClick={() => renameCategory(catFilter)} style={{ fontSize: 12 }}>重命名</button>
-              <button className="ghost" onClick={() => removeCategory(catFilter)} title={`删除分类「${catFilter}」`} style={{ fontSize: 12 }}>× 删除</button>
+              <select value={catFilter} onChange={(event) => setCatFilter(event.target.value)} style={{ width: 120 }}>
+                <option value="all">全部分类</option>
+                {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+              {catFilter !== 'all' && (
+                <>
+                  <button className="ghost" onClick={() => renameCategory(catFilter)} style={{ fontSize: 12 }}>重命名</button>
+                  <button className="ghost" onClick={() => removeCategory(catFilter)} title={`删除分类「${catFilter}」`} style={{ fontSize: 12 }}>× 删除</button>
+                </>
+              )}
             </>
           )}
           {(revisionsInUse.length > 0 || revFilter !== 'all') && (
@@ -569,7 +601,7 @@ export default function DocumentView() {
         )}
       </div>
 
-      {selected && !focusMode && (
+      {selected && !focusMode && inspectorOpen && (
         <Inspector>
           <div className="side-head" style={{ padding: '0 0 4px', borderBottom: '1px solid var(--border)' }}>
             <h3 style={{ margin: 0 }}>场景属性</h3>

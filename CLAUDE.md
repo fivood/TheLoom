@@ -199,6 +199,18 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.60.0 写作界面减负)
+
+用户反馈:「作为纯小说写作的工具还是不太顺手,多余的按钮在写小说时会影响输入」。四层干扰逐层收掉,**全部按 `workspacePreset === 'novel'` 分流**,互动 / 通用预设一行不动:
+
+- **块侧栏**:`BlocksEditor` 容器加 `doc-blocks-novel` 类;小说下段落块不渲染类型标签(99% 的块是段落,标签是恒定重复),侧栏 `opacity: 0` 直到 hover 或 active。**44px 宽度保留** —— 收掉宽度会让正文在打字时左右跳
+- **插入栏**:小说下收成一个 `＋` 折叠菜单(展开是 COMMON_TYPES + moreTypes 全部八种)。去掉 ＋正文 是因为 `handleTextKey` 的 Enter 分支本来就插段落
+- **工具栏**:长篇工具与新建分类进 ⋯ 溢出菜单;**分类下拉改为 `categories.length > 0 || catFilter !== 'all'` 才渲染**(这条对所有预设生效 —— 零分类时那个「全部分类」对谁都是噪音)。新增「属性」开关
+- **属性栏**:`inspectorOpen` 控制 `<Inspector>` 渲染,存 `theloom-doc-inspector-v1`(本机界面偏好,不入项目);**默认值按预设决定但记住的选择优先**(`saved ? saved === 'on' : !isNovel`)
+- **专注模式**:`{(!focusMode || focusNavOpen) && <NavigatorTree`,专注下保留场景列表 + 收起开关。此前专注模式把导航一起藏了,切场景必须先退出,导致它没法当日常写作面用
+- **移动端**:`.doc-focus-bar` 的 `COMMON_TYPES` 插入按钮在小说下不渲染(10 → 7 个按钮);`MobileWrite` 顶栏去掉 ThemeToggle(「我的」页仍有)
+- 实测(1440×900 与 375×812 各跑一遍):侧栏透明度 激活 1 / 其余 0、工具栏 5 项、属性开关往返持久化、专注模式内切场景正文跟随、Enter 仍插段落、切回 interactive 预设逐项复原、控制台零错误
+
 ## 最近变更(v0.54.4 PWA / 移动端走查修复 · 仅网页端)
 
 **A 级:移动壳云同步面板不可用**:RemotePanel 内联宽 560px 超出手机视口、`.palette` 无 `max-width` 兜底且 60vh + `overflow:hidden` 裁掉底部操作区,「我」页唯一跨端入口在手机上完全够不着。修复:`styles.css` `.palette` 加 `max-width: calc(100vw - 24px)`(兜住全部内联固定宽 520–780px 面板)、`.sync-body` 内部可滚(`flex:1; min-height:0; overflow-y:auto`)、`.app-mobile .palette-backdrop/.palette` 改近全屏工作表(padding-top 12px + safe-area、`max-height` 跟随 `--vvh` 键盘变量)。
