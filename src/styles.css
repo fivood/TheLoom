@@ -173,7 +173,22 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
 }
+.sidebar .logo:hover, .sidebar .logo.active { border-color: var(--focus); }
+.logo-wrap { position: relative; }
+/* 侧栏很窄,菜单向右弹出 */
+.logo-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 6px);
+  right: auto;
+  min-width: 210px;
+  z-index: 40;
+}
+.logo-menu .menu-key { margin-left: auto; color: var(--text-faint); font-size: 11px; }
+.logo-menu button { display: flex; align-items: center; gap: 8px; }
 /*
  * 深色主题:侧栏加深一档。
  * logo **不做反色** —— 那条规则是 logo 还是黑白线稿时写的;换成全彩之后

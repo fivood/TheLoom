@@ -164,6 +164,8 @@ export default function App() {
   useEscape(recentOpen, () => setRecentOpen(false));
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
+  const [logoMenu, setLogoMenu] = useState(false);
+  useEscape(logoMenu, () => setLogoMenu(false));
   // 手机 / 小平板一律走移动壳:桌面三栏布局在这些尺寸上无法使用(判定见 useIsMobile)
   const isMobile = useIsMobile();
   const mobileShell = isMobile && !isTauri;
@@ -368,7 +370,41 @@ export default function App() {
       {mobileShell ? <MobileShell key={revision} /> : (
         <>
           <nav className="sidebar">
-        <div className="logo" title="叙事织机 TheLoom"><img src="/logo.svg" alt="TheLoom" width={26} height={26} /></div>
+        <div className="logo-wrap">
+          <button
+            className={`logo ${logoMenu ? 'active' : ''}`}
+            title="叙事织机 TheLoom · 总览 / 指南 / 版本"
+            aria-label="应用菜单"
+            onClick={() => setLogoMenu((open) => !open)}
+          >
+            <img src="/logo.svg" alt="TheLoom" width={26} height={26} />
+          </button>
+          {logoMenu && (
+            <>
+              <div className="backdrop" onClick={() => setLogoMenu(false)} />
+              <div className="tools-menu logo-menu">
+                <button onClick={() => { setLogoMenu(false); setOverview(true); }}>
+                  <Icon name="grid" size={14} /> 项目总览 <span className="menu-key">Ctrl+Shift+K</span>
+                </button>
+                <button onClick={() => { setLogoMenu(false); setSearching(true); }}>
+                  <Icon name="search" size={14} /> 全局搜索 <span className="menu-key">Ctrl+K</span>
+                </button>
+                <button onClick={() => { setLogoMenu(false); setHelp(true); }}>
+                  <Icon name="help" size={14} /> 使用指南 <span className="menu-key">F1</span>
+                </button>
+                {isTauri && (
+                  <button
+                    disabled={checkingUpdate}
+                    onClick={() => { setLogoMenu(false); runUpdateCheck(false); }}
+                  >
+                    <Icon name="refresh" size={14} /> {checkingUpdate ? '检查中…' : '检查更新'}
+                  </button>
+                )}
+                <span className="hint" style={{ padding: '4px 12px 2px' }}>v{__APP_VERSION__} · {isTauri ? '桌面版' : '网页版'}</span>
+              </div>
+            </>
+          )}
+        </div>
         {primaryTabs.map((t, i) => {
           const prev = i > 0 ? primaryTabs[i - 1].group : null;
           const showSep = workspacePreset === 'universal' && prev !== null && prev !== t.group;
