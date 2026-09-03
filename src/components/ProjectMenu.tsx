@@ -30,6 +30,7 @@ export default function ProjectMenu() {
   const setFolder = useLoom((s) => s.setFolder);
 
   const [open, setOpen] = useState(false);
+  const [presetPick, setPresetPick] = useState(false);
   const [checkingImport, setCheckingImport] = useState(false);
   const [inspection, setInspection] = useState<ImportInspection | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -81,7 +82,11 @@ export default function ProjectMenu() {
     await alertDialog(state.syncError || state.saveError || '项目切换失败，当前项目仍保持打开。');
   };
 
-  const createSlot = async (kind: 'blank' | 'sample') => {
+  const createSlot = async (kind: 'blank' | 'sample', preset?: WorkspacePreset) => {
+    // newSlot 成功后立刻写入预设:新建时选一次,省得事后去菜单里找
+    const applyPreset = () => {
+      if (preset) update((p) => { p.workspacePreset = preset; });
+    };
     let dir: string | null = null;
     if (isTauri) {
       setOpen(false);
@@ -97,6 +102,8 @@ export default function ProjectMenu() {
         if (!await newSlot(kind)) {
           const state = useLoom.getState();
           await alertDialog(state.syncError || state.saveError || '无法创建新项目，当前项目没有被修改。');
+        } else {
+          applyPreset();
         }
         return;
       }
@@ -140,6 +147,7 @@ export default function ProjectMenu() {
       await alertDialog(state.syncError || state.saveError || '无法创建新项目，当前项目没有被修改。');
       return;
     }
+    applyPreset();
 
     if (!dir) {
       setOpen(false);
@@ -174,14 +182,14 @@ export default function ProjectMenu() {
         className="ghost icon-btn project-menu-toggle"
         title="切换项目 / 新建 / 导入"
         aria-label="切换项目 / 新建 / 导入"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setPresetPick(false); setOpen((v) => !v); }}
       >
         <Icon name="chevronDown" size={14} />
       </button>
 
       {open && (
         <div className="project-dropdown">
-          <div className="project-dropdown-head">工作区布局</div>
+          <div className="project-dropdown-head">工作区预设(随时可改)</div>
           <div className="project-workspace-preset">
             <select
               value={project.workspacePreset ?? 'universal'}
@@ -342,15 +350,38 @@ export default function ProjectMenu() {
               <div className="project-dropdown-sep" />
             </>
           )}
-          <div className="project-slot" onClick={() => { void createSlot('blank'); }}>
-            <Icon name="plus" /> <span className="project-slot-name">新建空白项目</span>
+          {presetPick ? (
+            <>
+              <div className="project-dropdown-head">新建项目 · 先选工作区预设</div>
+              {(Object.keys(WORKSPACE_PRESET_LABEL) as WorkspacePreset[]).map((preset) => (
+                <div
+                  key={preset}
+                  className="project-slot project-preset-pick"
+                  onClick={() => { setPresetPick(false); void createSlot('blank', preset); }}
+                >
+                  <span className="project-slot-name">{WORKSPACE_PRESET_LABEL[preset]}</span>
+                  <span className="project-preset-hint">{WORKSPACE_PRESET_HINT[preset]}</span>
+                </div>
+              ))}
+              <div className="project-slot" onClick={() => setPresetPick(false)}>
+                <span className="project-slot-name">返回</span>
+              </div>
+            </>
+          ) : (
+          <div className="project-slot" onClick={() => setPresetPick(true)}>
+            <Icon name="plus" /> <span className="project-slot-name">新建空白项目…</span>
           </div>
-          <div className="project-slot" onClick={() => { void createSlot('sample'); }}>
-            <Icon name="book" /> <span className="project-slot-name">新建 · 载入示例</span>
-          </div>
-          <div className="project-slot" onClick={() => { if (!checkingImport) fileRef.current?.click(); }}>
-            <Icon name="upload" /> <span className="project-slot-name">{checkingImport ? '正在检查…' : '从 JSON 文件导入'}</span>
-          </div>
+          )}
+          {!presetPick && (
+            <>
+              <div className="project-slot" onClick={() => { void createSlot('sample'); }}>
+                <Icon name="book" /> <span className="project-slot-name">新建 · 载入示例</span>
+              </div>
+              <div className="project-slot" onClick={() => { if (!checkingImport) fileRef.current?.click(); }}>
+                <Icon name="upload" /> <span className="project-slot-name">{checkingImport ? '正在检查…' : '从 JSON 文件导入'}</span>
+              </div>
+            </>
+          )}
           <input
             ref={fileRef}
             type="file"
