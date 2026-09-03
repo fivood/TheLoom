@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import type { KeyboardEventHandler, ReactNode } from 'react';
 
-/** 行内 Markdown 渲染:**bold** / *italic* / ~~strike~~,以及「」引文着色。
+/** 行内 Markdown 渲染:**bold** / *italic* / ~~strike~~。
  * React 默认转义字符串,无 XSS 风险。可嵌套(如 **粗 *粗斜* 粗**)。 */
 export function RichText({ text }: { text: string }) {
   return <>{parseInline(text)}</>;
@@ -12,9 +12,6 @@ const RULES: Rule[] = [
   { start: '**', end: '**', render: (k, key) => <strong key={key}>{k}</strong> },
   { start: '*', end: '*', render: (k, key) => <em key={key}>{k}</em> },
   { start: '~~', end: '~~', render: (k, key) => <s key={key}>{k}</s> },
-  // 「」里的内容换色。引号本身保留:它是正文标点,导出与文件夹模式里都要原样存在,
-  // 这里只是渲染层着色,不引入任何新标记符号。
-  { start: '「', end: '」', render: (k, key) => <span className="ink-quote" key={key}>「{k}」</span> },
 ];
 
 function parseInline(text: string, keyPrefix = ''): ReactNode[] {
