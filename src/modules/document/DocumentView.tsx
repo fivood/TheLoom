@@ -18,6 +18,7 @@ import RevisionDiff from './RevisionDiff';
 import Inspector from '../../components/Inspector';
 import DocumentStructureDialog from './DocumentStructureDialog';
 import { useToolBus } from '../../toolBus';
+import { useStage } from '../../stage';
 import { useEscape } from '../../hooks/useEscape';
 import {
   countDocumentReferences,
@@ -26,8 +27,6 @@ import {
   previewDocumentMerge,
   splitDocumentAfterBlock,
 } from '../../documentOperations';
-
-const INSPECTOR_KEY = 'theloom-doc-inspector-v1';
 
 export default function DocumentView() {
   const project = useLoom((s) => s.project);
@@ -61,15 +60,17 @@ export default function DocumentView() {
 
   const workspacePreset = project.workspacePreset ?? 'universal';
   const isNovel = workspacePreset === 'novel';
-  // 属性栏与专注模式的场景列表都是本机界面偏好,不入项目
-  const [inspectorOpen, setInspectorOpen] = useState(() => {
-    const saved = localStorage.getItem(INSPECTOR_KEY);
-    return saved ? saved === 'on' : !isNovel;
-  });
+  const stage = useStage((s) => s.stage);
+  const isRevising = isNovel && stage === 'revise';
+  // 属性栏与专注模式的场景列表都是本机界面状态,不入项目
+  const [inspectorOpen, setInspectorOpen] = useState(!isNovel || stage === 'revise');
   const [focusNavOpen, setFocusNavOpen] = useState(true);
+  // 切阶段即换布局:改稿要属性栏(批注 / 快照 / 元数据),理稿进结构视图
   useEffect(() => {
-    localStorage.setItem(INSPECTOR_KEY, inspectorOpen ? 'on' : 'off');
-  }, [inspectorOpen]);
+    if (!isNovel) return;
+    setInspectorOpen(stage === 'revise');
+    setMode(stage === 'plan' ? 'structure' : 'writing');
+  }, [stage, isNovel]);
   const isInteractive = workspacePreset === 'interactive';
 
   const navSeq = useNav((s) => s.seq);
@@ -445,6 +446,27 @@ export default function DocumentView() {
             title={inspectorOpen ? '收起右侧场景属性栏' : '显示右侧场景属性栏'}
             onClick={() => setInspectorOpen((open) => !open)}
           >{inspectorOpen ? '收起属性' : '属性'}</button>
+          {isRevising && (
+            <>
+              <button
+                className="ghost"
+                title="跨文档查找替换 (可单步撤销)"
+                onClick={() => useToolBus.getState().open('findReplace')}
+              >查找替换</button>
+              <button
+                className="ghost"
+                disabled={!selected}
+                title="存档当前正文,之后可对比差异或恢复"
+                onClick={() => void saveSnapshot()}
+              >存快照</button>
+              <button
+                className="ghost"
+                disabled={!selected}
+                title="对比本场景的两个版本"
+                onClick={() => setDiffOpen({})}
+              >版本差异</button>
+            </>
+          )}
           {/* C3:低频的长篇工具 / 导入 / 导出 / 分类维护收进溢出菜单 */}
           <div className="tools-wrap">
             <button className="ghost" title="长篇工具 / 导入 / 导出 / 分类" onClick={() => setMoreOpen((o) => !o)}>⋯</button>

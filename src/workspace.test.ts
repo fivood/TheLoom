@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Project } from './types';
 import { normalizeProject } from './util';
-import { WORKSPACE_PRIMARY_TABS, workspaceTabLabel } from './workspace';
+import { WORKSPACE_PRIMARY_TABS, primaryTabsFor, workspaceTabLabel } from './workspace';
 
 describe('R17-4 项目工作区预设', () => {
   it('旧项目自动保持通用完整导航', () => {
@@ -32,5 +32,15 @@ describe('R17-4 项目工作区预设', () => {
     expect(project.workspacePreset).toBe('universal');
     expect(project.flows[0].name).toBe('主线');
     expect(project.documents[0].name).toBe('第一场');
+  });
+
+  it('「理」阶段只在小说预设下改变首层导航顺序,且不增删模块', () => {
+    const write = primaryTabsFor('novel', 'write');
+    const plan = primaryTabsFor('novel', 'plan');
+    expect(plan[0]).toBe('outline');
+    expect(plan.indexOf('documents')).toBeGreaterThan(plan.indexOf('outline'));
+    expect([...plan].sort()).toEqual([...write, 'timeline'].sort());
+    expect(primaryTabsFor('interactive', 'plan')).toEqual(primaryTabsFor('interactive', 'write'));
+    expect(primaryTabsFor('novel', 'revise')).toEqual(write);
   });
 });

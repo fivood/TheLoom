@@ -1,4 +1,5 @@
 import type { WorkspacePreset } from './types';
+import type { WritingStage } from './stage';
 
 export type WorkspaceTab = 'flow' | 'entities' | 'assets' | 'documents' | 'brainstorm' | 'outline' | 'timeline' | 'map' | 'research' | 'variables' | 'planning';
 
@@ -45,6 +46,15 @@ export function workspaceTabLabel(preset: WorkspacePreset, tab: WorkspaceTab): s
   return UNIVERSAL_LABELS[tab];
 }
 
-export function workspacePrimaryTabs(preset: WorkspacePreset): Set<WorkspaceTab> {
-  return new Set(WORKSPACE_PRIMARY_TABS[preset]);
+/** 「理」阶段:大纲 / 时间线 / 规划提到前面,正文退后一位 */
+const NOVEL_PLAN_TABS: WorkspaceTab[] = ['outline', 'timeline', 'planning', 'entities', 'documents', 'brainstorm', 'research'];
+
+/** 首层 tab 顺序。阶段只在小说预设的「理」下改变导航,其余沿用预设本身 */
+export function primaryTabsFor(preset: WorkspacePreset, stage: WritingStage): WorkspaceTab[] {
+  if (preset === 'novel' && stage === 'plan') return NOVEL_PLAN_TABS;
+  return WORKSPACE_PRIMARY_TABS[preset];
+}
+
+export function workspacePrimaryTabs(preset: WorkspacePreset, stage: WritingStage = 'write'): Set<WorkspaceTab> {
+  return new Set(primaryTabsFor(preset, stage));
 }

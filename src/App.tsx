@@ -42,7 +42,8 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
-import { WORKSPACE_PRIMARY_TABS, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
+import { primaryTabsFor, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
+import { STAGE_HINT, STAGE_LABEL, useStage, type WritingStage } from './stage';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
 const FlowEditor = lazy(() => import('./modules/flow/FlowEditor'));
@@ -137,6 +138,7 @@ export default function App() {
     if (kind === 'chapterCompile') setChapterCompile(true);
     else if (kind === 'manuscriptImport') importManuscriptRef.current?.click();
     else if (kind === 'remoteSync') setRemoteSync(true);
+    else if (kind === 'findReplace') setFindReplace(true);
   }, [toolRequest]);
   useEffect(() => startAutoSync(), []);
   // 桌面窗口:恢复上次尺寸,首次按屏幕比例
@@ -228,8 +230,10 @@ export default function App() {
   const canUndo = useLoom((s) => s.canUndo);
   const canRedo = useLoom((s) => s.canRedo);
   const workspacePreset = project.workspacePreset ?? 'universal';
-  const primaryTabKeys = workspacePrimaryTabs(workspacePreset);
-  const primaryTabs = WORKSPACE_PRIMARY_TABS[workspacePreset]
+  const stage = useStage((s) => s.stage);
+  const setStage = useStage((s) => s.setStage);
+  const primaryTabKeys = workspacePrimaryTabs(workspacePreset, stage);
+  const primaryTabs = primaryTabsFor(workspacePreset, stage)
     .map((key) => TABS.find((item) => item.key === key)!)
     .filter(Boolean);
   const otherTabs = TABS.filter((item) => !primaryTabKeys.has(item.key));
@@ -408,6 +412,18 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <ProjectMenu />
+          {workspacePreset === 'novel' && (
+            <div className="doc-mode-switch stage-switch mobile-hide">
+              {(['write', 'revise', 'plan'] as WritingStage[]).map((key) => (
+                <button
+                  key={key}
+                  className={stage === key ? 'primary' : 'ghost'}
+                  title={STAGE_HINT[key]}
+                  onClick={() => setStage(key)}
+                >{STAGE_LABEL[key]}</button>
+              ))}
+            </div>
+          )}
           <button
             className="ghost icon-btn"
             title="撤销 (Ctrl+Z)"

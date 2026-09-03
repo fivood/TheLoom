@@ -199,6 +199,18 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.61.0 写 / 改 / 理 三档写作阶段)
+
+预设此前只有一条「题材」轴(小说 / 互动 / 通用),而同一部小说在初稿 / 修订 / 构思三个阶段要的界面并不同。新增**与题材正交的阶段轴**,能力全部复用现成的:
+
+- **`src/stage.ts`**:`WritingStage = 'write' | 'revise' | 'plan'`,zustand 小 store(同 `toolBus` 惯例)+ localStorage `theloom-stage-v1`。**不进 Project** —— 台式机改稿、笔记本写初稿是合理状态,存进作品反而要处理迁移与同步冲突
+- **`workspace.ts` `primaryTabsFor(preset, stage)`**:只有 `novel + plan` 换顺序(大纲 / 时间线 / 规划优先),其余原样返回。`workspacePrimaryTabs` 加可选 stage 参数保持旧调用
+- **改**:`DocumentView` 工具栏出现 查找替换 / 存快照 / 版本差异,属性栏自动展开。查找替换经 `toolBus` 新增的 `'findReplace'` 请求交给 App(FindReplace 是 App 级状态)
+- **理**:`setMode('structure')`
+- **删掉 v0.60.0 的 `theloom-doc-inspector-v1`** —— 属性栏开合改由阶段决定,两处偏好并存必然打架
+- `workspace.test.ts` 加一条:**plan 的模块集合 = write 的集合 + timeline**,守住「阶段只重排、不增删模块」这条(预设 / 阶段一旦开始 gate 数据,用户会以为自己丢了内容)
+- 实测三档的导航顺序 / 工具栏 / 属性栏 / 正文视图逐项对上,阶段刷新后保持,通用预设下开关消失
+
 ## 最近变更(v0.60.0 写作界面减负)
 
 用户反馈:「作为纯小说写作的工具还是不太顺手,多余的按钮在写小说时会影响输入」。四层干扰逐层收掉,**全部按 `workspacePreset === 'novel'` 分流**,互动 / 通用预设一行不动:
