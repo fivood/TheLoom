@@ -42,7 +42,7 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
-import { hasStages, presetHomeTab, primaryTabsFor, stageHomeTab, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
+import { defaultSecondaryTab, hasStages, presetHomeTab, primaryTabsFor, stageHomeTab, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
 import { STAGE_HINT, STAGE_ICON, STAGE_LABEL, useStage, type WritingStage } from './stage';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
@@ -182,9 +182,13 @@ export default function App() {
   const recentVisits = useNav((s) => s.recent);
 
   // 搜索/反向引用跳转:切到目标模块,细节由模块自行消费
+  const secondaryTabRef = useRef<Tab | null>(null);
+  secondaryTabRef.current = secondaryTab;
   useEffect(() => {
     if (navTarget) {
-      setTab(navTarget.tab);
+      // 副面板已经开着这个模块时不动主面板:分屏的用法就是「左边写、右边查」
+      const inSecondary = secondaryTabRef.current === navTarget.tab && tabRef.current !== navTarget.tab;
+      if (!inSecondary) setTab(navTarget.tab);
       useNav.getState().setCurrentLabel(describeNavTarget(useLoom.getState().project, navTarget));
       if (Object.keys(navTarget).length === 1) useNav.getState().clear();
     }
@@ -254,7 +258,7 @@ export default function App() {
       if (k === 'k') { e.preventDefault(); setSearching(true); return; }
       if (e.key === '\\') {
         e.preventDefault();
-        setSecondaryTab((cur) => cur ? null : (tabRef.current === 'documents' ? 'flow' : 'documents'));
+        setSecondaryTab((cur) => cur ? null : defaultSecondaryTab(useLoom.getState().project.workspacePreset ?? 'universal', tabRef.current));
         return;
       }
       const t = e.target as HTMLElement;
@@ -524,7 +528,7 @@ export default function App() {
             className={`ghost icon-btn mobile-hide ${secondaryTab ? 'active' : ''}`}
             title="分屏:主副两个模块并列显示 (Ctrl+\)"
             aria-label="分屏"
-            onClick={() => setSecondaryTab((cur) => cur ? null : (tab === 'documents' ? 'flow' : 'documents'))}
+            onClick={() => setSecondaryTab((cur) => cur ? null : defaultSecondaryTab(workspacePreset, tab))}
           ><Icon name="split" /> 分屏</button>
           <button
             className={`ghost icon-btn ${aiAssistant ? 'active' : ''}`}
@@ -740,6 +744,17 @@ export default function App() {
                   })}
                 </div>
                 <span className="spacer" />
+                <button
+                  className="ghost icon-btn"
+                  title="与主面板互换:想在现在这一侧动手时用"
+                  aria-label="互换主副面板"
+                  onClick={() => {
+                    const swap = secondaryTab;
+                    setSecondaryTab(tab);
+                    setTab(swap);
+                    useNav.getState().visit({ tab: swap }, workspaceTabLabel(workspacePreset, swap));
+                  }}
+                ><Icon name="compare" size={14} /></button>
                 <button className="ghost icon-btn" title="关闭副面板" onClick={() => setSecondaryTab(null)}>×</button>
               </div>
               <div className="pane-inner">

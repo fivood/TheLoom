@@ -111,6 +111,20 @@ export function stageHomeTab(preset: WorkspacePreset, stage: WritingStage): Work
   return primaryTabsFor(preset, stage)[0];
 }
 
+/**
+ * 分屏时副面板默认配谁。配对原则是「左边干活、右边查」:
+ * 写正文查设定集,排大纲对正文,做流程对剧本。同模块双开由用户自己在副面板选。
+ */
+export function defaultSecondaryTab(preset: WorkspacePreset, primary: WorkspaceTab): WorkspaceTab {
+  if (primary === 'documents') return PRESET_TRAITS[preset].game ? 'flow' : 'entities';
+  if (primary === 'flow') return 'documents';
+  if (primary === 'outline' || primary === 'timeline' || primary === 'planning') return 'documents';
+  if (primary === 'entities' || primary === 'research' || primary === 'assets' || primary === 'map') {
+    return presetHomeTab(preset) === primary ? 'documents' : presetHomeTab(preset);
+  }
+  return 'documents';
+}
+
 /** 阶段开关对谁可见:通用预设本来就是完整导航,不需要再分阶段 */
 export function hasStages(preset: WorkspacePreset): boolean {
   return preset !== 'universal';
