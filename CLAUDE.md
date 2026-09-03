@@ -199,6 +199,15 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.63.1/.2 侧栏图标菜单 · 两个验证方法上的坑)
+
+侧栏 logo 改成应用菜单入口(项目总览 / 全局搜索 / 使用指南 / 检查更新 + 版本行,全部复用 App 已有 handler)。首版有 bug,**两条自查都给了假绿**:
+
+- **`.sidebar` 有 `overflow-x: hidden`**(为矮视口滚动加的),贴侧栏右侧 `position: absolute` 的菜单被整块裁掉。改 `position: fixed`,坐标在 onClick 里从按钮 `getBoundingClientRect()` 实测
+- **`.logo-menu` 写在 `.tools-menu` 之前 → 同特异性下被后者的 `position: absolute; right: 0; top: 100%` 盖回去**,即使写了 fixed 也不生效。规则必须排在 `.tools-menu` 之后(文件里已加注释说明)
+- **验证教训 ①**:`getBoundingClientRect()` 不反映祖先 overflow 裁剪(v0.46.0 已记过一次,这次又踩)。**验证教训 ②**:`element.click()` 对完全不可见的元素照样成功 —— 用它测「菜单能点」等于没测
+- **正确的自查**:对每个菜单项做 `document.elementFromPoint(中心点)` 命中测试,确认返回的就是该按钮本身(而不是 backdrop 或别的元素);这次三项全部命中才算过
+
 ## 最近变更(v0.63.0 「设」阶段 + v0.62.2/.3 预设可发现性)
 
 用户指出的建模错误:**世界观设定被做成了预设(项目是什么),但它其实是每种写作都要做的事**。修正为放到阶段轴(我现在在干什么):

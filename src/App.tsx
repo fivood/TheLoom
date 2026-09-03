@@ -164,8 +164,9 @@ export default function App() {
   useEscape(recentOpen, () => setRecentOpen(false));
   const [onboarding, setOnboarding] = useState(false);
   const [overview, setOverview] = useState(false);
-  const [logoMenu, setLogoMenu] = useState(false);
-  useEscape(logoMenu, () => setLogoMenu(false));
+  // 侧栏有 overflow-x: hidden,菜单必须 fixed 定位才不会被裁掉;坐标打开时从按钮实测
+  const [logoMenu, setLogoMenu] = useState<{ top: number; left: number } | null>(null);
+  useEscape(!!logoMenu, () => setLogoMenu(null));
   // 手机 / 小平板一律走移动壳:桌面三栏布局在这些尺寸上无法使用(判定见 useIsMobile)
   const isMobile = useIsMobile();
   const mobileShell = isMobile && !isTauri;
@@ -375,27 +376,30 @@ export default function App() {
             className={`logo ${logoMenu ? 'active' : ''}`}
             title="叙事织机 TheLoom · 总览 / 指南 / 版本"
             aria-label="应用菜单"
-            onClick={() => setLogoMenu((open) => !open)}
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setLogoMenu((open) => open ? null : { top: r.top, left: r.right + 6 });
+            }}
           >
             <img src="/logo.svg" alt="TheLoom" width={26} height={26} />
           </button>
           {logoMenu && (
             <>
-              <div className="backdrop" onClick={() => setLogoMenu(false)} />
-              <div className="tools-menu logo-menu">
-                <button onClick={() => { setLogoMenu(false); setOverview(true); }}>
+              <div className="backdrop" onClick={() => setLogoMenu(null)} />
+              <div className="tools-menu logo-menu" style={{ top: logoMenu.top, left: logoMenu.left }}>
+                <button onClick={() => { setLogoMenu(null); setOverview(true); }}>
                   <Icon name="grid" size={14} /> 项目总览 <span className="menu-key">Ctrl+Shift+K</span>
                 </button>
-                <button onClick={() => { setLogoMenu(false); setSearching(true); }}>
+                <button onClick={() => { setLogoMenu(null); setSearching(true); }}>
                   <Icon name="search" size={14} /> 全局搜索 <span className="menu-key">Ctrl+K</span>
                 </button>
-                <button onClick={() => { setLogoMenu(false); setHelp(true); }}>
+                <button onClick={() => { setLogoMenu(null); setHelp(true); }}>
                   <Icon name="help" size={14} /> 使用指南 <span className="menu-key">F1</span>
                 </button>
                 {isTauri && (
                   <button
                     disabled={checkingUpdate}
-                    onClick={() => { setLogoMenu(false); runUpdateCheck(false); }}
+                    onClick={() => { setLogoMenu(null); runUpdateCheck(false); }}
                   >
                     <Icon name="refresh" size={14} /> {checkingUpdate ? '检查中…' : '检查更新'}
                   </button>
