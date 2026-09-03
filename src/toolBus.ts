@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ToolRequest = 'chapterCompile' | 'manuscriptImport' | 'remoteSync' | 'findReplace';
+export type ToolRequest = 'chapterCompile' | 'manuscriptImport' | 'remoteSync' | 'findReplace' | 'fdxExport';
 
 interface ToolBus {
   request: { seq: number; kind: ToolRequest } | null;

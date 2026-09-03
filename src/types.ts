@@ -958,7 +958,8 @@ export interface SavedProjectQuery {
 
 /* ---------- 项目 ---------- */
 
-export type WorkspacePreset = 'novel' | 'interactive' | 'universal';
+export const WORKSPACE_PRESETS = ['novel', 'screenplay', 'codex', 'nonfiction', 'trpg', 'interactive', 'universal'] as const;
+export type WorkspacePreset = typeof WORKSPACE_PRESETS[number];
 
 export type WritingCountMode = 'cjk' | 'characters' | 'englishWords';
 

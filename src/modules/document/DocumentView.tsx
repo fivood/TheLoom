@@ -19,6 +19,7 @@ import Inspector from '../../components/Inspector';
 import DocumentStructureDialog from './DocumentStructureDialog';
 import { useToolBus } from '../../toolBus';
 import { useStage } from '../../stage';
+import { isProsePreset } from '../../workspace';
 import { useEscape } from '../../hooks/useEscape';
 import {
   countDocumentReferences,
@@ -59,7 +60,7 @@ export default function DocumentView() {
   const [structureToolsOpen, setStructureToolsOpen] = useState(false);
 
   const workspacePreset = project.workspacePreset ?? 'universal';
-  const isNovel = workspacePreset === 'novel';
+  const isNovel = isProsePreset(workspacePreset);
   const stage = useStage((s) => s.stage);
   const isRevising = isNovel && stage === 'revise';
   // 属性栏与专注模式的场景列表都是本机界面状态,不入项目
@@ -488,6 +489,12 @@ export default function DocumentView() {
                     title="按卷 / 章勾选场景,编译为 Word / Markdown / TXT / Final Draft 成品稿"
                     onClick={() => { setMoreOpen(false); useToolBus.getState().open('chapterCompile'); }}
                   ><Icon name="script" size={13} /> 成稿导出</button>
+                  {workspacePreset === 'screenplay' && (
+                    <button
+                      title="导出 Final Draft (.fdx),按流程 / 文档勾选范围"
+                      onClick={() => { setMoreOpen(false); useToolBus.getState().open('fdxExport'); }}
+                    ><Icon name="script" size={13} /> 导出 Final Draft</button>
+                  )}
                   <button
                     title="新建场景分类"
                     onClick={() => { setMoreOpen(false); void addCategory(); }}

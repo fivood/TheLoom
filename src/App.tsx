@@ -42,7 +42,7 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
-import { primaryTabsFor, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
+import { isProsePreset, presetHomeTab, primaryTabsFor, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
 import { STAGE_HINT, STAGE_LABEL, useStage, type WritingStage } from './stage';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
@@ -109,8 +109,8 @@ export default function App() {
       const saved = localStorage.getItem(TAB_MEMORY_KEY) as Tab | null;
       if (saved && VALID_TABS.includes(saved)) return saved;
     } catch { /* 忽略 */ }
-    // 首次进入:小说/通用落在「文档」,互动叙事落在「流程」
-    return useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents';
+    // 首次进入:落点按预设决定(见 presetHomeTab),之后一律记住上次停留的模块
+    return presetHomeTab(useLoom.getState().project.workspacePreset ?? 'universal');
   });
   useEffect(() => {
     try { localStorage.setItem(TAB_MEMORY_KEY, tab); } catch { /* 忽略 */ }
@@ -139,6 +139,7 @@ export default function App() {
     else if (kind === 'manuscriptImport') importManuscriptRef.current?.click();
     else if (kind === 'remoteSync') setRemoteSync(true);
     else if (kind === 'findReplace') setFindReplace(true);
+    else if (kind === 'fdxExport') setFdxExport(true);
   }, [toolRequest]);
   useEffect(() => startAutoSync(), []);
   // 桌面窗口:恢复上次尺寸,首次按屏幕比例
@@ -412,7 +413,7 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <ProjectMenu />
-          {workspacePreset === 'novel' && (
+          {isProsePreset(workspacePreset) && (
             <div className="doc-mode-switch stage-switch mobile-hide">
               {(['write', 'revise', 'plan'] as WritingStage[]).map((key) => (
                 <button
@@ -745,10 +746,10 @@ export default function App() {
       {help && <HelpPanel onClose={() => setHelp(false)} />}
       {onboarding && !mobileShell && (
         <Onboarding
-          onContinueBlank={() => { setTab(useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents'); }}
+          onContinueBlank={() => { setTab(presetHomeTab(useLoom.getState().project.workspacePreset ?? 'universal')); }}
           onLoadSample={() => {
             useLoom.getState().loadSampleProject();
-            setTab(useLoom.getState().project.workspacePreset === 'interactive' ? 'flow' : 'documents');
+            setTab(presetHomeTab(useLoom.getState().project.workspacePreset ?? 'universal'));
           }}
           onClose={() => setOnboarding(false)}
         />

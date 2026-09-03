@@ -3,7 +3,7 @@ import type {
   FlowEdge, FlowNode, NarrativeUnit, NarrativeUnitKind, Project, SubFlow,
 } from './types';
 import type { AssetKind } from './types';
-import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL, FLOW_NODE_LABEL, PALETTE } from './types';
+import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL, FLOW_NODE_LABEL, PALETTE, WORKSPACE_PRESETS } from './types';
 import { cleanTemplateRefs, migrateLegacyTemplates, migrateTemplateInstances } from './templates';
 import { normalizeWritingProgress } from './writingProgress';
 import { normalizeRevisionTasks } from './revisionWorkflow';
@@ -12,7 +12,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 
 /** 兼容旧版本数据:补齐后加字段 */
 export function normalizeProject(p: Project): Project {
-  if (!['novel', 'interactive', 'universal'].includes(p.workspacePreset ?? '')) p.workspacePreset = 'universal';
+  if (!(WORKSPACE_PRESETS as readonly string[]).includes(p.workspacePreset ?? '')) p.workspacePreset = 'universal';
   p.flows ??= [];
   p.entities ??= [];
   p.brainstormNotes ??= [];

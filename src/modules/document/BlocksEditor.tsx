@@ -9,6 +9,7 @@ import type { DocBlock, DocBlockType, Document } from '../../types';
 import { DOC_BLOCK_LABEL } from '../../types';
 import { walkFlowNodes } from '../../util';
 import { convertBlock, emptyBlock } from '../../documentOperations';
+import { isProsePreset } from '../../workspace';
 import StaticBlock from './StaticBlock';
 
 export { emptyBlock };
@@ -40,9 +41,13 @@ export default function BlocksEditor({
   const redo = useLoom((s) => s.redo);
   const canUndo = useLoom((s) => s.canUndo ?? false);
   const canRedo = useLoom((s) => s.canRedo ?? false);
-  const isNovel = workspacePreset === 'novel';
+  const isNovel = isProsePreset(workspacePreset ?? 'universal');
   const moreTypes = isNovel ? MORE_TYPES.filter((t) => !GAME_TYPES.includes(t)) : MORE_TYPES;
-  const slashTypes = [...COMMON_TYPES, ...moreTypes];
+  const commonTypes: DocBlockType[] = workspacePreset === 'screenplay'
+    ? ['heading', 'action', 'dialogue']
+    : COMMON_TYPES;
+  // 常用块按预设换,但换类型的菜单里必须仍能拿到全部可用类型(剧本预设也会有正文段落)
+  const slashTypes = [...new Set([...commonTypes, ...COMMON_TYPES, ...moreTypes])];
   const [activeBlockId, setActiveBlockIdRaw] = useState<string | null>(focusBlockId ?? doc.blocks[0]?.id ?? null);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(focusBlockId ?? null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -580,7 +585,7 @@ export default function BlocksEditor({
             {/* 小说预设:Enter 就是新段落,插入动作 / 对白是剧本需求,不占键盘上方那一条 */}
             {!isNovel && <>
               <span className="doc-focus-sep" />
-              {COMMON_TYPES.map((type) => (
+              {commonTypes.map((type) => (
                 <button
                   key={type}
                   className="ghost"
@@ -627,7 +632,7 @@ export default function BlocksEditor({
         <span className="hint">Enter 新段 · Shift+Enter 换行 · / 切换类型 · Alt+↑↓ 移动</span>
         {moreOpen && (
           <div className="doc-more-types">
-            {[...COMMON_TYPES, ...moreTypes].map((type) => (
+            {slashTypes.map((type) => (
               <button key={type} className="ghost" onClick={() => insertBlock(type)}>
                 {DOC_BLOCK_LABEL[type]}
               </button>
@@ -637,7 +642,7 @@ export default function BlocksEditor({
       </div>}
 
       {variant !== 'focus' && !isNovel && <div className="doc-insert-bar">
-        {COMMON_TYPES.map((type) => (
+        {commonTypes.map((type) => (
           <button key={type} className="ghost" onClick={() => insertBlock(type)}>
             ＋ {DOC_BLOCK_LABEL[type]}
           </button>

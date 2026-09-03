@@ -8,6 +8,7 @@ import SceneWall from './SceneWall';
 import PacingChart from './PacingChart';
 import WritingDashboard from './WritingDashboard';
 import { useLoom } from '../../store';
+import { isProsePreset } from '../../workspace';
 import RevisionCenter from './RevisionCenter';
 
 export type PlanningView = 'progress' | 'revision' | 'relations' | 'arcs' | 'foreshadow' | 'appearance' | 'wall' | 'pacing';
@@ -42,7 +43,7 @@ void _allViewsGrouped;
 
 export default function Planning() {
   const workspacePreset = useLoom((state) => state.project.workspacePreset);
-  const [view, setView] = useState<PlanningView>(workspacePreset === 'novel' ? 'progress' : 'relations');
+  const [view, setView] = useState<PlanningView>(isProsePreset(workspacePreset ?? 'universal') ? 'progress' : 'relations');
   const [navEntityId, setNavEntityId] = useState<string | null>(null);
   const [navForeshadowId, setNavForeshadowId] = useState<string | null>(null);
 

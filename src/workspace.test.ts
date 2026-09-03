@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Project } from './types';
 import { normalizeProject } from './util';
-import { WORKSPACE_PRIMARY_TABS, primaryTabsFor, workspaceTabLabel } from './workspace';
+import { WORKSPACE_PRESETS } from './types';
+import { WORKSPACE_PRIMARY_TABS, presetHomeTab, primaryTabsFor, workspaceTabLabel } from './workspace';
 
 describe('R17-4 项目工作区预设', () => {
   it('旧项目自动保持通用完整导航', () => {
@@ -42,5 +43,14 @@ describe('R17-4 项目工作区预设', () => {
     expect([...plan].sort()).toEqual([...write, 'timeline'].sort());
     expect(primaryTabsFor('interactive', 'plan')).toEqual(primaryTabsFor('interactive', 'write'));
     expect(primaryTabsFor('novel', 'revise')).toEqual(write);
+  });
+
+  it('每个预设的落点模块都在自己的首层导航里,且首层无重复', () => {
+    for (const preset of WORKSPACE_PRESETS) {
+      const tabs = WORKSPACE_PRIMARY_TABS[preset];
+      expect(tabs.length).toBeGreaterThan(0);
+      expect(new Set(tabs).size).toBe(tabs.length);
+      expect(tabs).toContain(presetHomeTab(preset));
+    }
   });
 });

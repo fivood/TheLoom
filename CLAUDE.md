@@ -199,6 +199,19 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.62.0 四套新预设:剧本 / 设定集 / 纪实 / TRPG)
+
+预设 3 → 7。**关键是没有让 `isNovel` 判断继续增殖**:
+
+- **`WORKSPACE_PRESETS` 常量 + `typeof [number]` 派生联合类型**(`types.ts`),`normalizeProject` 的白名单改为读这个常量 —— 以后加预设不会漏掉校验
+- **`PRESET_TRAITS: Record<WorkspacePreset, { prose, game }>`**(`workspace.ts`):`prose` 决定收起块结构按钮 / 隐藏游戏块类型 / 提供写-改-理阶段;`game` 决定落点是流程。原先散在 BlocksEditor / DocumentView / Planning / App 的四处 `workspacePreset === 'novel'` 全部换成 `isProsePreset(...)`,新增预设只填这张表
+- **`presetHomeTab(preset)`**:打开项目的落点与首层顺序解耦(小说首层是风暴但落点是正文;设定集落设定集,纪实落资料)。**注意 `theloom-last-tab` 记忆优先**,落点只在首次进入生效
+- **「理」阶段重排改为通用规则**(`PLAN_FIRST` 提到最前 + 其余保序),删掉 `NOVEL_PLAN_TABS` 硬表 —— 四套散文型预设自动都有
+- **剧本预设的常用块换成 `heading / action / dialogue`**。`slashTypes` 必须取**并集**(`[...new Set([...commonTypes, ...COMMON_TYPES, ...moreTypes])]`)—— 第一版按预设替换后,正文段落在剧本预设里彻底选不到了(导入的稿子里有 paragraph 块就没法改类型),浏览器实测才发现
+- 剧本预设的正文 ⋯ 菜单加「导出 Final Draft」(`toolBus` 新增 `'fdxExport'`)
+- `workspace.test.ts` 加一条:**每个预设的 `presetHomeTab` 必须在自己的首层导航里**,且首层无重复 —— 防止以后改 tab 数组把落点改到「其他」区里
+- 已知缺口(未做):剧本没有「转场」块类型,`DOC_BLOCK_LABEL` 也不随预设改名(剧本作者看到的仍是「场景锚点」)。要补的话是块类型层的改动,单独一批
+
 ## 最近变更(v0.61.0 写 / 改 / 理 三档写作阶段)
 
 预设此前只有一条「题材」轴(小说 / 互动 / 通用),而同一部小说在初稿 / 修订 / 构思三个阶段要的界面并不同。新增**与题材正交的阶段轴**,能力全部复用现成的:
