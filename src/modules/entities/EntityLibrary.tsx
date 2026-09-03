@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { fileToAvatar } from '../../util';
 import { findEntityRefs, useNav } from '../../search';
-import { confirmDialog, alertDialog } from '../../dialog';
+import { confirmDialog, alertDialog, promptText } from '../../dialog';
 import type { Entity, EntityKind } from '../../types';
 import { ENTITY_KIND_LABEL, PALETTE } from '../../types';
 import { activePaletteColors } from '../../util';
@@ -18,6 +18,7 @@ import { EntityRefEditor, fieldRefIds } from '../../components/EntityRefField';
 import type { EntityFieldType, EntityTemplateField, EntityTemplateSpec } from '../../types';
 import EntityEditor from './EntityEditor';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
+import { CODEX_GROUP_LABEL, groupEntities, type CodexGroup, type CodexGroupBy } from './codexGroups';
 import { useEscape } from '../../hooks/useEscape';
 
 
@@ -193,7 +194,13 @@ export default function EntityLibrary() {
 
   const [editingTemplate, setEditingTemplate] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'table' | 'overview'>('cards');
+  const folders = useLoom((s) => s.project.folders);
+  const addFolder = useLoom((s) => s.addFolder);
+  // 建过分类文件夹的项目默认按分类看:那才是这部作品自己的世界观骨架
+  const [groupBy, setGroupBy] = useState<CodexGroupBy>(
+    () => folders.some((f) => f.module === 'entity') ? 'folder' : 'kind',
+  );
 
   const fieldColumns = useMemo(() => {
     const seen = new Map<string, EntityFieldType>();
@@ -205,16 +212,16 @@ export default function EntityLibrary() {
     return Array.from(seen, ([label, type]) => ({ label, type }));
   }, [filtered]);
 
-  const createEntity = () => {
-    const kind = kindFilter === 'all' ? 'character' : kindFilter;
+  const createEntity = (into?: { kind?: EntityKind; folderId?: string; templateId?: string }) => {
+    const kind = into?.kind ?? (kindFilter === 'all' ? 'character' : kindFilter);
     const project = useLoom.getState().project;
     const defaultTpl = defaultEntityTemplate(project, kind);
     const tpl = resolveTemplateFields(project, defaultTpl?.id);
     const cols = activePaletteColors(project);
     const e: Entity = {
       id: uid(), kind, name: `新${ENTITY_KIND_LABEL[kind]}`,
-      folderId: selected?.folderId,
-      templateId: defaultTpl?.id,
+      folderId: into ? into.folderId : selected?.folderId,
+      templateId: into?.templateId ?? defaultTpl?.id,
       color: cols[entities.length % cols.length] ?? PALETTE[0],
       emoji: '', summary: '',
       fields: tpl.map((tf) => ({ id: uid(), label: tf.label, value: '', type: tf.type, filterKind: tf.filterKind })),
@@ -235,6 +242,23 @@ export default function EntityLibrary() {
 
   const templates = useLoom((s) => s.project.templates);
   const projectForSpecs = useLoom((s) => s.project);
+  const groups = useMemo(
+    () => groupEntities(filtered, folders, templates ?? [], groupBy),
+    [filtered, folders, templates, groupBy],
+  );
+  // 总览要看全貌,不受搜索与类型筛选影响
+  const allGroups = useMemo(
+    () => groupEntities(entities, folders, templates ?? [], groupBy === 'none' ? 'folder' : groupBy),
+    [entities, folders, templates, groupBy],
+  );
+
+  const addCategory = async () => {
+    const name = await promptText({ message: '新分类名称(例如:魔法体系 / 势力 / 地理 / 历史)', placeholder: '分类名称' });
+    const clean = name?.trim();
+    if (!clean) return;
+    addFolder({ id: uid(), module: 'entity', name: clean });
+    setGroupBy('folder');
+  };
 
   return (
     <>
@@ -266,18 +290,92 @@ export default function EntityLibrary() {
             <option value="all">全部类型</option>
             {KINDS.map((kind) => <option key={kind} value={kind}>{ENTITY_KIND_LABEL[kind]}</option>)}
           </select>
+          <select
+            value={groupBy}
+            title="分组方式:内置类型只是通用骨架,作品自己的分类用文件夹或模板"
+            onChange={(event) => setGroupBy(event.target.value as CodexGroupBy)}
+            style={{ width: 150 }}
+          >
+            {(Object.keys(CODEX_GROUP_LABEL) as CodexGroupBy[]).map((key) => (
+              <option key={key} value={key}>{CODEX_GROUP_LABEL[key]}</option>
+            ))}
+          </select>
+          <div className="doc-mode-switch">
+            {([['overview', '总览'], ['cards', '卡片'], ['table', '表格']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                className={viewMode === key ? 'primary' : 'ghost'}
+                onClick={() => setViewMode(key)}
+              >{label}</button>
+            ))}
+          </div>
+          <button className="ghost" title="新建一个分类(实体文件夹),可以先摆骨架再填内容" onClick={() => void addCategory()}>＋ 分类</button>
           <button className="ghost" title="按类型设置字段模板" onClick={() => setEditingTemplate(true)}>字段模板</button>
-          <button
-            className={`ghost${viewMode === 'table' ? ' active' : ''}`}
-            title={viewMode === 'cards' ? '切换到表格视图' : '切换到卡片视图'}
-            onClick={() => setViewMode(viewMode === 'cards' ? 'table' : 'cards')}
-          >{viewMode === 'cards' ? '表格' : '卡片'}</button>
           <input placeholder="搜索名称或简介…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
           <span className="hint">实体库中的角色可在流程编辑器里作为说话人引用</span>
         </div>
-        {viewMode === 'cards' ? (
-          <div className="card-grid">
-            {filtered.map((e) => (
+        {viewMode === 'overview' ? (
+          <div className="codex-overview">
+            <div className="codex-overview-head">
+              <span>共 {entities.length} 条设定 · {allGroups.filter((g) => g.items.length > 0).length} 个有内容的分类</span>
+              <span className="hint">先摆出分类骨架,再逐个填 —— 空分类会一直留在这里提醒你</span>
+            </div>
+            <div className="codex-grid">
+              {allGroups.map((g) => (
+                <div key={g.key} className={`codex-card ${g.items.length === 0 ? 'empty' : ''}`}>
+                  <div className="codex-card-head">
+                    <span className="codex-card-name">{g.label}</span>
+                    <span className="codex-card-count">{g.items.length}</span>
+                  </div>
+                  <div className="codex-card-meta">
+                    {g.items.length === 0
+                      ? '还是空的'
+                      : `${g.filled} / ${g.items.length} 写了简介`}
+                  </div>
+                  <div className="codex-chips">
+                    {g.items.slice(0, 12).map((e) => (
+                      <button
+                        key={e.id}
+                        className="codex-chip"
+                        style={{ borderColor: e.color }}
+                        onClick={() => { setSelectedId(e.id); setViewMode('cards'); }}
+                        title={e.summary || '还没有简介'}
+                      >
+                        {!e.summary.trim() && <span className="codex-chip-dot" />}
+                        {e.name}
+                      </button>
+                    ))}
+                    {g.items.length > 12 && <span className="hint">…另有 {g.items.length - 12} 条</span>}
+                  </div>
+                  <button
+                    className="ghost codex-add"
+                    onClick={() => createEntity({ kind: g.kind, folderId: g.folderId, templateId: g.templateId })}
+                  >＋ 新建到这一类</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : viewMode === 'cards' ? (
+          <div className="codex-cards-scroll">
+            {(groupBy === 'none' ? [{ key: 'all', label: '', items: filtered, filled: 0 } as CodexGroup] : groups)
+              .filter((g) => g.items.length > 0 || groupBy === 'folder')
+              .map((g) => (
+              <div key={g.key} className="codex-section">
+                {groupBy !== 'none' && (
+                  <div className="codex-section-head">
+                    <span>{g.label}</span>
+                    <span className="codex-card-count">{g.items.length}</span>
+                    <button
+                      className="ghost codex-section-add"
+                      title="新建到这一类"
+                      onClick={() => createEntity({ kind: g.kind, folderId: g.folderId, templateId: g.templateId })}
+                    >＋</button>
+                  </div>
+                )}
+                {g.items.length === 0
+                  ? <div className="hint" style={{ padding: '2px 4px 8px' }}>这一类还是空的</div>
+                  : <div className="card-grid">
+            {g.items.map((e) => (
               <div
                 key={e.id}
                 className={`info-card ${selectedId === e.id ? 'selected' : ''}`}
@@ -310,9 +408,12 @@ export default function EntityLibrary() {
                 )}
               </div>
             ))}
+                    </div>}
+              </div>
+            ))}
             {filtered.length === 0 && (
-              <div className="empty-hint" style={{ gridColumn: '1/-1' }}>
-                {entities.length === 0 ? '还没有实体。点击上方「＋ 新建实体」创建角色、地点或设定。' : '没有匹配的实体'}
+              <div className="empty-hint">
+                {entities.length === 0 ? '还没有设定。点击上方「＋ 分类」先摆出骨架,或用左侧「＋ 新建实体」直接写。' : '没有匹配的实体'}
               </div>
             )}
           </div>

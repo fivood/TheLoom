@@ -5631,3 +5631,48 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .sync-btn.busy > svg { animation: sync-spin 1.1s linear infinite; }
 }
 @keyframes sync-spin { to { transform: rotate(360deg); } }
+
+/* ---------- 设定集:总览与分组卡片 ---------- */
+.codex-overview, .codex-cards-scroll { flex: 1; overflow-y: auto; padding: 12px 14px 20px; }
+.codex-overview-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 12px; font-size: 13px; color: var(--text-dim);
+}
+.codex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.codex-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  padding: 10px 12px 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.codex-card.empty { background: transparent; border-style: dashed; }
+.codex-card-head { display: flex; align-items: center; gap: 8px; }
+.codex-card-name { font-weight: 600; font-size: 13px; color: var(--text); }
+.codex-card-count {
+  margin-left: auto; font-size: 11px; color: var(--text-faint);
+  background: var(--bg-panel); border-radius: 999px; padding: 1px 8px;
+}
+.codex-card-meta { font-size: 11px; color: var(--text-faint); }
+.codex-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.codex-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; padding: 2px 8px;
+  border: 1px solid var(--border); border-left-width: 3px;
+  border-radius: 6px; background: transparent; color: var(--text-dim); cursor: pointer;
+}
+.codex-chip:hover { background: var(--bg-hover); color: var(--text); }
+.codex-chip-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
+.codex-add { align-self: flex-start; font-size: 12px; padding: 2px 6px; }
+.codex-section { margin-bottom: 14px; }
+.codex-section-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 2px 4px 6px; font-size: 12px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border); margin-bottom: 8px;
+}
+.codex-section-add { padding: 0 6px; font-size: 13px; }
+.codex-section .card-grid { padding: 0; }
