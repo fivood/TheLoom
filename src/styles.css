@@ -11,6 +11,7 @@
   --border-light: #cfcdc7;
   --text: #1b1b19;
   --text-dim: #6d6c67;
+  --ink-quote: #3f6b8a;
   --text-faint: #82807a;
   --accent: #1b1b19;      /* 主色 = 黑;深色下变浅 */
   --accent-soft: #efeeea;
@@ -3790,6 +3791,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
     --border-light: #4a4a55;
     --text: #e8e6e0;
     --text-dim: #a09e97;
+    --ink-quote: #8fc0dd;
     --text-faint: #8b897f;
     --accent: #f5f4ef;
     --accent-soft: #2a2a30;
@@ -3852,6 +3854,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   --border-light: #4a4a55;
   --text: #e8e6e0;
   --text-dim: #a09e97;
+  --ink-quote: #8fc0dd;
   --text-faint: #8b897f;
   --accent: #f5f4ef;
   --accent-soft: #2a2a30;
@@ -5681,3 +5684,6 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .codex-section-add { padding: 0 6px; font-size: 13px; }
 .codex-section .card-grid { padding: 0; }
+
+/* 「」引文:只在渲染层着色,正文里存的仍是普通引号 */
+.ink-quote { color: var(--ink-quote); }
