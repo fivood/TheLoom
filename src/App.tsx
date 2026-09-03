@@ -707,20 +707,6 @@ export default function App() {
                       e.currentTarget.value = '';
                     }}
                   />
-                  {isTauri && (
-                    <>
-                      <div className="tools-sep" />
-                      <div className="tools-label">关于</div>
-                      <button
-                        title="检查并安装新版本"
-                        onClick={() => { setToolsOpen(false); runUpdateCheck(false); }}
-                        disabled={checkingUpdate}
-                      >
-                        <Icon name="refresh" size={14} /> {checkingUpdate ? '检查中…' : '检查更新'}
-                      </button>
-                      <span className="hint" style={{ padding: '2px 12px 6px' }}>当前版本 v{__APP_VERSION__}</span>
-                    </>
-                  )}
                 </div>
               </>
             )}
