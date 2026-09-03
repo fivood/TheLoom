@@ -42,7 +42,7 @@ import QueryPanel from './components/QueryPanel';
 import Icon, { type IconName } from './components/Icon';
 import { useIsMobile } from './mobile/useIsMobile';
 import MobileShell from './mobile/MobileShell';
-import { isProsePreset, presetHomeTab, primaryTabsFor, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
+import { hasStages, presetHomeTab, primaryTabsFor, workspacePrimaryTabs, workspaceTabLabel, type WorkspaceTab } from './workspace';
 import { STAGE_HINT, STAGE_LABEL, useStage, type WritingStage } from './stage';
 
 // 模块懒加载:首屏只加载默认 tab(流程),其他 9 个模块切换时才下载对应 chunk
@@ -413,9 +413,9 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <ProjectMenu />
-          {isProsePreset(workspacePreset) && (
+          {hasStages(workspacePreset) && (
             <div className="doc-mode-switch stage-switch mobile-hide">
-              {(['write', 'revise', 'plan'] as WritingStage[]).map((key) => (
+              {(['write', 'revise', 'plan', 'codex'] as WritingStage[]).map((key) => (
                 <button
                   key={key}
                   className={stage === key ? 'primary' : 'ghost'}

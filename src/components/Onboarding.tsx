@@ -24,7 +24,7 @@ export function markOnboarded() {
 const MODES: { key: WorkspacePreset; label: string; desc: string }[] = [
   { key: 'novel', label: '小说', desc: '正文为主:正文、设定集、大纲、资料' },
   { key: 'screenplay', label: '剧本', desc: '影视 / 舞台:剧本、场次表、人物,导出 Final Draft' },
-  { key: 'codex', label: '设定集', desc: '世界观与百科:设定集、地图、时间线、关系图' },
+  { key: 'codex', label: '设定集', desc: '整部作品就是世界观设定;写小说时查设定用「设」阶段就行' },
   { key: 'nonfiction', label: '纪实', desc: '非虚构:资料来源、大纲、正文、时间线' },
   { key: 'trpg', label: 'TRPG 模组', desc: '跑团:遭遇流程、NPC 与道具、地图、检定' },
   { key: 'interactive', label: '互动叙事', desc: '游戏剧本:流程、变量、实体、演出' },

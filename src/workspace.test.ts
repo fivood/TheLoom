@@ -41,7 +41,7 @@ describe('R17-4 项目工作区预设', () => {
     expect(plan[0]).toBe('outline');
     expect(plan.indexOf('documents')).toBeGreaterThan(plan.indexOf('outline'));
     expect([...plan].sort()).toEqual([...write, 'timeline'].sort());
-    expect(primaryTabsFor('interactive', 'plan')).toEqual(primaryTabsFor('interactive', 'write'));
+    expect(primaryTabsFor('universal', 'plan')).toEqual(primaryTabsFor('universal', 'write'));
     expect(primaryTabsFor('novel', 'revise')).toEqual(write);
   });
 
@@ -52,5 +52,15 @@ describe('R17-4 项目工作区预设', () => {
       expect(new Set(tabs).size).toBe(tabs.length);
       expect(tabs).toContain(presetHomeTab(preset));
     }
+  });
+
+  it('「设」阶段任何题材都能进,把设定集提到最前且不增删模块', () => {
+    for (const preset of WORKSPACE_PRESETS) {
+      const write = primaryTabsFor(preset, 'write');
+      const codex = primaryTabsFor(preset, 'codex');
+      expect([...codex].sort()).toEqual([...new Set([...write, 'entities', 'map', 'timeline', 'planning', 'research'])].sort());
+      if (preset !== 'universal') expect(codex[0]).toBe('entities');
+    }
+    expect(primaryTabsFor('universal', 'codex')).toEqual(primaryTabsFor('universal', 'write'));
   });
 });

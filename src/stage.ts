@@ -7,18 +7,20 @@
  */
 import { create } from 'zustand';
 
-export type WritingStage = 'write' | 'revise' | 'plan';
+export type WritingStage = 'write' | 'revise' | 'plan' | 'codex';
 
 export const STAGE_LABEL: Record<WritingStage, string> = {
   write: '写',
   revise: '改',
   plan: '理',
+  codex: '设',
 };
 
 export const STAGE_HINT: Record<WritingStage, string> = {
   write: '初稿:只留正文,工具按需展开',
   revise: '修订:查找替换、快照、版本差异与批注在手边',
   plan: '构思:大纲、时间线与规划优先,正文按块整理',
+  codex: '设定:设定集、地图、关系图与资料优先,查设定不必离开当前作品',
 };
 
 const STORE_KEY = 'theloom-stage-v1';
@@ -26,7 +28,7 @@ const STORE_KEY = 'theloom-stage-v1';
 export function loadStage(): WritingStage {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw === 'write' || raw === 'revise' || raw === 'plan') return raw;
+    if (raw === 'write' || raw === 'revise' || raw === 'plan' || raw === 'codex') return raw;
   } catch { /* 忽略 */ }
   return 'write';
 }

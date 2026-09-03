@@ -17,7 +17,7 @@ export const WORKSPACE_PRESET_LABEL: Record<WorkspacePreset, string> = {
 export const WORKSPACE_PRESET_HINT: Record<WorkspacePreset, string> = {
   novel: '从风暴起步,首层为风暴、正文、大纲、设定集、规划、资料',
   screenplay: '影视 / 舞台剧:剧本、场次表、人物、规划,导出 Final Draft',
-  codex: '世界观与百科:设定集、地图、时间线、关系图在前,正文靠后',
+  codex: '整部作品就是设定集时选它;写小说 / 剧本时只是要查设定,用顶栏的「设」阶段即可',
   nonfiction: '纪实与非虚构:资料来源、大纲、正文、时间线',
   trpg: '跑团模组:遭遇流程、NPC 与道具、地图、检定变量',
   interactive: '优先显示流程、剧本、实体、变量和资源',
@@ -97,14 +97,24 @@ export function workspaceTabLabel(preset: WorkspacePreset, tab: WorkspaceTab): s
   return UNIVERSAL_LABELS[tab];
 }
 
-/** 「理」阶段把这三个整理用的模块提到最前,其余保持预设自身顺序 */
-const PLAN_FIRST: WorkspaceTab[] = ['outline', 'timeline', 'planning'];
+/** 阶段各自要提到最前的模块;其余保持预设自身顺序,只重排不删 */
+const STAGE_FIRST: Partial<Record<WritingStage, WorkspaceTab[]>> = {
+  plan: ['outline', 'timeline', 'planning'],
+  // 设定不是某一种题材专属的:小说要翻人物关系,剧本要查地点,跑团更是。
+  // 所以它是阶段而不是预设,任何作品都能切进来。
+  codex: ['entities', 'map', 'timeline', 'planning', 'research'],
+};
 
-/** 首层 tab 顺序。阶段只在散文型预设的「理」下改变导航,且只重排、不删模块 */
+/** 阶段开关对谁可见:通用预设本来就是完整导航,不需要再分阶段 */
+export function hasStages(preset: WorkspacePreset): boolean {
+  return preset !== 'universal';
+}
+
 export function primaryTabsFor(preset: WorkspacePreset, stage: WritingStage): WorkspaceTab[] {
   const base = WORKSPACE_PRIMARY_TABS[preset];
-  if (stage !== 'plan' || !PRESET_TRAITS[preset].prose) return base;
-  return [...PLAN_FIRST, ...base.filter((tab) => !PLAN_FIRST.includes(tab))];
+  const first = STAGE_FIRST[stage];
+  if (!first || !hasStages(preset)) return base;
+  return [...first, ...base.filter((tab) => !first.includes(tab))];
 }
 
 export function workspacePrimaryTabs(preset: WorkspacePreset, stage: WritingStage = 'write'): Set<WorkspaceTab> {

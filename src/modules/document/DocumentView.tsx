@@ -19,7 +19,7 @@ import Inspector from '../../components/Inspector';
 import DocumentStructureDialog from './DocumentStructureDialog';
 import { useToolBus } from '../../toolBus';
 import { useStage } from '../../stage';
-import { isProsePreset } from '../../workspace';
+import { hasStages, isProsePreset } from '../../workspace';
 import { useEscape } from '../../hooks/useEscape';
 import {
   countDocumentReferences,
@@ -62,16 +62,16 @@ export default function DocumentView() {
   const workspacePreset = project.workspacePreset ?? 'universal';
   const isNovel = isProsePreset(workspacePreset);
   const stage = useStage((s) => s.stage);
-  const isRevising = isNovel && stage === 'revise';
+  const isRevising = hasStages(workspacePreset) && stage === 'revise';
   // 属性栏与专注模式的场景列表都是本机界面状态,不入项目
   const [inspectorOpen, setInspectorOpen] = useState(!isNovel || stage === 'revise');
   const [focusNavOpen, setFocusNavOpen] = useState(true);
   // 切阶段即换布局:改稿要属性栏(批注 / 快照 / 元数据),理稿进结构视图
   useEffect(() => {
-    if (!isNovel) return;
+    if (!hasStages(workspacePreset)) return;
     setInspectorOpen(stage === 'revise');
     setMode(stage === 'plan' ? 'structure' : 'writing');
-  }, [stage, isNovel]);
+  }, [stage, workspacePreset]);
   const isInteractive = workspacePreset === 'interactive';
 
   const navSeq = useNav((s) => s.seq);
