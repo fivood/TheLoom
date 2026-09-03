@@ -570,7 +570,7 @@ export default function App() {
           <SyncButton />
           <ThemeToggle />
           <div className="tools-wrap">
-            <button className="ghost icon-btn" onClick={() => setToolsOpen((o) => !o)} title="工具:文件 / 体检 / 历史 / 协作 / 导出" aria-label="工具菜单">
+            <button className="ghost icon-btn" onClick={() => setToolsOpen((o) => !o)} title="工具:检查 / 项目数据 / 素材 / AI / 导入导出" aria-label="工具菜单">
               <Icon name="script" />
             </button>
             {toolsOpen && (
@@ -579,6 +579,7 @@ export default function App() {
                 <div className="tools-menu tools-menu-main">
                   {!isTauri && (
                     <>
+                      <div className="tools-label">桌面版</div>
                       <button
                         title="下载 Windows 安装包(自动跳转最新版本,大陆网络可直连);桌面版支持绑定本地文件夹与 Obsidian 互通"
                         onClick={() => { setToolsOpen(false); window.open('/api/download/latest', '_blank'); }}
@@ -588,19 +589,7 @@ export default function App() {
                       <div className="tools-sep" />
                     </>
                   )}
-                  <div className="tools-label">检查</div>
-                  <button
-                    title="一屏看全各模块的概览 (Ctrl+Shift+K);顶栏也有入口"
-                    onClick={() => { setToolsOpen(false); setOverview(true); }}
-                  >
-                    <Icon name="grid" size={14} /> 项目总览
-                  </button>
-                  <button
-                    title="使用指南与快捷键 (F1)"
-                    onClick={() => { setToolsOpen(false); setHelp(true); }}
-                  >
-                    <Icon name="help" size={14} /> 使用指南
-                  </button>
+                  <div className="tools-label">查找与检查</div>
                   <button onClick={() => { setToolsOpen(false); setAuditing(true); }}>
                     <Icon name="script" size={14} /> 体检
                   </button>
@@ -614,7 +603,7 @@ export default function App() {
                     <Icon name="search" size={14} /> 查找替换
                   </button>
                   <div className="tools-sep" />
-                  <div className="tools-label">项目</div>
+                  <div className="tools-label">项目数据</div>
                   <button onClick={() => { setToolsOpen(false); setHistory(true); }}>
                     <Icon name="undo" size={14} /> 版本历史
                   </button>
@@ -627,17 +616,19 @@ export default function App() {
                   >
                     <Icon name="trash" size={14} /> 存储管理
                   </button>
-                  <button onClick={() => { setToolsOpen(false); setPalettes(true); }}>
-                    <Icon name="palette" size={14} /> 配色表
-                  </button>
-                  <button onClick={() => { setToolsOpen(false); setTemplateManager(true); }}>
-                    <Icon name="braces" size={14} /> 模板管理器
-                  </button>
                   <button
                     title="同步到你自己的 S3 兼容存储(R2 / B2 / MinIO / OSS):端到端加密、无 20MB 上限、资源原文件一起走"
                     onClick={() => { setToolsOpen(false); setRemoteSync(true); }}
                   >
                     <Icon name="upload" size={14} /> 外链网盘同步
+                  </button>
+                  <div className="tools-sep" />
+                  <div className="tools-label">素材与模板</div>
+                  <button onClick={() => { setToolsOpen(false); setPalettes(true); }}>
+                    <Icon name="palette" size={14} /> 配色表
+                  </button>
+                  <button onClick={() => { setToolsOpen(false); setTemplateManager(true); }}>
+                    <Icon name="braces" size={14} /> 模板管理器
                   </button>
                   <div className="tools-sep" />
                   <div className="tools-label">AI</div>
