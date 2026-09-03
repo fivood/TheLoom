@@ -7,6 +7,7 @@ import Icon from '../components/Icon';
 import ThemeToggle from '../components/ThemeToggle';
 import { uid, useLoom } from '../store';
 import type { Document } from '../types';
+import Q from '../components/Q';
 
 export default function MobileNote({ onOpenWrite }: { onOpenWrite?: () => void }) {
   const [cards, setCards] = useState<IdeaCard[]>(loadInbox);
@@ -168,7 +169,7 @@ export default function MobileNote({ onOpenWrite }: { onOpenWrite?: () => void }
         {visibleCount > 0 && list.length === 0 && <div className="hint" style={{ textAlign: 'center', padding: 20 }}>没有匹配的想法</div>}
         {visibleCount === 0 && (
           <div className="hint" style={{ textAlign: 'center', padding: '36px 20px' }}>
-            还没有灵感。这里记下的点子不属于任何项目，可以在写作时随时插进场景，或点击「写成场景」直接开篇。
+            还没有灵感。这里记下的点子不属于任何项目，可以在写作时随时插进场景，或点击<Q>写成场景</Q>直接开篇。
           </div>
         )}
       </div>

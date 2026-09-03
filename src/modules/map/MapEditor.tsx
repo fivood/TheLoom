@@ -12,6 +12,7 @@ import ColorPicker from '../../components/ColorPicker';
 import Inspector from '../../components/Inspector';
 
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
+import Q from '../../components/Q';
 
 type Mode = 'view' | 'marker' | 'region' | 'shape-polyline' | 'shape-rect' | 'shape-ellipse' | 'shape-text';
 type Selection =
@@ -115,7 +116,7 @@ export default function MapEditor() {
       ) : (
         <div className="pane-col">
           <div className="empty-hint" style={{ marginTop: 80 }}>
-            还没有地图<br />点击左侧「＋」新建<br /><br />
+            还没有地图<br />点击左侧<Q>＋</Q>新建<br /><br />
             推荐流程:在 Inkarnate / Azgaar / Wonderdraft 里画完导出 PNG,<br />上传到这里作为底图,再叠加地点标记与阵营领地
           </div>
         </div>
@@ -498,7 +499,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
         <div className="map-canvas-wrap">
           {/*
             没有底图也照常给出画布。要求先有一张图才能动手,等于把这个模块锁死在
-            「先去 Inkarnate 画一张」之后 —— 而多数时候作者要的只是「哪些地点、
+            <Q>先去 Inkarnate 画一张</Q>之后 —— 而多数时候作者要的只是「哪些地点、
             彼此什么位置关系」,空白纸上摆标记就够用,美术可以以后再补。
           */}
           <div className={`map-canvas${hasBaseImage(map) ? '' : ' map-canvas-blank'}`} style={{ aspectRatio: aspect }}>
@@ -507,7 +508,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
               : (
                 <div className="map-blank-hint">
                   空白底图 · 可直接摆放地点标记<br />
-                  需要美术时点工具栏「上传底图」(Inkarnate / Azgaar 导出、手绘扫描都行)
+                  需要美术时点工具栏<Q>上传底图</Q>(Inkarnate / Azgaar 导出、手绘扫描都行)
                 </div>
               )}
               <svg

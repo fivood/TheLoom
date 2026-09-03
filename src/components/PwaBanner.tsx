@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { installPwa, refreshForUpdate, usePwaStatus } from '../pwa';
+import Q from './Q';
 
 const INSTALL_DISMISS_KEY = 'theloom-install-dismissed';
 const IOS_SAFETY_DISMISS_KEY = 'theloom-ios-safety-dismissed';
@@ -69,7 +70,7 @@ export default function PwaBanner() {
   if (currentIsIosSafari() && !safetyDismissed) {
     return (
       <div className="pwa-banner" role="status">
-        <span>数据保存在本机浏览器,iOS 长期不打开可能被清理。建议定期「工具 → JSON 备份」,或用外链网盘同步 / 桌面版绑定文件夹。</span>
+        <span>数据保存在本机浏览器,iOS 长期不打开可能被清理。建议定期<Q>工具 → JSON 备份</Q>,或用外链网盘同步 / 桌面版绑定文件夹。</span>
         <button
           className="pwa-banner-close"
           aria-label="知道了"

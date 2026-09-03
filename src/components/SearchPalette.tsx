@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLoom } from '../store';
 import { searchProject, useNav, type SearchHit } from '../search';
+import Q from './Q';
 
 export default function SearchPalette({ onClose }: { onClose: () => void }) {
   const project = useLoom((s) => s.project);
@@ -51,7 +52,7 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
           onKeyDown={onKey}
         />
         <div className="palette-results">
-          {query && hits.length === 0 && <div className="empty-hint">没有找到「{query}」</div>}
+          {query && hits.length === 0 && <div className="empty-hint">没有找到<Q>{query}</Q></div>}
           {grouped.map(([module, items]) => (
             <div key={module}>
               <div className="palette-group">{module}</div>

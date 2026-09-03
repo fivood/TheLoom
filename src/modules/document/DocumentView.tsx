@@ -28,6 +28,7 @@ import {
   previewDocumentMerge,
   splitDocumentAfterBlock,
 } from '../../documentOperations';
+import Q from '../../components/Q';
 
 export default function DocumentView() {
   const project = useLoom((s) => s.project);
@@ -624,7 +625,7 @@ export default function DocumentView() {
         ) : (
           <div className="empty-hint" style={{ margin: 'auto' }}>
             {filtered.length === 0
-              ? <>还没有场景。<br />左侧「＋ 新建场景」开始写作。</>
+              ? <>还没有场景。<br />左侧<Q>＋ 新建场景</Q>开始写作。</>
               : <>点击左侧场景查看和编辑</>}
           </div>
         )}
@@ -891,7 +892,7 @@ export default function DocumentView() {
                 </div>
               ))}
               {docSnaps.length === 0 && (
-                <div className="empty-hint" style={{ padding: '6px 0' }}>改稿前先「存快照」,之后可对比差异或一键恢复</div>
+                <div className="empty-hint" style={{ padding: '6px 0' }}>改稿前先<Q>存快照</Q>,之后可对比差异或一键恢复</div>
               )}
             </div>
           </details>

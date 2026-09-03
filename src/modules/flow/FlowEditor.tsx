@@ -36,6 +36,7 @@ import TechNameField from '../../components/TechNameField';
 import FieldListEditor from '../../components/FieldListEditor';
 import ScriptInput from '../../components/ScriptInput';
 import { RichTextInput } from '../../components/RichText';
+import Q from '../../components/Q';
 
 type LoomNode = Node<FlowNodeData>;
 
@@ -479,7 +480,7 @@ function Canvas({ flow, path, navigate, crumbs, focusNodeId }: {
                 ))}
             </Fragment>
           ))}
-          {/* 动作簇:靠右成组,不与左侧「加节点」调色板混在一行里 */}
+          {/* 动作簇:靠右成组,不与左侧<Q>加节点</Q>调色板混在一行里 */}
           <div className="tool-actions">
           <button
             title="复制选中节点(Ctrl+C)。可跨流程、跨子流程层级粘贴"
@@ -1062,7 +1063,7 @@ export default function FlowEditor() {
       ) : (
         <div className="pane-col">
           <div className="empty-hint" style={{ marginTop: 80 }}>
-            还没有流程<br />点击左上角「＋」新建一个
+            还没有流程<br />点击左上角<Q>＋</Q>新建一个
           </div>
         </div>
       )}
@@ -1132,7 +1133,7 @@ function CrossFlowFields({ data, isCall, flows, onPatch }: {
           </select>
           {entries.length === 0 && (
             <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
-              「{target.name}」还没有命名入口。可在该流程的工具栏「入口」里添加。
+              「{target.name}」还没有命名入口。可在该流程的工具栏<Q>入口</Q>里添加。
             </div>
           )}
           {entryKey && !entry && (
@@ -1232,7 +1233,7 @@ function FlowEntriesModal({ flow, onClose }: { flow: Flow; onClose: () => void }
           </div>
           {entries.length === 0 && (
             <div className="empty-hint" style={{ padding: '16px 0' }}>
-              还没有命名入口。没有入口时,外部只能从「默认起点」(唯一无入边节点)进入。
+              还没有命名入口。没有入口时,外部只能从<Q>默认起点</Q>(唯一无入边节点)进入。
             </div>
           )}
           {entries.map((entry) => (
@@ -1358,7 +1359,7 @@ function ExternalEventFields({ data, events, onPatch }: {
         </select>
         {events.length === 0 && (
           <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
-            还没有声明外部事件。请到「变量」模块的「外部事件」里先加一个。
+            还没有声明外部事件。请到<Q>变量</Q>模块的<Q>外部事件</Q>里先加一个。
           </div>
         )}
         {name && !ev && (

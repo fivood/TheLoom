@@ -15,6 +15,7 @@ import {
 import Inspector from '../../components/Inspector';
 import TechNameField from '../../components/TechNameField';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
+import Q from '../../components/Q';
 
 const KINDS = Object.keys(ASSET_KIND_LABEL) as AssetKind[];
 
@@ -342,7 +343,7 @@ export default function Assets() {
         {filtered.length === 0 ? (
           <div className="empty-hint" style={{ gridColumn: '1/-1' }}>
             <p>这里还没有资源。</p>
-            <p style={{ fontSize: 12 }}>点击左上「＋」导入图片 / 音频 / 视频 / 任意文件,原文件将完整保留。</p>
+            <p style={{ fontSize: 12 }}>点击左上<Q>＋</Q>导入图片 / 音频 / 视频 / 任意文件,原文件将完整保留。</p>
           </div>
         ) : (
           <div className="asset-grid">
@@ -504,7 +505,7 @@ export default function Assets() {
             <label>出现于({refs.length})</label>
             {refs.length === 0 && (
               <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-                暂无引用——在实体 / 资料卡 / 流程节点 / 大纲 / 时间线 / 文档块的「附件」里挂接它
+                暂无引用——在实体 / 资料卡 / 流程节点 / 大纲 / 时间线 / 文档块的<Q>附件</Q>里挂接它
               </div>
             )}
             {refs.map((r) => (

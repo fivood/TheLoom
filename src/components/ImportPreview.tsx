@@ -11,6 +11,7 @@ import type { Document } from '../types';
 import Icon from './Icon';
 import { useEscape } from '../hooks/useEscape';
 import { toast } from '../toast';
+import Q from './Q';
 
 type Mode = 'fdx' | 'manuscript';
 
@@ -257,7 +258,7 @@ export default function ImportPreview({ mode, file, onClose }: Props) {
               )}
 
               <div className="player-tip" style={{ marginTop: 8 }}>
-                导入会新建一份文档,不覆盖任何现有内容。分类默认为「剧本草稿」。
+                导入会新建一份文档,不覆盖任何现有内容。分类默认为<Q>剧本草稿</Q>。
               </div>
 
               <div className="sync-actions">

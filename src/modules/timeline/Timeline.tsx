@@ -10,6 +10,7 @@ import { DOC_STATUS_LABEL, PALETTE } from '../../types';
 import { activePaletteColors, linearizeByFolders } from '../../util';
 import ColorPicker from '../../components/ColorPicker';
 import { documentSceneLabel } from '../../documentStructure';
+import Q from '../../components/Q';
 
 export default function Timeline() {
   const tracks = useLoom((s) => s.project.timelineTracks);
@@ -339,7 +340,7 @@ export default function Timeline() {
         ) : (
           <div className="empty-hint">
             点击事件卡查看和编辑<br /><br />
-            时间线记录「故事实际发生的顺序」,<br />大纲记录「讲述的顺序」——<br />倒叙、插叙时两者对照特别有用
+            时间线记录<Q>故事实际发生的顺序</Q>,<br />大纲记录<Q>讲述的顺序</Q>——<br />倒叙、插叙时两者对照特别有用
           </div>
         )}
       </Inspector>

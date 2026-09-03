@@ -5,6 +5,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import { readableInk } from '../theme';
 import { confirmDialog, promptText } from '../dialog';
 import type { Document, OutlineRow, TimelineEvent } from '../types';
+import Q from '../components/Q';
 
 type View = 'outline' | 'timeline';
 
@@ -171,7 +172,7 @@ function OutlineList({ onOpenWrite }: { onOpenWrite?: () => void }) {
                     </label>
                   ))}
                   {columns.length === 0 && (
-                    <div className="hint">还没有剧情线。用上面的「＋ 剧情线」加一条,就能在每章下分栏记录。</div>
+                    <div className="hint">还没有剧情线。用上面的<Q>＋ 剧情线</Q>加一条,就能在每章下分栏记录。</div>
                   )}
                   <div className="m-edit-foot">
                     <button className="ghost m-del" onClick={() => void onRemove(r)}>删除本章</button>
@@ -315,7 +316,7 @@ function TimelineList() {
       )}
 
       {points.length === 0 && (
-        <div className="hint">还没有时间线。点「＋ 时间点」建一个故事时刻(雨夜 / 第 7 日 / 16:09),再往里加事件。</div>
+        <div className="hint">还没有时间线。点<Q>＋ 时间点</Q>建一个故事时刻(雨夜 / 第 7 日 / 16:09),再往里加事件。</div>
       )}
 
       <div className="m-tl-list">

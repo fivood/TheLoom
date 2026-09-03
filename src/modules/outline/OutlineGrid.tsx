@@ -6,6 +6,7 @@ import { DOC_STATUS_LABEL, PALETTE } from '../../types';
 import { activePaletteColors, folderPath, linearizeByFolders } from '../../util';
 import { useNav } from '../../search';
 import { documentChapterFolder, documentSceneLabel, orderedDocumentFolders } from '../../documentStructure';
+import Q from '../../components/Q';
 
 function AutoTextarea({ value, onChange, placeholder }: {
   value: string;
@@ -219,7 +220,7 @@ export default function OutlineGrid() {
         </table>
         {rows.length === 0 && (
           <div className="empty-hint">
-            还没有章节。点击「＋ 新章节」开始搭建大纲。<br />
+            还没有章节。点击<Q>＋ 新章节</Q>开始搭建大纲。<br />
             建议先建好几条剧情线(列),再逐章填格子——空格也是信息:说明这条线在这一章沉默。
           </div>
         )}

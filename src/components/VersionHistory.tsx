@@ -3,6 +3,7 @@ import { useLoom } from '../store';
 import { confirmDialog } from '../dialog';
 import Icon from './Icon';
 import { useEscape } from '../hooks/useEscape';
+import Q from './Q';
 
 export default function VersionHistory({ onClose }: { onClose: () => void }) {
   useEscape(true, onClose);
@@ -43,7 +44,7 @@ export default function VersionHistory({ onClose }: { onClose: () => void }) {
             <div className="empty-hint" style={{ padding: 24 }}>
               还没有版本快照。<br />
               想保留某个里程碑(初稿完成、改稿前、试玩定版)时,给它起个名存下来。<br /><br />
-              <span className="hint" style={{ fontSize: 12 }}>此外每 15 分钟(或每 100 次编辑)会自动打一次快照,标「自动」以区分,配额独立。</span>
+              <span className="hint" style={{ fontSize: 12 }}>此外每 15 分钟(或每 100 次编辑)会自动打一次快照,标<Q>自动</Q>以区分,配额独立。</span>
             </div>
           ) : (
             <div className="snapshot-list">

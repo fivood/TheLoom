@@ -18,6 +18,7 @@ import {
 } from '../ai/extract';
 import SecretInput from './SecretInput';
 import { useEscape } from '../hooks/useEscape';
+import Q from './Q';
 
 /* ---------- AI 设置 ---------- */
 
@@ -462,7 +463,7 @@ export function AiExtractModal({ onClose }: { onClose: () => void }) {
                 </div>
               )}
               <div className="player-tip" style={{ marginTop: 8 }}>
-                应用不会删除或覆盖任何现有内容。建议先在「工具 → 版本历史」存一个快照,方便回滚。
+                应用不会删除或覆盖任何现有内容。建议先在<Q>工具 → 版本历史</Q>存一个快照,方便回滚。
               </div>
               <div className="sync-actions">
                 <button onClick={() => setPreview(null)}>← 返回修改</button>

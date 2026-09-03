@@ -10,6 +10,7 @@ import { nextNotePosition } from '../../brainstormLayout';
 import { getThemeMode, readableInk, subscribeThemeMode } from '../../theme';
 import { useNav } from '../../search';
 import { loadInbox, markUsed, saveInbox, visibleIdeas } from '../../inbox';
+import Q from '../../components/Q';
 
 interface StickyData {
   text: string;
@@ -283,7 +284,7 @@ function Canvas() {
       {inboxOpen && (
         <div className="inbox-strip">
           {visibleIdeas(inbox).length === 0 && (
-            <span className="hint">灵感库是空的。手机端「快记」记下的点子会出现在这里。</span>
+            <span className="hint">灵感库是空的。手机端<Q>快记</Q>记下的点子会出现在这里。</span>
           )}
           {visibleIdeas(inbox).map((c) => (
             <button

@@ -7,6 +7,7 @@ import BlocksEditor, { emptyBlock } from '../modules/document/BlocksEditor';
 import Icon from '../components/Icon';
 import { confirmDialog, promptText } from '../dialog';
 import { loadInbox, markUsed, saveInbox, visibleIdeas, type IdeaCard } from '../inbox';
+import Q from '../components/Q';
 
 function lastDocKey(): string {
   return `theloom-mobile-last-doc:${useLoom.getState().currentSlotId}`;
@@ -195,7 +196,7 @@ export default function MobileWrite() {
                 {n.text}
               </button>
             ))}
-            {recentIdeas.length === 0 && <div className="hint">灵感库是空的，可在「快记」中添加想法。</div>}
+            {recentIdeas.length === 0 && <div className="hint">灵感库是空的，可在<Q>快记</Q>中添加想法。</div>}
           </div>
         </div>
       )}

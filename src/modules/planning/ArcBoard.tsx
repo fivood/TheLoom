@@ -5,6 +5,7 @@ import { useNav } from '../../search';
 import { useModuleName } from '../../moduleName';
 import { arcStagesOf, groupDocsByChapter } from '../../planning';
 import { folderPath } from '../../util';
+import Q from '../../components/Q';
 
 export default function ArcBoard({ focusEntityId, onConsumeFocus }: {
   focusEntityId: string | null;
@@ -153,7 +154,7 @@ export default function ArcBoard({ focusEntityId, onConsumeFocus }: {
               ))}
               {stages.length === 0 && (
                 <div className="empty-hint" style={{ padding: 24 }}>
-                  还没有阶段。经典结构可以从「现状 → 触发 → 挣扎 → 转变 → 新常态」开始
+                  还没有阶段。经典结构可以从<Q>现状 → 触发 → 挣扎 → 转变 → 新常态</Q>开始
                 </div>
               )}
             </div>

@@ -4,6 +4,7 @@ import { confirmDialog } from '../../dialog';
 import { countScriptIdentifier } from '../../script';
 import type { ExternalEvent, VariableType } from '../../types';
 import Icon from '../../components/Icon';
+import Q from '../../components/Q';
 
 /** 稳定的空数组:selector 里返回 `?? []` 会因新引用触发无限重渲染 */
 const NO_EVENTS: ExternalEvent[] = [];
@@ -36,7 +37,7 @@ export default function Variables() {
           onClick={() => setTab('events')}
           title="管理外部事件声明:流程用「外部事件」节点请求宿主引擎播动画 / 切场景 / 启动谜题"
         ><Icon name="bolt" size={12} /> 外部事件{events.length > 0 ? `(${events.length})` : ''}</button>
-        <span className="hint">全局变量可在流程的「条件分支」和「指令」节点中引用,用于追踪剧情状态</span>
+        <span className="hint">全局变量可在流程的<Q>条件分支</Q>和<Q>指令</Q>节点中引用,用于追踪剧情状态</span>
       </div>
       <div className="pad-wrap">
         <table className="var-table">
@@ -145,14 +146,14 @@ function ExternalEvents({ onBack }: { onBack: () => void }) {
           }])}
         >＋ 新事件</button>
         <span className="hint">
-          流程用「外部事件」节点声明式地请求引擎做事(播动画 / 切场景 / 启动谜题),
+          流程用<Q>外部事件</Q>节点声明式地请求引擎做事(播动画 / 切场景 / 启动谜题),
           不直接执行引擎代码;导出时会为宿主生成事件名与参数类型
         </span>
       </div>
       <div className="pad-wrap">
         {events.length === 0 && (
           <div className="empty-hint">
-            还没有外部事件。先在这里声明事件名与参数,流程里的「外部事件」节点才能选到它。
+            还没有外部事件。先在这里声明事件名与参数,流程里的<Q>外部事件</Q>节点才能选到它。
           </div>
         )}
         {events.map((ev) => (

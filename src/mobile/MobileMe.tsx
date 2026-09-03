@@ -7,6 +7,7 @@ import RemotePanel from '../components/RemotePanel';
 import ThemeToggle from '../components/ThemeToggle';
 import Icon from '../components/Icon';
 import { confirmDialog } from '../dialog';
+import Q from '../components/Q';
 
 export default function MobileMe() {
   const project = useLoom((s) => s.project);
@@ -105,7 +106,7 @@ export default function MobileMe() {
       )}
 
       {/* 手机上原本没有任何载入示例的入口:跳过引导后就再也见不到,
-          空项目里「查阅」等页面只剩空状态文案,没法看出长什么样 */}
+          空项目里<Q>查阅</Q>等页面只剩空状态文案,没法看出长什么样 */}
       <button className="m-me-full" onClick={() => void onLoadSample()}>
         载入示例项目(老伦敦寻人记)
       </button>

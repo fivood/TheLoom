@@ -7,6 +7,7 @@ import { documentFolderAncestors, orderedDocumentFolders } from '../../documentS
 import {
   countDocumentWriting, dailyStatValue, recentWritingSeries, writingDateKey,
 } from '../../writingProgress';
+import Q from '../../components/Q';
 
 const COUNT_MODE_LABEL: Record<WritingCountMode, string> = {
   cjk: '中文字符',
@@ -223,7 +224,7 @@ export default function WritingDashboard() {
     return (
       <div className="writing-dashboard">
         <div className="empty-hint" style={{ margin: 'auto', textAlign: 'center', maxWidth: 460 }}>
-          写作进度按场景统计:标记「完成」的场景计入进度,每天的新增量会自动记账。
+          写作进度按场景统计:标记<Q>完成</Q>的场景计入进度,每天的新增量会自动记账。
           <div style={{ marginTop: 4 }}>现在还没有场景,先去写第一场。</div>
           <div style={{ marginTop: 10 }}>
             <button className="primary" onClick={() => go({ tab: 'documents' })}>去写第一场 →</button>
@@ -238,7 +239,7 @@ export default function WritingDashboard() {
       <div className="writing-dashboard-head">
         <div>
           <h2>写作进度</h2>
-          <p>场景标记「完成」后计入进度。目标可逐级设定，也可由子级自动汇总。</p>
+          <p>场景标记<Q>完成</Q>后计入进度。目标可逐级设定，也可由子级自动汇总。</p>
         </div>
       </div>
 
@@ -281,7 +282,7 @@ export default function WritingDashboard() {
           <div className="writing-panel-title">
             <div>
               <h3>目标树</h3>
-              <p>进度只计「完成」场景，目标未设时由子级汇总</p>
+              <p>进度只计<Q>完成</Q>场景，目标未设时由子级汇总</p>
             </div>
             {countControls}
           </div>

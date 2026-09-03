@@ -6,6 +6,7 @@ import type { ColorPalette } from '../types';
 import { PALETTE } from '../types';
 import Icon from './Icon';
 import { useEscape } from '../hooks/useEscape';
+import Q from './Q';
 
 /**
  * 配色表管理:创建 / 编辑 / 导入 JSON / 激活 / 删除。
@@ -135,7 +136,7 @@ export default function PaletteManager({ onClose }: { onClose: () => void }) {
             <div className="palette-list">
               {palettes.length === 0 && (
                 <div className="empty-hint" style={{ padding: 16, textAlign: 'left' }}>
-                  还没有自定义配色。可以「新建」手动调,或「导入 JSON」。<br /><br />
+                  还没有自定义配色。可以<Q>新建</Q>手动调,或<Q>导入 JSON</Q>。<br /><br />
                   <span style={{ color: 'var(--text-faint)' }}>导入接受三种写法,hex 带不带 <code>#</code> 都行,三位简写会自动补全:</span>
                   <pre style={{
                     margin: '6px 0 0', padding: '8px 10px', fontSize: 11, lineHeight: 1.6,
@@ -209,7 +210,7 @@ export default function PaletteManager({ onClose }: { onClose: () => void }) {
 
           <div className="player-tip" style={{ marginTop: 4 }}>
             配色表随项目保存(JSON 备份、云同步、桌面文件夹都跟着走)。<br />
-            激活后,所有节点/实体/时间线/地图/大纲/卡片的取色器都会用它;每个颜色还能点「＋」按需选自定义色。
+            激活后,所有节点/实体/时间线/地图/大纲/卡片的取色器都会用它;每个颜色还能点<Q>＋</Q>按需选自定义色。
           </div>
         </div>
       </div>

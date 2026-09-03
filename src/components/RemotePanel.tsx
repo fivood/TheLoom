@@ -17,6 +17,7 @@ import { loadInbox, saveInbox } from '../inbox';
 import Icon from './Icon';
 import SecretInput from './SecretInput';
 import { useEscape } from '../hooks/useEscape';
+import Q from './Q';
 
 /**
  * OneDrive 后端暂时隐藏(2026-08-27)。代码与测试都在,挡住的是微软那边:
@@ -230,7 +231,7 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
             {od ? (
               <>
                 <br />只申请 <b>应用文件夹</b>权限,写在 OneDrive 的
-                「应用/TheLoom」下,碰不到你的其他文件。切换后端相当于换了一个仓库,需重新上传一次。
+                <Q>应用/TheLoom</Q>下,碰不到你的其他文件。切换后端相当于换了一个仓库,需重新上传一次。
               </>
             ) : (
               <>
@@ -251,7 +252,7 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
                 />
               </div>
               <div className="hint">
-                在 Azure 门户「应用注册」建一个应用,平台选 <b>单页应用程序(SPA)</b>,
+                在 Azure 门户<Q>应用注册</Q>建一个应用,平台选 <b>单页应用程序(SPA)</b>,
                 重定向 URI 填 <code>{onedrive.redirectUri()}</code>,把 Application ID 粘到上面。
                 这不是密钥,可以公开。
               </div>
@@ -351,7 +352,7 @@ export default function RemotePanel({ onClose }: { onClose: () => void }) {
             <div className="remote-projects">
               <label>远端作品({remoteProjects.length})</label>
               {remoteProjects.length === 0 && (
-                <div className="hint">远端还没有作品。点「上传本作品」推第一部上去。</div>
+                <div className="hint">远端还没有作品。点<Q>上传本作品</Q>推第一部上去。</div>
               )}
               {remoteProjects.map((p) => (
                 <div key={p.name} className="remote-project">

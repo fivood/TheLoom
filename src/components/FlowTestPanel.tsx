@@ -5,6 +5,7 @@ import { confirmDialog, promptText } from '../dialog';
 import { flowFingerprint, findTestFlow, isTestStale, runAllFlowTests, type FlowTestResult } from '../flowTest';
 import type { FlowTest } from '../types';
 import { useEscape } from '../hooks/useEscape';
+import Q from './Q';
 
 /**
  * R19-4 场景化回归测试面板。
@@ -95,8 +96,8 @@ export default function FlowTestPanel({ onClose }: { onClose: () => void }) {
 
           {tests.length === 0 && (
             <div className="empty-hint" style={{ padding: '16px 0' }}>
-              还没有回归测试。在流程「演出」里走一遍想固化的路线,点工具栏的
-              「⛿ 存为测试」——种子、选择序列与事件响应都会记下来,之后流程一改就能重跑。
+              还没有回归测试。在流程<Q>演出</Q>里走一遍想固化的路线,点工具栏的
+              <Q>⛿ 存为测试</Q>——种子、选择序列与事件响应都会记下来,之后流程一改就能重跑。
             </div>
           )}
 
@@ -142,7 +143,7 @@ export default function FlowTestPanel({ onClose }: { onClose: () => void }) {
 
                 {r && r.results.length === 0 && !r.error && (
                   <div className="hint" style={{ fontSize: 11, marginTop: 4 }}>
-                    这条测试还没有断言 —— 它现在只验证「能跑完不报错」。
+                    这条测试还没有断言 —— 它现在只验证<Q>能跑完不报错</Q>。
                   </div>
                 )}
 

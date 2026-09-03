@@ -23,6 +23,7 @@ import { makeZip } from '../interop/zip';
 import { formatSize } from '../util';
 import { useEscape } from '../hooks/useEscape';
 import { toast } from '../toast';
+import Q from './Q';
 
 /** 未保存为命名配置时用的临时配置 */
 const DRAFT_ID = '__draft__';
@@ -375,7 +376,7 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
               {saved && <button className="ghost" onClick={renameConfig}>重命名</button>}
               {saved && <button className="ghost" onClick={removeConfig}>删除</button>}
             </div>
-            {dirty && saved && <div className="hint" style={{ marginTop: 4 }}>当前规则与已保存的「{saved.name}」不同,点「保存」写回。</div>}
+            {dirty && saved && <div className="hint" style={{ marginTop: 4 }}>当前规则与已保存的<Q>{saved.name}</Q>不同,点<Q>保存</Q>写回。</div>}
           </div>
 
           <div className="field">
@@ -393,7 +394,7 @@ export default function EngineExportModal({ onClose }: { onClose: () => void }) 
             </div>
             {!allFlows && (
               <button className="ghost" style={{ marginTop: 4 }} onClick={() => patch({ flowIds: undefined })}>
-                改为「全部流程」
+                改为<Q>全部流程</Q>
               </button>
             )}
           </div>
