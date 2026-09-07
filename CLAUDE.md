@@ -196,7 +196,7 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
   ```
   `?? []`、`.filter()`、`.map()`、对象字面量在 selector 里一律禁止。**类型检查与单元测试都发现不了这类问题**(R19-3b 时 406 项测试全绿但流程编辑器一打开就崩),只有浏览器实测能挡住 —— 改动 selector 后务必到浏览器点一遍受影响模块
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
-- 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
+- 发版号由 AI 自行判断(按改动性质定 minor / patch),不必逐次询问;但推送 tag、移动已有版本标签或发布安装包仍需用户明确要求。发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
 ## 最近变更(v0.65.0 风暴板连线方式)
