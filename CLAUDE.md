@@ -199,6 +199,26 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 未经用户明确要求,不要推送 tag、移动版本标签或发布安装包;发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
 
+## 最近变更(v0.65.0 风暴板连线方式)
+
+风暴板的连线一直是「左 target / 右 source」,连线被迫按左→右走 —— 摆卡片就得先想好顺序,
+而头脑风暴恰恰是顺序还没有的时候做的事。三处改动:
+
+- **`components/FloatingEdge.tsx`**:从 `RelationGraph.tsx` 抽出共用(沿两节点边框最短方向直连)。
+  风暴板便签四边各一个 `type="source"` 把手 + `ConnectionMode.Loose` —— **Loose 下 React Flow
+  找目标锚点时会把 source 把手也算进去**(`getEdgePosition` 里 `target.concat(source)`),
+  所以四个 source 就够,不必再叠一套 target
+- **`brainstormLayout.ts` `mindmapLayout`**:放射整理。**扇区式**分配角度(子节点在父节点的角度段内均分),
+  不是「同一层摊到整圈」—— 后者会让不同分支的连线互相穿越。同圈太挤时按张数撑开半径;
+  与根不连通的散点落到下方网格
+- 双击连线写关系(`brainstormEdges.label` 本来就在存储里,一直没有编辑入口)
+
+**验证环境的坑(第三次记)**:这个无头浏览器**不触发 ResizeObserver**,React Flow 因此测不到
+节点尺寸(`internals.handleBounds` 为空 → `isNodeInitialized` 为假 → `getEdgePosition` 返回 null),
+**所有连线一条都不渲染,且控制台完全干净**。改完连线后看到「边消失了」先别急着当回归 ——
+`git stash` 掉改动跑一遍基线,未改的代码同样 0 条边。可验的是把手数量、边的 `type`、
+布局后的坐标,连线画面只能在本机确认
+
 ## 最近变更(v0.64.0 设定集总览 / 分屏联动 / 界面整理)
 
 - **`modules/entities/codexGroups.ts`**(纯逻辑):分组轴放开到 类型 / 文件夹 / 模板 / 不分组。**空分类必须保留**(先摆骨架再填内容是「总设计」用法的前提),指向已删除文件夹的实体落到未分组而不是消失;3 项测试守这两条。设定集新增「总览」视图(填充度 = 有简介的条目数)
