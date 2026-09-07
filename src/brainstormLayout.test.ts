@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { BrainNote } from './types';
 import {
-  NOTE_COLUMNS, NOTE_COL_WIDTH, NOTE_ORIGIN, NOTE_ROW_HEIGHT, nextNotePosition,
+  NOTE_COLUMNS, NOTE_COL_WIDTH, NOTE_ORIGIN, NOTE_ROW_HEIGHT, RING_STEP,
+  mindmapLayout, nextNotePosition,
 } from './brainstormLayout';
 
 function note(x: number, y: number, id = `${x}-${y}`): BrainNote {
@@ -71,5 +72,44 @@ describe('便签自动摆放', () => {
   it('坐标损坏的便签不影响摆放', () => {
     const broken = { id: 'x', text: '', color: '#fff', position: { x: NaN, y: 0 } } as BrainNote;
     expect(nextNotePosition([broken])).toEqual(NOTE_ORIGIN);
+  });
+});
+
+describe('放射整理', () => {
+  const link = (source: string, target: string) => ({ source, target });
+  const n = (id: string) => ({ id, position: { x: 0, y: 0 } });
+
+  it('中心留在原点,直接相连的落在第一圈上,同圈彼此不重叠', () => {
+    const notes = ['root', 'a', 'b', 'c'].map(n);
+    const pos = mindmapLayout(notes, [link('root', 'a'), link('root', 'b'), link('c', 'root')], 'root');
+    const root = pos.get('root')!;
+    const ring = ['a', 'b', 'c'].map((id) => pos.get(id)!);
+    for (const p of ring) {
+      expect(Math.hypot((p.x - root.x) / 1.4, p.y - root.y)).toBeCloseTo(RING_STEP, 0);
+    }
+    for (let i = 0; i < ring.length; i++) {
+      for (let j = i + 1; j < ring.length; j++) expect(overlaps(ring[i], ring[j])).toBe(false);
+    }
+  });
+
+  it('层级越深半径越大,散点不进圈而是排到下方网格', () => {
+    const notes = ['root', 'a', 'deep', 'lonely'].map(n);
+    const pos = mindmapLayout(notes, [link('root', 'a'), link('a', 'deep')], 'root');
+    const root = pos.get('root')!;
+    const d = (id: string) => Math.hypot((pos.get(id)!.x - root.x) / 1.4, pos.get(id)!.y - root.y);
+    expect(d('deep')).toBeGreaterThan(d('a'));
+    expect(pos.get('lonely')).toEqual({ x: NOTE_ORIGIN.x, y: expect.any(Number) });
+    expect(pos.get('lonely')!.y).toBeGreaterThan(root.y + RING_STEP * 2);
+  });
+
+  it('不指定中心时取连线最多的那张', () => {
+    const notes = ['x', 'hub', 'y', 'z'].map(n);
+    const pos = mindmapLayout(notes, [link('hub', 'x'), link('hub', 'y'), link('hub', 'z')]);
+    const others = ['x', 'y', 'z'].map((id) => pos.get(id)!);
+    const hub = pos.get('hub')!;
+    for (const p of others) expect(Math.hypot(p.x - hub.x, p.y - hub.y)).toBeGreaterThan(0);
+    // hub 在中心 = 到三张卡的距离相等
+    const ds = others.map((p) => Math.hypot((p.x - hub.x) / 1.4, p.y - hub.y));
+    expect(Math.max(...ds) - Math.min(...ds)).toBeLessThan(1);
   });
 });

@@ -1342,6 +1342,17 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   overflow: hidden;
 }
 .sticky-note.selected { outline: 2px solid var(--focus); }
+/* 四面把手平时藏起来,便签才是主角;悬停或选中才露出四个连接点 */
+.sticky-note .react-flow__handle {
+  width: 9px;
+  height: 9px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--focus);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.sticky-note:hover .react-flow__handle,
+.sticky-note.selected .react-flow__handle { opacity: 1; }
 
 /* ---------- 大纲表格 ---------- */
 

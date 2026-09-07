@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
   applyNodeChanges, applyEdgeChanges, addEdge, useReactFlow, MarkerType,
-  Handle, Position,
+  ConnectionMode, Handle, Position,
   type Node, type Edge, type NodeChange, type EdgeChange, type Connection, type NodeProps,
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
-import { nextNotePosition } from '../../brainstormLayout';
+import { mindmapLayout, nextNotePosition } from '../../brainstormLayout';
+import { floatingEdgeTypes } from '../../components/FloatingEdge';
+import { promptText } from '../../dialog';
 import { getThemeMode, readableInk, subscribeThemeMode } from '../../theme';
 import { useNav } from '../../search';
 import { loadInbox, markUsed, saveInbox, visibleIdeas } from '../../inbox';
@@ -20,6 +22,14 @@ interface StickyData {
 type StickyNode = Node<StickyData>;
 
 const NOTE_COLORS = ['#ffffff', '#f2f1ee', '#e6e4df', '#d8d6d0', '#c9c7c1', '#bab8b1'];
+
+/**
+ * 四面都能连。原来只有左 target / 右 source,连线被迫按左→右走,
+ * 摆卡片就得先想好顺序 —— 而头脑风暴恰恰是顺序还没有的时候做的事。
+ * 配合 ConnectionMode.Loose,任一把手既可拉出也可接入 —— 该模式下 React Flow
+ * 找目标锚点时会把 source 把手也算进去,所以四个 source 把手就够,不必再叠一套 target。
+ */
+const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 
 function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
   const { updateNodeData } = useReactFlow();
@@ -36,7 +46,7 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
 
   return (
     <div className={`sticky-note ${selected ? 'selected' : ''}`} style={{ background: data.color, color: readableInk(data.color) }}>
-      <Handle type="target" position={Position.Left} />
+      {SIDES.map((p) => <Handle key={p} id={p} type="source" position={p} />)}
       <textarea
         ref={ref}
         className="nodrag nowheel"
@@ -45,7 +55,6 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
         placeholder="写下想法…"
         onChange={(e) => { updateNodeData(id, { text: e.target.value }); autoSize(); }}
       />
-      <Handle type="source" position={Position.Right} />
     </div>
   );
 }
@@ -58,14 +67,14 @@ function Canvas() {
   const notes = useLoom((s) => s.project.brainstormNotes);
   const storedEdges = useLoom((s) => s.project.brainstormEdges);
   const setBrainstorm = useLoom((s) => s.setBrainstorm);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
 
   const [nodes, setNodes] = useState<StickyNode[]>(() =>
     notes.map((n) => ({ id: n.id, type: 'sticky', position: n.position, data: { text: n.text, color: n.color } })),
   );
   const [edges, setEdges] = useState<Edge[]>(() =>
-    storedEdges.map((e) => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed } })),
+    storedEdges.map((e) => ({ ...e, type: 'floating', markerEnd: { type: MarkerType.ArrowClosed } })),
   );
 
   const latest = useRef({ nodes, edges });
@@ -110,6 +119,7 @@ function Canvas() {
       id: uid(),
       source: idMap.get(e.source)!,
       target: idMap.get(e.target)!,
+      type: 'floating',
       markerEnd: { type: MarkerType.ArrowClosed },
     }));
     dirty.current = true;
@@ -160,7 +170,7 @@ function Canvas() {
   }, []);
   const onConnect = useCallback((conn: Connection) => {
     dirty.current = true;
-    setEdges((es) => addEdge({ ...conn, id: uid(), markerEnd: { type: MarkerType.ArrowClosed } }, es));
+    setEdges((es) => addEdge({ ...conn, id: uid(), type: 'floating', markerEnd: { type: MarkerType.ArrowClosed } }, es));
   }, []);
 
   const addNote = (position?: { x: number; y: number }) => {
@@ -175,6 +185,32 @@ function Canvas() {
         selected: true,
       },
     ]);
+  };
+
+  /**
+   * 放射整理:以选中的便签为中心把整块板摊成思维导图。没选就取连线最多的那张。
+   * 只改位置,不动内容与连线。
+   */
+  const tidy = () => {
+    const { nodes: ns, edges: es } = latest.current;
+    if (ns.length === 0) return;
+    const root = ns.find((n) => n.selected)?.id;
+    const pos = mindmapLayout(ns.map((n) => ({ id: n.id, position: n.position })), es, root);
+    dirty.current = true;
+    setNodes((cur) => cur.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position })));
+    window.setTimeout(() => fitView({ duration: 300, padding: 0.15 }), 60);
+  };
+
+  /** 连线上写一句「为什么连」—— 联想的理由往往比连线本身重要 */
+  const labelEdge = async (edgeId: string, current: unknown) => {
+    const next = await promptText({
+      message: '这条联想是什么关系?',
+      defaultValue: typeof current === 'string' ? current : '',
+      placeholder: '留空则去掉标注',
+    });
+    if (next === null) return;
+    dirty.current = true;
+    setEdges((es) => es.map((e) => (e.id === edgeId ? { ...e, label: next.trim() || undefined } : e)));
   };
 
   const recolorSelected = (color: string) => {
@@ -260,6 +296,7 @@ function Canvas() {
     <div className="pane-col">
       <div className="toolbar">
         <button className="primary" onClick={() => addNote()}>＋ 新便签</button>
+        <button title="以选中便签为中心放射摊开(没选就取连线最多的那张);只改位置" onClick={tidy}>放射整理</button>
         <button
           className={inboxOpen ? 'primary' : ''}
           title="跨项目灵感库:手机快记写进这里,取用后卡片仍留在库中"
@@ -279,7 +316,7 @@ function Canvas() {
             ))}
           </div>
         )}
-        <span className="hint">双击空白处新建便签 · 拖动边缘连线 · Ctrl+C/V 复制 · Delete 删除</span>
+        <span className="hint">双击空白处新建便签 · 从便签四边任意方向拉出连线 · 双击连线写关系 · Ctrl+C/V 复制 · Delete 删除</span>
       </div>
       {inboxOpen && (
         <div className="inbox-strip">
@@ -306,9 +343,12 @@ function Canvas() {
           nodes={nodes}
           edges={edges}
           nodeTypes={stickyTypes}
+          edgeTypes={floatingEdgeTypes}
+          connectionMode={ConnectionMode.Loose}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onEdgeDoubleClick={(_, edge) => { void labelEdge(edge.id, edge.label); }}
           onPaneClick={(e) => {
             if (e.detail === 2) addNote(screenToFlowPosition({ x: e.clientX, y: e.clientY }));
           }}
