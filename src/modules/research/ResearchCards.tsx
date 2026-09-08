@@ -72,6 +72,10 @@ export default function ResearchCards() {
       source: '', pinned: false, createdAt: Date.now(),
     };
     addCard(c);
+    // 新卡没有标签、标题也不含搜索词,不清掉这两项它会当场被筛没 ——
+    // 卡是建出来了,用户只看到「点了没反应」。分类不用清,新卡本来就建进当前分类
+    setTagFilter(null);
+    setQuery('');
     setSelectedId(c.id);
   };
 

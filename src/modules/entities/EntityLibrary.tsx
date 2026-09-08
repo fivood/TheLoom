@@ -229,6 +229,10 @@ export default function EntityLibrary() {
       notes: '', createdAt: Date.now(),
     };
     addEntity(e);
+    // 新实体名里没有搜索词;从总览「新建到这一类」建的实体类型也可能不等于当前类型筛选。
+    // 不跟着调整,新建出来的东西会当场被筛没
+    setQuery('');
+    if (kindFilter !== 'all' && kindFilter !== kind) setKindFilter(kind);
     setSelectedId(e.id);
     setPendingNameFocus(e.id);
   };

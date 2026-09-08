@@ -68,6 +68,17 @@ function Canvas() {
   const storedEdges = useLoom((s) => s.project.brainstormEdges);
   const setBrainstorm = useLoom((s) => s.setBrainstorm);
   const { screenToFlowPosition, fitView } = useReactFlow();
+  const paneRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * 当前视口左上角的画布坐标,新便签从这里开始找空位 —— 落在看得见的地方。
+   * 拿不到容器(理论上不会)就回落到画布原点。
+   */
+  const viewOrigin = () => {
+    const r = paneRef.current?.getBoundingClientRect();
+    if (!r || r.width === 0) return undefined;
+    return screenToFlowPosition({ x: r.left + 40, y: r.top + 40 });
+  };
   const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
 
   const [nodes, setNodes] = useState<StickyNode[]>(() =>
@@ -180,7 +191,7 @@ function Canvas() {
       ...ns.map((n) => ({ ...n, selected: false })),
       {
         id: uid(), type: 'sticky' as const,
-        position: position ?? nextNotePosition(ns),
+        position: position ?? nextNotePosition(ns, viewOrigin()),
         data: { text: '', color },
         selected: true,
       },
@@ -236,7 +247,7 @@ function Canvas() {
       ...ns.map((n) => ({ ...n, selected: false })),
       {
         id: uid(), type: 'sticky' as const,
-        position: nextNotePosition(ns),
+        position: nextNotePosition(ns, viewOrigin()),
         data: { text, color: NOTE_COLORS[0] },
         selected: true,
       },
@@ -336,7 +347,7 @@ function Canvas() {
           ))}
         </div>
       )}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1 }} ref={paneRef}>
         <ReactFlow
           className="rf-light"
           colorMode={themeMode}

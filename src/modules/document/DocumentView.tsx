@@ -207,6 +207,9 @@ export default function DocumentView() {
       updatedAt: Date.now(),
     };
     addDocument(d);
+    // 新场景不带修订轮次、标题也不含搜索词,不清掉这两项它会被当场筛没
+    setRevFilter('all');
+    setQuery('');
     setSelectedId(d.id);
     setFocusBlockId(d.blocks[0].id);
   };

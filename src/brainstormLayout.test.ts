@@ -73,6 +73,17 @@ describe('便签自动摆放', () => {
     const broken = { id: 'x', text: '', color: '#fff', position: { x: NaN, y: 0 } } as BrainNote;
     expect(nextNotePosition([broken])).toEqual(NOTE_ORIGIN);
   });
+
+  it('从视口左上角起扫,不再把新便签丢到屏幕外', () => {
+    // 便签都在下方(用户视口也在那里),而画布左上角那几格是空的
+    const far = [note(80, 1100), note(310, 1240), note(600, 1380)];
+    const view = { x: 60, y: 1000 };
+    const pos = nextNotePosition(far, view);
+    expect(pos.y).toBeGreaterThanOrEqual(view.y);
+    for (const n of far) expect(overlaps(pos, n.position)).toBe(false);
+    // 不传视口才回落到画布原点(旧行为)
+    expect(nextNotePosition(far)).toEqual(NOTE_ORIGIN);
+  });
 });
 
 describe('放射整理', () => {

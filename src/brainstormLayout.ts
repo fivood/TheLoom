@@ -30,8 +30,15 @@ const NOTE_HEIGHT = 100;
  * 按行优先扫描格点,返回第一个「真的没压住任何便签」的位置。
  * 这里比对的是各便签的真实坐标而不是把它们吸附到格上 —— 历史便签(或用户手动拖过的)
  * 并不落在格点上,只按格子记占用会算出一个离它 190px 的位置,而便签宽 210px,照样叠。
+ *
+ * `origin` 是开始扫描的位置,默认画布左上角。**调用方应传当前视口的左上角** ——
+ * 固定从 (80,80) 起扫的话,板子铺开以后新便签会落在屏幕外(左上角那几格往往还空着),
+ * 点了没反应,看着就像「加不上便签了」。
  */
-export function nextNotePosition(notes: readonly PlacedNote[]): { x: number; y: number } {
+export function nextNotePosition(
+  notes: readonly PlacedNote[],
+  origin: { x: number; y: number } = NOTE_ORIGIN,
+): { x: number; y: number } {
   const placed = notes
     .filter((n) => n?.position && Number.isFinite(n.position.x) && Number.isFinite(n.position.y))
     .map((n) => n.position);
@@ -42,8 +49,8 @@ export function nextNotePosition(notes: readonly PlacedNote[]): { x: number; y: 
 
   for (let row = 0; ; row++) {
     for (let col = 0; col < NOTE_COLUMNS; col++) {
-      const x = NOTE_ORIGIN.x + col * NOTE_COL_WIDTH;
-      const y = NOTE_ORIGIN.y + row * NOTE_ROW_HEIGHT;
+      const x = origin.x + col * NOTE_COL_WIDTH;
+      const y = origin.y + row * NOTE_ROW_HEIGHT;
       if (!collides(x, y)) return { x, y };
     }
   }

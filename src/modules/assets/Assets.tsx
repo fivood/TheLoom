@@ -121,6 +121,7 @@ export default function Assets() {
   const onPickFiles = async (files: FileList) => {
     const skipped: string[] = [];
     const failed: string[] = [];
+    let added = 0;
     for (const file of Array.from(files)) {
       const kind = classifyAsset(file);
       const hash = await hashBlob(file);
@@ -153,6 +154,13 @@ export default function Assets() {
         createdAt: Date.now(),
       };
       addAsset(a);
+      added++;
+    }
+    // 导入进来的文件类型 / 标签 / 名字都未必对得上当前筛选,不清就是「导了但列表没变」
+    if (added > 0) {
+      setKindFilter('all');
+      setTagFilter(null);
+      setQuery('');
     }
     await refreshStored();
     const report = [
