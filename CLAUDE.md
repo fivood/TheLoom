@@ -20,8 +20,8 @@
 
 ### 当前基线
 
-- 已发布版本:网页 / 桌面 `v0.55.0`(地图 NavigatorTree 树、风暴便签快捷键与实体表格交互升级)
-- 当前基线:网页 / 桌面 `v0.55.0`;**路线图 R17→R22 除 R21 外全部完成**,R21(本地化与配音)经用户决定暂缓;Unreal 可选;v1.0.0 留待多轮真实项目测试后
+- 已发布版本:网页 / 桌面 `v0.68.0`(风暴板连线手动弯度)
+- 当前基线:网页 / 桌面 `v0.68.0`;**路线图 R17→R22 除 R21 外全部完成**,R21(本地化与配音)经用户决定暂缓;Unreal 可选;v1.0.0 留待多轮真实项目测试后
 - 后续路线以 `docs/PRODUCT_OPTIMIZATION_ROADMAP.md` 为准(R17→R19 收束为小说 / 游戏两条主工作流),下方 R0-R16 表是历史记录
 - 已交付的能力(截至 v0.41.0):
   - **v0.41.0 R22 《老伦敦寻人记》正式示例** ✅ — `examples/old-london/`:原稿 `source.md` + `build.mts` 生成器 → 文件夹格式项目(1 卷 4 章 12 场景 1.2 万字 / 15 实体 / 5 伏笔 / 5 弧线 / 7 时间线事件 / 25 节点解谜流程 / 4 结局 / 3 回归测试);`verify.mts` 跑小说通道验收,`trace.mts` 核对流程走向;端到端串起闸门 → 自包含包 → 脱机验收 → 编译 / DOCX → 三端一致
@@ -198,6 +198,58 @@ A 级四项已修复(v0.54.1,见「最近变更」);B 级七项与 C 级五项�
 - 每批至少运行:`npm test`、`npm run build`;涉及桌面文件夹存储时再运行 `cd src-tauri && cargo test --lib`;界面改动需实际检查受影响模块
 - 发版号由 AI 自行判断(按改动性质定 minor / patch),不必逐次询问;但推送 tag、移动已有版本标签或发布安装包仍需用户明确要求。发布前更新版本号(package.json / tauri.conf.json / Cargo.toml 三处 + `cargo check --lib` 刷新 Cargo.lock)、`RELEASE_NOTES.md` 并确认桌面更新清单
 - 新增外部依赖(尤其是运行时依赖)前请先评估能否用浏览器原生 API 手写;当前项目坚持零第三方 zip / xlsx / fdx 解析(见 `src/interop/`),接入 LLM 时也应保留可切换后端(OpenAI 兼容 / Anthropic / Ollama)以维持本地优先
+
+## 最近变更(v0.68.0 连线手动弯度 + 无头环境终于能验连线了)
+
+用户反馈:「风暴视图里卡片连线都被拉成了直线,多卡片时会有遮挡,能不能手动调整
+曲柄绕开(类似 ppt 里的功能)」。
+
+**`src/edgeCurve.ts`**(纯几何,8 项测试):弯度存的是**相对两节点中心连线中点的偏移**,
+不是绝对坐标 —— 存绝对点的话一拖卡片线就散了。控制点取「中点 + 2×偏移」:
+二次贝塞尔在 t=0.5 处是 `(p1 + 2·ctrl + p2)/4`,控制点移 Δ 该点只移 Δ/2,
+乘 2 才让手柄跟着光标走。半像素以内的抖动不算弯,一次误触不该把直线永久变成贝塞尔。
+测试做了负向验证(把 2× 改回 1× → 3 项挂)。
+
+**`FloatingEdge.tsx`**:边框交点要朝**控制点**求,不是朝对方中心 —— 弯得厉害时朝中心求
+会让线从卡片的错误一侧钻出去。手柄只在该边选中时出现,`data.bendable` 显式开关
+(关系图 edges 是 useMemo 派生的、没有 onEdgesChange,给个拖不住的手柄比没有更糟)。
+
+**三个只有真拖一遍才能发现的问题**:
+
+- **CSS 的 `rotate: 45deg` 会把定位用的 translate 一起转 45°**。个别 transform 属性的
+  应用顺序是 translate → rotate → scale → transform,`rotate` 排在 `transform` **之前**,
+  所以 `transform: translate(-50%,-50%) translate(505px,323px)` 先被旋转再生效 ——
+  手柄飞到了离连线 530px 的屏幕左下角。45° 必须写在组件 transform 字符串的**末尾**。
+  截图上看不出来(手柄在视野外),`getBoundingClientRect` 一量就现形
+- **松手补发的 click 会取消选中**。React Flow `Pane` 的 `onClick` 无条件调
+  `resetSelectedElements()`,**不看 target**,所以手柄上 pointerdown 的 stopPropagation
+  拦不住它 —— 一松手手柄就没了,想连着调两下得重新点中连线。在 `onUp` 里挂一个捕获阶段的
+  一次性 click 监听吃掉它,`setTimeout(…, 0)` 在同批输入事件派发完之后清理,没 click 时也不留监听
+- **手柄不是精确 1:1 跟手**:端点会朝控制点方向沿卡片边框滑动,手柄因此比光标少走
+  (端点位移)/2,拖 90px 差十来个像素。**不修** —— 手柄留在线上比精确跟手重要,
+  你是照着看见的线去抓它的。`edgeCurve.ts` 的注释已改成实话(测试守的是端点固定时的精确 1:1)
+
+### 无头浏览器终于能验连线了(此前记过三次「验不了」)
+
+根因没变:**ResizeObserver 存在但从不触发**(实测 `new ResizeObserver(cb).observe(node)`
+1.5s 内零回调),React Flow 因此测不到节点尺寸,给未测量节点挂 `visibility: hidden`,
+**连线一条都不渲染且控制台完全干净**。
+
+**绕过办法**:从 `.react-flow` 元素的 `__reactFiber$*` 往上走,找到 memoizedProps /
+memoizedState 里那个 `getState()` 带 `nodeLookup` 的 zustand store,然后手动调一次
+
+```js
+store.getState().updateNodeInternals(
+  new Map([...document.querySelectorAll('.react-flow__node')]
+    .map((el) => [el.dataset.id, { id: el.dataset.id, nodeElement: el, force: true }])),
+  { triggerFitView: false },
+);
+```
+
+`measured` 立刻填上、`nodesInitialized` 转真、节点 `visible`、连线渲染。之后 `computer` 的
+`left_click` / `left_click_drag` 就能真拖手柄了(**CDP 的 drag 只派发 pointer 事件,
+不发 mousedown**,调试事件顺序时注意)。**HMR 或 reload 之后要重新做一遍** ——
+节点重新挂载又回到未测量状态。上面三个问题全部是靠这条查出来的。
 
 ## 最近变更(v0.67.0 地图三尺度 + 走查 B 级收尾)
 
