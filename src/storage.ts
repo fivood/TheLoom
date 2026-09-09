@@ -222,6 +222,7 @@ export function cardToMd(c: ResearchCard): string {
     createdAt: c.createdAt,
   };
   if (c.source) meta.source = c.source;
+  if (c.verified) meta.verified = c.verified;
   if (c.favorite) meta.favorite = true;
   if (c.folderId) meta.folderId = c.folderId;
   if (typeof c.order === 'number' && Number.isFinite(c.order)) meta.order = c.order;
@@ -241,6 +242,8 @@ export function mdToCard(filename: string, md: string, index: number): ResearchC
     tags: Array.isArray(meta.tags) ? meta.tags.map(String) : [],
     color: typeof meta.color === 'string' ? meta.color : PALETTE[index % PALETTE.length],
     source: typeof meta.source === 'string' ? meta.source : '',
+    // 非法值交给 normalizeProject 删掉,这里只负责原样带回来
+    verified: typeof meta.verified === 'string' ? (meta.verified as ResearchCard['verified']) : undefined,
     pinned: meta.pinned === true,
     createdAt: typeof meta.createdAt === 'number' ? meta.createdAt : Date.now(),
   };

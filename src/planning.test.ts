@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { DocBlock, Document, Entity, Foreshadow, Project } from './types';
 import { normalizeProject } from './util';
-import { appearanceMatrix, foreshadowStatus, groupDocsByChapter, pacingPoints } from './planning';
+import { appearanceMatrix, foreshadowRefLabel, foreshadowStatus, groupDocsByChapter, pacingPoints } from './planning';
+import { unlinkOutlineRowReferences } from './documentReferences';
 import { foreshadowStatusLabel } from './types';
 
 function baseProject(): Project {
@@ -235,5 +236,40 @@ describe('疑点台账(与伏笔共用结构,措辞不同)', () => {
     ];
     const out = normalizeProject(p);
     expect((out.foreshadows ?? []).map((f) => f.kind)).toEqual(['doubt', undefined, undefined]);
+  });
+});
+
+describe('台账锚点可以挂大纲行(构思阶段还没有场景)', () => {
+  const withRow = (): Project => {
+    const p = baseProject();
+    p.outlineRows = [{ id: 'r1', no: '四', time: '', title: '瓶签', main: '', cells: {} }];
+    p.foreshadows = [{
+      id: 'f1', kind: 'doubt', title: '门是从里面插上的', note: '',
+      plants: [{ id: 'a1', rowId: 'r1' }], payoffs: [], createdAt: 1,
+    }];
+    return p;
+  };
+
+  it('只挂大纲行也算已提出,不会被 normalize 当悬挂引用丢掉', () => {
+    const p = normalizeProject(withRow());
+    expect(p.foreshadows?.[0].plants).toHaveLength(1);
+    expect(foreshadowStatus(p.foreshadows![0])).toBe('planted');
+  });
+
+  it('锚点名取「章号 · 标题」', () => {
+    const p = withRow();
+    expect(foreshadowRefLabel(p, p.foreshadows![0].plants[0])).toBe('四 · 瓶签');
+  });
+
+  it('大纲行被删则锚点解绑,不留「已删除」残影', () => {
+    const p = withRow();
+    unlinkOutlineRowReferences(p, 'r1');
+    expect(p.foreshadows![0].plants).toHaveLength(0);
+  });
+
+  it('两种锚点都失效才丢弃', () => {
+    const p = withRow();
+    p.foreshadows![0].plants = [{ id: 'a1', docId: 'gone', rowId: 'gone' }];
+    expect(normalizeProject(p).foreshadows?.[0].plants).toHaveLength(0);
   });
 });

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { confirmDialog } from '../../dialog';
 import { useNav } from '../../search';
-import { foreshadowStatus, groupDocsByChapter } from '../../planning';
+import { foreshadowRefLabel, foreshadowStatus, groupDocsByChapter } from '../../planning';
 import type { Foreshadow, ForeshadowKind, ForeshadowStatus } from '../../types';
 import { FORESHADOW_ANCHOR_LABEL, FORESHADOW_KIND_LABEL, foreshadowStatusLabel } from '../../types';
 import Icon from '../../components/Icon';
@@ -50,7 +50,7 @@ export default function ForeshadowLedger({ focusId, onConsumeFocus }: {
     () => groupDocsByChapter(project.documents, project.folders),
     [project.documents, project.folders],
   );
-  const docName = (docId: string) => project.documents.find((d) => d.id === docId)?.name ?? '(已删除)';
+  const outlineRows = project.outlineRows;
 
   const counts = useMemo(() => {
     const c: Record<ForeshadowStatus, number> = { idea: 0, planted: 0, resolved: 0, unplanted: 0, abandoned: 0 };
@@ -63,8 +63,13 @@ export default function ForeshadowLedger({ focusId, onConsumeFocus }: {
   const refCell = (f: Foreshadow, field: 'plants' | 'payoffs') => (
     <div className="fs-refs">
       {f[field].map((ref) => (
-        <span key={ref.id} className="fs-ref-chip" title={ref.note || '点击打开场景'}>
-          <button className="fs-ref-open" onClick={() => go({ tab: 'documents', docId: ref.docId })}>{docName(ref.docId)}</button>
+        <span key={ref.id} className="fs-ref-chip" title={ref.note || (ref.rowId ? '点击打开大纲' : '点击打开场景')}>
+          <button
+            className="fs-ref-open"
+            onClick={() => (ref.rowId
+              ? go({ tab: 'outline', outlineRowId: ref.rowId })
+              : go({ tab: 'documents', docId: ref.docId }))}
+          >{foreshadowRefLabel(project, ref)}</button>
           <button
             className="chip-x"
             title="移除"
@@ -76,14 +81,31 @@ export default function ForeshadowLedger({ focusId, onConsumeFocus }: {
         className="fs-ref-add"
         value=""
         onChange={(e) => {
-          const docId = e.target.value;
-          if (docId) updateForeshadow(f.id, (x) => { x[field].push({ id: uid(), docId }); });
+          // 值带前缀区分两类锚点 —— 场景 id 与大纲行 id 都是 uid,光看值分不出来
+          const [type, id] = e.target.value.split(':');
+          if (!id) return;
+          updateForeshadow(f.id, (x) => {
+            x[field].push(type === 'row' ? { id: uid(), rowId: id } : { id: uid(), docId: id });
+          });
         }}
       >
         <option value="">＋ {field === 'plants' ? anchor.plant : anchor.payoff}于…</option>
+        {/*
+          * 大纲行排在场景前面:疑点与倒着规划的伏笔都是构思阶段列的,
+          * 那时候一个场景都还没写,能挂的只有计划中的章节
+          */}
+        {outlineRows.length > 0 && (
+          <optgroup label="大纲(计划中的章节)">
+            {outlineRows.map((r) => (
+              <option key={r.id} value={`row:${r.id}`}>
+                {[r.no, r.title].map((x) => (x ?? '').trim()).filter(Boolean).join(' · ') || '(未命名章节)'}
+              </option>
+            ))}
+          </optgroup>
+        )}
         {chapters.map((ch) => (
-          <optgroup key={ch.key || 'none'} label={ch.label}>
-            {ch.docs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          <optgroup key={ch.key || 'none'} label={ch.label ? `场景 · ${ch.label}` : '场景'}>
+            {ch.docs.map((d) => <option key={d.id} value={`doc:${d.id}`}>{d.name}</option>)}
           </optgroup>
         ))}
       </select>

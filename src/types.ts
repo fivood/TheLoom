@@ -397,11 +397,30 @@ export interface Flow {
 
 /* ---------- 头脑风暴 ---------- */
 
+/** 便签的一次「被用掉」记录:转成了什么,或者作者手动标的 */
+export type BrainNoteUseKind = 'document' | 'outlineRow' | 'research' | 'entity' | 'manual';
+
+export interface BrainNoteUse {
+  kind: BrainNoteUseKind;
+  /** 转换生成的对象 id;手动标记没有 */
+  targetId?: ID;
+  at: number;
+}
+
 export interface BrainNote {
   id: ID;
   text: string;
   color: string;
   position: { x: number; y: number };
+  /**
+   * 这条灵感在本作品里被用到过的记录,只增不减。
+   *
+   * 一条灵感可以反复用(转成场景之后又拿去写成资料卡),所以不去重、不设上限 ——
+   * 台账要回答的是「哪些还没用过」,不是「用过几次」。
+   * 转成场景 / 大纲行 / 资料卡 / 实体会自动记一笔;直接写进正文的那种,
+   * 作者点便签上的标记手动记(kind: 'manual')。
+   */
+  usedIn?: BrainNoteUse[];
 }
 
 export interface BrainEdge {
@@ -550,8 +569,27 @@ export interface MapDoc {
 
 /* ---------- 资料卡片 ---------- */
 
+/**
+ * 考据的证实状态。
+ *
+ * 写年代 / 专业题材时,「这条到底查实了没有」和卡片内容一样重要 —— 抄来的说法
+ * 与查过原始出处的说法必须分得开,不然改稿时无从判断哪些还能信。
+ * AI 抽取管线的 SourceMaterial 早有 trust 分级,手建的卡片此前没有。
+ * 缺省 undefined = 没标过,不是「待查」—— 大多数卡片(设定、灵感)本来就不需要考证。
+ */
+export type ResearchVerified = 'todo' | 'confirmed' | 'doubtful' | 'refuted';
+
+export const RESEARCH_VERIFIED_LABEL: Record<ResearchVerified, string> = {
+  todo: '待查',
+  confirmed: '已证实',
+  doubtful: '存疑',
+  refuted: '已推翻',
+};
+
 export interface ResearchCard {
   id: ID;
+  /** 证实状态;不标 = 无需考证 */
+  verified?: ResearchVerified;
   favorite?: boolean;
   /** 所属资料文件夹 id;空 = 未分组 */
   folderId?: ID;
@@ -878,9 +916,18 @@ export interface ArcStage {
 }
 
 /** 伏笔的一处埋设 / 回收位置(指向场景文档) */
+/**
+ * 台账条目的一个锚点:指向一个场景,或者指向一行大纲。
+ *
+ * 两者二选一。大纲行这条出口是必需的 —— 疑点(以及倒着规划的伏笔)恰恰是构思阶段
+ * 列出来的,那时候一个场景都还没写,只能挂在计划中的章节上。
+ * 场景写出来之后再改挂到场景上,或者两个都留着。
+ */
 export interface ForeshadowRef {
   id: ID;
-  docId: ID;
+  docId?: ID;
+  /** 指向 outlineRows 里的一行;与 docId 二选一 */
+  rowId?: ID;
   note?: string;
 }
 

@@ -1,5 +1,5 @@
 import { auditProject } from '../audit';
-import { appearanceMatrix, arcStagesOf, foreshadowStatus, pacingPoints } from '../planning';
+import { appearanceMatrix, arcStagesOf, foreshadowRefLabel, foreshadowStatus, pacingPoints } from '../planning';
 import type { NavTarget } from '../search';
 import { simulateFlow } from '../simulate';
 import type { Entity, Flow, Project } from '../types';
@@ -136,9 +136,10 @@ function foreshadowBlocks(p: Project): AnalysisBlock[] {
   const status = item.kind === 'doubt'
     ? `${FORESHADOW_KIND_LABEL.doubt}·${foreshadowStatusLabel('doubt', foreshadowStatus(item))}`
     : foreshadowStatusLabel('setup', foreshadowStatus(item));
-    const plants = item.plants.map((ref) => docName(ref.docId)).join('、') || '(未埋设)';
-    const payoffs = item.payoffs.map((ref) => docName(ref.docId)).join('、') || '(未回收)';
-    return `「${item.title}」[${status}] 埋设: ${plants};回收: ${payoffs}${item.note ? `;备注: ${item.note.slice(0, 60)}` : ''}`;
+    const doubt = item.kind === 'doubt';
+    const plants = item.plants.map((ref) => foreshadowRefLabel(p, ref)).join('、') || (doubt ? '(未提出)' : '(未埋设)');
+    const payoffs = item.payoffs.map((ref) => foreshadowRefLabel(p, ref)).join('、') || (doubt ? '(未排除)' : '(未回收)');
+    return `「${item.title}」[${status}] ${doubt ? '提出' : '埋设'}: ${plants};${doubt ? '排除' : '回收'}: ${payoffs}${item.note ? `;备注: ${item.note.slice(0, 60)}` : ''}`;
   });
   return [{
     key: 'analysis:foreshadow:ledger',

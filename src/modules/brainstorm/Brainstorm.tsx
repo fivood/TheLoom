@@ -8,6 +8,7 @@ import {
 import { uid, useLoom } from '../../store';
 import { activePaletteColors } from '../../util';
 import { PALETTE } from '../../types';
+import type { BrainNoteUse } from '../../types';
 import { mindmapLayout, nextNotePosition } from '../../brainstormLayout';
 import { floatingEdgeTypes } from '../../components/FloatingEdge';
 import { promptText } from '../../dialog';
@@ -19,6 +20,7 @@ import Q from '../../components/Q';
 interface StickyData {
   text: string;
   color: string;
+  usedIn?: BrainNoteUse[];
   [key: string]: unknown;
 }
 type StickyNode = Node<StickyData>;
@@ -32,6 +34,10 @@ const NOTE_COLORS = ['#ffffff', '#f2f1ee', '#e6e4df', '#d8d6d0', '#c9c7c1', '#ba
  * 找目标锚点时会把 source 把手也算进去,所以四个 source 把手就够,不必再叠一套 target。
  */
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
+
+const USE_LABEL: Record<BrainNoteUse['kind'], string> = {
+  document: '转为场景', outlineRow: '转为大纲行', research: '转为资料卡', entity: '转为实体', manual: '手动标记',
+};
 
 /**
  * 新建便签后要聚焦的那一张。
@@ -61,8 +67,19 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
     ref.current?.focus();
   }, [id]);
 
+  const used = data.usedIn ?? [];
+  const toggleManual = () => {
+    // 已经转出去过的不给取消 —— 它确实用过了;手动标记可以反悔
+    const manual = used.some((u) => u.kind === 'manual');
+    updateNodeData(id, {
+      usedIn: manual
+        ? used.filter((u) => u.kind !== 'manual')
+        : [...used, { kind: 'manual' as const, at: Date.now() }],
+    });
+  };
+
   return (
-    <div className={`sticky-note ${selected ? 'selected' : ''}`} style={{ background: data.color, color: readableInk(data.color) }}>
+    <div className={`sticky-note ${selected ? 'selected' : ''} ${used.length ? 'used' : ''}`} style={{ background: data.color, color: readableInk(data.color) }}>
       {SIDES.map((p) => <Handle key={p} id={p} type="source" position={p} />)}
       <textarea
         ref={ref}
@@ -72,6 +89,11 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
         placeholder="写下想法…"
         onChange={(e) => { updateNodeData(id, { text: e.target.value }); autoSize(); }}
       />
+      <button
+        className={`sticky-used-mark nodrag ${used.length ? 'on' : ''}`}
+        title={used.length ? `已用过:${used.map((u) => USE_LABEL[u.kind]).join('、')}(点击取消手动标记)` : '标记为「已用到」'}
+        onClick={toggleManual}
+      >✓</button>
     </div>
   );
 }
@@ -100,7 +122,7 @@ function Canvas() {
   const themeMode = useSyncExternalStore(subscribeThemeMode, getThemeMode);
 
   const [nodes, setNodes] = useState<StickyNode[]>(() =>
-    notes.map((n) => ({ id: n.id, type: 'sticky', position: n.position, data: { text: n.text, color: n.color } })),
+    notes.map((n) => ({ id: n.id, type: 'sticky', position: n.position, data: { text: n.text, color: n.color, usedIn: n.usedIn } })),
   );
   const [edges, setEdges] = useState<Edge[]>(() =>
     storedEdges.map((e) => ({ ...e, type: 'floating', markerEnd: { type: MarkerType.ArrowClosed } })),
@@ -115,7 +137,11 @@ function Canvas() {
     const t = setTimeout(() => {
       dirty.current = false;
       setBrainstorm(
-        nodes.map((n) => ({ id: n.id, text: n.data.text, color: n.data.color, position: { x: n.position.x, y: n.position.y } })),
+        nodes.map((n) => ({
+          id: n.id, text: n.data.text, color: n.data.color,
+          position: { x: n.position.x, y: n.position.y },
+          ...(n.data.usedIn?.length ? { usedIn: n.data.usedIn } : {}),
+        })),
         edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: typeof e.label === 'string' ? e.label : undefined })),
       );
     }, 350);
@@ -203,7 +229,9 @@ function Canvas() {
   }, []);
 
   const addNote = (position?: { x: number; y: number }) => {
-    const color = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
+    // 按张数轮转而不是随机 —— 颜色在风暴板上是拿来当分类用的(待查 / 已证实 / 诡计 / 动机),
+    // 随机色等于先替用户洗一遍牌,每张新便签都得重新指定一次。资料卡与实体都是这么轮的
+    const color = NOTE_COLORS[nodes.length % NOTE_COLORS.length];
     const id = uid();
     pendingNoteFocus = id;
     dirty.current = true;
@@ -256,6 +284,7 @@ function Canvas() {
    * 从跨项目灵感库取用:未用过的点子落成便签,进入本项目的空间梳理。
    * 卡片留在库里只记去向 —— 同一个点子可能还要用在别的作品上。
    */
+  const [dimUsed, setDimUsed] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [inbox, setInbox] = useState(loadInbox);
   const projectName = useLoom((s) => s.project.name);
@@ -278,8 +307,34 @@ function Canvas() {
   };
 
   const hasSelection = nodes.some((n) => n.selected);
-  const selectedTexts = () => nodes.filter((n) => n.selected)
-    .map((n) => String(n.data.text ?? '').trim()).filter(Boolean);
+  const selectedNotes = () => nodes.filter((n) => n.selected)
+    .map((n) => ({ id: n.id, text: String(n.data.text ?? '').trim() }))
+    .filter((n) => n.text);
+
+  /**
+   * 记一笔「这条灵感用掉了」。只增不减、不去重 —— 同一条灵感转成场景之后
+   * 再拿去写成资料卡是常事,台账要回答的是「哪些还没用过」。
+   */
+  const markNotesUsed = (ids: string[], kind: BrainNoteUse['kind']) => {
+    const at = Date.now();
+    const set = new Set(ids);
+    /*
+     * 直接写 store,不能只改画布的本地状态 —— 转换完会立刻跳到目标模块,画布随之卸载,
+     * 而画布落盘是 350ms 防抖的,卸载时的 clearTimeout 正好把这笔记录清掉。
+     * 本地状态同步更新是为了分屏下画布不卸载时角标能立刻出现,
+     * 也避免之后那次防抖落盘拿旧数据把 store 里的记录覆盖回去。
+     */
+    useLoom.getState().update((p) => {
+      for (const note of p.brainstormNotes) {
+        if (set.has(note.id)) note.usedIn = [...(note.usedIn ?? []), { kind, at }];
+      }
+    });
+    setNodes((ns) => ns.map((n) => (set.has(n.id)
+      ? { ...n, data: { ...n.data, usedIn: [...(n.data.usedIn ?? []), { kind, at }] } }
+      : n)));
+  };
+
+  const unusedCount = nodes.filter((n) => !(n.data.usedIn?.length)).length;
 
   /**
    * 便签原本是死胡同 —— 想不到别处去,只能手工复制粘贴。
@@ -287,8 +342,9 @@ function Canvas() {
    * 这两个动作把那一步接上;便签本身保留,不是移动。
    */
   const toScenes = () => {
-    const texts = selectedTexts();
-    if (texts.length === 0) return;
+    const picked = selectedNotes();
+    if (picked.length === 0) return;
+    const texts = picked.map((n) => n.text);
     const first = useLoom.getState().project.documentCategories[0] ?? '未分类';
     useLoom.getState().update((p) => {
       for (const text of texts) {
@@ -302,6 +358,7 @@ function Canvas() {
         });
       }
     });
+    markNotesUsed(picked.map((n) => n.id), 'document');
     useNav.getState().go({ tab: 'documents' });
   };
 
@@ -315,8 +372,9 @@ function Canvas() {
    * 便签文字看不出该是哪一类,与其弹窗问,不如先落地再改。
    */
   const toResearchCards = () => {
-    const texts = selectedTexts();
-    if (texts.length === 0) return;
+    const picked = selectedNotes();
+    if (picked.length === 0) return;
+    const texts = picked.map((n) => n.text);
     const project = useLoom.getState().project;
     const category = project.researchCategories[0] ?? '未分类';
     const cols = activePaletteColors(project);
@@ -333,12 +391,14 @@ function Canvas() {
         });
       }
     });
+    markNotesUsed(picked.map((n) => n.id), 'research');
     useNav.getState().go({ tab: 'research' });
   };
 
   const toEntities = () => {
-    const texts = selectedTexts();
-    if (texts.length === 0) return;
+    const picked = selectedNotes();
+    if (picked.length === 0) return;
+    const texts = picked.map((n) => n.text);
     const cols = activePaletteColors(useLoom.getState().project);
     useLoom.getState().update((p) => {
       for (const text of texts) {
@@ -356,12 +416,14 @@ function Canvas() {
         });
       }
     });
+    markNotesUsed(picked.map((n) => n.id), 'entity');
     useNav.getState().go({ tab: 'entities' });
   };
 
   const toOutlineRows = () => {
-    const texts = selectedTexts();
-    if (texts.length === 0) return;
+    const picked = selectedNotes();
+    if (picked.length === 0) return;
+    const texts = picked.map((n) => n.text);
     useLoom.getState().update((p) => {
       for (const text of texts) {
         p.outlineRows.push({
@@ -374,6 +436,7 @@ function Canvas() {
         });
       }
     });
+    markNotesUsed(picked.map((n) => n.id), 'outlineRow');
     useNav.getState().go({ tab: 'outline' });
   };
 
@@ -382,6 +445,11 @@ function Canvas() {
       <div className="toolbar">
         <button className="primary" onClick={() => addNote()}>＋ 新便签</button>
         <button title="以选中便签为中心放射摊开(没选就取连线最多的那张);只改位置" onClick={tidy}>放射整理</button>
+        <button
+          className={dimUsed ? 'primary' : ''}
+          title="淡化已经用掉的便签,让还没用过的显出来。转成场景 / 大纲行 / 资料卡 / 实体会自动记一笔,也可以点便签上的 ✓ 手动标"
+          onClick={() => setDimUsed((v) => !v)}
+        >未用过 {unusedCount}</button>
         <button
           className={inboxOpen ? 'primary' : ''}
           title="跨项目灵感库:手机快记写进这里,取用后卡片仍留在库中"
@@ -425,7 +493,7 @@ function Canvas() {
       )}
       <div style={{ flex: 1 }} ref={paneRef}>
         <ReactFlow
-          className="rf-light"
+          className={`rf-light${dimUsed ? ' dim-used' : ''}`}
           colorMode={themeMode}
           nodes={nodes}
           edges={edges}

@@ -109,7 +109,7 @@ function collectReferenceCounts(p: Project): Map<string, number> {
     add(arc.docId);
   }
   for (const foreshadow of p.foreshadows ?? []) {
-    for (const ref of [...foreshadow.plants, ...foreshadow.payoffs]) add(ref.docId);
+    for (const ref of [...foreshadow.plants, ...foreshadow.payoffs]) { add(ref.docId); add(ref.rowId); }
   }
   for (const ids of Object.values(p.attachments ?? {})) for (const assetId of new Set(ids)) add(assetId);
   return counts;

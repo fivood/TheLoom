@@ -431,10 +431,15 @@ export function advancedAuditProject(p: Project, options: AuditOptions = {}): Pr
       add({ code: 'reference.arc-document', kind: '无效引用', message: `角色弧线「${arc.title}」关联的场景不存在`, scope: 'planning', nav, objectId: arc.id });
     }
   }
+  const outlineRowIds = new Set(p.outlineRows.map((r) => r.id));
   for (const foreshadow of p.foreshadows ?? []) {
+    const label = foreshadow.kind === 'doubt' ? '疑点' : '伏笔';
     for (const ref of [...foreshadow.plants, ...foreshadow.payoffs]) {
-      if (!documents.has(ref.docId)) {
-        add({ code: 'reference.foreshadow-document', kind: '无效引用', message: `伏笔「${foreshadow.title}」关联的场景不存在`, scope: 'planning', nav: { tab: 'planning', planningView: 'foreshadow', foreshadowId: foreshadow.id }, objectId: foreshadow.id });
+      // 锚点是场景或大纲行二选一;两边都指不到才算无效引用
+      const liveDoc = ref.docId ? documents.has(ref.docId) : false;
+      const liveRow = ref.rowId ? outlineRowIds.has(ref.rowId) : false;
+      if (!liveDoc && !liveRow) {
+        add({ code: 'reference.foreshadow-document', kind: '无效引用', message: `${label}「${foreshadow.title}」关联的场景或大纲行不存在`, scope: 'planning', nav: { tab: 'planning', planningView: 'foreshadow', foreshadowId: foreshadow.id }, objectId: foreshadow.id });
       }
     }
   }

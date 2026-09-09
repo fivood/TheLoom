@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sampleProject } from './sample';
-import type { Document, Entity, ResearchCard } from './types';
+import type { Document, Entity, Project, ResearchCard } from './types';
+import { normalizeProject } from './util';
 import {
   assignDocumentFilenames, cardToMd, documentToMd, entityToMd, mdToCard, mdToDocument, mdToEntity,
   projectToFolderJson, resolveEntityRefs,
@@ -278,5 +279,32 @@ describe('R2 场景元数据往返', () => {
     expect(restoredBad.wordTarget).toBeUndefined();
     expect(restoredBad.tension).toBeUndefined();
     expect(restoredBad.revision).toBeUndefined();
+  });
+});
+
+describe('资料卡证实状态往返', () => {
+  it('verified 无损往返,不标时不写进 frontmatter', () => {
+    const base = {
+      id: 'c1', title: '铁氰化钾遇酸放氰化氢', content: '正文', category: '考据',
+      tags: ['1934'], color: '#eee', source: 'EHS', pinned: false, createdAt: 1,
+    };
+    const withV = cardToMd({ ...base, verified: 'confirmed' } as ResearchCard);
+    expect(withV).toContain('verified: confirmed');
+    expect(mdToCard('铁氰化钾遇酸放氰化氢.md', withV, 0).verified).toBe('confirmed');
+
+    const without = cardToMd(base as ResearchCard);
+    expect(without).not.toContain('verified');
+    expect(mdToCard('x.md', without, 0).verified).toBeUndefined();
+  });
+
+  it('非法值由 normalizeProject 清掉', () => {
+    const md = cardToMd({ ...{
+      id: 'c1', title: 't', content: '', category: '考据', tags: [], color: '#eee',
+      source: '', pinned: false, createdAt: 1,
+    }, verified: 'nonsense' } as unknown as ResearchCard);
+    const card = mdToCard('t.md', md, 0);
+    expect(card.verified).toBe('nonsense');
+    const p = normalizeProject({ version: 1, name: 't', flows: [], researchCards: [card], updatedAt: 0 } as unknown as Project);
+    expect(p.researchCards[0].verified).toBeUndefined();
   });
 });

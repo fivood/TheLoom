@@ -16,9 +16,14 @@ export const STAGE_LABEL: Record<WritingStage, string> = {
   codex: '设',
 };
 
-/** 阶段图标沿用它主要模块的图标:写=文档、改=版本对比、理=大纲、设=设定集 */
-export const STAGE_ICON: Record<WritingStage, 'doc' | 'compare' | 'grid' | 'cards'> = {
-  write: 'doc',
+/**
+ * 阶段图标。改、理、设沿用各自主模块的图标(版本对比 / 大纲 / 设定集),
+ * **写单独用铅笔而不是文档图标** —— 文档、大纲、设定集三个图标都是「矩形加内部线条」,
+ * 15px 并排时分不出来;铅笔是斜向笔杆,轮廓和另外三个都不同,一眼能认出来。
+ * 而且这四个格子表达的是「我现在在干什么」,写的动作本来就该是笔而不是一页纸。
+ */
+export const STAGE_ICON: Record<WritingStage, 'pencil' | 'compare' | 'grid' | 'cards'> = {
+  write: 'pencil',
   revise: 'compare',
   plan: 'grid',
   codex: 'cards',

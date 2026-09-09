@@ -5,7 +5,8 @@ import { confirmDialog, promptText } from '../../dialog';
 import Icon from '../../components/Icon';
 import AttachmentEditor from '../../components/AttachmentEditor';
 import Inspector from '../../components/Inspector';
-import type { ResearchCard } from '../../types';
+import type { ResearchCard, ResearchVerified } from '../../types';
+import { RESEARCH_VERIFIED_LABEL } from '../../types';
 import { PALETTE } from '../../types';
 import { activePaletteColors } from '../../util';
 import ColorPicker from '../../components/ColorPicker';
@@ -20,6 +21,7 @@ export default function ResearchCards() {
   const { addCard, updateCard, removeCard, update } = useLoom();
   const [catFilter, setCatFilter] = useState<string | 'all'>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [verifiedFilter, setVerifiedFilter] = useState<ResearchVerified | 'all'>('all');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export default function ResearchCards() {
     const list = cards.filter((c) =>
       (catFilter === 'all' || c.category === catFilter) &&
       (!tagFilter || c.tags.includes(tagFilter)) &&
+      (verifiedFilter === 'all' || c.verified === verifiedFilter) &&
       (!q ||
         c.title.toLowerCase().includes(q) ||
         c.content.toLowerCase().includes(q) ||
@@ -55,7 +58,7 @@ export default function ResearchCards() {
         c.tags.some((t) => t.toLowerCase().includes(q))),
     );
     return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt - a.createdAt);
-  }, [cards, catFilter, tagFilter, query]);
+  }, [cards, catFilter, tagFilter, verifiedFilter, query]);
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [pendingTitleFocus, setPendingTitleFocus] = useState<string | null>(null);
@@ -155,6 +158,19 @@ export default function ResearchCards() {
               {allTags.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
             </select>
           )}
+          {(cards.some((c) => c.verified) || verifiedFilter !== 'all') && (
+            <select
+              value={verifiedFilter}
+              onChange={(e) => setVerifiedFilter(e.target.value as ResearchVerified | 'all')}
+              style={{ width: 110 }}
+              title="按考据的证实状态筛选"
+            >
+              <option value="all">全部证实状态</option>
+              {(Object.keys(RESEARCH_VERIFIED_LABEL) as ResearchVerified[]).map((v) => (
+                <option key={v} value={v}>{RESEARCH_VERIFIED_LABEL[v]}</option>
+              ))}
+            </select>
+          )}
           <input placeholder="搜索标题、内容、来源或标签…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 240 }} />
           {tagFilter && <span className="tag active clickable" onClick={() => setTagFilter(null)}>#{tagFilter} ×</span>}
           <span className="hint">动笔前把设定、考据、灵感来源都归档到这里</span>
@@ -169,6 +185,7 @@ export default function ResearchCards() {
             >
               <div className="card-title">
                 <span>{c.title}</span>
+                {c.verified && <span className={`verified-badge v-${c.verified}`}>{RESEARCH_VERIFIED_LABEL[c.verified]}</span>}
                 {c.pinned && <span className="pin"><Icon name="pin" size={13} /></span>}
               </div>
               <div className="card-body">{c.content || '(空白卡片)'}</div>
@@ -193,6 +210,18 @@ export default function ResearchCards() {
             <div className="field">
               <label>正文</label>
               <textarea rows={10} value={selected.content} onChange={(e) => updateCard(selected.id, { content: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>证实状态(不标 = 无需考证)</label>
+              <select
+                value={selected.verified ?? ''}
+                onChange={(e) => updateCard(selected.id, { verified: (e.target.value || undefined) as ResearchVerified | undefined })}
+              >
+                <option value="">—</option>
+                {(Object.keys(RESEARCH_VERIFIED_LABEL) as ResearchVerified[]).map((v) => (
+                  <option key={v} value={v}>{RESEARCH_VERIFIED_LABEL[v]}</option>
+                ))}
+              </select>
             </div>
             <div className="field">
               <label>分类</label>

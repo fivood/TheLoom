@@ -16,3 +16,16 @@ export function unlinkDocumentReferences(project: Project, documentId: string): 
   project.docSnapshots = (project.docSnapshots ?? []).filter((snapshot) => snapshot.docId !== documentId);
   project.revisionTasks = (project.revisionTasks ?? []).filter((task) => task.docId !== documentId);
 }
+
+/**
+ * 删掉一行大纲时,清掉指向它的台账锚点。
+ *
+ * commit 不跑 normalizeProject(只有加载时跑),不显式解绑的话,台账上会挂着
+ * 一串「(已删除)」直到下次重新打开项目 —— 与删场景走同一条路。
+ */
+export function unlinkOutlineRowReferences(project: Project, rowId: string): void {
+  for (const foreshadow of project.foreshadows ?? []) {
+    foreshadow.plants = foreshadow.plants.filter((ref) => ref.rowId !== rowId);
+    foreshadow.payoffs = foreshadow.payoffs.filter((ref) => ref.rowId !== rowId);
+  }
+}

@@ -16,6 +16,13 @@ export function normalizeProject(p: Project): Project {
   p.flows ??= [];
   p.entities ??= [];
   p.brainstormNotes ??= [];
+  // 便签的使用记录:清掉结构不对的条目,别让脏数据把「未用过」的计数算歪
+  const USE_KINDS = new Set(['document', 'outlineRow', 'research', 'entity', 'manual']);
+  for (const note of p.brainstormNotes) {
+    if (!Array.isArray(note.usedIn)) { delete note.usedIn; continue; }
+    note.usedIn = note.usedIn.filter((u) => u && USE_KINDS.has(u.kind) && Number.isFinite(u.at));
+    if (note.usedIn.length === 0) delete note.usedIn;
+  }
   p.brainstormEdges ??= [];
   p.outlineColumns ??= [];
   p.outlineRows ??= [];
@@ -24,6 +31,12 @@ export function normalizeProject(p: Project): Project {
   p.timelineEvents ??= [];
   p.maps ??= [];
   p.researchCards ??= [];
+  // 证实状态:非法值删掉当「没标过」。必须排在上面的 ??= 兜底之后 ——
+  // 旧项目里这个数组可能压根不存在
+  const VERIFIED = new Set(['todo', 'confirmed', 'doubtful', 'refuted']);
+  for (const card of p.researchCards) {
+    if (card.verified && !VERIFIED.has(card.verified)) delete card.verified;
+  }
   p.researchCategories ??= [];
   p.variables ??= [];
   p.assets ??= [];
@@ -418,9 +431,16 @@ export function normalizeProject(p: Project): Project {
     if (a.docId && !docIds.has(a.docId)) a.docId = undefined;
   }
   cleanOrder(p.arcs);
+  // 锚点指向场景或大纲行,二选一;两边都失效才丢弃
+  const rowIds = new Set(p.outlineRows.map((r) => r.id));
+  const liveRef = (ref: { docId?: string; rowId?: string }) => {
+    if (ref.docId && !docIds.has(ref.docId)) delete ref.docId;
+    if (ref.rowId && !rowIds.has(ref.rowId)) delete ref.rowId;
+    return !!(ref.docId || ref.rowId);
+  };
   for (const f of p.foreshadows) {
-    f.plants = (f.plants ?? []).filter((ref) => docIds.has(ref.docId));
-    f.payoffs = (f.payoffs ?? []).filter((ref) => docIds.has(ref.docId));
+    f.plants = (f.plants ?? []).filter(liveRef);
+    f.payoffs = (f.payoffs ?? []).filter(liveRef);
     // kind 是后加的:旧条目与非法值一律按伏笔算,不要把字段留成脏值
     if (f.kind !== 'doubt') delete f.kind;
   }

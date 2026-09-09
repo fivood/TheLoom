@@ -349,3 +349,28 @@ describe('R19-4 回归测试的规范化', () => {
     expect(p.flowTests).toBeUndefined();
   });
 });
+
+describe('便签使用记录的规范化', () => {
+  const p = (notes: unknown[]) => normalizeProject({
+    version: 1, name: 't', flows: [], brainstormNotes: notes, updatedAt: 0,
+  } as unknown as Project);
+
+  it('剔除结构不对的条目,全剔光就删掉字段', () => {
+    const out = p([
+      { id: 'a', text: '', color: '#fff', position: { x: 0, y: 0 }, usedIn: [{ kind: 'research', at: 1 }, { kind: '瞎写', at: 2 }] },
+      { id: 'b', text: '', color: '#fff', position: { x: 0, y: 0 }, usedIn: [{ kind: 'research', at: NaN }] },
+      { id: 'c', text: '', color: '#fff', position: { x: 0, y: 0 }, usedIn: '不是数组' },
+    ]);
+    expect(out.brainstormNotes[0].usedIn).toEqual([{ kind: 'research', at: 1 }]);
+    expect(out.brainstormNotes[1].usedIn).toBeUndefined();
+    expect(out.brainstormNotes[2].usedIn).toBeUndefined();
+  });
+
+  it('同一条灵感可以记多次,不去重', () => {
+    const out = p([{
+      id: 'a', text: '', color: '#fff', position: { x: 0, y: 0 },
+      usedIn: [{ kind: 'document', at: 1 }, { kind: 'research', at: 2 }, { kind: 'document', at: 3 }],
+    }]);
+    expect(out.brainstormNotes[0].usedIn).toHaveLength(3);
+  });
+});

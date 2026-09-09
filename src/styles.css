@@ -1327,7 +1327,21 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* ---------- 头脑风暴便签 ---------- */
 
+/* 资料卡的证实状态角标。四档只用深浅区分,不上红绿 —— 卡片顶边已经在用配色表的颜色了 */
+.verified-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.verified-badge.v-confirmed { color: var(--text); border-color: var(--text-dim); }
+.verified-badge.v-refuted { text-decoration: line-through; }
+
 .sticky-note {
+  position: relative; /* ✓ 标记按角定位 */
   width: 210px;
   border-radius: 10px;
   padding: 10px 12px;
@@ -1349,6 +1363,34 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   overflow: hidden;
 }
 .sticky-note.selected { outline: 2px solid var(--focus); }
+/*
+ * 「用过了」的标记。平时只在悬停 / 已标记时出现 —— 便签板上一堆常驻角标会盖过内容。
+ * 「未用过」按钮打开后淡化已用的,让还没用过的灵感自己跳出来(要回答的是这个问题,
+ * 不是「用过几次」)。
+ */
+.sticky-used-mark {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.sticky-note:hover .sticky-used-mark { opacity: 0.45; }
+.sticky-used-mark.on,
+.sticky-note:hover .sticky-used-mark.on { opacity: 1; }
+/* 已标记的便签给角标让出一点右边距,免得压住第一行末尾 */
+.sticky-note.used textarea { padding-right: 16px; }
+.react-flow.dim-used .sticky-note.used { opacity: 0.32; }
+.react-flow.dim-used .sticky-note.used:hover { opacity: 0.75; }
 /* 四面把手平时藏起来,便签才是主角;悬停或选中才露出四个连接点 */
 .sticky-note .react-flow__handle {
   width: 9px;

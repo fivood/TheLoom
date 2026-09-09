@@ -22,7 +22,7 @@ import {
 import { estimateWebStorage, mirrorIdbToLocal, readThrough, requestPersistentStorage, webdbAvailable, writeThrough } from './webdb';
 import { getStorageUsage, type StorageUsage } from './diagnostics';
 import type { AiProposalApplyResult, ApplyAiProposalOptions } from './ai/proposal';
-import { unlinkDocumentReferences } from './documentReferences';
+import { unlinkDocumentReferences, unlinkOutlineRowReferences } from './documentReferences';
 import { recordWritingProgress } from './writingProgress';
 
 export { uid, normalizeProject };
@@ -913,6 +913,7 @@ export const useLoom = create<LoomState>((set, get) => {
     }),
     removeOutlineRow: (id) => commit((p) => {
       p.outlineRows = p.outlineRows.filter((x) => x.id !== id);
+      unlinkOutlineRowReferences(p, id);
     }),
     moveOutlineRow: (id, dir) => commit((p) => {
       const i = p.outlineRows.findIndex((x) => x.id === id);

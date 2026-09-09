@@ -1,5 +1,5 @@
 import type {
-  ArcStage, DocStatus, Document, Entity, Folder, Foreshadow, ForeshadowStatus, Project,
+  ArcStage, DocStatus, Document, Entity, Folder, Foreshadow, ForeshadowRef, ForeshadowStatus, Project,
 } from './types';
 import { documentWordCount, linearizeByFolders } from './util';
 import { documentChapterIdentity } from './documentStructure';
@@ -15,6 +15,22 @@ export function foreshadowStatus(f: Foreshadow): ForeshadowStatus {
   if (f.payoffs.length > 0) return 'resolved';
   if (f.plants.length > 0) return 'planted';
   return 'idea';
+}
+
+/**
+ * 台账锚点的显示名:指向场景就用场景名,指向大纲行就用「章号 · 标题」。
+ * 分析块与台账界面共用 —— 两处各写一份,迟早在「已删除」的说法上分岔。
+ */
+export function foreshadowRefLabel(p: Project, ref: ForeshadowRef): string {
+  if (ref.docId) {
+    const doc = p.documents.find((d) => d.id === ref.docId);
+    if (doc) return doc.name;
+  }
+  if (ref.rowId) {
+    const row = p.outlineRows.find((r) => r.id === ref.rowId);
+    if (row) return [row.no, row.title].map((x) => (x ?? '').trim()).filter(Boolean).join(' · ') || '(未命名章节)';
+  }
+  return '(已删除)';
 }
 
 /* ---------- 章节分组:文档按 Navigator 树序线性化后,按所属文件夹分组 ---------- */
