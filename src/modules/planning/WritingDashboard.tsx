@@ -162,8 +162,10 @@ export default function WritingDashboard() {
     .filter((annotation) => !annotation.resolved)
     .sort((a, b) => b.createdAt - a.createdAt);
   const unresolvedAnnotations = allUnresolvedAnnotations.slice(0, 6);
+  // 只数伏笔 —— 疑点用的是同一张台账,但「埋了没回收」和「提了没排除」是两件事,
+  // 混在一个待办数字里会让人以为伏笔欠得比实际多
   const allPendingForeshadows = (project.foreshadows ?? [])
-    .filter((item) => !item.abandoned && item.plants.length > 0 && item.payoffs.length === 0);
+    .filter((item) => item.kind !== 'doubt' && !item.abandoned && item.plants.length > 0 && item.payoffs.length === 0);
   const pendingForeshadows = allPendingForeshadows.slice(0, 6);
   const allUnderTargetChapters = folders
     .filter((folder) => folder.documentRole === 'chapter')

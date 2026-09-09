@@ -57,3 +57,37 @@ describe('proofreadProject', () => {
     expect(proofreadProject(project).some((issue) => issue.message.includes('混用称谓'))).toBe(false);
   });
 });
+
+describe('全半角:实测里漏掉的那几个', () => {
+  function scan(text: string) {
+    const project = sampleProject();
+    project.documents[0].blocks = [{ id: 'b', type: 'paragraph', text }];
+    return proofreadProject(project).filter((i) => i.category === 'width' && i.blockId === 'b');
+  }
+
+  it('对白的直引号成对报出,并按奇偶给出上下引号', () => {
+    // 收尾引号前面是「？」不是汉字 —— 旧的「前后有汉字」判定会整条漏掉
+    const issues = scan('"人是几点发现的？"');
+    expect(issues.length).toBe(2);
+    expect(issues[0].suggestion).toContain('“');
+    expect(issues[1].suggestion).toContain('”');
+  });
+
+  it('纯英文块里的直引号不报', () => {
+    expect(scan('He said "yes" and left.').length).toBe(0);
+  });
+
+  it('汉字之间的半角句点与括号要报', () => {
+    expect(scan('他走了.然后呢').some((i) => i.suggestion.includes('。'))).toBe(true);
+    expect(scan('沈砚秋(华探)到场').some((i) => i.suggestion.includes('（'))).toBe(true);
+  });
+
+  it('小数点和英文括号不误报', () => {
+    expect(scan('售价 3.14 元的相纸').every((i) => !i.suggestion.includes('。'))).toBe(true);
+    expect(scan('用了 Kodak (1934) 的胶卷').every((i) => !i.suggestion.includes('（'))).toBe(true);
+  });
+
+  it('省略号只交给「连续标点」,不逐点报半角句点', () => {
+    expect(scan('他说...然后就走了').every((i) => !i.suggestion.includes('。'))).toBe(true);
+  });
+});

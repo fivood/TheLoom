@@ -110,7 +110,17 @@ function scanBlock(issues: ProofreadingIssue[], docId: string, block: DocBlock):
     () => '统一转换为半角字母、数字或普通空格',
   );
 
-  const halfWidth = /[,!?;:]/g;
+  /*
+   * 半角标点。判定条件是「前后任一侧是汉字」—— 这样 3.14、GPT-4 (2023)、don't
+   * 这些本就该用半角的地方不会被误报。
+   * `.` 额外跳过与另一个点相邻的情况:中文里的 ... 是省略号写法问题,
+   * 逐点报会对同一处报两次,交给「连续标点」那条规则去管。
+   */
+  const halfWidth = /[,!?;:.()]/g;
+  const FULL: Record<string, string> = {
+    ',': '，', '!': '！', '?': '？', ';': '；', ':': '：',
+    '.': '。', '(': '（', ')': '）',
+  };
   let match: RegExpExecArray | null;
   while ((match = halfWidth.exec(text))) {
     const before = text.slice(0, match.index);
@@ -119,6 +129,7 @@ function scanBlock(issues: ProofreadingIssue[], docId: string, block: DocBlock):
     const next = [...after][0] ?? '';
     if (!/\p{Script=Han}/u.test(previous) && !/\p{Script=Han}/u.test(next)) continue;
     const value = match[0];
+    if (value === '.' && (previous === '.' || next === '.')) continue;
     issues.push({
       id: issueId('width', `${docId}:${block.id}:${match.index}`, value),
       category: 'width',
@@ -126,8 +137,35 @@ function scanBlock(issues: ProofreadingIssue[], docId: string, block: DocBlock):
       blockId: block.id,
       message: `中文语境中使用半角标点「${value}」`,
       excerpt: excerpt(text, match.index, 1),
-      suggestion: `建议改为${({ ',': '，', '!': '！', '?': '？', ';': '；', ':': '：' } as Record<string, string>)[value]}`,
+      suggestion: `建议改为${FULL[value]}`,
     });
+  }
+
+  /*
+   * 直引号单独一条规则,不走上面的「前后有汉字」判定 —— 对白的收尾引号前面
+   * 往往是「？」「。」这类全角标点而不是汉字,那条判定会把它整个漏掉。
+   * 改判「这个块里有汉字」:中文正文里混进 ASCII 引号基本都是输入法切换或粘贴带来的。
+   * 开合按块内序号的奇偶推断,奇数个在前即为下引号。
+   */
+  if (/\p{Script=Han}/u.test(text)) {
+    const quotes = /["']/g;
+    const seen: Record<string, number> = { '"': 0, "'": 0 };
+    let q: RegExpExecArray | null;
+    while ((q = quotes.exec(text))) {
+      const value = q[0];
+      const opening = seen[value] % 2 === 0;
+      seen[value] += 1;
+      const pair = value === '"' ? (opening ? '“' : '”') : (opening ? '‘' : '’');
+      issues.push({
+        id: issueId('width', `${docId}:${block.id}:${q.index}`, value),
+        category: 'width',
+        docId,
+        blockId: block.id,
+        message: `中文语境中使用直引号「${value}」`,
+        excerpt: excerpt(text, q.index, 1),
+        suggestion: `建议改为${pair}（成对使用中文引号）`,
+      });
+    }
   }
 }
 

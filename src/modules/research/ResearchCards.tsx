@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { uid, useLoom } from '../../store';
 import { useNav } from '../../search';
 import { confirmDialog, promptText } from '../../dialog';
@@ -57,10 +57,21 @@ export default function ResearchCards() {
     return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt - a.createdAt);
   }, [cards, catFilter, tagFilter, query]);
 
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [pendingTitleFocus, setPendingTitleFocus] = useState<string | null>(null);
+
   const selected = cards.find((c) => c.id === selectedId) ?? null;
   useEffect(() => {
     if (selected) useNav.getState().visit({ tab: 'research', cardId: selected.id }, `资料 · ${selected.title}`);
   }, [selected?.id, selected?.title]);
+
+  // 新建后直接进入命名,与新建实体 / 新建场景一致
+  useEffect(() => {
+    if (!pendingTitleFocus || selected?.id !== pendingTitleFocus) return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+    setPendingTitleFocus(null);
+  }, [pendingTitleFocus, selected?.id]);
 
   const createCard = () => {
     const cols = activePaletteColors(useLoom.getState().project);
@@ -77,6 +88,7 @@ export default function ResearchCards() {
     setTagFilter(null);
     setQuery('');
     setSelectedId(c.id);
+    setPendingTitleFocus(c.id);
   };
 
   const addCategory = async () => {
@@ -176,7 +188,7 @@ export default function ResearchCards() {
             <h3>卡片内容</h3>
             <div className="field">
               <label>标题</label>
-              <input value={selected.title} onChange={(e) => updateCard(selected.id, { title: e.target.value })} />
+              <input ref={titleInputRef} value={selected.title} onChange={(e) => updateCard(selected.id, { title: e.target.value })} />
             </div>
             <div className="field">
               <label>正文</label>

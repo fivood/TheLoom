@@ -887,6 +887,30 @@ export interface ForeshadowRef {
 /** 伏笔状态(由埋设 / 回收记录推导,abandoned 为手动标记) */
 export type ForeshadowStatus = 'idea' | 'planted' | 'resolved' | 'unplanted' | 'abandoned';
 
+/**
+ * 台账条目的类型。
+ *
+ * `setup` 伏笔:埋设 → 回收。
+ * `doubt` 疑点:提出 → 排除 —— 推理写作里「排除了所有不合理才是真相」那一步,
+ * 需要把每一条不合理列出来反复核对,还剩几条没排除要一眼看得到。
+ *
+ * 两者共用同一套两锚点结构与状态推导,差别只在措辞:
+ * 「回收了却没埋设」对疑点就是「排除了却没提出过」—— 读者没见过的疑点被你排除了,
+ * 同样是台账该抓的错误。
+ */
+export type ForeshadowKind = 'setup' | 'doubt';
+
+export const FORESHADOW_KIND_LABEL: Record<ForeshadowKind, string> = {
+  setup: '伏笔',
+  doubt: '疑点',
+};
+
+/** 两个锚点在各类型下的叫法:埋设/回收 vs 提出/排除 */
+export const FORESHADOW_ANCHOR_LABEL: Record<ForeshadowKind, { plant: string; payoff: string }> = {
+  setup: { plant: '埋设', payoff: '回收' },
+  doubt: { plant: '提出', payoff: '排除' },
+};
+
 export const FORESHADOW_STATUS_LABEL: Record<ForeshadowStatus, string> = {
   idea: '未埋设',
   planted: '待回收',
@@ -896,11 +920,26 @@ export const FORESHADOW_STATUS_LABEL: Record<ForeshadowStatus, string> = {
   abandoned: '已弃用',
 };
 
-/** 伏笔台账条目:追踪一条伏笔从埋设到回收的全程 */
+const DOUBT_STATUS_LABEL: Record<ForeshadowStatus, string> = {
+  idea: '未提出',
+  planted: '待排除',
+  resolved: '已排除',
+  unplanted: '缺提出',
+  abandoned: '已搁置',
+};
+
+/** 按类型取状态名。旧数据没有 kind,按伏笔算 */
+export function foreshadowStatusLabel(kind: ForeshadowKind | undefined, status: ForeshadowStatus): string {
+  return (kind === 'doubt' ? DOUBT_STATUS_LABEL : FORESHADOW_STATUS_LABEL)[status];
+}
+
+/** 伏笔 / 疑点台账条目:追踪一条线索从埋设到回收(或一条不合理从提出到排除)的全程 */
 export interface Foreshadow {
   id: ID;
   title: string;
   note: string;
+  /** 缺省 setup —— 这个字段是后加的,旧项目里的条目都是伏笔 */
+  kind?: ForeshadowKind;
   /** 手动标记弃用(不再打算回收) */
   abandoned?: boolean;
   plants: ForeshadowRef[];

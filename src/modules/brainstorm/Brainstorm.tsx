@@ -6,6 +6,8 @@ import {
   type Node, type Edge, type NodeChange, type EdgeChange, type Connection, type NodeProps,
 } from '@xyflow/react';
 import { uid, useLoom } from '../../store';
+import { activePaletteColors } from '../../util';
+import { PALETTE } from '../../types';
 import { mindmapLayout, nextNotePosition } from '../../brainstormLayout';
 import { floatingEdgeTypes } from '../../components/FloatingEdge';
 import { promptText } from '../../dialog';
@@ -31,6 +33,16 @@ const NOTE_COLORS = ['#ffffff', '#f2f1ee', '#e6e4df', '#d8d6d0', '#c9c7c1', '#ba
  */
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 
+/**
+ * 新建便签后要聚焦的那一张。
+ *
+ * 风暴板是「还没想法,先把它记下来」这一步的主场 —— 建出来不聚焦的话,
+ * 一个念头要点按钮、把鼠标移过去、点进去、再打字,四个动作。
+ * 正文(setFocusBlockId)与设定集(setPendingNameFocus)早就是即刻可打字的。
+ * 放模块级是因为要跨 Canvas 与 Sticky 两个组件传一次性信号,和下面的剪贴板同惯例。
+ */
+let pendingNoteFocus: string | null = null;
+
 function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
   const { updateNodeData } = useReactFlow();
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -43,6 +55,11 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
     }
   };
   useEffect(autoSize, [data.text]);
+  useEffect(() => {
+    if (pendingNoteFocus !== id) return;
+    pendingNoteFocus = null;
+    ref.current?.focus();
+  }, [id]);
 
   return (
     <div className={`sticky-note ${selected ? 'selected' : ''}`} style={{ background: data.color, color: readableInk(data.color) }}>
@@ -62,6 +79,7 @@ function Sticky({ id, data, selected }: NodeProps<StickyNode>) {
 const stickyTypes = { sticky: Sticky };
 
 let stickyClipboard: { nodes: StickyNode[]; edges: Edge[] } | null = null;
+
 
 function Canvas() {
   const notes = useLoom((s) => s.project.brainstormNotes);
@@ -186,11 +204,13 @@ function Canvas() {
 
   const addNote = (position?: { x: number; y: number }) => {
     const color = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
+    const id = uid();
+    pendingNoteFocus = id;
     dirty.current = true;
     setNodes((ns) => [
       ...ns.map((n) => ({ ...n, selected: false })),
       {
-        id: uid(), type: 'sticky' as const,
+        id, type: 'sticky' as const,
         position: position ?? nextNotePosition(ns, viewOrigin()),
         data: { text: '', color },
         selected: true,
@@ -285,6 +305,60 @@ function Canvas() {
     useNav.getState().go({ tab: 'documents' });
   };
 
+  /**
+   * 转为资料卡:风暴板上写下的「待查」条目,直接落成一张待调查的考据卡。
+   * 转为实体:「主角是谁?」这类卡片,直接落成一个待设计的对象。
+   *
+   * 这两个出口比场景 / 大纲行更靠前 —— 推理写作的顺序是先查证、先立人物,
+   * 才轮到写场景。缺了它们,这两步只能靠手工复制粘贴。
+   * 实体一律建成「设定」类,由用户在设定集里改成角色 / 地点 / 物品 ——
+   * 便签文字看不出该是哪一类,与其弹窗问,不如先落地再改。
+   */
+  const toResearchCards = () => {
+    const texts = selectedTexts();
+    if (texts.length === 0) return;
+    const project = useLoom.getState().project;
+    const category = project.researchCategories[0] ?? '未分类';
+    const cols = activePaletteColors(project);
+    useLoom.getState().update((p) => {
+      for (const text of texts) {
+        p.researchCards.push({
+          id: uid(),
+          title: firstLine(text) || '新资料卡片',
+          content: text,
+          category,
+          tags: [],
+          color: cols[p.researchCards.length % cols.length] ?? PALETTE[0],
+          source: '', pinned: false, createdAt: Date.now(),
+        });
+      }
+    });
+    useNav.getState().go({ tab: 'research' });
+  };
+
+  const toEntities = () => {
+    const texts = selectedTexts();
+    if (texts.length === 0) return;
+    const cols = activePaletteColors(useLoom.getState().project);
+    useLoom.getState().update((p) => {
+      for (const text of texts) {
+        p.entities.push({
+          id: uid(),
+          kind: 'concept',
+          name: firstLine(text) || '新设定',
+          color: cols[p.entities.length % cols.length] ?? PALETTE[0],
+          // 原文进备注,简介留空 —— 便签文字是「想到的东西」,一句话简介是
+          // 想清楚之后才写得出来的,不该拿同一段话把两个字段都填满
+          emoji: '', summary: '',
+          fields: [],
+          notes: text,
+          createdAt: Date.now(),
+        });
+      }
+    });
+    useNav.getState().go({ tab: 'entities' });
+  };
+
   const toOutlineRows = () => {
     const texts = selectedTexts();
     if (texts.length === 0) return;
@@ -316,6 +390,8 @@ function Canvas() {
         {hasSelection && (
           <>
             <span className="tool-sep" aria-hidden="true" />
+            <button title="把选中便签各建一张资料卡(便签保留),并跳到资料 —— 写着「待查」的卡片走这里" onClick={toResearchCards}>转为资料卡</button>
+            <button title="把选中便签各建一个实体(便签保留),先落成「设定」类,到设定集里改成角色 / 地点 / 物品" onClick={toEntities}>转为实体</button>
             <button title="把选中便签各建一个场景(便签保留),并跳到正文" onClick={toScenes}>转为场景</button>
             <button title="把选中便签各建一行大纲(便签保留),并跳到大纲" onClick={toOutlineRows}>转为大纲行</button>
           </>

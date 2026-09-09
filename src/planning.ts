@@ -76,17 +76,24 @@ export interface AppearanceMatrix {
   rows: AppearanceRow[];
 }
 
-/** 单个场景中某实体的出现情况 */
+/**
+ * 单个场景中某实体的出现情况。
+ *
+ * 提及要连别名一起找 —— 中文小说里角色以「周师傅」「掌柜」「老周」出现是常态,
+ * 只认全名会大面积漏统计,而登场矩阵漏了,依赖它的规划视图跟着一起漏。
+ * 校对模块(proofreading.ts)早就是按 name + aliases 找的,这里跟上。
+ * 一个块里同时出现全名和别名只算一次 —— mentions 记的是块数,不是出现次数。
+ */
 function appearanceInDoc(d: Document, e: Entity): { lines: number; mentions: number; pov: boolean } {
-  const name = e.name.trim();
-  const canMention = name.length >= 2;
+  const forms = [...new Set([e.name, ...(e.aliases ?? [])].map((f) => f.trim()))]
+    .filter((f) => f.length >= 2);
   let lines = 0;
   let mentions = 0;
   for (const b of d.blocks) {
     if (b.type === 'dialogue' && b.speakerId === e.id) lines += 1;
-    if (canMention) {
+    if (forms.length > 0) {
       const texts = [b.text, ...(b.items ?? [])];
-      if (texts.some((t) => t.includes(name))) mentions += 1;
+      if (texts.some((t) => forms.some((f) => t.includes(f)))) mentions += 1;
     }
   }
   return { lines, mentions, pov: d.povId === e.id };

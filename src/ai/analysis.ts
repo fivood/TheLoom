@@ -3,7 +3,7 @@ import { appearanceMatrix, arcStagesOf, foreshadowStatus, pacingPoints } from '.
 import type { NavTarget } from '../search';
 import { simulateFlow } from '../simulate';
 import type { Entity, Flow, Project } from '../types';
-import { DOC_STATUS_LABEL, FORESHADOW_STATUS_LABEL } from '../types';
+import { DOC_STATUS_LABEL, FORESHADOW_KIND_LABEL, foreshadowStatusLabel } from '../types';
 import { walkFlowNodes } from '../util';
 
 export type AnalysisKind = 'paths' | 'voice' | 'consistency' | 'foreshadow' | 'pacing';
@@ -132,7 +132,10 @@ function consistencyBlocks(p: Project): AnalysisBlock[] {
 function foreshadowBlocks(p: Project): AnalysisBlock[] {
   const docName = (id: string) => p.documents.find((document) => document.id === id)?.name ?? '(缺失场景)';
   const lines = (p.foreshadows ?? []).slice(0, 40).map((item) => {
-    const status = FORESHADOW_STATUS_LABEL[foreshadowStatus(item)];
+    // 只有疑点才标类型:纯伏笔的项目里每行都挂个「伏笔·」是纯噪音
+  const status = item.kind === 'doubt'
+    ? `${FORESHADOW_KIND_LABEL.doubt}·${foreshadowStatusLabel('doubt', foreshadowStatus(item))}`
+    : foreshadowStatusLabel('setup', foreshadowStatus(item));
     const plants = item.plants.map((ref) => docName(ref.docId)).join('、') || '(未埋设)';
     const payoffs = item.payoffs.map((ref) => docName(ref.docId)).join('、') || '(未回收)';
     return `「${item.title}」[${status}] 埋设: ${plants};回收: ${payoffs}${item.note ? `;备注: ${item.note.slice(0, 60)}` : ''}`;

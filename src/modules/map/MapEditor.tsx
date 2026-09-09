@@ -116,8 +116,10 @@ export default function MapEditor() {
       ) : (
         <div className="pane-col">
           <div className="empty-hint" style={{ marginTop: 80 }}>
-            还没有地图<br />点击左侧<Q>＋</Q>新建<br /><br />
-            推荐流程:在 Inkarnate / Azgaar / Wonderdraft 里画完导出 PNG,<br />上传到这里作为底图,再叠加地点标记与阵营领地
+            还没有地图<br />点击左侧<Q>新建地图</Q>开始<br /><br />
+            建好就是一张空白画布,标记 / 区域 / 路径 / 矩形 / 椭圆 / 文字都能直接画 ——<br />
+            案发现场平面图、房间与动线、大陆疆域,都不必先去别处画好<br /><br />
+            已经有底图(手绘扫描、Inkarnate / Azgaar 导出)的话,进去点<Q>上传底图</Q>叠上去
           </div>
         </div>
       )}
@@ -233,6 +235,9 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
       const nm: MapMarker = { id: uid(), x, y, label: '', layerId };
       patch((m) => { m.markers.push(nm); });
       setSelection({ kind: 'marker', id: nm.id });
+      // 没有标签的标记在画布上就是一个没有名字的黑点(label 为空时不渲染文字),
+      // 连放几个就分不清哪个是哪个 —— 建完直接进入命名
+      setPendingMarkerFocus(nm.id);
       setMode('view');
     } else if (mode === 'region') {
       setDraftRegion((d) => [...d, { x, y }]);
@@ -373,6 +378,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
 
   const aspect = map.imageWidth && map.imageHeight ? map.imageWidth / map.imageHeight : 16 / 9;
 
+  const [pendingMarkerFocus, setPendingMarkerFocus] = useState<string | null>(null);
   const selMarker = selection?.kind === 'marker' ? map.markers.find((m) => m.id === selection.id) : null;
   const selRegion = selection?.kind === 'region' ? map.regions.find((r) => r.id === selection.id) : null;
   const selShape = selection?.kind === 'shape' ? (map.shapes ?? []).find((s) => s.id === selection.id) : null;
@@ -710,7 +716,14 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
 
       <Inspector>
         {selMarker ? (
-          <MarkerInspector marker={selMarker} layers={map.layers ?? []} onChange={(p) => patchMarker(selMarker.id, p)} onDelete={() => removeMarker(selMarker.id)} />
+          <MarkerInspector
+            marker={selMarker}
+            layers={map.layers ?? []}
+            autoFocusLabel={pendingMarkerFocus === selMarker.id}
+            onLabelFocused={() => setPendingMarkerFocus(null)}
+            onChange={(p) => patchMarker(selMarker.id, p)}
+            onDelete={() => removeMarker(selMarker.id)}
+          />
         ) : selRegion ? (
           <RegionInspector region={selRegion} layers={map.layers ?? []} onChange={(p) => patchRegion(selRegion.id, p)} onDelete={() => removeRegion(selRegion.id)} />
         ) : selShape ? (
@@ -812,18 +825,29 @@ function LayerPicker({ layers, value, onChange }: { layers: MapLayer[]; value?: 
   );
 }
 
-function MarkerInspector({ marker, layers, onChange, onDelete }: {
+function MarkerInspector({ marker, layers, autoFocusLabel, onLabelFocused, onChange, onDelete }: {
   marker: MapMarker;
   layers: MapLayer[];
+  /** 刚放下的标记:聚焦标签框,而不是让用户对着一个无名黑点发呆 */
+  autoFocusLabel?: boolean;
+  onLabelFocused?: () => void;
   onChange: (patch: Partial<MapMarker>) => void;
   onDelete: () => void;
 }) {
+  const labelRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!autoFocusLabel) return;
+    labelRef.current?.focus();
+    labelRef.current?.select();
+    onLabelFocused?.();
+  }, [autoFocusLabel, marker.id]);
+
   return (
     <>
       <h3>标记属性</h3>
       <div className="field">
         <label>标签(留空则用实体名)</label>
-        <input value={marker.label} onChange={(e) => onChange({ label: e.target.value })} />
+        <input ref={labelRef} value={marker.label} onChange={(e) => onChange({ label: e.target.value })} />
       </div>
       <div className="field">
         <label>关联实体</label>

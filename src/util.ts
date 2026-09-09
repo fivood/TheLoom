@@ -421,6 +421,8 @@ export function normalizeProject(p: Project): Project {
   for (const f of p.foreshadows) {
     f.plants = (f.plants ?? []).filter((ref) => docIds.has(ref.docId));
     f.payoffs = (f.payoffs ?? []).filter((ref) => docIds.has(ref.docId));
+    // kind 是后加的:旧条目与非法值一律按伏笔算,不要把字段留成脏值
+    if (f.kind !== 'doubt') delete f.kind;
   }
   if (p.relationLayout) {
     for (const id of Object.keys(p.relationLayout)) {

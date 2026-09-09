@@ -811,7 +811,14 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* ---------- 通用布局块 ---------- */
 
 .side-list {
-  width: var(--pane-nav, 260px);
+  /*
+   * 320 而不是 260。下面的容器查询在 <=300px 时收掉头部按钮的文字标签(闭区间,
+   * 正好 300 也命中),而文档模块四个按钮带文字要 287px。默认 260 时那条规则
+   * 从第一次打开就生效 —— 于是「还没有场景。左侧『＋ 新建场景』开始写作」这类
+   * 引导,指的是一个没有文字的图标。默认宽度必须大于收起阈值,
+   * 否则「拖窄了才收成图标」这个设计意图永远不成立。
+   */
+  width: var(--pane-nav, 320px);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -3481,6 +3488,18 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   color: var(--text-faint);
 }
 .fs-filter.on { background: var(--focus); color: var(--selected-fg); border-color: var(--focus); }
+/* 类型页签(伏笔 / 疑点)切的是整套措辞,比状态筛选重一级,做成分段控件的样子 */
+.fs-kind {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-faint);
+}
+.fs-kind:first-of-type { border-radius: 8px 0 0 8px; }
+.fs-kind:nth-of-type(2) { border-radius: 0 8px 8px 0; border-left: none; }
+.fs-kind.on { background: var(--bg-card); color: var(--text); border-color: var(--text-dim); }
 .fs-table { width: 100%; border-collapse: collapse; }
 .fs-table th {
   text-align: left;

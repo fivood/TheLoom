@@ -10,7 +10,7 @@ const STORE_KEY = 'theloom-panes-v1';
 type PaneVar = '--pane-nav' | '--pane-inspector' | '--pane-split';
 
 const LIMITS: Record<PaneVar, { min: number; max: number; fallback: number }> = {
-  '--pane-nav': { min: 170, max: 480, fallback: 260 },
+  '--pane-nav': { min: 170, max: 480, fallback: 320 },
   '--pane-inspector': { min: 240, max: 560, fallback: 320 },
   '--pane-split': { min: 280, max: 1600, fallback: 600 },
 };

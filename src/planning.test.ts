@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DocBlock, Document, Entity, Foreshadow, Project } from './types';
 import { normalizeProject } from './util';
 import { appearanceMatrix, foreshadowStatus, groupDocsByChapter, pacingPoints } from './planning';
+import { foreshadowStatusLabel } from './types';
 
 function baseProject(): Project {
   return normalizeProject({ version: 1, name: 't', flows: [], updatedAt: 0 } as unknown as Project);
@@ -177,5 +178,62 @@ describe('R4 normalizeProject 清理', () => {
     expect(p.documents[1].tension).toBeUndefined();
     expect(p.documents[2].tension).toBeUndefined();
     expect(p.documents[0].tension).toBe(2);
+  });
+});
+
+describe('登场统计认别名', () => {
+  it('正文写别名也算登场,同块出现全名与别名只算一次', () => {
+    const p = baseProject();
+    p.entities = [{
+      id: 'e1', kind: 'character', name: '周敬堂', aliases: ['周师傅'],
+      color: '#eee', emoji: '', summary: '', fields: [], notes: '', createdAt: 1,
+    } as Entity];
+    p.documents = [makeDoc('d1', '一', {}, [
+      { text: '周师傅昨夜一个人在店里。' },
+      { text: '周敬堂与周师傅是同一个人。' },
+    ])];
+    const cell = appearanceMatrix(p).rows[0].cells[0];
+    expect(cell.mentions).toBe(2);
+    expect(cell.scenes).toBe(1);
+  });
+
+  it('单字别名不参与提及匹配,避免满篇误命中', () => {
+    const p = baseProject();
+    p.entities = [{
+      id: 'e1', kind: 'character', name: '沈砚秋', aliases: ['沈'],
+      color: '#eee', emoji: '', summary: '', fields: [], notes: '', createdAt: 1,
+    } as Entity];
+    p.documents = [makeDoc('d1', '一', {}, [{ text: '沈默了很久。' }])];
+    expect(appearanceMatrix(p).rows[0].cells[0].mentions).toBe(0);
+  });
+});
+
+describe('疑点台账(与伏笔共用结构,措辞不同)', () => {
+  const mk = (over: Partial<Foreshadow>): Foreshadow => ({
+    id: 'f1', title: '门是从里面插上的', note: '', plants: [], payoffs: [], createdAt: 1, ...over,
+  });
+
+  it('状态推导与伏笔完全一致', () => {
+    expect(foreshadowStatus(mk({ kind: 'doubt' }))).toBe('idea');
+    expect(foreshadowStatus(mk({ kind: 'doubt', plants: [{ id: 'r', docId: 'd1' }] }))).toBe('planted');
+    expect(foreshadowStatus(mk({ kind: 'doubt', payoffs: [{ id: 'r', docId: 'd1' }] }))).toBe('unplanted');
+  });
+
+  it('措辞按类型切换,旧数据没有 kind 时按伏笔算', () => {
+    expect(foreshadowStatusLabel('doubt', 'planted')).toBe('待排除');
+    expect(foreshadowStatusLabel('doubt', 'unplanted')).toBe('缺提出');
+    expect(foreshadowStatusLabel('setup', 'planted')).toBe('待回收');
+    expect(foreshadowStatusLabel(undefined, 'planted')).toBe('待回收');
+  });
+
+  it('normalizeProject 把非法 kind 清成伏笔', () => {
+    const p = baseProject();
+    p.foreshadows = [
+      mk({ id: 'a', kind: 'doubt' }),
+      mk({ id: 'b', kind: 'setup' }),
+      mk({ id: 'c', kind: 'nonsense' as unknown as Foreshadow['kind'] }),
+    ];
+    const out = normalizeProject(p);
+    expect((out.foreshadows ?? []).map((f) => f.kind)).toEqual(['doubt', undefined, undefined]);
   });
 });
