@@ -89,13 +89,31 @@ export function normalizeProject(p: Project): Project {
   cleanAssignments(p.researchCards, 'research');
   cleanAssignments(p.maps, 'map');
   // R14 地图图层与矢量形状:旧项目 / 缺字段自动补默认图层,并把已有 markers/regions/shapes 迁入
-  const validShapeType = new Set(['polyline', 'rect', 'ellipse', 'text']);
+  const validShapeType = new Set(['polyline', 'rect', 'ellipse', 'text', 'door', 'window']);
   const validPoint = (pt: unknown): pt is { x: number; y: number } =>
     !!pt && typeof pt === 'object'
     && Number.isFinite((pt as { x: unknown }).x) && Number.isFinite((pt as { y: unknown }).y);
   for (const map of p.maps) {
     // 底图哈希:非法值剔除。注意**不碰 image** —— 内联那份是搬进资源库之前
     // 唯一的底图,清掉就没了
+    /*
+     * 网格:格边长限定在 0.005..0.5 —— 对应 200 格到 2 格。
+     * 再密画出来是一片糊,再疏就不成其为网格。
+     * 偏移只要求是有限数,具体取模交给渲染与吸附(那里才知道纵向格距)。
+     */
+    if (map.grid) {
+      const size = Number(map.grid.size);
+      if (!Number.isFinite(size) || size < 0.005 || size > 0.5) delete map.grid;
+      else {
+        map.grid.size = size;
+        for (const key of ['offsetX', 'offsetY'] as const) {
+          const v = Number(map.grid[key]);
+          if (!Number.isFinite(v) || v === 0) delete map.grid[key];
+          else map.grid[key] = v;
+        }
+        if (typeof map.grid.unit !== 'string' || !map.grid.unit.trim()) delete map.grid.unit;
+      }
+    }
     if (typeof map.imageHash !== 'string' || !/^[0-9a-f]{64}$/.test(map.imageHash)) delete map.imageHash;
     if (typeof map.imageExt !== 'string' || !/^[a-z0-9]{1,8}$/.test(map.imageExt)) delete map.imageExt;
     if (!Array.isArray(map.layers)) map.layers = [];
@@ -122,7 +140,8 @@ export function normalizeProject(p: Project): Project {
       s.points = s.points.filter(validPoint);
       if (s.points.length === 0) return false;
       // rect / ellipse 需要两个点(左上 + 右下);text 只取第一个点
-      if ((s.type === 'rect' || s.type === 'ellipse') && s.points.length < 2) return false;
+      // 两点型:矩形 / 椭圆 / 门 / 窗
+      if (s.type !== 'polyline' && s.type !== 'text' && s.points.length < 2) return false;
       if (s.layerId && !layerIds.has(s.layerId)) s.layerId = defaultLayerId;
       return true;
     });

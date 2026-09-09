@@ -3,7 +3,9 @@ import { uid, useLoom } from '../../store';
 import { fileToDataUrl } from './util';
 import { assetExt, getAssetUrl, hashBlob, invalidateAssetUrl, loadAssetBlob, storeAssetFile } from '../../assetFiles';
 import { dataUrlMime, hasBaseImage, needsImageMigration } from '../../mapImage';
+import { gridCell, gridFromDrag, snapToGrid } from '../../mapGrid';
 import { useNav } from '../../search';
+import { useEscape } from '../../hooks/useEscape';
 import { confirmDialog, promptText, alertDialog } from '../../dialog';
 import type { MapDoc, MapMarker, MapRegion, MapShape, MapShapeType, MapLayer } from '../../types';
 import Icon from '../../components/Icon';
@@ -14,21 +16,60 @@ import Inspector from '../../components/Inspector';
 import NavigatorTree, { FolderSelect } from '../../components/NavigatorTree';
 import Q from '../../components/Q';
 
-type Mode = 'view' | 'marker' | 'region' | 'shape-polyline' | 'shape-rect' | 'shape-ellipse' | 'shape-text';
+/**
+ * 绘制工具表。
+ *
+ * 工具不等于形状类型:房间 / 墙 / 家具只是预设了粗细与填充的 rect / polyline,
+ * 门 / 窗才是真的新类型(弧线与双线画不出来)。把这层映射摆成一张表,
+ * 加工具就只改这里,不必再动 click / drag / 渲染三处的分支。
+ */
+type ShapeToolKey =
+  | 'room' | 'wall' | 'door' | 'window' | 'furniture'
+  | 'polyline' | 'rect' | 'ellipse' | 'text';
+
+interface ShapeTool {
+  label: string;
+  type: MapShapeType;
+  /** drag = 拖出两点;poly = 连点折线;click = 单击落一个 */
+  draw: 'drag' | 'poly' | 'click';
+  preset: { strokeWidth?: number; fill?: boolean; color?: string };
+  title: string;
+  /** plan = 平面图构件,generic = 通用图形 */
+  group: 'plan' | 'generic';
+}
+
+const SHAPE_TOOLS: Record<ShapeToolKey, ShapeTool> = {
+  room: { label: '房间', type: 'rect', draw: 'drag', group: 'plan',
+    preset: { strokeWidth: 5, fill: false }, title: '拖出一个房间:粗墙线矩形。开着网格时四角吸附到格点,墙才接得上' },
+  wall: { label: '墙', type: 'polyline', draw: 'poly', group: 'plan',
+    preset: { strokeWidth: 5 }, title: '折线墙:依次点击落点,右键 / 双击完成' },
+  door: { label: '门', type: 'door', draw: 'drag', group: 'plan',
+    preset: { strokeWidth: 2 }, title: '在墙上拖出门宽,画成一道开合弧' },
+  window: { label: '窗', type: 'window', draw: 'drag', group: 'plan',
+    preset: { strokeWidth: 2 }, title: '在墙上拖出窗宽,画成双线' },
+  furniture: { label: '家具', type: 'rect', draw: 'drag', group: 'plan',
+    preset: { strokeWidth: 1.5, fill: true }, title: '桌 / 床 / 柜:细线浅填充的矩形' },
+  polyline: { label: '路径', type: 'polyline', draw: 'poly', group: 'generic',
+    preset: { strokeWidth: 2 }, title: '路径 / 河流 / 边界:依次点击落点,右键 / 双击完成' },
+  rect: { label: '矩形', type: 'rect', draw: 'drag', group: 'generic',
+    preset: { strokeWidth: 2, fill: false }, title: '矩形:按住鼠标拖出' },
+  ellipse: { label: '椭圆', type: 'ellipse', draw: 'drag', group: 'generic',
+    preset: { strokeWidth: 2, fill: false }, title: '椭圆:按住鼠标拖出' },
+  text: { label: '文字', type: 'text', draw: 'click', group: 'generic',
+    preset: {}, title: '文字标注:点击放置' },
+};
+
+const SHAPE_TOOL_KEYS = Object.keys(SHAPE_TOOLS) as ShapeToolKey[];
+
+type Mode = 'view' | 'marker' | 'region' | 'calibrate' | `shape-${ShapeToolKey}`;
 type Selection =
   | { kind: 'marker'; id: string }
   | { kind: 'region'; id: string }
   | { kind: 'shape'; id: string }
   | null;
 
-const SHAPE_MODE_TO_TYPE: Record<'shape-polyline' | 'shape-rect' | 'shape-ellipse' | 'shape-text', MapShapeType> = {
-  'shape-polyline': 'polyline',
-  'shape-rect': 'rect',
-  'shape-ellipse': 'ellipse',
-  'shape-text': 'text',
-};
 const SHAPE_LABEL: Record<MapShapeType, string> = {
-  polyline: '路径', rect: '矩形', ellipse: '椭圆', text: '文字',
+  polyline: '路径', rect: '矩形', ellipse: '椭圆', text: '文字', door: '门', window: '窗',
 };
 
 /** 把归一化坐标 [0..1] 映射为 svg viewBox 内的像素(1000 单位) */
@@ -142,9 +183,13 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
   // R14 正在绘制的多点路径(共用 draftRegion 逻辑,polyline 走这个)
   const [draftPolyline, setDraftPolyline] = useState<{ x: number; y: number }[]>([]);
   // R14 拖拽绘制中的形状(rect / ellipse 用两点)
-  const [dragShape, setDragShape] = useState<{ type: 'rect' | 'ellipse'; start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
+  const [dragShape, setDragShape] = useState<{ type: MapShapeType; start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
   const [pointFilter, setPointFilter] = useState<string>('');
+  /** 吸附开关:画自由曲线(河流、等高线)时关掉 */
+  const [snapOn, setSnapOn] = useState(true);
+  /** 对齐底图时一次拖过几格 —— 拖得越长,算出的格边长误差越小 */
+  const [calibrateCells, setCalibrateCells] = useState(1);
   const [dragging, setDragging] = useState<string | null>(null);
   const [draggingVertex, setDraggingVertex] = useState<{ regionId: string; idx: number } | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -218,6 +263,24 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
     } catch { await alertDialog('无法读取该图片'); }
   };
 
+  /** 底图宽高比;无底图时按 16:9。网格与吸附都要用它换算纵向格距 */
+  const aspect = map.imageWidth && map.imageHeight ? map.imageWidth / map.imageHeight : 16 / 9;
+
+  /** 当前选中的绘制工具(mode 形如 shape-room) */
+  const tool: ShapeTool | null = mode.startsWith('shape-')
+    ? SHAPE_TOOLS[mode.slice('shape-'.length) as ShapeToolKey] ?? null
+    : null;
+
+  /**
+   * 吸附到格点。
+   *
+   * 纵向格距是 aspect/cols 而不是 1/cols —— 画布是拉伸坐标系,
+   * 归一化里边长相等的格子在屏幕上是长方形,量距离会全错。
+   * 真正让画图变快的是这个而不是网格本身:房间四角落在格上,墙才自然接头。
+   */
+  const cell = map.grid ? gridCell(map.grid, aspect) : null;
+  const snap = (pt: { x: number; y: number }) => (cell && snapOn ? snapToGrid(pt, cell) : pt);
+
   const clientToNormalized = (clientX: number, clientY: number) => {
     const svg = svgRef.current!;
     const rect = svg.getBoundingClientRect();
@@ -229,7 +292,7 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
 
   const onCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
     // 只有点击 svg 空白处才触发新建;点击已有元素时事件被 stopPropagation 拦住
-    const { x, y } = clientToNormalized(e.clientX, e.clientY);
+    const { x, y } = snap(clientToNormalized(e.clientX, e.clientY));
     const layerId = activeLayerId ?? undefined;
     if (mode === 'marker') {
       const nm: MapMarker = { id: uid(), x, y, label: '', layerId };
@@ -238,18 +301,20 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
       // 没有标签的标记在画布上就是一个没有名字的黑点(label 为空时不渲染文字),
       // 连放几个就分不清哪个是哪个 —— 建完直接进入命名
       setPendingMarkerFocus(nm.id);
-      setMode('view');
+      // 连放:模式保持不变。画平面图时标记是成串放的,放一个跳回浏览等于每次重选工具。
+      // 退出靠工具栏的「浏览」或 Esc,当前工具一直高亮着
     } else if (mode === 'region') {
       setDraftRegion((d) => [...d, { x, y }]);
-    } else if (mode === 'shape-polyline') {
+    } else if (tool?.draw === 'poly') {
       setDraftPolyline((d) => [...d, { x, y }]);
-    } else if (mode === 'shape-text') {
-      const ns: MapShape = { id: uid(), type: 'text', points: [{ x, y }], text: '文字', color: '#1b1b19', layerId };
+    } else if (tool?.draw === 'click') {
+      const ns: MapShape = {
+        id: uid(), type: tool.type, points: [{ x, y }], text: '文字',
+        color: tool.preset.color ?? '#1b1b19', ...tool.preset, layerId,
+      };
       patch((m) => { (m.shapes ??= []).push(ns); });
       setSelection({ kind: 'shape', id: ns.id });
-      setMode('view');
-    } else if (mode !== 'shape-rect' && mode !== 'shape-ellipse') {
-      // rect / ellipse 用拖拽,不在 click 里处理
+    } else if (!tool) {
       setSelection(null);
     }
   };
@@ -265,23 +330,29 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
 
   const finishPolyline = () => {
     if (draftPolyline.length < 2) { setDraftPolyline([]); return; }
+    const preset = tool?.preset ?? { strokeWidth: 2 };
     const ns: MapShape = {
-      id: uid(), type: 'polyline', points: draftPolyline,
-      color: '#1b1b19', strokeWidth: 2, layerId: activeLayerId ?? undefined,
+      id: uid(), type: tool?.type ?? 'polyline', points: draftPolyline,
+      color: '#1b1b19', ...preset, layerId: activeLayerId ?? undefined,
     };
     patch((m) => { (m.shapes ??= []).push(ns); });
     setDraftPolyline([]);
     setSelection({ kind: 'shape', id: ns.id });
-    setMode('view');
+    // 连放:继续画下一道墙 / 下一条路径
   };
 
   // rect / ellipse 拖拽绘制:mouseDown 在空白 → 记录起点,进入 dragShape 状态
   const onCanvasMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (mode !== 'shape-rect' && mode !== 'shape-ellipse') return;
     if (e.button !== 0) return;
-    const type = mode === 'shape-rect' ? 'rect' : 'ellipse';
-    const p = clientToNormalized(e.clientX, e.clientY);
-    setDragShape({ type, start: p, end: p });
+    if (mode === 'calibrate') {
+      // 校准时**不吸附** —— 要对齐的正是底图自己的格线,吸到旧网格上就白拖了
+      const p = clientToNormalized(e.clientX, e.clientY);
+      setDragShape({ type: 'rect', start: p, end: p });
+      return;
+    }
+    if (tool?.draw !== 'drag') return;
+    const p = snap(clientToNormalized(e.clientX, e.clientY));
+    setDragShape({ type: tool.type, start: p, end: p });
   };
   // 用 ref 追踪最新的 dragShape,避免 setState 回调里做副作用被 StrictMode 双调用
   const dragShapeRef = useRef(dragShape);
@@ -289,7 +360,8 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
   useEffect(() => {
     if (!dragShape) return;
     const onMove = (e: MouseEvent) => {
-      const p = clientToNormalized(e.clientX, e.clientY);
+      const raw = clientToNormalized(e.clientX, e.clientY);
+      const p = mode === 'calibrate' ? raw : snap(raw);
       setDragShape((cur) => cur ? { ...cur, end: p } : null);
     };
     const onUp = () => {
@@ -298,15 +370,28 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
       if (!cur) return;
       const dx = Math.abs(cur.end.x - cur.start.x), dy = Math.abs(cur.end.y - cur.start.y);
       if (dx < 0.005 && dy < 0.005) return; // 太小视为误操作
+      if (mode === 'calibrate') {
+        /*
+         * 从这一拖得出三个自由度:边长取横向跨度 / 格数,偏移取起点对格距的余数。
+         * 只用横向定边长 —— 纵向格距由宽高比推出来,重复量一遍反而会因为
+         * 手抖引入不一致。
+         */
+        const next = gridFromDrag(cur.start, cur.end, calibrateCells, aspect);
+        if (!next) return;
+        patch((m) => { m.grid = { ...(m.grid ?? {}), ...next }; });
+        setMode('view');
+        return;
+      }
       const x1 = Math.min(cur.start.x, cur.end.x), y1 = Math.min(cur.start.y, cur.end.y);
       const x2 = Math.max(cur.start.x, cur.end.x), y2 = Math.max(cur.start.y, cur.end.y);
       const ns: MapShape = {
         id: uid(), type: cur.type, points: [{ x: x1, y: y1 }, { x: x2, y: y2 }],
-        color: '#1b1b19', strokeWidth: 2, fill: false, layerId: activeLayerId ?? undefined,
+        color: '#1b1b19', strokeWidth: 2, fill: false,
+        ...(tool?.preset ?? {}), layerId: activeLayerId ?? undefined,
       };
       patch((m) => { (m.shapes ??= []).push(ns); });
       setSelection({ kind: 'shape', id: ns.id });
-      setMode('view');
+      // 连放:画完一间接着画下一间
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -376,8 +461,6 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
     return f <= filterIndex && filterIndex <= t;
   };
 
-  const aspect = map.imageWidth && map.imageHeight ? map.imageWidth / map.imageHeight : 16 / 9;
-
   const [pendingMarkerFocus, setPendingMarkerFocus] = useState<string | null>(null);
   const selMarker = selection?.kind === 'marker' ? map.markers.find((m) => m.id === selection.id) : null;
   const selRegion = selection?.kind === 'region' ? map.regions.find((r) => r.id === selection.id) : null;
@@ -408,6 +491,17 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
   };
 
   // 切换到需要归属图层的绘制模式时:确保有图层
+  /*
+   * 绘制工具会一直保持,直到切回「浏览」—— 画平面图是连着画的,画一个跳回浏览
+   * 等于每放一样东西都要重选一次工具。代价是误点空白处会多出东西,
+   * 所以退出口要够明显:当前工具高亮着,Esc 随时退出,Ctrl+Z 兜底。
+   */
+  useEscape(mode !== 'view', () => {
+    setMode('view');
+    setDraftRegion([]);
+    setDraftPolyline([]);
+  });
+
   const setDrawMode = (m: Mode) => {
     if (m !== 'view') ensureLayer();
     setMode(m);
@@ -449,13 +543,34 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
       <div className="pane-col">
         <div className="toolbar">
           <button className={mode === 'view' ? 'primary' : ''} onClick={() => setDrawMode('view')}>浏览</button>
-          <button className={mode === 'marker' ? 'primary' : ''} onClick={() => setDrawMode('marker')} title="点击画布放置标记">＋ 标记</button>
-          <button className={mode === 'region' ? 'primary' : ''} onClick={() => setDrawMode('region')} title="依次点击落点,右键 / 双击完成">＋ 区域</button>
+          <button className={mode === 'marker' ? 'primary' : ''} onClick={() => setDrawMode('marker')} title="点击画布放置一个地点。可以关联实体(地点 / 人物),并设定它在哪段时间里存在">＋ 标记</button>
+          <button className={mode === 'region' ? 'primary' : ''} onClick={() => setDrawMode('region')} title="圈一块地:领地、行政区、房间范围。可以关联实体(通常是阵营),并设定它在哪个时代出现和消失 —— 配合工具栏右侧的时间线滤镜就能看疆域变迁。依次点击落点,右键 / 双击完成">＋ 区域</button>
           <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
-          <button className={mode === 'shape-polyline' ? 'primary' : ''} onClick={() => setDrawMode('shape-polyline')} title="路径 / 河流 / 边界:依次点击落点,右键 / 双击完成">＋ 路径</button>
-          <button className={mode === 'shape-rect' ? 'primary' : ''} onClick={() => setDrawMode('shape-rect')} title="矩形:按住鼠标拖出">＋ 矩形</button>
-          <button className={mode === 'shape-ellipse' ? 'primary' : ''} onClick={() => setDrawMode('shape-ellipse')} title="椭圆:按住鼠标拖出">＋ 椭圆</button>
-          <button className={mode === 'shape-text' ? 'primary' : ''} onClick={() => setDrawMode('shape-text')} title="文字:点击放置">＋ 文字</button>
+          {/* 平面图构件:案发现场、遭遇地图、舞台平面图都用这一组 */}
+          {SHAPE_TOOL_KEYS.filter((k) => SHAPE_TOOLS[k].group === 'plan').map((k) => (
+            <button
+              key={k}
+              className={mode === `shape-${k}` ? 'primary' : ''}
+              onClick={() => setDrawMode(`shape-${k}`)}
+              title={SHAPE_TOOLS[k].title}
+            >{SHAPE_TOOLS[k].label}</button>
+          ))}
+          {map.grid && (
+            <button
+              className={snapOn ? 'primary' : ''}
+              title="吸附到格点。画河流、等高线这类自由曲线时关掉"
+              onClick={() => setSnapOn((v) => !v)}
+            >吸附</button>
+          )}
+          <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
+          {SHAPE_TOOL_KEYS.filter((k) => SHAPE_TOOLS[k].group === 'generic').map((k) => (
+            <button
+              key={k}
+              className={mode === `shape-${k}` ? 'primary' : ''}
+              onClick={() => setDrawMode(`shape-${k}`)}
+              title={SHAPE_TOOLS[k].title}
+            >＋ {SHAPE_TOOLS[k].label}</button>
+          ))}
           {mode === 'region' && (
             <>
               <button className="ghost" onClick={finishRegion} disabled={draftRegion.length < 3}>完成({draftRegion.length} 点)</button>
@@ -495,10 +610,20 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
               </button>
             )}
             <label style={{ fontSize: 12, color: 'var(--text-faint)' }}>时间线滤镜</label>
-            <select value={pointFilter} onChange={(e) => { setPointFilter(e.target.value); setPlaying(false); }}>
-              <option value="">全部时间</option>
-              {points.map((pt) => <option key={pt.id} value={pt.id}>{pt.label}</option>)}
-            </select>
+            {points.length > 0 ? (
+              <select value={pointFilter} onChange={(e) => { setPointFilter(e.target.value); setPlaying(false); }}>
+                <option value="">全部时间</option>
+                {points.map((pt) => <option key={pt.id} value={pt.id}>{pt.label}</option>)}
+              </select>
+            ) : (
+              /* 只有「全部时间」一项的下拉是个死控件,还不如说清它能做什么 */
+              <button
+                className="ghost"
+                style={{ fontSize: 12 }}
+                title="给标记和区域设定存在时段后,这里可以只看某个时代的地图,还能按 ▶ 扫过所有时间点看它怎么变的"
+                onClick={() => useNav.getState().go({ tab: 'timeline' })}
+              >建时间点后可按时代查看</button>
+            )}
           </span>
         </div>
 
@@ -514,8 +639,14 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
               : (
                 <div className="map-blank-hint">
                   空白底图 · 可直接摆放地点标记<br />
+                  <Q>区域</Q>圈出的地块能关联阵营、设定存在的时代,配合时间线滤镜看疆域变迁<br />
                   需要美术时点工具栏<Q>上传底图</Q>(Inkarnate / Azgaar 导出、手绘扫描都行)
                 </div>
+              )}
+              {map.grid?.unit && (
+                /* 图例走 HTML 而不是 svg <text> —— viewBox 被 preserveAspectRatio="none"
+                   拉伸,画在里面的文字会跟着横向或纵向变形 */
+                <div className="map-scale-legend">1 格 = {map.grid.unit}</div>
               )}
               <svg
                 ref={svgRef}
@@ -525,10 +656,31 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
                 onMouseDown={onCanvasMouseDown}
                 onContextMenu={(e) => {
                   if (mode === 'region') { e.preventDefault(); finishRegion(); }
-                  else if (mode === 'shape-polyline') { e.preventDefault(); finishPolyline(); }
+                  else if (tool?.draw === 'poly') { e.preventDefault(); finishPolyline(); }
                 }}
                 style={{ cursor: mode === 'view' ? 'default' : 'crosshair' }}
               >
+                {/*
+                  网格。纵向格距是 aspect/cols —— viewBox 是 1000×1000 被拉伸填充的,
+                  横竖用同一个格距画出来是长方形,量距离全错。
+                  画在最前面当背景,pointerEvents none 不挡选中。
+                */}
+                {cell && (() => {
+                  const stepX = cell.x * S, stepY = cell.y * S;
+                  const startX = cell.ox * S, startY = cell.oy * S;
+                  const lines = [];
+                  for (let x = startX; x < S; x += stepX) {
+                    if (x > 0) lines.push(<line key={`v${x}`} x1={x} y1={0} x2={x} y2={S} />);
+                  }
+                  for (let y = startY; y < S; y += stepY) {
+                    if (y > 0) lines.push(<line key={`h${y}`} x1={0} y1={y} x2={S} y2={y} />);
+                  }
+                  return (
+                    <g stroke="#1b1b19" strokeOpacity={0.14} strokeWidth={1} style={{ pointerEvents: 'none' }}>
+                      {lines}
+                    </g>
+                  );
+                })()}
                 {/* 已有区域 */}
                 {map.regions.map((r) => {
                   if (!isVisibleAtFilter(r.fromPointId, r.toPointId)) return null;
@@ -611,6 +763,47 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
                         fill={s.fill ? col : 'none'} fillOpacity={s.fill ? 0.2 : 0}
                         stroke={col} strokeWidth={active ? sw + 2 : sw}
                         style={{ cursor, pointerEvents }} onClick={onSel} />
+                    );
+                  }
+                  /*
+                    门:两点之间画一段墙口(白底盖住墙线),再画一道 90° 开合弧。
+                    弧的方向固定朝一侧 —— 作者要改朝向就把两个端点对调,
+                    比加一个「开向」字段省事,而这图是自查用的,朝向对不对作者自己看得出来。
+                  */
+                  if (s.type === 'door' && s.points.length >= 2) {
+                    const [a, b] = s.points;
+                    const x1 = a.x * S, y1 = a.y * S, x2 = b.x * S, y2 = b.y * S;
+                    const dx = x2 - x1, dy = y2 - y1;
+                    const len = Math.hypot(dx, dy) || 1;
+                    // 垂直方向(逆时针 90°),弧的另一端落在这里
+                    const nx = -dy / len, ny = dx / len;
+                    const ex = x1 + nx * len, ey = y1 + ny * len;
+                    return (
+                      <g key={s.id} style={{ cursor, pointerEvents }} onClick={onSel}>
+                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fff" strokeWidth={sw + 5} />
+                        <line x1={x1} y1={y1} x2={ex} y2={ey} stroke={col} strokeWidth={active ? sw + 2 : sw} />
+                        <path
+                          d={`M ${x2} ${y2} A ${len} ${len} 0 0 0 ${ex} ${ey}`}
+                          fill="none" stroke={col} strokeWidth={active ? sw + 1 : sw} strokeDasharray="4 3"
+                        />
+                      </g>
+                    );
+                  }
+                  /* 窗:两条平行线,中间留白盖住墙 */
+                  if (s.type === 'window' && s.points.length >= 2) {
+                    const [a, b] = s.points;
+                    const x1 = a.x * S, y1 = a.y * S, x2 = b.x * S, y2 = b.y * S;
+                    const dx = x2 - x1, dy = y2 - y1;
+                    const len = Math.hypot(dx, dy) || 1;
+                    const nx = (-dy / len) * (sw + 2), ny = (dx / len) * (sw + 2);
+                    return (
+                      <g key={s.id} style={{ cursor, pointerEvents }} onClick={onSel}>
+                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fff" strokeWidth={sw * 2 + 8} />
+                        <line x1={x1 + nx} y1={y1 + ny} x2={x2 + nx} y2={y2 + ny}
+                          stroke={col} strokeWidth={active ? sw + 2 : sw} />
+                        <line x1={x1 - nx} y1={y1 - ny} x2={x2 - nx} y2={y2 - ny}
+                          stroke={col} strokeWidth={active ? sw + 2 : sw} />
+                      </g>
                     );
                   }
                   if (s.type === 'text' && s.points.length >= 1) {
@@ -746,8 +939,129 @@ function MapCanvas({ map, initialMarker }: { map: MapDoc; initialMarker?: string
                 onFieldsChange={(fields) => patch((m) => { m.fields = fields; })}
               />
             </div>
+            <div className="field">
+              <label>方格网格</label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={!!map.grid}
+                  onChange={(e) => patch((m) => {
+                    if (e.target.checked) m.grid = { size: 0.05 };
+                    else delete m.grid;
+                  })}
+                />
+                显示网格并吸附
+              </label>
+              {map.grid && (
+                <>
+                  <div className="field-row2">
+                    <div>
+                      <label>横向格数</label>
+                      <input
+                        type="number" min={2} max={200}
+                        value={Math.round(1 / map.grid.size)}
+                        onChange={(e) => patch((m) => {
+                          const n = Math.round(Number(e.target.value));
+                          if (m.grid && Number.isFinite(n) && n >= 2 && n <= 200) m.grid.size = 1 / n;
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label>1 格 = </label>
+                      <input
+                        value={map.grid.unit ?? ''}
+                        placeholder="1 米 / 5 尺"
+                        onChange={(e) => patch((m) => {
+                          if (!m.grid) return;
+                          const v = e.target.value.trim();
+                          if (v) m.grid.unit = v; else delete m.grid.unit;
+                        })}
+                      />
+                    </div>
+                  </div>
+
+                  {/*
+                    对齐外部工具画的底图。底图自带的网格几乎不会正好等分图宽,
+                    第一条格线也通常不在边上 —— 所以要边长 + 两个偏移共三个自由度。
+                  */}
+                  {hasBaseImage(map) && (
+                    <>
+                      <div className="field-row2">
+                        <div>
+                          <label>底图每格像素</label>
+                          <input
+                            type="number" min={1}
+                            value={map.imageWidth ? Math.round(map.grid.size * map.imageWidth) : 0}
+                            placeholder="Dungeondraft 256 / Roll20 70"
+                            onChange={(e) => patch((m) => {
+                              const px = Number(e.target.value);
+                              if (!m.grid || !m.imageWidth || !Number.isFinite(px) || px < 1) return;
+                              const size = px / m.imageWidth;
+                              if (size >= 0.005 && size <= 0.5) m.grid.size = size;
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label>&nbsp;</label>
+                          <button
+                            className={mode === 'calibrate' ? 'primary' : ''}
+                            style={{ width: '100%' }}
+                            onClick={() => setDrawMode(mode === 'calibrate' ? 'view' : 'calibrate')}
+                          >{mode === 'calibrate' ? '取消对齐' : '拖一格对齐'}</button>
+                        </div>
+                      </div>
+                      {mode === 'calibrate' && (
+                        <div className="field-row2">
+                          <div>
+                            <label>一次拖几格(越多越准)</label>
+                            <input
+                              type="number" min={1} max={50} value={calibrateCells}
+                              onChange={(e) => setCalibrateCells(Math.max(1, Math.min(50, Math.round(Number(e.target.value)) || 1)))}
+                            />
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-faint)', alignSelf: 'end', paddingBottom: 6 }}>
+                            在底图上沿着它自己的格线拖出 {calibrateCells} 格
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="field-row2">
+                    <div>
+                      <label>横向偏移</label>
+                      <input
+                        type="number" step={0.002}
+                        value={+(map.grid.offsetX ?? 0).toFixed(4)}
+                        onChange={(e) => patch((m) => {
+                          const v = Number(e.target.value);
+                          if (m.grid && Number.isFinite(v)) m.grid.offsetX = v;
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label>纵向偏移</label>
+                      <input
+                        type="number" step={0.002}
+                        value={+(map.grid.offsetY ?? 0).toFixed(4)}
+                        onChange={(e) => patch((m) => {
+                          const v = Number(e.target.value);
+                          if (m.grid && Number.isFinite(v)) m.grid.offsetY = v;
+                        })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.6 }}>
+                    纵向格距按底图宽高比自动算,保证格子是方的。
+                    换算只作图例显示,应用不参与计算 —— 「三米够不够扔过去」由你自己判断。
+                  </div>
+                </>
+              )}
+            </div>
             <div className="empty-hint">
-              切换工具栏模式并点画布来添加。<br /><br />
+              切换工具栏模式并点画布来添加,工具会一直保持,Esc 退出。<br /><br />
+              <b>房间 / 墙 / 门 / 窗 / 家具</b>:平面图构件,开着网格时吸附到格点<br />
               <b>标记 / 区域</b>:关联实体 / 时间线<br />
               <b>路径 / 矩形 / 椭圆 / 文字</b>:自由标注,归入图层<br /><br />
               选中已有对象后可编辑与删除。
@@ -792,7 +1106,27 @@ function TimeRangeFields({ from, to, onChange }: {
   onChange: (patch: { fromPointId?: string; toPointId?: string }) => void;
 }) {
   const points = useLoom((s) => s.project.timelinePoints);
-  if (points.length === 0) return null;
+  /*
+   * 没有时间点时不能直接 return null —— 那样「这个东西可以在某个时代出现、
+   * 在另一个时代消失」这件事就永远不会被用户发现。给一句话说清它是什么、
+   * 以及去哪里把它打开。
+   */
+  if (points.length === 0) {
+    return (
+      <div className="field">
+        <label>存在时段</label>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.6 }}>
+          在<Q>时间线</Q>里建立时间点后,这里可以设定它从哪个时代出现、到哪个时代消失
+          —— 疆域变迁、建筑兴废、人物迁徙都靠它。
+          <button
+            className="ghost"
+            style={{ padding: '2px 6px', marginLeft: 4 }}
+            onClick={() => useNav.getState().go({ tab: 'timeline' })}
+          >去建时间点</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <>
       <div className="field">

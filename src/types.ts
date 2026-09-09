@@ -516,7 +516,45 @@ export interface MapLayer {
 }
 
 /** R14 矢量形状:polyline(路径 / 河流 / 边界)/ rect / ellipse / text */
-export type MapShapeType = 'polyline' | 'rect' | 'ellipse' | 'text';
+/**
+ * `door` / `window` 是平面图构件:两点表示开口的两端。
+ * 它们必须是独立类型而不是「预设参数的 polyline」—— 门要画开合弧、窗要画双线,
+ * 这两样都不是折线画得出来的。
+ * 房间 / 墙 / 家具则相反:矩形和折线本来就画得出来,它们只是预设了粗细与填充的
+ * rect / polyline,不占新类型。
+ */
+export type MapShapeType = 'polyline' | 'rect' | 'ellipse' | 'text' | 'door' | 'window';
+
+/**
+ * 方格网格。
+ *
+ * 只做方格不做六角:六角格服务的是陆地旅行(一格一天路程)那种疆域尺度,
+ * 而网格在这里是为平面图尺度做的 —— 战术遭遇图、案发现场、舞台平面图,
+ * 这三者的惯例都是方格。真要做六角爬行时再加 type 字段,加得进去。
+ */
+export interface MapGrid {
+  /**
+   * 格边长(归一化,占图宽的比例)。存边长而不是「横向格数」,是因为对齐外部工具
+   * 画的底图时,格边长几乎不会正好是图宽的整数分之一 —— 底图有页边距。
+   * 界面上从零画图仍按「横向格数」来问,写入时换算成 1/n。
+   *
+   * 纵向格距是 size × 宽高比 —— 画布是 `preserveAspectRatio="none"` 的拉伸
+   * 坐标系,归一化里边长相等的格子在屏幕上不是正方形,必须反算。
+   */
+  size: number;
+  /**
+   * 网格原点偏移(归一化)。导入的底图自带网格时,第一条格线通常不在 x=0,
+   * 光有格边长永远对不上 —— 对齐需要边长 + 两个偏移共三个自由度。
+   * 取值按格距取模使用,所以存 0..1 之间任意值都可以。
+   */
+  offsetX?: number;
+  offsetY?: number;
+  /**
+   * 作者自己写的换算说明,如「1 格 = 1 米」「1 格 = 5 尺」。
+   * 只渲染成角上的图例,不参与任何计算 —— 应用不需要懂单位,算术作者自己做。
+   */
+  unit?: string;
+}
 export interface MapShape {
   id: ID;
   type: MapShapeType;
@@ -565,6 +603,8 @@ export interface MapDoc {
   /** R14 图层与矢量形状;旧项目为空 = 全部归入自动创建的「默认」图层 */
   layers?: MapLayer[];
   shapes?: MapShape[];
+  /** 方格网格与吸附;不设 = 不显示网格 */
+  grid?: MapGrid;
 }
 
 /* ---------- 资料卡片 ---------- */

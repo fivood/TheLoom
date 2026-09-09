@@ -61,3 +61,34 @@ describe('规范化:底图字段', () => {
     expect(projectWith({ image: inline, imageHash: '坏' }).maps[0].image).toBe(inline);
   });
 });
+
+describe('规范化:方格网格与平面图构件', () => {
+  const mapWith = (map: Partial<MapDoc>): MapDoc => normalizeProject({
+    version: 1,
+    maps: [{ id: 'm1', name: '图', markers: [], regions: [], ...map }],
+  } as unknown as Project).maps[0];
+
+  it('格边长卡在 0.005..0.5,越界整个网格丢弃', () => {
+    expect(mapWith({ grid: { size: 0.05 } }).grid).toEqual({ size: 0.05 });
+    expect(mapWith({ grid: { size: 0.6 } }).grid).toBeUndefined();
+    expect(mapWith({ grid: { size: 0.001 } }).grid).toBeUndefined();
+    expect(mapWith({ grid: { size: NaN } }).grid).toBeUndefined();
+  });
+
+  it('零偏移与空白换算不留残字段', () => {
+    expect(mapWith({ grid: { size: 0.05, offsetX: 0, unit: '   ' } }).grid).toEqual({ size: 0.05 });
+    expect(mapWith({ grid: { size: 0.05, offsetX: 0.013, unit: '1 米' } }).grid)
+      .toEqual({ size: 0.05, offsetX: 0.013, unit: '1 米' });
+  });
+
+  it('门与窗是合法形状类型,并和矩形一样要求两个点', () => {
+    const two = [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.2 }];
+    const kept = mapWith({ shapes: [
+      { id: 's1', type: 'door', points: two },
+      { id: 's2', type: 'window', points: two },
+      { id: 's3', type: 'door', points: [{ x: 0.1, y: 0.2 }] },
+      { id: 's4', type: '瞎写', points: two },
+    ] as unknown as MapDoc['shapes'] }).shapes ?? [];
+    expect(kept.map((s) => s.id)).toEqual(['s1', 's2']);
+  });
+});

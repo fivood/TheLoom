@@ -2138,6 +2138,20 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   background-size: 40px 40px, 40px 40px;
   background-color: var(--bg-card);
 }
+/* 比例尺图例:压在画布右下角。走 HTML 是因为 svg 的 viewBox 被拉伸,文字会变形 */
+.map-scale-legend {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  border: 1px solid var(--border);
+  pointer-events: none;
+}
 .map-blank-hint {
   position: absolute;
   inset: auto 0 12px 0;
