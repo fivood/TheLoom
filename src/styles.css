@@ -3684,6 +3684,29 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .rel-edge-label.selected { border-color: var(--focus); color: var(--focus); font-weight: 650; }
 
+/*
+ * 连线的弯度手柄(同 PPT 连接符的调整点)。只在选中该条边时出现 —— 画布上每条边
+ * 都常驻一个小方块的话,便签本身就看不清了。菱形是为了和端点、标记那些圆点区分开。
+ */
+.edge-curve-handle {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--focus);
+  border-radius: 2px;
+  /* 45° 必须写在组件的 transform 末尾,不能用 CSS 的 rotate 属性 ——
+     rotate 排在 transform 之前,会把定位用的 translate 一起转 45°,手柄直接飞到别处 */
+  cursor: grab;
+  pointer-events: all;
+  z-index: 2;
+}
+.edge-curve-handle:hover { background: var(--focus); }
+.edge-curve-handle:active { cursor: grabbing; }
+/* 已经弯过的边:手柄实心,一眼看出这条线是手动调过的 */
+.edge-curve-handle.on { background: var(--focus); }
+.edge-curve-handle.on:hover { background: var(--bg-card); }
+
 /* ---------- 正文修订(R5) ---------- */
 
 .doc-block-anno { font-size: 10px; color: var(--text-dim); white-space: nowrap; }

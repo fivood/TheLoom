@@ -7,6 +7,7 @@ import { DOC_STATUS_LABEL, ENTITY_KIND_LABEL, FLOW_NODE_LABEL, PALETTE, WORKSPAC
 import { cleanTemplateRefs, migrateLegacyTemplates, migrateTemplateInstances } from './templates';
 import { normalizeWritingProgress } from './writingProgress';
 import { normalizeRevisionTasks } from './revisionWorkflow';
+import { sanitizeCurve } from './edgeCurve';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -24,6 +25,11 @@ export function normalizeProject(p: Project): Project {
     if (note.usedIn.length === 0) delete note.usedIn;
   }
   p.brainstormEdges ??= [];
+  // 连线弯度:非有限数或小到看不出来的一律丢弃,不让脏数据把直线变成贝塞尔
+  for (const edge of p.brainstormEdges) {
+    const curve = sanitizeCurve(edge.curve);
+    if (curve) edge.curve = curve; else delete edge.curve;
+  }
   p.outlineColumns ??= [];
   p.outlineRows ??= [];
   p.timelineTracks ??= [];

@@ -374,3 +374,22 @@ describe('便签使用记录的规范化', () => {
     expect(out.brainstormNotes[0].usedIn).toHaveLength(3);
   });
 });
+
+describe('连线弯度的持久化清洗', () => {
+  const withEdges = (edges: unknown[]) => normalizeProject({
+    version: 1, name: 't', flows: [], brainstormEdges: edges, updatedAt: 0,
+  } as unknown as Project).brainstormEdges;
+
+  it('合法弯度保留,脏值与微小抖动删成直线', () => {
+    const out = withEdges([
+      { id: 'a', source: 's', target: 't', curve: { dx: 40, dy: -25 } },
+      { id: 'b', source: 's', target: 't', curve: { dx: NaN, dy: 3 } },
+      { id: 'c', source: 's', target: 't', curve: { dx: 0.2, dy: -0.1 } },
+      { id: 'd', source: 's', target: 't' },
+    ]);
+    expect(out[0].curve).toEqual({ dx: 40, dy: -25 });
+    expect(out[1].curve).toBeUndefined();
+    expect(out[2].curve).toBeUndefined();
+    expect(out[3].curve).toBeUndefined();
+  });
+});

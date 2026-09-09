@@ -11,6 +11,7 @@ import { PALETTE } from '../../types';
 import type { BrainNoteUse } from '../../types';
 import { mindmapLayout, nextNotePosition } from '../../brainstormLayout';
 import { floatingEdgeTypes } from '../../components/FloatingEdge';
+import { sanitizeCurve } from '../../edgeCurve';
 import { promptText } from '../../dialog';
 import { getThemeMode, readableInk, subscribeThemeMode } from '../../theme';
 import { useNav } from '../../search';
@@ -125,7 +126,11 @@ function Canvas() {
     notes.map((n) => ({ id: n.id, type: 'sticky', position: n.position, data: { text: n.text, color: n.color, usedIn: n.usedIn } })),
   );
   const [edges, setEdges] = useState<Edge[]>(() =>
-    storedEdges.map((e) => ({ ...e, type: 'floating', markerEnd: { type: MarkerType.ArrowClosed } })),
+    storedEdges.map((e) => ({
+      id: e.id, source: e.source, target: e.target, label: e.label,
+      type: 'floating', markerEnd: { type: MarkerType.ArrowClosed },
+      data: { curve: e.curve, bendable: true },
+    })),
   );
 
   const latest = useRef({ nodes, edges });
@@ -142,7 +147,13 @@ function Canvas() {
           position: { x: n.position.x, y: n.position.y },
           ...(n.data.usedIn?.length ? { usedIn: n.data.usedIn } : {}),
         })),
-        edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: typeof e.label === 'string' ? e.label : undefined })),
+        edges.map((e) => ({
+          id: e.id, source: e.source, target: e.target,
+          label: typeof e.label === 'string' ? e.label : undefined,
+          // 手柄拖动经 updateEdgeData 写进 data,再由这里落盘
+          ...(sanitizeCurve((e.data as { curve?: unknown } | undefined)?.curve)
+            ? { curve: sanitizeCurve((e.data as { curve?: unknown }).curve) } : {}),
+        })),
       );
     }, 350);
     return () => clearTimeout(t);
@@ -225,7 +236,7 @@ function Canvas() {
   }, []);
   const onConnect = useCallback((conn: Connection) => {
     dirty.current = true;
-    setEdges((es) => addEdge({ ...conn, id: uid(), type: 'floating', markerEnd: { type: MarkerType.ArrowClosed } }, es));
+    setEdges((es) => addEdge({ ...conn, id: uid(), type: 'floating', markerEnd: { type: MarkerType.ArrowClosed }, data: { bendable: true } }, es));
   }, []);
 
   const addNote = (position?: { x: number; y: number }) => {

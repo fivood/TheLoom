@@ -428,6 +428,12 @@ export interface BrainEdge {
   source: ID;
   target: ID;
   label?: string;
+  /**
+   * 手动弯度:相对两便签中心连线中点的偏移。卡片一多直线会从别的卡片身上穿过去,
+   * 拖手柄把线弯开绕过它(见 `src/edgeCurve.ts`)。存偏移而不是绝对坐标 ——
+   * 挪动便签时弯度要跟着走。缺省 = 直线。
+   */
+  curve?: { dx: number; dy: number };
 }
 
 /* ---------- 罗琳式表格大纲(行 = 章节,列 = 剧情线) ---------- */
